@@ -102,13 +102,13 @@ class QuantScene(Scene):
         col = config.COL_UP if self.option == "call" else config.COL_DOWN
         widgets.draw_text(surf, f"Prix {self.option.upper()}", (inner.x, inner.y),
                           fonts.small(), config.COL_TEXT_DIM)
-        widgets.draw_text(surf, f"{price:.4f}", (inner.x, inner.y+22),
-                          fonts.title(bold=True), col)
-        # autre type pour comparaison
+        # autre type, en haut à droite (hors de portée du gros prix)
         other = "put" if self.option == "call" else "call"
         other_price = fm.black_scholes(self.S, self.K, self.T, self.r, self.sigma, other)
-        widgets.draw_text(surf, f"({other.upper()} : {other_price:.4f})",
-                          (inner.x+150, inner.y+30), fonts.small(), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, f"{other.upper()} : {other_price:.4f}",
+                          (inner.right, inner.y), fonts.small(), config.COL_TEXT_DIM, align="right")
+        widgets.draw_text(surf, f"{price:.4f}", (inner.x, inner.y+22),
+                          fonts.title(bold=True), col)
         # greeks
         y = inner.y+80
         greek_rows = [

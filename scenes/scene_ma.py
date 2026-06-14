@@ -99,7 +99,7 @@ class MAScene(Scene):
             self.entry_ev, self.entry_ebitda, self.debt_pct,
             self.exit_multiple, int(self.years), self.ebitda_cagr)
 
-        res_panel = pygame.Rect(x-4, y, inner.w-8, 230)
+        res_panel = pygame.Rect(x-4, y, inner.w-8, 258)
         pygame.draw.rect(surf, (10, 22, 14), res_panel)
         pygame.draw.rect(surf, config.COL_UP, res_panel, 1)
         ry = y+14

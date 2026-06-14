@@ -18,7 +18,7 @@ _KIND_COLOR = {
     "prestige": config.COL_PRESTIGE,
 }
 
-TTL = 4.0          # durée de vie (s)
+TTL = 3.4          # durée de vie (s)
 SLIDE = 0.25       # durée d'entrée (s)
 FADE = 0.6         # durée de sortie (s)
 WIDTH = 320
@@ -66,9 +66,12 @@ class NotificationCenter:
             x = sw - MARGIN - WIDTH + int((1 - slide) * WIDTH)
             col = _KIND_COLOR.get(t["kind"], config.COL_CYAN)
 
-            chip = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-            a = int(235 * appear)
+            chip = pygame.Surface((WIDTH, HEIGHT + 4), pygame.SRCALPHA)
+            a = int(255 * appear)        # fond OPAQUE : le texte derrière ne transparaît plus
             chip.fill((0, 0, 0, 0))
+            # ombre portée (lit le toast comme une carte flottant au-dessus du contenu)
+            pygame.draw.rect(chip, (0, 0, 0, int(120 * appear)), (2, 4, WIDTH, HEIGHT), border_radius=6)
+            pygame.draw.rect(chip, (*config.COL_BG, a), (0, 0, WIDTH, HEIGHT), border_radius=6)
             pygame.draw.rect(chip, (*config.COL_PANEL_HEAD, a), (0, 0, WIDTH, HEIGHT), border_radius=6)
             pygame.draw.rect(chip, (*col, a), (0, 0, WIDTH, HEIGHT), 1, border_radius=6)
             pygame.draw.rect(chip, (*col, a), (0, 0, 4, HEIGHT), border_top_left_radius=6,

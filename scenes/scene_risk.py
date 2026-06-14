@@ -187,9 +187,6 @@ class RiskScene(Scene):
             sel = (abs(self.confidence-conf) < 1e-6)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect)
             pygame.draw.rect(surf, config.COL_AMBER if sel else config.COL_BORDER, rect, 1)
-            widgets.draw_text(surf, f"{int(conf*100)}%", rect.center,
-                              fonts.small(bold=sel),
-                              config.COL_AMBER if sel else config.COL_TEXT, align="center")
             img = fonts.small(bold=sel).render(f"{int(conf*100)}%", True,
                                                config.COL_AMBER if sel else config.COL_TEXT)
             surf.blit(img, img.get_rect(center=rect.center))
@@ -202,11 +199,11 @@ class RiskScene(Scene):
             ("Volatilité du P&L (1j)", f"{self.port_sigma:.2f} M$", config.COL_TEXT),
             ("VaR annualisée (~√252)", f"-{self.var*np.sqrt(252):.1f} M$", config.COL_NEUTRAL),
         ]
-        y = inner.y+62
+        y = inner.y+58
         for label, val, col in rows:
             widgets.draw_text(surf, label, (inner.x, y), fonts.small(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, val, (inner.x+250, y), fonts.body(bold=True), col)
-            y += 36
+            y += 33
 
     def _draw_stress(self, surf):
         panel = pygame.Rect(416, 400, 560, 270)

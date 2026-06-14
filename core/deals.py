@@ -20,6 +20,7 @@ Structure d'un deal (dict) :
 """
 import random
 from core import config
+from core import tracks
 
 
 MAX_ACTIVE_DEALS = 4        # au-delà, plus de génération
@@ -98,7 +99,9 @@ def maybe_generate(player, rng=None):
         return []
     t = rng.choice(_eligible_templates(player))
     scale = _scale(player)
-    reward_cash = round(t["base_cash"] * scale * rng.uniform(0.85, 1.25), 2)
+    # bonus de récompense si le deal relève de la voie du joueur (M&A surtout)
+    track_mult = tracks.perk(player, "deal_reward_mult") if t["kind"] == player.track else 1.0
+    reward_cash = round(t["base_cash"] * scale * track_mult * rng.uniform(0.85, 1.25), 2)
     deal = {
         "id": player.next_deal_id,
         "title": t["title"],
@@ -148,8 +151,9 @@ def success_probability(player, deal):
     par la difficulté, bornée dans [0.10, 0.95].
     """
     rep_factor = player.reputation / 100.0          # 0..1
-    diff_penalty = (deal["difficulty"] - 1) * 0.12   # 0..0.48
-    p = 0.45 + 0.5 * rep_factor - diff_penalty
+    edge, relief = tracks.deal_edge(player, deal)    # bonus si deal de sa voie
+    diff_penalty = max(0.0, (deal["difficulty"] - 1) * 0.12 - relief)
+    p = 0.45 + 0.5 * rep_factor - diff_penalty + edge
     return max(0.10, min(0.95, p))
 
 

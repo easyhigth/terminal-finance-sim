@@ -5,6 +5,7 @@ des questions d'évaluation et des concepts spécifiques.
 """
 import pygame
 from core import config
+from core import tracks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
@@ -81,9 +82,9 @@ class TrackScene(Scene):
 
         self._cards = {}
         cols = 3
-        cw, ch, gap = 380, 200, 20
+        cw, ch, gap = 380, 250, 20
         x0 = 40
-        y0 = 120
+        y0 = 112
         for i, (name, info) in enumerate(TRACK_INFO.items()):
             col = i % cols
             row = i // cols
@@ -97,11 +98,16 @@ class TrackScene(Scene):
             pygame.draw.rect(surf, accent if sel else config.COL_BORDER, rect, 2 if sel else 1)
             widgets.draw_text(surf, name.upper(), (x+16, y+14),
                               fonts.head(bold=True), accent)
-            widgets.draw_text_wrapped(surf, info["desc"], (x+16, y+52),
+            widgets.draw_text_wrapped(surf, info["desc"], (x+16, y+50),
                                       fonts.small(), config.COL_TEXT, cw-32, line_gap=4)
-            widgets.draw_text(surf, "Concepts clés :", (x+16, y+ch-58),
+            # avantage mécanique de jeu (perk)
+            widgets.draw_text(surf, "AVANTAGE DE JEU :", (x+16, y+132),
+                              fonts.tiny(bold=True), accent)
+            widgets.draw_text_wrapped(surf, tracks.label(name), (x+16, y+148),
+                                      fonts.tiny(), config.COL_WHITE, cw-32, line_gap=2)
+            widgets.draw_text(surf, "Concepts clés :", (x+16, y+ch-46),
                               fonts.tiny(bold=True), config.COL_TEXT_DIM)
-            widgets.draw_text_wrapped(surf, info["concepts"], (x+16, y+ch-42),
+            widgets.draw_text_wrapped(surf, info["concepts"], (x+16, y+ch-30),
                                       fonts.tiny(), config.COL_NEUTRAL, cw-32, line_gap=2)
 
         self.confirm.draw(surf)

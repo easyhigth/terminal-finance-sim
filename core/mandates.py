@@ -14,6 +14,7 @@ Structures (PlayerState) :
   mandates       : mandats acceptés en cours (avec snapshot de départ)
 """
 import random
+from core import tracks
 
 MIN_GRADE = 6              # Vice President et au-delà (cf. unlocks)
 MAX_ACTIVE = 2            # mandats simultanés
@@ -36,7 +37,7 @@ def maybe_offer(player, rng=None):
         return None
     if len(player.mandates) + len(player.mandate_offers) >= MAX_ACTIVE + 1:
         return None
-    if rng.random() > OFFER_PROB:
+    if rng.random() > OFFER_PROB * tracks.perk(player, "mandate_offer_mult"):
         return None
     capital = round(rng.uniform(300_000, 1_200_000) * _scale(player.grade_index), -3)
     horizon = rng.choice([2, 3, 4])
@@ -50,7 +51,7 @@ def maybe_offer(player, rng=None):
         "target_pct": target,
         "horizon": horizon,
         "max_beta": max_beta,
-        "reward_cash": round(capital * fee_pct, 2),
+        "reward_cash": round(capital * fee_pct * tracks.perk(player, "mandate_reward_mult"), 2),
         "reward_rep": rng.randint(6, 11),
         "penalty_rep": rng.randint(4, 8),
     }

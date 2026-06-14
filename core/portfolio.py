@@ -21,6 +21,7 @@ Conventions :
   levier                = exposition brute / equity
 """
 from core import config
+from core import tracks
 
 COMMISSION = 0.001        # 10 points de base par transaction
 MAINT_MARGIN = 0.25       # equity/exposition mini avant appel de marge
@@ -32,6 +33,22 @@ LIQUIDATION_FEE = 0.005   # surcoût appliqué à la valeur liquidée lors d'un 
 def max_leverage(grade_index):
     """Levier maximal autorisé, croissant avec le grade (1.5x → 4.0x)."""
     return min(4.0, 1.5 + 0.25 * grade_index)
+
+
+def _commission(player):
+    """Commission effective (réduite pour la voie Portfolio)."""
+    return COMMISSION * tracks.perk(player, "commission_mult")
+
+
+def _max_leverage(player):
+    """Levier maximal effectif (bonus de voie Risk inclus)."""
+    return max_leverage(player.grade_index) + tracks.perk(player, "max_leverage_add")
+
+
+def _maint_margin(player):
+    """Marge de maintenance effective (plus clémente pour la voie Risk)."""
+    m = tracks.perk(player, "maint_margin")
+    return MAINT_MARGIN if m is None else m
 
 
 # ---------------------------------------------------------------------------
@@ -73,11 +90,11 @@ def margin_status(player, market):
     """Synthèse de marge : equity, exposition, levier, pouvoir d'achat, alerte."""
     eq = net_worth(player, market)
     gross = gross_exposure(player, market)
-    maxlev = max_leverage(player.grade_index)
+    maxlev = _max_leverage(player)
     buying_power = max(0.0, maxlev * eq - gross)
     # appel de marge dès que l'equity passe sous la marge de maintenance
     # (y compris equity négative : c'est le cas le plus grave)
-    call = gross > 0 and eq < MAINT_MARGIN * gross
+    call = gross > 0 and eq < _maint_margin(player) * gross
     return {"equity": eq, "gross": gross, "leverage": (gross / eq) if eq > 0 else float("inf"),
             "max_leverage": maxlev, "buying_power": buying_power,
             "borrowed": max(0.0, -player.cash), "margin_call": call}
@@ -86,7 +103,7 @@ def margin_status(player, market):
 def _would_exceed_leverage(player, market, new_gross, fee=0.0):
     """Vrai si une exposition brute `new_gross` dépasserait le levier autorisé."""
     eq = net_worth(player, market) - fee
-    maxlev = max_leverage(player.grade_index)
+    maxlev = _max_leverage(player)
     if eq <= 0:
         return new_gross > 0
     return new_gross > maxlev * eq + 1e-6
@@ -119,12 +136,12 @@ def buy(player, market, ticker, qty):
     if pos and pos["shares"] < 0:
         return {"ok": False, "reason": "isshort"}
     cost = price * qty
-    fee = cost * COMMISSION
+    fee = cost * _commission(player)
     cur_shares = pos["shares"] if pos else 0.0
     new_gross = _gross_excluding(player, market, ticker) + abs((cur_shares + qty) * price)
     if _would_exceed_leverage(player, market, new_gross, fee):
         return {"ok": False, "reason": "leverage",
-                "max_leverage": max_leverage(player.grade_index)}
+                "max_leverage": _max_leverage(player)}
     player.cash -= (cost + fee)
     if pos:
         n = pos["shares"] + qty
@@ -149,7 +166,7 @@ def sell(player, market, ticker, qty):
     if qty <= 0:
         return {"ok": False, "reason": "qty"}
     proceeds = price * qty
-    fee = proceeds * COMMISSION
+    fee = proceeds * _commission(player)
     net = proceeds - fee
     realized = (price - pos["avg"]) * qty - fee
     player.cash += net
@@ -176,12 +193,12 @@ def short(player, market, ticker, qty):
     if pos and pos["shares"] > 0:
         return {"ok": False, "reason": "islong"}
     proceeds = price * qty
-    fee = proceeds * COMMISSION
+    fee = proceeds * _commission(player)
     cur_shares = pos["shares"] if pos else 0.0
     new_gross = _gross_excluding(player, market, ticker) + abs((cur_shares - qty) * price)
     if _would_exceed_leverage(player, market, new_gross, fee):
         return {"ok": False, "reason": "leverage",
-                "max_leverage": max_leverage(player.grade_index)}
+                "max_leverage": _max_leverage(player)}
     player.cash += (proceeds - fee)
     if pos:
         n = pos["shares"] - qty                       # plus négatif
@@ -207,7 +224,7 @@ def cover(player, market, ticker, qty):
     if qty <= 0:
         return {"ok": False, "reason": "qty"}
     cost = price * qty
-    fee = cost * COMMISSION
+    fee = cost * _commission(player)
     realized = (pos["avg"] - price) * qty - fee       # short gagne quand le prix baisse
     player.cash -= (cost + fee)
     player.realized_pnl = getattr(player, "realized_pnl", 0.0) + realized
@@ -227,7 +244,7 @@ def accrue_financing(player, market, days):
     yr = days / 365.0
     rate = market.macro["rate"]["v"] / 100.0 if hasattr(market, "macro") else 0.03
     borrowed = max(0.0, -player.cash)
-    interest = borrowed * (rate + MARGIN_SPREAD) * yr
+    interest = borrowed * (rate + MARGIN_SPREAD * tracks.perk(player, "margin_spread_mult")) * yr
     short_notional = sum(abs(p["shares"]) * (market.price_of(t) or 0.0)
                          for t, p in player.portfolio.items() if p["shares"] < 0)
     borrow_fee = short_notional * SHORT_FEE_ANNUAL * yr
@@ -245,7 +262,7 @@ def check_margin_call(player, market):
     if not st["margin_call"]:
         return None
     eq = st["equity"]
-    safe_lev = min(max_leverage(player.grade_index), 1.5)
+    safe_lev = min(_max_leverage(player), 1.5)
     target_gross = max(0.0, eq * safe_lev)
     gross = st["gross"]
     if gross <= target_gross:

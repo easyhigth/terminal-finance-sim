@@ -346,3 +346,137 @@ def financial_ratios(financials):
     if "cogs" in f and "inventory" in f:
         r["Inventory Turnover"] = safe(f["cogs"], f["inventory"])
     return r
+
+
+# ===========================================================================
+# 9. VALORISATION ACTIONS (Gordon) & OBLIGATIONS (convexité)
+# ===========================================================================
+def gordon_growth(d1, cost_equity, growth):
+    """Modèle de Gordon : P0 = D1 / (re - g). Exige re > g."""
+    if cost_equity <= growth:
+        raise ValueError("cost_equity doit être > growth pour Gordon")
+    return d1 / (cost_equity - growth)
+
+
+def terminal_value(last_fcf, discount_rate, growth):
+    """Valeur terminale (Gordon) à partir du dernier FCF : FCF·(1+g)/(r-g)."""
+    if discount_rate <= growth:
+        raise ValueError("discount_rate doit être > growth")
+    return last_fcf * (1 + growth) / (discount_rate - growth)
+
+
+def bond_convexity(face, coupon_rate, ytm, years, freq=2):
+    """Convexité d'une obligation à coupons (annualisée)."""
+    n = int(years * freq)
+    c = face * coupon_rate / freq
+    r = ytm / freq
+    price = bond_price(face, coupon_rate, ytm, years, freq)
+    s = 0.0
+    for t in range(1, n + 1):
+        cf = c + (face if t == n else 0)
+        s += cf * t * (t + 1) / ((1 + r) ** (t + 2))
+    return s / (price * freq ** 2)
+
+
+# ===========================================================================
+# 10. DÉRIVÉS : prix forward (cost of carry) & roll yield
+# ===========================================================================
+def forward_price(spot, rate, T, income_yield=0.0, storage_yield=0.0):
+    """Prix forward par coût de portage (discret) :
+    F = S·(1 + r - income + storage)^T."""
+    return spot * ((1 + rate - income_yield + storage_yield) ** T)
+
+
+def roll_yield(near_price, far_price):
+    """Roll yield d'une courbe de futures. > 0 = backwardation (near > far),
+    < 0 = contango (near < far)."""
+    if far_price == 0:
+        return 0.0
+    return (near_price - far_price) / far_price
+
+
+# ===========================================================================
+# 11. MACRO : taux réel (Fisher)
+# ===========================================================================
+def real_rate(nominal_rate, inflation):
+    """Taux réel exact (Fisher) : (1 + nominal)/(1 + inflation) - 1."""
+    return (1 + nominal_rate) / (1 + inflation) - 1
+
+
+# ===========================================================================
+# 12. CRÉDIT : perte attendue
+# ===========================================================================
+def expected_loss(pd, lgd, ead):
+    """Expected Loss = PD × LGD × EAD."""
+    return pd * lgd * ead
+
+
+# ===========================================================================
+# 13. PERFORMANCE AVANCÉE : Treynor, IR, drawdown, Sortino, Calmar, TWR
+# ===========================================================================
+def treynor_ratio(portfolio_return, beta, rf=0.02):
+    """Rendement excédentaire par unité de risque de marché (bêta)."""
+    return (portfolio_return - rf) / beta if beta else 0.0
+
+
+def tracking_error(portfolio_returns, benchmark_returns):
+    """Écart-type de la différence de rendement vs benchmark (active return)."""
+    diff = np.asarray(portfolio_returns, float) - np.asarray(benchmark_returns, float)
+    return float(np.std(diff, ddof=1)) if len(diff) > 1 else 0.0
+
+
+def information_ratio(portfolio_returns, benchmark_returns):
+    """Surperformance moyenne rapportée à la tracking error."""
+    diff = np.asarray(portfolio_returns, float) - np.asarray(benchmark_returns, float)
+    te = float(np.std(diff, ddof=1)) if len(diff) > 1 else 0.0
+    return float(np.mean(diff)) / te if te > 0 else 0.0
+
+
+def max_drawdown(equity_curve):
+    """Drawdown maximal (magnitude positive) d'une courbe de valeur nette."""
+    arr = np.asarray(equity_curve, float)
+    if len(arr) < 2:
+        return 0.0
+    peak = np.maximum.accumulate(arr)
+    dd = (arr - peak) / peak
+    return float(-dd.min())
+
+
+def downside_deviation(returns, target=0.0):
+    """Écart-type des seuls rendements sous un seuil cible (risque baissier)."""
+    arr = np.asarray(returns, float)
+    shortfall = np.minimum(0.0, arr - target)
+    return float(np.sqrt(np.mean(shortfall ** 2)))
+
+
+def sortino_ratio(returns, target=0.0, rf=0.0):
+    """Comme le Sharpe mais avec la downside deviation au dénominateur."""
+    arr = np.asarray(returns, float)
+    dd = downside_deviation(arr, target)
+    return (float(np.mean(arr)) - rf) / dd if dd > 0 else 0.0
+
+
+def calmar_ratio(annual_return, max_dd):
+    """Rendement annuel rapporté au max drawdown."""
+    return annual_return / max_dd if max_dd > 0 else 0.0
+
+
+def time_weighted_return(period_returns):
+    """TWR : rendement composé des sous-périodes, neutralise les flux."""
+    prod = 1.0
+    for r in period_returns:
+        prod *= (1 + r)
+    return prod - 1
+
+
+# ===========================================================================
+# 14. FINANCE DE PROJET & BANQUE (ratios de couverture / capital)
+# ===========================================================================
+def dscr(cash_flow_available, debt_service):
+    """Debt Service Coverage Ratio = cash flow disponible / service de la dette."""
+    return cash_flow_available / debt_service if debt_service else float("inf")
+
+
+def cet1_ratio(cet1_capital, rwa):
+    """Ratio CET1 = fonds propres durs / actifs pondérés du risque."""
+    return cet1_capital / rwa if rwa else float("inf")

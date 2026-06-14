@@ -156,6 +156,78 @@ def test_lbo_returns_consistency():
 
 
 # --------------------------------------------------------------- ratios
+def test_gordon_growth():
+    # D1=2, re=8%, g=3% -> 2/0.05 = 40
+    assert fm.gordon_growth(2.0, 0.08, 0.03) == pytest.approx(40.0)
+    with pytest.raises(ValueError):
+        fm.gordon_growth(2.0, 0.03, 0.05)   # re <= g interdit
+
+
+def test_terminal_value():
+    tv = fm.terminal_value(100, 0.09, 0.025)
+    assert tv == pytest.approx(100 * 1.025 / (0.09 - 0.025))
+
+
+def test_bond_convexity_positive_and_orders():
+    conv_short = fm.bond_convexity(1000, 0.05, 0.05, 3)
+    conv_long = fm.bond_convexity(1000, 0.05, 0.05, 15)
+    assert conv_short > 0 and conv_long > conv_short   # plus longue = plus convexe
+
+
+def test_forward_price_cost_of_carry():
+    # sans revenu ni stockage : F = S(1+r)^T
+    assert fm.forward_price(100, 0.05, 2) == pytest.approx(100 * 1.05 ** 2)
+    # un rendement (dividende) abaisse le forward
+    assert fm.forward_price(100, 0.05, 1, income_yield=0.03) < fm.forward_price(100, 0.05, 1)
+
+
+def test_roll_yield_sign():
+    assert fm.roll_yield(110, 100) > 0    # backwardation (near > far)
+    assert fm.roll_yield(90, 100) < 0     # contango
+
+
+def test_real_rate_fisher():
+    assert fm.real_rate(0.05, 0.02) == pytest.approx((1.05 / 1.02) - 1)
+    assert fm.real_rate(0.05, 0.02) < 0.05
+
+
+def test_expected_loss():
+    assert fm.expected_loss(0.02, 0.45, 1_000_000) == pytest.approx(9000.0)
+
+
+def test_treynor_and_information_ratio():
+    assert fm.treynor_ratio(0.12, 1.5, rf=0.02) == pytest.approx((0.10) / 1.5)
+    port = [0.02, 0.01, 0.03, -0.01]
+    bench = [0.01, 0.01, 0.01, 0.01]
+    assert fm.information_ratio(port, bench) > 0
+    assert fm.tracking_error(port, bench) > 0
+
+
+def test_max_drawdown():
+    curve = [100, 120, 90, 110, 80, 130]
+    # pire chute pic->creux : de 120 à 80 = -33.3%
+    assert fm.max_drawdown(curve) == pytest.approx((120 - 80) / 120, rel=1e-6)
+
+
+def test_downside_deviation_and_sortino():
+    rets = [0.02, -0.03, 0.01, -0.05, 0.04]
+    dd = fm.downside_deviation(rets, target=0.0)
+    assert dd > 0
+    # le Sortino ignore la volatilité haussière → dénominateur plus petit que l'écart-type
+    assert dd <= np.std(rets) + 1e-9
+    assert isinstance(fm.sortino_ratio(rets), float)
+
+
+def test_calmar_and_twr():
+    assert fm.calmar_ratio(0.15, 0.30) == pytest.approx(0.5)
+    assert fm.time_weighted_return([0.1, -0.05, 0.2]) == pytest.approx(1.1 * 0.95 * 1.2 - 1)
+
+
+def test_dscr_and_cet1():
+    assert fm.dscr(150, 100) == pytest.approx(1.5)
+    assert fm.cet1_ratio(80, 1000) == pytest.approx(0.08)
+
+
 def test_financial_ratios():
     r = fm.financial_ratios({
         "net_income": 20, "total_equity": 100, "total_assets": 200,

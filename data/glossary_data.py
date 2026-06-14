@@ -558,3 +558,20 @@ GLOSSARY.update({
 
 # Catégories pour la navigation
 CATEGORIES = sorted(set(cat for cat, _ in GLOSSARY.values()))
+
+# ---- accès localisé (FR / EN) ---------------------------------------------
+from data.glossary_en import GLOSSARY_EN, display_name
+_CATEGORIES_EN = sorted(set(cat for cat, _ in GLOSSARY_EN.values()))
+
+
+def localized(lang):
+    """Renvoie (dict terme->(catégorie, définition), liste catégories) selon la langue."""
+    if lang == "en":
+        return GLOSSARY_EN, _CATEGORIES_EN
+    return GLOSSARY, CATEGORIES
+
+
+def entry(term, lang):
+    """Renvoie (catégorie, définition) d'un terme dans la langue, repli FR."""
+    g = GLOSSARY_EN if lang == "en" else GLOSSARY
+    return g.get(term) or GLOSSARY.get(term)

@@ -80,6 +80,13 @@ TR = {
         "common.back_terminal": "← TERMINAL",
         "common.back": "← RETOUR",
         "common.confirm": "CONFIRMER",
+        # glossaire
+        "gloss.title": "GLOSSAIRE FINANCIER",
+        "gloss.search": "Recherche",
+        "gloss.categories": "Catégories",
+        "gloss.terms": "Termes",
+        "gloss.definition": "Définition",
+        "gloss.all": "Tous",
         # écran de sélection
         "continent.title": "CHOISISSEZ VOTRE PLACE FINANCIÈRE",
         "continent.subtitle": "Chaque région impose son propre régulateur, ses normes "
@@ -134,6 +141,13 @@ TR = {
         "common.back_terminal": "← TERMINAL",
         "common.back": "← BACK",
         "common.confirm": "CONFIRM",
+        # glossary
+        "gloss.title": "FINANCIAL GLOSSARY",
+        "gloss.search": "Search",
+        "gloss.categories": "Categories",
+        "gloss.terms": "Terms",
+        "gloss.definition": "Definition",
+        "gloss.all": "All",
         # selection screen
         "continent.title": "CHOOSE YOUR FINANCIAL HUB",
         "continent.subtitle": "Each region has its own regulator, accounting "

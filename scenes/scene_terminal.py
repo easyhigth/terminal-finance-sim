@@ -638,7 +638,9 @@ class TerminalScene(Scene):
         if not q:
             self._log("  Usage : DEFINE <terme>  (ex: DEFINE WACC). Voir aussi GLOSSARY.")
             return
-        from data.glossary_data import GLOSSARY
+        from data import glossary_data
+        from core.i18n import get_lang
+        GLOSSARY, _ = glossary_data.localized(get_lang())
         ql = q.lower()
         hit = None
         for term, (cat, definition) in GLOSSARY.items():

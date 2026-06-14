@@ -7,28 +7,33 @@ import pygame
 from core import config
 from core.scene_manager import Scene
 from ui import fonts, widgets
-from data.glossary_data import GLOSSARY, CATEGORIES
+from core.i18n import get_lang
+from data import glossary_data
 
 
 class GlossaryScene(Scene):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
-        self.category = "Tous"
+        self.category = "__all__"     # sentinelle indépendante de la langue
         self.search = ""
         self.selected_term = None
         self.scroll = 0
+        from core.i18n import t
         self.back_btn = widgets.Button(
-            (40, config.SCREEN_HEIGHT-70, 180, 46), "← RETOUR", config.COL_TEXT_DIM)
+            (40, config.SCREEN_HEIGHT-70, 180, 46), t("common.back"), config.COL_TEXT_DIM)
         self._rebuild_list()
 
     def _rebuild_list(self):
+        gloss, _cats = glossary_data.localized(get_lang())
         terms = []
-        for term, (cat, _) in sorted(GLOSSARY.items()):
-            if self.category != "Tous" and cat != self.category:
+        for term, (cat, _) in sorted(gloss.items()):
+            if self.category != "__all__" and cat != self.category:
                 continue
             if self.search and self.search.lower() not in term.lower():
                 continue
             terms.append(term)
+        lang = get_lang()
+        terms.sort(key=lambda tm: glossary_data.display_name(tm, lang).lower())
         self.terms = terms
         if self.terms and self.selected_term not in self.terms:
             self.selected_term = self.terms[0]
@@ -68,33 +73,36 @@ class GlossaryScene(Scene):
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "GLOSSAIRE FINANCIER", (40, 24),
+        from core.i18n import t
+        lang = get_lang()
+        gloss, CATEGORIES = glossary_data.localized(lang)
+        widgets.draw_text(surf, t("gloss.title"), (40, 24),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, f"Recherche : {self.search}_",
+        widgets.draw_text(surf, f"{t('gloss.search')} : {self.search}_",
                           (42, 74), fonts.small(), config.COL_CYAN)
 
         # --- Colonne catégories ---
         cat_panel = pygame.Rect(40, 110, 220, 560)
-        inner = widgets.draw_panel(surf, cat_panel, "Catégories", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, cat_panel, t("gloss.categories"), config.COL_AMBER)
         self._cat_rects = {}
-        cats = ["Tous"] + CATEGORIES
+        cats = [("__all__", t("gloss.all"))] + [(c, c) for c in CATEGORIES]
         # pas adaptatif pour que toutes les catégories tiennent dans le panneau
         cstep = max(22, min(30, (inner.h - 4) // max(1, len(cats))))
         y = inner.y
-        for name in cats:
+        for key, label in cats:
             rect = pygame.Rect(inner.x-4, y-2, inner.w+8, cstep-2)
-            self._cat_rects[name] = rect
-            sel = (name == self.category)
+            self._cat_rects[key] = rect
+            sel = (key == self.category)
             if sel:
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect)
             col = config.COL_CYAN if sel else config.COL_TEXT
-            widgets.draw_text(surf, name, (inner.x+4, y+2), fonts.small(bold=sel), col)
+            widgets.draw_text(surf, label, (inner.x+4, y+2), fonts.small(bold=sel), col)
             y += cstep
 
         # --- Colonne termes ---
         term_panel = pygame.Rect(276, 110, 300, 560)
         inner2 = widgets.draw_panel(surf, term_panel,
-                                    f"Termes ({len(self.terms)})", config.COL_CYAN)
+                                    f"{t('gloss.terms')} ({len(self.terms)})", config.COL_CYAN)
         self._term_rects = {}
         y = inner2.y
         visible = self.terms[self.scroll:self.scroll+18]
@@ -105,15 +113,18 @@ class GlossaryScene(Scene):
             if sel:
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect)
             col = config.COL_AMBER if sel else config.COL_TEXT
-            widgets.draw_text(surf, term, (inner2.x+4, y+2), fonts.small(bold=sel), col)
+            widgets.draw_text(surf, glossary_data.display_name(term, lang),
+                              (inner2.x+4, y+2), fonts.small(bold=sel), col)
             y += 30
 
         # --- Définition ---
         def_panel = pygame.Rect(592, 110, config.SCREEN_WIDTH-632, 560)
-        inner3 = widgets.draw_panel(surf, def_panel, "Définition", config.COL_AMBER)
-        if self.selected_term and self.selected_term in GLOSSARY:
-            cat, definition = GLOSSARY[self.selected_term]
-            widgets.draw_text(surf, self.selected_term, (inner3.x, inner3.y),
+        inner3 = widgets.draw_panel(surf, def_panel, t("gloss.definition"), config.COL_AMBER)
+        _e = glossary_data.entry(self.selected_term, lang) if self.selected_term else None
+        if _e:
+            cat, definition = _e
+            widgets.draw_text(surf, glossary_data.display_name(self.selected_term, lang),
+                              (inner3.x, inner3.y),
                               fonts.head(bold=True), config.COL_AMBER)
             widgets.draw_text(surf, f"[{cat}]", (inner3.x, inner3.y+34),
                               fonts.small(), config.COL_TEXT_DIM)

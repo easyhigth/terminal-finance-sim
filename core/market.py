@@ -36,6 +36,22 @@ VOL_SECTOR = 0.012
 VOL_REGION = 0.010
 DRIFT_MULT = 0.3        # atténue les dérives propres des sociétés (anti sur-bull)
 
+# Régimes de marché — toile de fond lente (déterministe) par-dessus les crises.
+# Chaque régime module la dérive et la volatilité du facteur MONDE.
+REGIMES = {
+    "Expansion":  {"drift": 0.0005,  "vol": 0.95, "label": "Expansion"},
+    "Calme":      {"drift": 0.0001,  "vol": 0.80, "label": "Marché calme"},
+    "Volatil":    {"drift": -0.0002, "vol": 1.55, "label": "Marché volatil"},
+    "Récession":  {"drift": -0.0011, "vol": 1.80, "label": "Récession"},
+}
+# Matrice de transition (par pas) : régimes persistants, voisins probables.
+REGIME_TRANSITIONS = {
+    "Expansion":  [("Expansion", 0.93), ("Calme", 0.05), ("Volatil", 0.02)],
+    "Calme":      [("Calme", 0.92), ("Expansion", 0.045), ("Volatil", 0.035)],
+    "Volatil":    [("Volatil", 0.88), ("Calme", 0.06), ("Récession", 0.06)],
+    "Récession":  [("Récession", 0.90), ("Volatil", 0.08), ("Calme", 0.02)],
+}
+
 # Résultats trimestriels (« earnings ») — saison échelonnée, déterministe
 EARN_PERIOD = 13        # ~13 pas (semaines) = un trimestre ; report échelonné
 SURPRISE_VOL = 0.05     # écart-type de la surprise de résultats (en % de croissance)
@@ -85,6 +101,8 @@ class Market:
         self._base_ebitda_margin = self.ebitda_margin.copy()
         self.last_earnings = []      # rapports publiés au dernier pas
         self.earnings_log = {}       # ticker -> dernier rapport {surprise, growth, beat, step}
+        self.regime = "Calme"        # régime de marché courant (toile de fond lente)
+        self.regime_changed = False  # vrai au pas où le régime vient de basculer
         self.sec_id = np.array([self._sector_idx[c["sector"]] for c in companies])
         self.reg_id = np.array([self._region_idx[c["region"]] for c in companies])
         self.ticker_idx = {c["ticker"]: i for i, c in enumerate(companies)}
@@ -148,6 +166,11 @@ class Market:
                 if s in self._sector_idx:
                     sec_shock[self._sector_idx[s]] += v
 
+        # régime de marché : toile de fond lente qui module dérive/vol du monde
+        self._step_regime()
+        reg = REGIMES[self.regime]
+        vol_mult *= reg["vol"]
+
         # macro : mise à jour + influence (pédagogique) sur les facteurs
         self._step_macro()
         mc = self.macro
@@ -157,7 +180,7 @@ class Market:
         if "Immobilier" in self._sector_idx:
             sec_shock[self._sector_idx["Immobilier"]] += -(mc["rate"]["v"] - 2.5) * 0.0020
 
-        F_world = self.rng.normal(MU_WORLD, VOL_WORLD * vol_mult) + world_shock
+        F_world = self.rng.normal(MU_WORLD + reg["drift"], VOL_WORLD * vol_mult) + world_shock
         F_sector = self.rng.normal(0.0, VOL_SECTOR * vol_mult, size=len(self.sectors)) + sec_shock
         F_region = self.rng.normal(0.0, VOL_REGION * vol_mult, size=len(self.regions)) + reg_shock
         eps = self.rng.normal(0.0, 1.0, size=self.n)
@@ -200,6 +223,11 @@ class Market:
 
         self._last_news = self._generate_news(F_world, F_sector, F_region)
         self._last_news += self._earnings_news()
+        if self.regime_changed:
+            good = self.regime in ("Expansion", "Calme")
+            self._last_news.insert(0, {
+                "region": None, "kind": "good" if good else "bad",
+                "text": f"Bascule de régime : {self.regime_label()}"})
         self._last_news = self._last_news[:4]
         return self._last_news
 
@@ -223,6 +251,23 @@ class Market:
             self.macro_hist[k].append(m[k]["v"])
             if len(self.macro_hist[k]) > HIST_LEN:
                 self.macro_hist[k].pop(0)
+
+    def _step_regime(self):
+        """Fait évoluer le régime de marché (chaîne de Markov déterministe)."""
+        self.regime_changed = False
+        u = self.rng.random_sample()
+        cum = 0.0
+        for name, prob in REGIME_TRANSITIONS[self.regime]:
+            cum += prob
+            if u <= cum:
+                if name != self.regime:
+                    self.regime = name
+                    self.regime_changed = True
+                return
+        # reliquat de probabilité -> reste dans le régime courant
+
+    def regime_label(self):
+        return REGIMES[self.regime]["label"]
 
     def _step_earnings(self):
         """Saison de résultats échelonnée : ~1/EARN_PERIOD des sociétés publient

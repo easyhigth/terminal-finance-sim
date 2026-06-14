@@ -496,6 +496,10 @@ class TerminalScene(Scene):
             "confidence": "moral des marchés",
         }
         rows = []
+        reg_good = self.market.regime in ("Expansion", "Calme")
+        rows.append(("Régime de marché", self.market.regime_label(),
+                     ("", config.COL_UP if reg_good else config.COL_DOWN),
+                     "toile de fond : module dérive & volatilité"))
         for key in ["rate", "inflation", "growth", "unemployment", "confidence"]:
             d = m[key]
             ch = self.market.macro_change(key)
@@ -1274,7 +1278,8 @@ class TerminalScene(Scene):
                           fonts.small(), config.COL_AMBER_DIM)
 
     def _draw_indices(self, surf, rect):
-        inner = widgets.draw_panel(surf, rect, "Indices mondiaux", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, rect,
+                                   f"Indices · {self.market.regime_label()}", config.COL_AMBER)
         self._index_rects = {}
         defs = self.market.index_defs
         n = max(1, len(defs))

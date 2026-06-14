@@ -8,7 +8,7 @@ l'émergence des indices et l'effet des crises.
 import numpy as np
 import pytest
 
-from core.market import Market, Crisis
+from core.market import Market, Crisis, REGIMES
 
 STEPS_PER_YEAR = 52  # un pas de marché ≈ une semaine (cf. market.py)
 
@@ -147,6 +147,24 @@ def test_factor_attribution_empty_before_any_step():
     m = Market(seed=77)
     attr = m.factor_attribution({m.companies[0]["ticker"]: 10})
     assert attr["total"] == 0.0  # aucun pas joué -> pas d'attribution
+
+
+# --------------------------------------------------------------- régimes
+def test_regime_always_valid_and_reconstructed():
+    a = Market(seed=8); a.fast_forward(80)
+    b = Market(seed=8); b.sync_to(80)
+    assert a.regime in REGIMES
+    assert a.regime == b.regime  # régime reconstruit via (graine, pas)
+
+
+def test_regimes_visited_over_long_horizon():
+    m = Market(seed=2024)
+    seen = set()
+    for _ in range(3000):
+        m.step()
+        seen.add(m.regime)
+    # sur un long horizon, plusieurs régimes différents apparaissent
+    assert len(seen) >= 2
 
 
 # --------------------------------------------------------------- earnings

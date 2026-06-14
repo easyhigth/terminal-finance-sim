@@ -125,6 +125,30 @@ def test_crisis_expires():
     assert len(m.crises) == 0  # la crise a expiré
 
 
+# --------------------------------------------------------------- attribution
+def test_factor_attribution_sums_to_total():
+    m = Market(seed=77)
+    m.fast_forward(10)
+    # un panier de 3 sociétés
+    tickers = [m.companies[i]["ticker"] for i in (0, 50, 150)]
+    holdings = {tk: 100 for tk in tickers}
+    m.step()
+    attr = m.factor_attribution(holdings)
+    parts = attr["world"] + attr["sector"] + attr["region"] + attr["specific"] + attr["drift"]
+    # la somme des composantes égale exactement le P&L total
+    assert parts == pytest.approx(attr["total"], rel=1e-9, abs=1e-6)
+    # le P&L total == variation de valeur des positions sur le pas
+    expected = sum(100 * (m.price[m.ticker_idx[tk]] - m.prev_price[m.ticker_idx[tk]])
+                   for tk in tickers)
+    assert attr["total"] == pytest.approx(expected, rel=1e-9, abs=1e-6)
+
+
+def test_factor_attribution_empty_before_any_step():
+    m = Market(seed=77)
+    attr = m.factor_attribution({m.companies[0]["ticker"]: 10})
+    assert attr["total"] == 0.0  # aucun pas joué -> pas d'attribution
+
+
 # --------------------------------------------------------------- requêtes
 def test_metrics_and_price_lookup():
     m = Market(seed=11)

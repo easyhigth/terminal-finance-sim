@@ -95,6 +95,8 @@ class Market:
         self.last_world = 0.0
         self.last_sector = np.zeros(len(self.sectors))
         self.last_region = np.zeros(len(self.regions))
+        self.prev_price = None      # prix avant le dernier pas (attribution P&L)
+        self.last_ret = None        # rendements log du dernier pas (par société)
         self.crises = []
         self._last_news = []
 
@@ -153,12 +155,14 @@ class Market:
                + self.sigma * eps)
         # borne les rendements par pas pour éviter les valeurs aberrantes
         np.clip(ret, -0.35, 0.35, out=ret)
+        self.prev_price = self.price.copy()   # mémorise pour l'attribution du P&L
         self.price *= np.exp(ret)
         np.maximum(self.price, 0.01, out=self.price)
 
         self.last_world = float(F_world)
         self.last_sector = F_sector
         self.last_region = F_region
+        self.last_ret = ret.copy()
         self.step_count += 1
 
         # historiques
@@ -363,3 +367,42 @@ class Market:
 
     def latest_news(self):
         return self._last_news
+
+    # -------------------------------------------------------- attribution P&L
+    def factor_attribution(self, holdings):
+        """Décompose le P&L de PRIX des positions sur le dernier pas par facteur.
+
+        `holdings` : dict ticker -> nombre d'actions.
+        Le rendement de chaque société se décompose (en log) en
+        dérive + monde + secteur + région + spécifique ; on répartit le gain/perte
+        en devise de chaque position au prorata de ces composantes. La somme des
+        composantes égale exactement le P&L de prix total des positions.
+
+        Retourne {world, sector, region, specific, drift, total} (en devise).
+        """
+        out = {"world": 0.0, "sector": 0.0, "region": 0.0,
+               "specific": 0.0, "drift": 0.0, "total": 0.0}
+        if self.prev_price is None or self.last_ret is None:
+            return out
+        for tk, shares in holdings.items():
+            i = self.ticker_idx.get(tk)
+            if i is None or not shares:
+                continue
+            prev = float(self.prev_price[i])
+            pnl = shares * (float(self.price[i]) - prev)
+            out["total"] += pnl
+            total_log = float(self.last_ret[i])
+            if abs(total_log) < 1e-12:
+                out["specific"] += pnl
+                continue
+            c_drift = float(self.drift[i])
+            c_world = float(self.beta[i]) * self.last_world
+            c_sector = float(self.b_sector[i]) * float(self.last_sector[self.sec_id[i]])
+            c_region = float(self.b_region[i]) * float(self.last_region[self.reg_id[i]])
+            c_specific = total_log - c_drift - c_world - c_sector - c_region
+            out["drift"] += pnl * c_drift / total_log
+            out["world"] += pnl * c_world / total_log
+            out["sector"] += pnl * c_sector / total_log
+            out["region"] += pnl * c_region / total_log
+            out["specific"] += pnl * c_specific / total_log
+        return out

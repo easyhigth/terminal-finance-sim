@@ -1004,6 +1004,16 @@ class TerminalScene(Scene):
                   f"Solde du tour : {widgets.format_money(summary['net'], cur)}")
         if summary.get("dividends", 0) > 0:
             self._log(f"  💰 Dividendes encaissés : +{widgets.format_money(summary['dividends'], cur)}")
+        # débrief « pourquoi mon portefeuille a bougé » : attribution par facteur
+        if p.portfolio:
+            holdings = {t: pos["shares"] for t, pos in p.portfolio.items()}
+            attr = m.factor_attribution(holdings)
+            if abs(attr["total"]) > 1.0:
+                fm_ = lambda v: widgets.format_money(v, cur)
+                own = attr["specific"] + attr["drift"]   # part propre + dérive de base
+                self._log(f"  📊 Positions {fm_(attr['total'])} = marché {fm_(attr['world'])}"
+                          f" · secteur {fm_(attr['sector'])} · région {fm_(attr['region'])}"
+                          f" · propre {fm_(own)}")
         # news marché en tête du flux
         self.recent_events = [{"title": n["text"], "kind": n["kind"], "cash": 0, "rep": 0}
                               for n in market_news] + summary["events"] + self.recent_events

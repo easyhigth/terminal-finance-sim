@@ -98,6 +98,12 @@ def net_worth(player, market):
     if getattr(player, "bonds", None):
         from core import bonds
         nw += bonds.holdings_value(player, market)
+    if getattr(player, "commodities", None):
+        from core import commodities
+        nw += commodities.holdings_value(player, market)
+    if getattr(player, "crypto", None):
+        from core import crypto as crypto_mod
+        nw += crypto_mod.holdings_value(player, market)
     return nw
 
 

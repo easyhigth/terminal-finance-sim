@@ -35,7 +35,8 @@ CMD_NAMES = [
     "COMPANY", "FA", "SEARCH", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS",
     "PORTFOLIO", "BOOK", "BUY", "SELL", "SHORT", "COVER", "MARGIN",
-    "BONDS", "BUYBOND", "SELLBOND", "ALLOCATE", "HEDGE", "REBALANCE",
+    "BONDS", "BUYBOND", "SELLBOND", "CMDTY", "BUYCMDTY", "SELLCMDTY",
+    "CRYPTO", "BUYCRYPTO", "SELLCRYPTO", "ALLOCATE", "HEDGE", "REBALANCE",
     "PITCH", "FRONTIER", "RISK", "QUANT", "MA", "SHEET", "GLOSSARY",
     "SAVE", "SAVES", "NEWS", "REG", "STATUS", "MENU",
 ]
@@ -264,6 +265,14 @@ class TerminalScene(Scene):
             self.app.scenes.go("bonds", return_to="terminal")
         elif cmd in ("BUYBOND", "SELLBOND"):
             self._cmd_bond_trade(cmd, parts[1:])
+        elif cmd in ("CMDTY", "COMMODITIES", "COMMO", "MATIERES"):
+            self.app.scenes.go("commodities", return_to="terminal")
+        elif cmd in ("BUYCMDTY", "SELLCMDTY"):
+            self._cmd_alt_trade("commodities", cmd, parts[1:])
+        elif cmd in ("CRYPTO", "COIN"):
+            self.app.scenes.go("crypto", return_to="terminal")
+        elif cmd in ("BUYCRYPTO", "SELLCRYPTO"):
+            self._cmd_alt_trade("crypto", cmd, parts[1:])
         elif cmd in ("GP", "CHART", "GRAPH"):
             self._cmd_chart(arg)
         elif cmd in ("RV", "PEERS", "COMPS"):
@@ -472,6 +481,37 @@ class TerminalScene(Scene):
                           f"{r['realized']:+.0f}).")
             else:
                 self._log(f"  Vente refusée ({r['reason']}).")
+        self._after_trade()
+
+    def _cmd_alt_trade(self, asset, cmd, args):
+        """Trading générique commodities/crypto : BUY/SELL <id> <qté>."""
+        import importlib
+        mod = importlib.import_module(f"core.{asset}")
+        if not unlocks_mod.unlocked(self.app.gs.player, "trade"):
+            self._log("  🔒 Trading débloqué au grade Associate.")
+            return
+        if len(args) < 1:
+            self._log(f"  Usage : {cmd} <id> <qté>.")
+            return
+        cid = args[0].upper()
+        qty = "ALL"
+        if len(args) > 1 and args[1].upper() != "ALL":
+            if not args[1].isdigit():
+                self._log("  Quantité invalide.")
+                return
+            qty = int(args[1])
+        p, m = self.app.gs.player, self.market
+        if cmd.startswith("BUY"):
+            if qty == "ALL":
+                self._log("  Précisez une quantité pour l'achat.")
+                return
+            r = mod.buy(p, m, cid, qty)
+            self._log(f"  ✓ Achat {qty} {cid} @ {r['price']:.2f}." if r["ok"]
+                      else f"  Achat refusé ({r['reason']}).")
+        else:
+            r = mod.sell(p, m, cid, qty)
+            self._log(f"  ✓ Vente {cid} (P&L réalisé {r['realized']:+.0f})." if r["ok"]
+                      else f"  Vente refusée ({r['reason']}).")
         self._after_trade()
 
     def _cmd_financials(self, ticker):

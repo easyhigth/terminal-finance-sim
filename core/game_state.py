@@ -32,6 +32,8 @@ class PlayerState:
     market_step: int = 0                               # nb de pas de marché écoulés (resync au chargement)
     portfolio: dict = field(default_factory=dict)      # holdings : ticker -> {"shares","avg"}
     bonds: dict = field(default_factory=dict)          # obligations : bond_id -> {"qty","avg"}
+    commodities: dict = field(default_factory=dict)    # matières premières : id -> {"qty","avg"}
+    crypto: dict = field(default_factory=dict)         # crypto-actifs : id -> {"qty","avg"}
     realized_pnl: float = 0.0                          # P&L réalisé cumulé (ventes)
     # ----- progression de carrière -----
     deals_won: int = 0                                 # deals conclus (cumulatif)
@@ -256,6 +258,13 @@ class GameState:
                 if coup:
                     p.adjust_cash(coup)
                     dividends += coup   # agrégé dans le revenu passif affiché
+            # roulement des futures commodities (roll yield : coût en contango)
+            if getattr(p, "commodities", None):
+                from core import commodities as _cmdty
+                roll = _cmdty.roll_cost(p, market, config.DAYS_PER_STEP)
+                if roll:
+                    p.adjust_cash(roll)
+                    dividends += roll
             financing = portfolio.accrue_financing(p, market, config.DAYS_PER_STEP)
             margin_call = portfolio.check_margin_call(p, market)
             nw = portfolio.net_worth(p, market)

@@ -44,20 +44,21 @@ class GlossaryScene(Scene):
                 self.search += event.unicode
                 self._rebuild_list()
 
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 4:
+            self.scroll = max(0, self.scroll - 1)
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 5:
+            self.scroll = min(max(0, len(self.terms) - 18), self.scroll + 1)
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             # catégories
             for name, rect in getattr(self, "_cat_rects", {}).items():
                 if rect.collidepoint(event.pos):
                     self.category = name
+                    self.scroll = 0
                     self._rebuild_list()
             # termes
             for term, rect in getattr(self, "_term_rects", {}).items():
                 if rect.collidepoint(event.pos):
                     self.selected_term = term
-            if event.button == 4:
-                self.scroll = max(0, self.scroll - 1)
-            elif event.button == 5:
-                self.scroll += 1
 
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
@@ -76,16 +77,19 @@ class GlossaryScene(Scene):
         cat_panel = pygame.Rect(40, 110, 220, 560)
         inner = widgets.draw_panel(surf, cat_panel, "Catégories", config.COL_AMBER)
         self._cat_rects = {}
+        cats = ["Tous"] + CATEGORIES
+        # pas adaptatif pour que toutes les catégories tiennent dans le panneau
+        cstep = max(22, min(30, (inner.h - 4) // max(1, len(cats))))
         y = inner.y
-        for name in ["Tous"] + CATEGORIES:
-            rect = pygame.Rect(inner.x-4, y-2, inner.w+8, 28)
+        for name in cats:
+            rect = pygame.Rect(inner.x-4, y-2, inner.w+8, cstep-2)
             self._cat_rects[name] = rect
             sel = (name == self.category)
             if sel:
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect)
             col = config.COL_CYAN if sel else config.COL_TEXT
             widgets.draw_text(surf, name, (inner.x+4, y+2), fonts.small(bold=sel), col)
-            y += 30
+            y += cstep
 
         # --- Colonne termes ---
         term_panel = pygame.Rect(276, 110, 300, 560)

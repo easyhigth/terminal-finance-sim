@@ -74,6 +74,7 @@ CATALOG = [
         ("BUYCMDTY / SELLCMDTY <id> <qté>", "Trader des contrats de commodities"),
         ("CRYPTO", "Crypto-actifs & stablecoin (volatil, risque de depeg)"),
         ("BUYCRYPTO / SELLCRYPTO <id> <qté>", "Trader des crypto-actifs"),
+        ("STRUCT", "Produits structurés (capital garanti, autocallable...)"),
         ("ALLOCATE <ticker> <pct>", "Ajuster une position à pct% de la valeur nette"),
         ("HEDGE [pct]", "Réduire l'exposition (bêta) du portefeuille"),
         ("REBALANCE", "Ramener les positions à poids égaux"),

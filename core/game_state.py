@@ -34,6 +34,7 @@ class PlayerState:
     bonds: dict = field(default_factory=dict)          # obligations : bond_id -> {"qty","avg"}
     commodities: dict = field(default_factory=dict)    # matières premières : id -> {"qty","avg"}
     crypto: dict = field(default_factory=dict)         # crypto-actifs : id -> {"qty","avg"}
+    structured: list = field(default_factory=list)     # produits structurés souscrits
     realized_pnl: float = 0.0                          # P&L réalisé cumulé (ventes)
     # ----- progression de carrière -----
     deals_won: int = 0                                 # deals conclus (cumulatif)
@@ -246,6 +247,7 @@ class GameState:
         dividends = 0.0
         financing = None
         margin_call = None
+        structured_due = None
         if market is not None:
             from core import portfolio
             dividends = portfolio.dividends(p, market, config.DAYS_PER_STEP)
@@ -267,6 +269,10 @@ class GameState:
                     dividends += roll
             financing = portfolio.accrue_financing(p, market, config.DAYS_PER_STEP)
             margin_call = portfolio.check_margin_call(p, market)
+            # produits structurés arrivés à échéance
+            if getattr(p, "structured", None):
+                from core import structured as _struct
+                structured_due = _struct.evaluate_due(p, market)
             nw = portfolio.net_worth(p, market)
         else:
             nw = p.cash
@@ -303,6 +309,7 @@ class GameState:
             "dividends": dividends,
             "financing": financing,
             "margin_call": margin_call,
+            "structured_due": structured_due,
             "quarter_changed": p.quarter != prev_quarter,
             "quarter_report": quarter_report,
             "game_over": p.game_over,

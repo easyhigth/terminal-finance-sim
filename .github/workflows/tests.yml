@@ -1,0 +1,20 @@
+name: tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Installer les dépendances de test
+        # Les tests ciblent la logique pure (finmath + market) : pas besoin de pygame.
+        run: pip install numpy scipy pytest
+      - name: Lancer pytest
+        run: pytest

@@ -47,6 +47,18 @@ class BookScene(Scene):
                f"bêta {beta:.2f} · P&L réalisé {widgets.format_money(p.realized_pnl, cur)}")
         widgets.draw_text(surf, sub, (config.SCREEN_WIDTH - 40, 70), fonts.small(),
                           config.COL_TEXT_DIM, align="right")
+        # ligne de marge / levier
+        st = pf.margin_status(p, m)
+        lev = "∞" if st["leverage"] == float("inf") else f"{st['leverage']:.2f}x"
+        lev_col = config.COL_DOWN if st["margin_call"] else (
+            config.COL_WARN if st["leverage"] != float("inf") and st["leverage"] > st["max_leverage"] * 0.8
+            else config.COL_TEXT_DIM)
+        marg = (f"Levier {lev} / max {st['max_leverage']:.1f}x · "
+                f"exposition {widgets.format_money(st['gross'], cur)} · "
+                f"pouvoir d'achat {widgets.format_money(st['buying_power'], cur)}"
+                + ("  ⚠ APPEL DE MARGE" if st["margin_call"] else ""))
+        widgets.draw_text(surf, marg, (config.SCREEN_WIDTH - 40, 88), fonts.tiny(),
+                          lev_col, align="right")
 
         # table des positions
         ph = config.footer_y() - 8 - 100
@@ -67,7 +79,9 @@ class BookScene(Scene):
             y = inner.y + 22
             for h in holds:
                 pcol = config.COL_UP if h["pnl"] >= 0 else config.COL_DOWN
-                widgets.draw_text(surf, h["ticker"], (cols[0][1], y), fonts.small(bold=True), config.COL_AMBER)
+                tk_label = h["ticker"] + (" (S)" if h["short"] else "")
+                tk_col = config.COL_DOWN if h["short"] else config.COL_AMBER
+                widgets.draw_text(surf, tk_label, (cols[0][1], y), fonts.small(bold=True), tk_col)
                 widgets.draw_text(surf, f"{h['shares']:.0f}", (cols[1][1], y), fonts.small(), config.COL_TEXT)
                 widgets.draw_text(surf, f"{h['avg']:.2f}", (cols[2][1], y), fonts.small(), config.COL_TEXT_DIM)
                 widgets.draw_text(surf, f"{h['price']:.2f}", (cols[3][1], y), fonts.small(), config.COL_WHITE)

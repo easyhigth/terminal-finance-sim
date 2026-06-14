@@ -15,6 +15,7 @@ UNLOCKS = {
     "trade": 4,      # investir : acheter / vendre / allouer / rééquilibrer
     "pitch": 4,      # démarcher un client pour un mandat
     "hedge": 6,      # couverture du portefeuille (réduction d'exposition)
+    "leverage": 6,   # levier & vente à découvert (short)
     "mandates": 6,   # mandats clients
 }
 
@@ -25,6 +26,7 @@ LABELS = {
     "trade": "Investir (acheter / vendre / allouer)",
     "pitch": "Démarcher des mandats (PITCH)",
     "hedge": "Couverture du portefeuille (HEDGE)",
+    "leverage": "Levier & vente à découvert (SHORT/COVER)",
     "mandates": "Mandats clients",
 }
 
@@ -39,6 +41,8 @@ CMD_FEATURE = {
     "DEALS": "deals", "DEAL": "deals",
     "BUY": "trade", "ACHETER": "trade", "SELL": "trade", "VENDRE": "trade",
     "ALLOCATE": "trade", "ALLOC": "trade", "REBALANCE": "trade", "REBAL": "trade",
+    "MARGIN": "trade", "MARGE": "trade",
+    "SHORT": "leverage", "VAD": "leverage", "COVER": "leverage", "RACHETER": "leverage",
     "PITCH": "pitch",
     "HEDGE": "hedge",
     "MANDATES": "mandates", "MANDATS": "mandates", "MANDATE": "mandates", "MANDAT": "mandates",

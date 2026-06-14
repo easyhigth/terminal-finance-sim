@@ -238,13 +238,18 @@ class GameState:
         # génération de nouveaux deals (probabilité dépend du grade)
         new_deals = deals.maybe_generate(p)
 
-        # dividendes des positions (revenu passif) + valeur nette
+        # dividendes des positions (longs touchent, shorts paient) + financement
+        # (intérêts sur marge + frais d'emprunt de titres) + appel de marge éventuel
         dividends = 0.0
+        financing = None
+        margin_call = None
         if market is not None:
             from core import portfolio
             dividends = portfolio.dividends(p, market, config.DAYS_PER_STEP)
             if dividends:
                 p.adjust_cash(dividends)
+            financing = portfolio.accrue_financing(p, market, config.DAYS_PER_STEP)
+            margin_call = portfolio.check_margin_call(p, market)
             nw = portfolio.net_worth(p, market)
         else:
             nw = p.cash
@@ -279,6 +284,8 @@ class GameState:
             "new_deals": new_deals,
             "net": net,
             "dividends": dividends,
+            "financing": financing,
+            "margin_call": margin_call,
             "quarter_changed": p.quarter != prev_quarter,
             "quarter_report": quarter_report,
             "game_over": p.game_over,

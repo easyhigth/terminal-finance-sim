@@ -34,7 +34,8 @@ CMD_NAMES = [
     "RIVALS", "MANDATES", "MANDATE", "DECIDE", "MARKET", "TOP", "MOVERS",
     "COMPANY", "SEARCH", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS",
-    "PORTFOLIO", "BOOK", "BUY", "SELL", "ALLOCATE", "HEDGE", "REBALANCE",
+    "PORTFOLIO", "BOOK", "BUY", "SELL", "SHORT", "COVER", "MARGIN",
+    "ALLOCATE", "HEDGE", "REBALANCE",
     "PITCH", "FRONTIER", "RISK", "QUANT", "MA", "SHEET", "GLOSSARY",
     "SAVE", "SAVES", "NEWS", "REG", "STATUS", "MENU",
 ]
@@ -287,6 +288,12 @@ class TerminalScene(Scene):
             self._cmd_buy(parts[1:])
         elif cmd in ("SELL", "VENDRE"):
             self._cmd_sell(parts[1:])
+        elif cmd in ("SHORT", "VAD"):
+            self._cmd_short(parts[1:])
+        elif cmd in ("COVER", "RACHETER"):
+            self._cmd_cover(parts[1:])
+        elif cmd in ("MARGIN", "MARGE"):
+            self._cmd_margin()
         elif cmd in ("ALLOCATE", "ALLOC"):
             self._cmd_allocate(parts[1:])
         elif cmd == "HEDGE":
@@ -853,11 +860,10 @@ class TerminalScene(Scene):
         res = pf_mod.buy(self.app.gs.player, self.market, tk, qty)
         if not res["ok"]:
             reason = {"ticker": "ticker inconnu", "qty": "quantité invalide",
-                      "cash": "trésorerie insuffisante"}.get(res["reason"], res["reason"])
-            extra = ""
-            if res["reason"] == "cash":
-                extra = f" (besoin {widgets.format_money(res['need'], self._cur())})"
-            self._log(f"  Achat refusé : {reason}{extra}.")
+                      "isshort": f"position courte ouverte sur {tk} — utilisez COVER",
+                      "leverage": f"levier max atteint ({res.get('max_leverage',0):.1f}x)"
+                      }.get(res["reason"], res["reason"])
+            self._log(f"  Achat refusé : {reason}.")
             return
         self._log(f"  ✓ Achat {qty} {tk} @ {res['price']:.2f} = "
                   f"{widgets.format_money(res['total'], self._cur())} (frais inclus).")
@@ -885,6 +891,58 @@ class TerminalScene(Scene):
                   f"{widgets.format_money(res['net'], self._cur())}  "
                   f"(P&L réalisé {sign}{widgets.format_money(res['realized'], self._cur())}).")
         self._after_trade()
+
+    def _cmd_short(self, args):
+        """SHORT <ticker> <quantité> : vente à découvert (pari à la baisse)."""
+        if len(args) < 2 or not args[1].isdigit():
+            self._log("  Usage : SHORT <ticker> <quantité>  (parier à la baisse)")
+            return
+        tk, qty = args[0].upper(), int(args[1])
+        res = pf_mod.short(self.app.gs.player, self.market, tk, qty)
+        if not res["ok"]:
+            reason = {"ticker": "ticker inconnu", "qty": "quantité invalide",
+                      "islong": f"position longue ouverte sur {tk} — vendez-la d'abord",
+                      "leverage": f"levier max atteint ({res.get('max_leverage',0):.1f}x)"
+                      }.get(res["reason"], res["reason"])
+            self._log(f"  Short refusé : {reason}.")
+            return
+        self._log(f"  ✓ Short {qty} {tk} @ {res['price']:.2f} = "
+                  f"+{widgets.format_money(res['net'], self._cur())} en cash "
+                  "(à racheter via COVER).")
+        self._after_trade()
+
+    def _cmd_cover(self, args):
+        """COVER <ticker> <quantité|ALL> : rachète une position courte."""
+        if not args:
+            self._log("  Usage : COVER <ticker> <quantité|ALL>")
+            return
+        tk = args[0].upper()
+        qty = "ALL"
+        if len(args) > 1 and args[1].upper() != "ALL":
+            if not args[1].isdigit():
+                self._log("  Quantité invalide.")
+                return
+            qty = int(args[1])
+        res = pf_mod.cover(self.app.gs.player, self.market, tk, qty)
+        if not res["ok"]:
+            self._log(f"  Rachat refusé : {'aucune position courte' if res['reason']=='noshort' else res['reason']}.")
+            return
+        sign = "+" if res["realized"] >= 0 else ""
+        self._log(f"  ✓ Cover {int(res['qty'])} {tk} @ {res['price']:.2f} "
+                  f"(P&L réalisé {sign}{widgets.format_money(res['realized'], self._cur())}).")
+        self._after_trade()
+
+    def _cmd_margin(self):
+        """MARGIN : état de la marge (equity, exposition, levier, pouvoir d'achat)."""
+        st = pf_mod.margin_status(self.app.gs.player, self.market)
+        cur = self._cur()
+        lev = "∞" if st["leverage"] == float("inf") else f"{st['leverage']:.2f}x"
+        self._log(f"  Marge — equity {widgets.format_money(st['equity'], cur)} · "
+                  f"exposition {widgets.format_money(st['gross'], cur)} · levier {lev} "
+                  f"(max {st['max_leverage']:.1f}x)")
+        self._log(f"  Pouvoir d'achat {widgets.format_money(st['buying_power'], cur)} · "
+                  f"capital emprunté {widgets.format_money(st['borrowed'], cur)}"
+                  + ("  ⚠ APPEL DE MARGE IMMINENT" if st["margin_call"] else ""))
 
     def _cmd_allocate(self, args):
         """ALLOCATE <ticker> <pct> : ajuste la position à pct% de la valeur nette."""
@@ -927,15 +985,15 @@ class TerminalScene(Scene):
                       "HEDGE <pct> pour réduire l'exposition (vendre une part vers le cash).")
             return
         pct = max(0.0, min(100.0, float(arg)))
-        sold = 0.0
         for tk, pos in list(p.portfolio.items()):
-            qty = int(pos["shares"] * pct / 100.0)
-            if qty > 0:
-                r = pf_mod.sell(p, self.market, tk, qty)
-                if r["ok"]:
-                    sold += r["net"]
-        self._log(f"  Couverture : {pct:.0f}% des positions vendues "
-                  f"(+{widgets.format_money(sold, self._cur())} en cash). "
+            qty = int(abs(pos["shares"]) * pct / 100.0)
+            if qty <= 0:
+                continue
+            if pos["shares"] > 0:           # long -> on allège
+                pf_mod.sell(p, self.market, tk, qty)
+            else:                           # short -> on rachète
+                pf_mod.cover(p, self.market, tk, qty)
+        self._log(f"  Couverture : exposition réduite de {pct:.0f}%. "
                   f"Nouveau bêta {pf_mod.portfolio_beta(p, self.market):.2f}.")
         self._after_trade()
 
@@ -1018,6 +1076,17 @@ class TerminalScene(Scene):
                 self._log(f"  📊 Positions {fm_(attr['total'])} = marché {fm_(attr['world'])}"
                           f" · secteur {fm_(attr['sector'])} · région {fm_(attr['region'])}"
                           f" · propre {fm_(own)}")
+        # financement (intérêts sur marge + frais de short) et appel de marge
+        fin = summary.get("financing")
+        if fin and fin["total"] > 1.0:
+            self._log(f"  💸 Frais de financement : -{widgets.format_money(fin['total'], cur)} "
+                      f"(intérêts marge + emprunt de titres).")
+        mc = summary.get("margin_call")
+        if mc:
+            self._log(f"  ⚠ APPEL DE MARGE : liquidation forcée de "
+                      f"{widgets.format_money(mc['liquidated'], cur)} "
+                      f"(pénalité {widgets.format_money(mc['penalty'], cur)}).")
+            self.app.notify("Appel de marge : liquidation forcée", "bad")
         # news marché en tête du flux
         self.recent_events = [{"title": n["text"], "kind": n["kind"], "cash": 0, "rep": 0}
                               for n in market_news] + summary["events"] + self.recent_events

@@ -32,7 +32,7 @@ from ui.worldmap import WorldMap
 CMD_NAMES = [
     "HELP", "COMMANDS", "ADV", "MISSION", "EVAL", "TRACK", "CAREER", "INBOX",
     "RIVALS", "MANDATES", "MANDATE", "DECIDE", "MARKET", "TOP", "MOVERS",
-    "COMPANY", "SEARCH", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
+    "COMPANY", "FA", "SEARCH", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS",
     "PORTFOLIO", "BOOK", "BUY", "SELL", "SHORT", "COVER", "MARGIN",
     "ALLOCATE", "HEDGE", "REBALANCE",
@@ -256,8 +256,10 @@ class TerminalScene(Scene):
             self._cmd_top(arg)
         elif cmd in ("MOVERS", "MOVER"):
             self._cmd_movers()
-        elif cmd in ("COMPANY", "CO", "TICKER", "DES", "FA"):
+        elif cmd in ("COMPANY", "CO", "TICKER", "DES"):
             self._cmd_company(arg)
+        elif cmd in ("FA", "FIN", "STATEMENTS", "ETATS"):
+            self._cmd_financials(arg)
         elif cmd in ("GP", "CHART", "GRAPH"):
             self._cmd_chart(arg)
         elif cmd in ("RV", "PEERS", "COMPS"):
@@ -431,6 +433,16 @@ class TerminalScene(Scene):
             self._log(f"  Ticker inconnu : {ticker.upper()}. Essayez SEARCH.")
             return
         self.app.scenes.go("company", ticker=ticker.upper(), return_to="terminal")
+
+    def _cmd_financials(self, ticker):
+        """FA <ticker> : états financiers complets (bilan + compte de résultat)."""
+        if not ticker:
+            self._log("  Usage : FA <ticker>  (états financiers ; ex: FA MVC).")
+            return
+        if self.market.price_of(ticker.upper()) is None:
+            self._log(f"  Ticker inconnu : {ticker.upper()}. Essayez SEARCH.")
+            return
+        self.app.scenes.go("financials", ticker=ticker.upper(), return_to="terminal")
 
     def _cmd_search(self, terms):
         q = " ".join(terms) if terms else ""

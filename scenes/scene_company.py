@@ -23,15 +23,21 @@ class CompanyScene(Scene):
             self.app.market.track_company(self.ticker)
         self.back_btn = widgets.Button(
             (40, config.SCREEN_HEIGHT - 70, 200, 46), "← TERMINAL", config.COL_TEXT_DIM)
+        self.fa_btn = widgets.Button(
+            (250, config.SCREEN_HEIGHT - 70, 220, 46), "ÉTATS FINANCIERS (FA)", config.COL_CYAN)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.go(self.return_to)
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+        if self.fa_btn.handle(event):
+            self.app.scenes.go("financials", ticker=self.ticker, return_to=self.return_to)
 
     def update(self, dt):
-        self.back_btn.update(pygame.mouse.get_pos(), dt)
+        mp = pygame.mouse.get_pos()
+        self.back_btn.update(mp, dt)
+        self.fa_btn.update(mp, dt)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -143,3 +149,4 @@ class CompanyScene(Scene):
                 (cinner.x, cinner.y), fonts.small(), config.COL_TEXT_DIM, cinner.w)
 
         self.back_btn.draw(surf)
+        self.fa_btn.draw(surf)

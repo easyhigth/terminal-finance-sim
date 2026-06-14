@@ -183,6 +183,7 @@ CONTINENTS = {
 DAYS_PER_QUARTER = 90        # un trimestre = 90 jours
 DAYS_PER_STEP    = 5         # un "tour" d'avancement = 5 jours
 START_CASH       = 250_000.0 # capital de départ (firme/joueur), en devise locale
+BASE_FISCAL_YEAR = 2025      # exercice de départ ; avance avec les années de jeu
 
 # Seuils de fin de partie
 BANKRUPTCY_CASH  = -500_000.0  # en-dessous : faillite

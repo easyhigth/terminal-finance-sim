@@ -51,6 +51,7 @@ CATALOG = [
         ("TOP [region] / RANKING", "Meilleures sociétés (USA / Europe / Asia)"),
         ("MOVERS", "Plus fortes hausses / baisses du dernier pas"),
         ("COMPANY <ticker>", "Fiche société type Bloomberg (ex: COMPANY MVC)"),
+        ("FA <ticker>", "États financiers : compte de résultat + bilan (N/N-1/N-2)"),
         ("SEARCH <texte>", "Rechercher une société par nom/ticker"),
         ("WATCHLIST [ADD/REMOVE <tk>]", "Suivre des valeurs"),
         ("COMPARE <t1> <t2>", "Comparer deux sociétés"),

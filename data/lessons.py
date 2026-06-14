@@ -118,9 +118,130 @@ LESSONS = [
                 "EQS screener · ECO macro · PRT portefeuille",
      "example": "Taper « DES MVC » ouvre la fiche ; « RV MVC » la compare à ses pairs.",
      "takeaway": "Tape COMMANDS pour le catalogue, et utilise Tab pour autocompléter."},
+
+    # ============ EXTENSION — concepts du master (additif) ============
+    # -------------------------------- Taux ----------------------------------
+    {"id": "convexity", "topic": "Taux", "title": "Convexité obligataire",
+     "body": "La duration approxime la sensibilité au taux par une droite ; la "
+             "convexité corrige par la courbure. Une forte convexité fait gagner "
+             "plus quand les taux baissent et perdre moins quand ils montent.",
+     "formula": "ΔP/P ≈ −D*·Δy + ½·Convexité·(Δy)²",
+     "example": "Deux obligations de même duration : celle qui a la plus forte "
+                "convexité surperforme lors d'un grand mouvement de taux.",
+     "takeaway": "À duration égale, préférez la convexité quand la volatilité de taux monte."},
+    {"id": "carry_roll", "topic": "Taux", "title": "Carry & roll-down",
+     "body": "Le carry est le rendement gagné si le marché ne bouge pas : coupon "
+             "+ roll-down (le titre « glisse » le long d'une courbe croissante et "
+             "voit son yield baisser, donc son prix monter).",
+     "formula": "Carry obligataire ≈ coupon + roll-down ;  Carry FX = différentiel de taux",
+     "example": "Sur une courbe pentue, détenir du 5 ans rapporte même sans baisse des taux.",
+     "takeaway": "Une position peut être rentable par le seul carry — mais le carry trade se retourne brutalement."},
+    # ------------------------------- Dérivés --------------------------------
+    {"id": "forwards", "topic": "Dérivés", "title": "Forwards, futures & cost of carry",
+     "body": "Un contrat à terme fixe aujourd'hui un prix d'échange futur. Le prix "
+             "forward se déduit du spot par le coût de portage (financement, "
+             "moins les revenus, plus le stockage). Les futures sont standardisés "
+             "et appellent de la marge.",
+     "formula": "F = S·(1 + r − rendement + stockage)^T",
+     "example": "Spot 100, taux 5%, 1 an, sans dividende → forward ≈ 105.",
+     "takeaway": "Un écart anormal spot/forward crée une opportunité d'arbitrage (cash-and-carry)."},
+    {"id": "contango", "topic": "Dérivés", "title": "Contango, backwardation & roll yield",
+     "body": "La courbe des futures relie prix et maturité. En contango (futures > "
+             "spot), rouler les contrats coûte (roll yield négatif) ; en "
+             "backwardation (futures < spot), il rapporte.",
+     "formula": "Roll yield ≈ (prix proche − prix lointain) / prix lointain",
+     "example": "Un ETF pétrole en contango sous-performe le spot à cause du roll négatif.",
+     "takeaway": "Sur les commodities, la structure de courbe compte autant que le spot."},
+    {"id": "structured", "topic": "Dérivés", "title": "Produits structurés",
+     "body": "Un produit structuré combine une brique obligataire et des options "
+             "pour créer un payoff non linéaire : capital (partiellement) garanti, "
+             "coupons conditionnels, barrières. Porte le risque de crédit de l'émetteur.",
+     "formula": "Ex. capital garanti = zéro-coupon + call ;  reverse convertible = obligation − put vendu",
+     "example": "Un autocallable est rappelé avec coupon si le sous-jacent reste au-dessus d'un seuil.",
+     "takeaway": "Vérifiez toujours à QUI le produit profite : payoff, barrières et émetteur."},
+    # -------------------------------- Crédit --------------------------------
+    {"id": "credit_el", "topic": "Crédit", "title": "Risque de crédit : EL = PD·LGD·EAD",
+     "body": "La perte attendue d'un crédit combine la probabilité de défaut (PD), "
+             "la perte en cas de défaut (LGD) et l'exposition au défaut (EAD). "
+             "L'approche structurelle (Merton) voit les fonds propres comme un "
+             "call sur l'actif de la firme.",
+     "formula": "Expected Loss = PD × LGD × EAD",
+     "example": "PD 2%, LGD 45%, EAD 1M€ → perte attendue 9 000€.",
+     "takeaway": "On provisionne la perte ATTENDUE ; le capital couvre la perte INATTENDUE."},
+    {"id": "securitisation", "topic": "Crédit", "title": "Titrisation & tranches",
+     "body": "Un pool de prêts est logé dans un SPV qui émet des titres en "
+             "tranches. La cascade (waterfall) fait absorber les pertes d'abord "
+             "par l'equity, puis la mezzanine, enfin le senior (subordination).",
+     "formula": "Pertes : equity → mezzanine → senior ;  flux : sens inverse",
+     "example": "Une hausse des défauts efface l'equity avant de toucher la mezzanine.",
+     "takeaway": "Le senior paraît sûr — sauf si les défauts corrèlent plus que prévu."},
+    # -------------------------------- Marché --------------------------------
+    {"id": "microstructure", "topic": "Marché", "title": "Carnet d'ordres & exécution",
+     "body": "Le carnet affiche bid/ask et la profondeur. Un ordre marché "
+             "s'exécute vite mais subit le spread et l'impact ; un ordre limite "
+             "contrôle le prix mais peut ne pas passer. Les gros ordres « mangent » "
+             "plusieurs niveaux (slippage).",
+     "formula": "Spread = ask − bid ;  Mid = (bid + ask)/2",
+     "example": "Un ordre trop gros pour la profondeur déplace le cours contre soi.",
+     "takeaway": "Adaptez le type d'ordre à la liquidité : marché si urgent, limite si patient."},
+    {"id": "liquidity", "topic": "Marché", "title": "Liquidité, repo & spirale",
+     "body": "La liquidité de marché (vendre sans impacter) et de financement (se "
+             "refinancer via repo) se détériorent ensemble en crise. La hausse "
+             "des haircuts force à apporter plus de collatéral.",
+     "formula": "Spirale : baisse → pertes → appels de marge → ventes forcées → baisse",
+     "example": "Un haircut qui passe de 5% à 20% double presque le collatéral exigé.",
+     "takeaway": "Le levier transforme un choc de prix en problème de liquidité mortel."},
+    # ----------------------------- Performance ------------------------------
+    {"id": "drawdown", "topic": "Performance", "title": "Drawdown, Sortino & Calmar",
+     "body": "Le max drawdown est la pire chute pic-creux subie : c'est la douleur "
+             "réelle de l'investisseur. Le Sortino ne pénalise que la volatilité "
+             "baissière ; le Calmar rapporte le rendement au max drawdown.",
+     "formula": "Sortino = (R − cible)/σ_baissière ;  Calmar = rendement annuel / max drawdown",
+     "example": "Deux stratégies à Sharpe égal : préférez celle au drawdown plus faible.",
+     "takeaway": "Un bon Sharpe ne dit rien de la profondeur des creux : regardez le drawdown."},
+    {"id": "twr_mwr", "topic": "Performance", "title": "TWR vs MWR",
+     "body": "Le Time-Weighted Return neutralise les apports/retraits et mesure la "
+             "compétence du gérant. Le Money-Weighted (IRR) intègre le timing des "
+             "flux et reflète l'expérience réelle de l'investisseur.",
+     "formula": "TWR = Π(1 + r_période) − 1 ;  MWR = IRR des cash flows",
+     "example": "Un bon gérant peut afficher un mauvais MWR si le client investit au pire moment.",
+     "takeaway": "Pour juger le gérant : TWR. Pour juger l'expérience client : MWR."},
+    # ------------------------------- Facteurs -------------------------------
+    {"id": "factors", "topic": "Risque", "title": "Facteurs & styles (Fama-French)",
+     "body": "Au-delà du marché, des facteurs expliquent les rendements : taille "
+             "(small/big), value (décoté/croissance), profitabilité, "
+             "investissement. Un portefeuille porte des biais factoriels.",
+     "formula": "R = α + β_marché·MKT + β_size·SMB + β_value·HML + …",
+     "example": "Un fonds « value » souffre quand la growth domine, et inversement.",
+     "takeaway": "Diagnostiquez les biais de style : ils expliquent la perf plus que le stock-picking."},
+    # ----------------------------- Comportement -----------------------------
+    {"id": "behavioural", "topic": "Comportement", "title": "Biais & finance comportementale",
+     "body": "Les biais dégradent les décisions : ancrage (rester fixé sur un "
+             "prix), aversion aux pertes, disposition (vendre les gagnants, garder "
+             "les perdants), herding (suivre la foule, amplifier bulles et krachs).",
+     "formula": "Aversion aux pertes : douleur d'une perte ≈ 2× le plaisir d'un gain équivalent",
+     "example": "Garder une position perdante « pour se refaire » = disposition effect.",
+     "takeaway": "Une règle écrite (stop-loss, rééquilibrage) protège de vos propres biais."},
+    # --------------------------------- ESG ----------------------------------
+    {"id": "esg", "topic": "ESG", "title": "ESG & finance verte",
+     "body": "L'intégration ESG (environnement, social, gouvernance) gère risques "
+             "et opportunités de durabilité. Les green bonds financent des projets "
+             "verts ; le risque de transition vise les actifs carbonés.",
+     "formula": "Approches : exclusion · best-in-class · engagement · impact",
+     "example": "Un scandale de gouvernance peut faire décrocher un titre du jour au lendemain.",
+     "takeaway": "L'ESG est aussi une grille de RISQUE, pas seulement d'éthique."},
+    # -------------------------------- Banque --------------------------------
+    {"id": "bank_ratios", "topic": "Banque", "title": "Capital, liquidité & ALM",
+     "body": "Une banque doit tenir des ratios : CET1 (fonds propres durs / RWA), "
+             "LCR/NSFR (liquidité), leverage ratio. L'ALM gère le risque de taux "
+             "et de liquidité entre actifs et passifs (gap de duration).",
+     "formula": "CET1 = fonds propres durs / RWA ;  DSCR = cash flow / service de la dette",
+     "example": "Toucher un seuil réglementaire force à réduire le risque (vendre des RWA).",
+     "takeaway": "Le capital absorbe les pertes ; la liquidité évite la mort subite."},
 ]
 
-TOPICS = ["Valorisation", "Risque", "Dérivés", "Macro", "M&A", "Bloomberg"]
+TOPICS = ["Valorisation", "Risque", "Taux", "Dérivés", "Crédit", "Marché",
+          "Performance", "Macro", "M&A", "Comportement", "ESG", "Banque", "Bloomberg"]
 
 
 def by_topic():

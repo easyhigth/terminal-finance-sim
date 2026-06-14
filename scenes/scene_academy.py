@@ -14,6 +14,9 @@ _TOPIC_COL = {
     "Valorisation": config.COL_AMBER, "Risque": config.COL_DOWN,
     "Dérivés": config.COL_WARN, "Macro": config.COL_CYAN,
     "M&A": config.COL_UP, "Bloomberg": config.COL_PRESTIGE,
+    "Taux": config.COL_CYAN, "Crédit": config.COL_DOWN, "Marché": config.COL_AMBER,
+    "Performance": config.COL_UP, "Comportement": config.COL_WARN,
+    "ESG": config.COL_UP, "Banque": config.COL_CYAN,
 }
 
 
@@ -23,6 +26,8 @@ class AcademyScene(Scene):
         self.sel = L.LESSONS[0]["id"]
         self._mark_read(self.sel)
         self.row_rects = {}
+        self.scroll = 0          # défilement de la liste de leçons (px)
+        self._max_scroll = 0
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
@@ -42,7 +47,11 @@ class AcademyScene(Scene):
             self.app.scenes.go(self.return_to)
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 4:
+            self.scroll = max(0, self.scroll - 40)
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 5:
+            self.scroll = min(self._max_scroll, self.scroll + 40)
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for lid, rect in self.row_rects.items():
                 if rect.collidepoint(event.pos):
                     self.sel = lid
@@ -65,13 +74,18 @@ class AcademyScene(Scene):
         listp = pygame.Rect(40, 100, 360, ph)
         linner = widgets.draw_panel(surf, listp, "Programme", config.COL_CYAN)
         self.row_rects = {}
-        mp = pygame.mouse.get_pos()
-        y = linner.y
+        # liste défilante : on clippe au panneau et on décale de self.scroll
+        prev_clip = surf.get_clip()
+        surf.set_clip(linner)
+        y = linner.y - self.scroll
         for topic in L.TOPICS:
+            lessons_t = [x for x in L.LESSONS if x["topic"] == topic]
+            if not lessons_t:
+                continue
             widgets.draw_text(surf, topic.upper(), (linner.x, y),
                               fonts.tiny(bold=True), _TOPIC_COL.get(topic, config.COL_TEXT))
             y += 18
-            for lesson in [x for x in L.LESSONS if x["topic"] == topic]:
+            for lesson in lessons_t:
                 rect = pygame.Rect(linner.x - 4, y - 2, linner.w + 8, 22)
                 self.row_rects[lesson["id"]] = rect
                 sel = (lesson["id"] == self.sel)
@@ -84,6 +98,11 @@ class AcademyScene(Scene):
                                   fonts.small(bold=sel), col if not sel else config.COL_WHITE)
                 y += 22
             y += 6
+        surf.set_clip(prev_clip)
+        # hauteur totale du contenu -> borne de défilement
+        content_h = (y + self.scroll) - linner.y
+        self._max_scroll = max(0, content_h - linner.h)
+        self.scroll = min(self.scroll, self._max_scroll)
 
         # lecture à droite
         readp = pygame.Rect(420, 100, config.SCREEN_WIDTH - 460, ph)

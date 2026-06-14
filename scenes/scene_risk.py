@@ -12,6 +12,7 @@ import pygame
 from core import config
 from core.scene_manager import Scene
 from core import finmath as fm
+from core import risk as risk_mod
 from ui import fonts, widgets
 
 
@@ -43,9 +44,15 @@ class RiskScene(Scene):
         self.confidence = 0.95
         self.scenario = None
         self.scenario_pnl = None
+        # mode réel si le joueur a des positions, sinon démo
+        p = self.app.gs.player
+        self.real = bool(p.portfolio or getattr(p, "bonds", None))
+        self.stress_real = None
         self._simulate()
         self.back_btn = widgets.Button(
             (40, config.SCREEN_HEIGHT-66, 160, 44), "← TERMINAL", config.COL_TEXT_DIM)
+        self.mode_btn = widgets.Button(
+            (210, config.SCREEN_HEIGHT-66, 240, 44), "MODE : —", config.COL_CYAN)
         self._exp_btns = {}
         self._scenario_btns = {}
         self._conf_btns = {}
@@ -58,6 +65,20 @@ class RiskScene(Scene):
         return cov
 
     def _simulate(self, n=20000):
+        if self.real:
+            return self._simulate_real()
+        return self._simulate_demo(n)
+
+    def _simulate_real(self):
+        """VaR/CVaR sur le portefeuille RÉEL via le modèle à facteurs du marché."""
+        r = risk_mod.simulate(self.app.gs.player, self.app.market, self.confidence)
+        self.total_pnl = r["pnl"]
+        self.var, self.cvar = r["var"], r["cvar"]
+        self.param_var, self.port_sigma = r["param_var"], r["sigma"]
+        self.real_exposures = risk_mod.exposures(self.app.gs.player, self.app.market)
+        self.max_dd = risk_mod.net_worth_drawdown(self.app.gs.player)
+
+    def _simulate_demo(self, n=20000):
         """Monte-Carlo : tire des P&L corrélés et calcule les métriques."""
         cov = self._cov_matrix()
         rng = np.random.default_rng(7)
@@ -78,6 +99,10 @@ class RiskScene(Scene):
 
     def _run_scenario(self, name):
         """Applique un scénario de stress et calcule la perte instantanée."""
+        if self.real:
+            self.scenario = name
+            self.stress_real = risk_mod.stress(self.app.gs.player, self.app.market, name)
+            return
         shocks = STRESS_SCENARIOS[name]           # en nb de sigma
         dollar_sigma = self.exposure * FACTOR_VOL
         pnl_by_factor = shocks * dollar_sigma     # M$ de P&L par facteur
@@ -93,6 +118,11 @@ class RiskScene(Scene):
     def handle_event(self, event):
         if self.back_btn.handle(event):
             self.app.scenes.go("terminal")
+        if self.mode_btn.handle(event):
+            self.real = not self.real
+            self.scenario = None
+            self.stress_real = None
+            self._simulate()
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for i, (minus, plus) in self._exp_btns.items():
                 if minus.collidepoint(event.pos):
@@ -108,26 +138,48 @@ class RiskScene(Scene):
                     self._simulate()
 
     def update(self, dt):
-        self.back_btn.update(pygame.mouse.get_pos())
+        mp = pygame.mouse.get_pos()
+        self.back_btn.update(mp)
+        self.mode_btn.label = "MODE : PORTEFEUILLE RÉEL" if self.real else "MODE : DÉMO"
+        self.mode_btn.update(mp)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
         widgets.draw_text(surf, "MODULE RISK — VALUE AT RISK & STRESS TESTS",
                           (40, 24), fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Monte-Carlo corrélé (Cholesky). Horizon 1 jour. "
-                                "Notionnel total : {:.0f} M$".format(self.exposure.sum()),
-                          (42, 76), fonts.small(), config.COL_TEXT_DIM)
+        sub = ("Portefeuille RÉEL · modèle à facteurs du marché · horizon 1 pas"
+               if self.real else
+               "DÉMO · Monte-Carlo corrélé (Cholesky) · horizon 1 jour · "
+               "notionnel {:.0f} M$".format(self.exposure.sum()))
+        widgets.draw_text(surf, sub, (42, 76), fonts.small(), config.COL_TEXT_DIM)
 
         self._draw_exposures(surf)
         self._draw_histogram(surf)
         self._draw_metrics(surf)
         self._draw_stress(surf)
         self.back_btn.draw(surf)
+        self.mode_btn.draw(surf)
 
     def _draw_exposures(self, surf):
         panel = pygame.Rect(40, 110, 360, 280)
-        inner = widgets.draw_panel(surf, panel, "Exposition par facteur (M$)", config.COL_CYAN)
         self._exp_btns = {}
+        if self.real:
+            inner = widgets.draw_panel(surf, panel, "Exposition du book réel (M$)", config.COL_CYAN)
+            y = inner.y
+            for name, val in self.real_exposures.items():
+                widgets.draw_text(surf, name, (inner.x, y), fonts.small(), config.COL_TEXT)
+                widgets.draw_text(surf, f"{val:,.1f}".replace(",", " "),
+                                  (inner.right, y), fonts.small(bold=True),
+                                  config.COL_WHITE, align="right")
+                y += 34
+            cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
+            widgets.draw_text(surf, f"Max drawdown valeur nette : {self.max_dd*100:.1f}%",
+                              (inner.x, inner.bottom - 40), fonts.small(bold=True),
+                              config.COL_DOWN if self.max_dd > 0.15 else config.COL_TEXT_DIM)
+            widgets.draw_text(surf, "Bascule en MODE DÉMO pour ajuster des expositions.",
+                              (inner.x, inner.bottom - 18), fonts.tiny(), config.COL_TEXT_DIM)
+            return
+        inner = widgets.draw_panel(surf, panel, "Exposition par facteur (M$)", config.COL_CYAN)
         y = inner.y
         for i, name in enumerate(FACTORS):
             widgets.draw_text(surf, name, (inner.x, y), fonts.small(), config.COL_TEXT)
@@ -197,7 +249,8 @@ class RiskScene(Scene):
             ("VaR paramétrique", f"-{self.param_var:.2f} M$", config.COL_WARN),
             ("CVaR (Expected Shortfall)", f"-{self.cvar:.2f} M$", config.COL_DOWN),
             ("Volatilité du P&L (1j)", f"{self.port_sigma:.2f} M$", config.COL_TEXT),
-            ("VaR annualisée (~√252)", f"-{self.var*np.sqrt(252):.1f} M$", config.COL_NEUTRAL),
+            (f"VaR annualisée (~√{52 if self.real else 252})",
+             f"-{self.var*np.sqrt(52 if self.real else 252):.1f} M$", config.COL_NEUTRAL),
         ]
         y = inner.y+58
         for label, val, col in rows:
@@ -209,9 +262,10 @@ class RiskScene(Scene):
         panel = pygame.Rect(416, 400, 560, 270)
         inner = widgets.draw_panel(surf, panel, "Stress Tests — scénarios", config.COL_WARN)
         self._scenario_btns = {}
+        names = list(risk_mod.STRESS) if self.real else list(STRESS_SCENARIOS)
+        w = max(110, (inner.w - 6 * (len(names) - 1)) // len(names))
         x = inner.x
-        for name in STRESS_SCENARIOS:
-            w = 130
+        for name in names:
             rect = pygame.Rect(x, inner.y, w, 30)
             self._scenario_btns[name] = rect
             sel = (self.scenario == name)
@@ -221,6 +275,30 @@ class RiskScene(Scene):
                                               config.COL_WARN if sel else config.COL_TEXT)
             surf.blit(img, img.get_rect(center=rect.center))
             x += w + 6
+
+        if self.real:
+            if self.scenario and self.stress_real is not None:
+                s = self.stress_real
+                y = inner.y + 52
+                widgets.draw_text(surf, f"Scénario : {self.scenario} (sur votre book)",
+                                  (inner.x, y), fonts.small(bold=True), config.COL_WARN)
+                y += 30
+                for lab, key in [("Impact actions", "equity"), ("Impact obligations", "bond")]:
+                    v = s[key]
+                    widgets.draw_text(surf, lab, (inner.x, y), fonts.small(), config.COL_TEXT_DIM)
+                    widgets.draw_text(surf, f"{'+' if v>=0 else ''}{v:.2f} M$",
+                                      (inner.x+200, y), fonts.small(bold=True),
+                                      config.COL_UP if v >= 0 else config.COL_DOWN)
+                    y += 26
+                tcol = config.COL_UP if s["total"] >= 0 else config.COL_DOWN
+                widgets.draw_text(surf, "PERTE/GAIN TOTAL", (inner.x, y+6),
+                                  fonts.body(bold=True), config.COL_WHITE)
+                widgets.draw_text(surf, f"{'+' if s['total']>=0 else ''}{s['total']:.2f} M$",
+                                  (inner.x+200, y+6), fonts.head(bold=True), tcol)
+            else:
+                widgets.draw_text(surf, "Sélectionnez un scénario pour stresser votre book réel.",
+                                  (inner.x, inner.y+52), fonts.small(), config.COL_TEXT_DIM)
+            return
 
         if self.scenario and self.scenario_pnl is not None:
             y = inner.y+44

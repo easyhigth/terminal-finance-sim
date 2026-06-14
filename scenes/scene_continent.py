@@ -5,6 +5,7 @@ Affiche le globe interactif + panneaux réglementaires par région.
 import pygame
 from core import config
 from core.i18n import t
+from core import startscenarios as scen
 from core.scene_manager import Scene
 from core.game_state import GameState, PlayerState
 from ui import fonts, widgets
@@ -16,8 +17,11 @@ class ContinentScene(Scene):
         self.globe = Globe((345, 360), 190)
         self.selected = None
         self.hardcore = kwargs.get("hardcore", False)
+        self.scen_idx = 0          # scénario de départ sélectionné
         fy = config.SCREEN_HEIGHT - 50
         self.back_btn = widgets.Button((40, fy, 150, 42), t("common.back"), config.COL_TEXT_DIM)
+        self.scen_btn = widgets.Button((460, fy, 300, 42),
+                                       "SCÉNARIO : " + scen.SCENARIOS[0]["name"], config.COL_CYAN)
         self.hardcore_btn = widgets.Button(
             (200, fy, 250, 42), t("continent.hardcore_off"), config.COL_WARN)
         self.confirm_btn = widgets.Button(
@@ -38,6 +42,9 @@ class ContinentScene(Scene):
 
         if self.back_btn.handle(event):
             self.app.scenes.go("menu")
+        if self.scen_btn.handle(event):
+            self.scen_idx = (self.scen_idx + 1) % len(scen.SCENARIOS)
+            self.scen_btn.label = "SCÉNARIO : " + scen.SCENARIOS[self.scen_idx]["name"]
         if self.hardcore_btn.handle(event):
             self.hardcore = not self.hardcore
             self.hardcore_btn.label = t("continent.hardcore_on") if self.hardcore else t("continent.hardcore_off")
@@ -49,7 +56,7 @@ class ContinentScene(Scene):
                 grade_index=0, cash=config.START_CASH, reputation=50,
                 hardcore=getattr(self, "hardcore", False),
             )
-            gs.player.cash_history = [config.START_CASH]
+            scen.apply(gs.player, scen.SCENARIOS[self.scen_idx]["id"])  # conditions de départ
             import random as _r
             gs.player.market_seed = _r.randint(1, 2_000_000_000)
             gs.player.market_step = 0
@@ -64,6 +71,7 @@ class ContinentScene(Scene):
         self.confirm_btn.update(mp, dt)
         self.back_btn.update(mp, dt)
         self.hardcore_btn.update(mp, dt)
+        self.scen_btn.update(mp, dt)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -102,9 +110,15 @@ class ContinentScene(Scene):
             widgets.draw_text_wrapped(surf, info["blurb"], (x+12, y+74),
                                       fonts.tiny(), config.COL_NEUTRAL, cw-24, line_gap=2)
 
-        if self.hardcore:
-            widgets.draw_text(surf, "Hardcore : sauvegarde manuelle désactivée · faillite = run perdu",
-                              (40, config.SCREEN_HEIGHT - 74), fonts.tiny(), config.COL_DOWN)
+        # description du scénario de départ sélectionné
+        sc = scen.SCENARIOS[self.scen_idx]
+        widgets.draw_text(surf, f"Scénario : {sc['name']} — capital "
+                          f"{widgets.format_money(sc['cash'], '$')}, "
+                          f"grade {config.GRADES[sc['grade_index']]}, réputation {sc['reputation']}",
+                          (40, config.SCREEN_HEIGHT - 132), fonts.tiny(bold=True), config.COL_CYAN)
+        widgets.draw_text_wrapped(surf, sc["desc"], (40, config.SCREEN_HEIGHT - 116),
+                                  fonts.tiny(), config.COL_TEXT_DIM, 700, line_gap=2)
         self.hardcore_btn.draw(surf)
+        self.scen_btn.draw(surf)
         self.confirm_btn.draw(surf)
         self.back_btn.draw(surf)

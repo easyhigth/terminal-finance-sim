@@ -69,6 +69,12 @@ class TerminalScene(Scene):
             p.cash_history = [p.cash]
         # marché déterministe (créé/synchronisé)
         self.market = self.app.ensure_market()
+        # scénario « krach de départ » : on injecte un choc une seule fois
+        if p.flags.get("start_crisis") and not p.flags.get("start_crisis_done"):
+            from core.market import Crisis
+            self.market.add_crisis(Crisis("Krach de départ", steps=6,
+                                          world=-0.05, vol_mult=2.2))
+            p.flags["start_crisis_done"] = True
         career_mod.ensure_objectives(p)   # objectifs du trimestre courant
         rivals_mod.ensure(p)              # concurrents
         self._check_badges()              # badges éventuellement franchis ailleurs

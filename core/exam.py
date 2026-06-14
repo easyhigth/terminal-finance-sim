@@ -22,7 +22,10 @@ import math
 import random
 import unicodedata
 
+from data.glossary_data import GLOSSARY
+
 PASS_THRESHOLD = 0.70
+_GLOSS_ITEMS = list(GLOSSARY.items())
 
 
 def num_questions(grade_index):
@@ -472,6 +475,132 @@ def _concept_from_bank(rng, max_grade):
     return _mcq(q["q"], list(q["choices"]), q["answer"], q["expl"], rng)
 
 
+# ===========================================================================
+# GÉNÉRATEURS — concepts du master (additif) : taux, dérivés, crédit,
+# performance avancée, macro, banque, comportement, facteurs, glossaire.
+# ===========================================================================
+def g_gordon(rng):
+    d1 = round(rng.uniform(1.0, 8.0), 2)
+    re = rng.choice([0.07, 0.08, 0.09, 0.10, 0.11, 0.12])
+    g = rng.choice([0.01, 0.02, 0.03, 0.04])
+    return _fill(f"Dividende attendu {d1}, coût des fonds propres {re*100:.0f}%, "
+                 f"croissance {g*100:.0f}%. Prix par le modèle de Gordon ≈ ?",
+                 d1 / (re - g), "Gordon : P = D1 / (re − g).", tol=0.03)
+
+
+def g_forward(rng):
+    S = _money(rng, 50, 400, 5)
+    r = rng.choice([0.02, 0.03, 0.04, 0.05])
+    T = rng.choice([1, 2, 3])
+    return _fill(f"Spot {S}, taux {r*100:.0f}%, {T} an(s), sans dividende. "
+                 "Prix forward ≈ ?", S * ((1 + r) ** T),
+                 "Cost of carry : F = S·(1+r)^T.", tol=0.02)
+
+
+def g_real_rate(rng):
+    n = rng.choice([3, 4, 5, 6, 7, 8])
+    i = rng.choice([1, 2, 3, 4, 5])
+    rr = ((1 + n / 100) / (1 + i / 100) - 1) * 100
+    return _fill(f"Taux nominal {n}%, inflation {i}%. Taux réel ≈ ? (%)",
+                 rr, "Fisher : (1+nominal)/(1+inflation) − 1.", abstol=0.3, unit="%")
+
+
+def g_expected_loss(rng):
+    pd = rng.choice([1, 2, 3, 5, 8])
+    lgd = rng.choice([30, 40, 45, 60])
+    ead = _money(rng, 2, 50, 1)
+    return _fill(f"PD {pd}%, LGD {lgd}%, EAD {ead}M. Perte attendue (EL) ≈ ? (M)",
+                 pd / 100 * lgd / 100 * ead, "EL = PD × LGD × EAD.", abstol=0.05)
+
+
+def g_treynor(rng):
+    R = rng.choice([8, 10, 12, 14])
+    beta = round(rng.uniform(0.6, 1.8), 1)
+    return _fill(f"Rendement {R}%, sans risque 2%, bêta {beta}. Ratio de Treynor ≈ ?",
+                 (R - 2) / 100 / beta, "Treynor = (R − rf) / β.", abstol=0.004)
+
+
+def g_dscr(rng):
+    cf = _money(rng, 90, 400, 10)
+    ds = _money(rng, 40, int(cf), 10)
+    return _fill(f"Cash flow disponible {cf}M, service de la dette {ds}M. DSCR ≈ ? (x)",
+                 cf / ds, "DSCR = cash flow disponible / service de la dette.",
+                 abstol=0.05, unit="x")
+
+
+def g_cet1(rng):
+    cap = _money(rng, 40, 220, 5)
+    rwa = _money(rng, 600, 3000, 50)
+    return _fill(f"Fonds propres durs {cap}M, RWA {rwa}M. Ratio CET1 ≈ ? (%)",
+                 cap / rwa * 100, "CET1 = fonds propres durs / RWA.", abstol=0.3, unit="%")
+
+
+def g_roll(rng):
+    near = _money(rng, 80, 120, 1)
+    far = _money(rng, 80, 120, 1)
+    while far == near:
+        far = _money(rng, 80, 120, 1)
+    return _fill(f"Future proche {near}, future lointain {far}. Roll yield ≈ ? (%)",
+                 (near - far) / far * 100,
+                 "Roll yield = (proche − lointain) / lointain.", abstol=0.4, unit="%")
+
+
+def g_drawdown(rng):
+    peak = _money(rng, 100, 150, 5)
+    trough = _money(rng, 50, int(peak * 0.9), 5)
+    return _fill(f"Une valeur nette grimpe à {peak} puis chute à {trough}. "
+                 "Max drawdown ≈ ? (%)", (peak - trough) / peak * 100,
+                 "Max drawdown = (pic − creux) / pic.", abstol=0.6, unit="%")
+
+
+def g_contango(rng):
+    if rng.random() < 0.5:
+        return _mcq("Les futures cotent AU-DESSUS du spot (courbe ascendante). C'est…",
+                    ["Contango (roll yield négatif)", "Backwardation (roll yield positif)",
+                     "Une inversion de la courbe des taux", "Un short squeeze"], 0,
+                    "Futures > spot = contango ; rouler les contrats coûte.", rng)
+    return _mcq("Les futures cotent EN DESSOUS du spot (courbe descendante). C'est…",
+                ["Backwardation (roll yield positif)", "Contango (roll yield négatif)",
+                 "Un défaut de livraison", "Un dividende exceptionnel"], 0,
+                "Futures < spot = backwardation ; rouler les contrats rapporte.", rng)
+
+
+def g_behavioural(rng):
+    qs = [("Un investisseur vend vite ses gagnants et conserve ses perdants. Biais ?",
+           ["Disposition effect", "Herding", "Carry", "Convexité"], 0,
+           "Vendre les gagnants / garder les perdants = disposition effect."),
+          ("Suivre le consensus et amplifier une bulle, c'est…",
+           ["Herding", "Ancrage", "Best execution", "Aversion au risque"], 0,
+           "Suivre la foule = herding (comportement de troupeau)."),
+          ("Rester fixé sur son prix d'achat pour décider de vendre, c'est…",
+           ["Biais d'ancrage", "Disposition effect", "Slippage", "Carry"], 0,
+           "Se référer à un prix de référence = biais d'ancrage.")]
+    q = rng.choice(qs)
+    return _mcq(q[0], list(q[1]), q[2], q[3], rng)
+
+
+def g_factor(rng):
+    qs = [("Un fonds surpondère les sociétés décotées (faible P/B). Style ?",
+           ["Value", "Growth", "Momentum", "Quality"], 0,
+           "Décoté sur ses fondamentaux = biais value."),
+          ("Acheter les titres récemment les plus performants exploite le facteur…",
+           ["Momentum", "Value", "Size", "Carry"], 0,
+           "Continuation des performances récentes = momentum.")]
+    q = rng.choice(qs)
+    return _mcq(q[0], list(q[1]), q[2], q[3], rng)
+
+
+def g_glossary(rng):
+    """Pioche un terme du glossaire et demande de l'identifier d'après sa définition.
+    Rend les 160+ termes du glossaire examinables."""
+    term, (cat, definition) = rng.choice(_GLOSS_ITEMS)
+    others = [t for t, _ in _GLOSS_ITEMS if t != term]
+    rng.shuffle(others)
+    d = definition if len(definition) < 170 else definition[:167] + "…"
+    return _mcq(f"Quel terme correspond à : « {d} »", [term] + others[:3], 0,
+                f"Réponse : {term} — catégorie {cat}.", rng)
+
+
 # ---------------------------------------------------------------------------
 # Composition des examens par tier
 # ---------------------------------------------------------------------------
@@ -481,16 +610,22 @@ TIER_GENERATORS = {
         g_formula_basic, g_concept0, g_graph_trend, g_graph_trend],
     1: [g_eps, g_pe, g_ev, g_ev_ebitda, g_net_margin, g_div_yield, g_cagr,
         g_terminal_value, g_def, g_def_valo, g_formula_basic, g_formula_valo,
-        g_concept2, g_graph_trend, g_graph_return],
+        g_concept2, g_graph_trend, g_graph_return,
+        g_forward, g_real_rate, g_glossary],
     2: [g_ev, g_ev_ebitda, g_wacc, g_terminal_value, g_dcf2, g_cagr,
         g_def_valo, g_def_valo, g_formula_valo, g_formula_valo, g_concept2,
-        g_graph_return, g_graph_vol],
+        g_graph_return, g_graph_vol,
+        g_gordon, g_contango, g_factor, g_real_rate, g_glossary],
     3: [g_wacc, g_dcf2, g_terminal_value, g_lbo_moic, g_sharpe, g_option_intrinsic,
         g_def_adv, g_def_valo, g_formula_adv, g_formula_valo, g_concept_adv,
-        g_graph_return, g_graph_vol],
+        g_graph_return, g_graph_vol,
+        g_expected_loss, g_treynor, g_roll, g_drawdown, g_behavioural,
+        g_contango, g_glossary],
     4: [g_sharpe, g_var_param, g_option_intrinsic, g_portfolio_ret, g_lbo_moic,
         g_dcf2, g_def_adv, g_def_adv, g_formula_adv, g_formula_adv, g_concept_adv,
-        g_concept_adv, g_graph_vol],
+        g_concept_adv, g_graph_vol,
+        g_dscr, g_cet1, g_expected_loss, g_drawdown, g_treynor, g_behavioural,
+        g_glossary],
 }
 
 
@@ -506,6 +641,10 @@ _VARIANTS = {
     g_def: len(_DEFS), g_formula_basic: len(_FORMULAS),
     g_def_valo: 4, g_formula_valo: 4, g_def_adv: 6, g_formula_adv: 5,
     g_concept0: 11, g_concept2: 25, g_concept_adv: 45,
+    # nouveaux concepts (master)
+    g_gordon: 1500, g_forward: 1200, g_real_rate: 900, g_expected_loss: 1200,
+    g_treynor: 1000, g_dscr: 1100, g_cet1: 1100, g_roll: 800, g_drawdown: 900,
+    g_contango: 2, g_behavioural: 3, g_factor: 2, g_glossary: len(_GLOSS_ITEMS),
 }
 for _fn, _v in _VARIANTS.items():
     _fn.variants = _v
@@ -519,6 +658,11 @@ GEN_LESSON = {
     "g_terminal_value": "dcf", "g_dcf2": "dcf", "g_wacc": "dcf", "g_cagr": "dcf",
     "g_sharpe": "sharpe", "g_var_param": "var", "g_option_intrinsic": "options",
     "g_lbo_moic": "lbo", "g_portfolio_ret": "diversification", "g_graph_vol": "beta",
+    # nouveaux concepts -> leçons de l'Académie
+    "g_gordon": "dcf", "g_forward": "forwards", "g_real_rate": "rates",
+    "g_expected_loss": "credit_el", "g_treynor": "beta", "g_dscr": "bank_ratios",
+    "g_cet1": "bank_ratios", "g_roll": "contango", "g_contango": "contango",
+    "g_behavioural": "behavioural", "g_factor": "factors", "g_drawdown": "drawdown",
 }
 
 

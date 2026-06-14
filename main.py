@@ -40,6 +40,7 @@ from scenes.scene_bonds import BondsScene
 from scenes.scene_commodities import CommoditiesScene
 from scenes.scene_crypto import CryptoScene
 from scenes.scene_structured import StructuredScene
+from scenes.scene_credit import CreditScene
 
 
 class App:
@@ -88,6 +89,7 @@ class App:
         self.scenes.register("commodities", CommoditiesScene(self))
         self.scenes.register("crypto", CryptoScene(self))
         self.scenes.register("structured", StructuredScene(self))
+        self.scenes.register("credit", CreditScene(self))
         self.scenes.go("menu")
 
     def notify(self, text, kind="info"):

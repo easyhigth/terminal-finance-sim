@@ -107,6 +107,9 @@ def net_worth(player, market):
     if getattr(player, "structured", None):
         from core import structured
         nw += structured.holdings_value(player, market)
+    if getattr(player, "securitised", None):
+        from core import securitisation
+        nw += securitisation.holdings_value(player, market)
     return nw
 
 

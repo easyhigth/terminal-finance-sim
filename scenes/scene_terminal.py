@@ -36,7 +36,8 @@ CMD_NAMES = [
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS",
     "PORTFOLIO", "BOOK", "BUY", "SELL", "SHORT", "COVER", "MARGIN",
     "BONDS", "BUYBOND", "SELLBOND", "CMDTY", "BUYCMDTY", "SELLCMDTY",
-    "CRYPTO", "BUYCRYPTO", "SELLCRYPTO", "STRUCT", "ALLOCATE", "HEDGE", "REBALANCE",
+    "CRYPTO", "BUYCRYPTO", "SELLCRYPTO", "STRUCT", "CREDIT",
+    "ALLOCATE", "HEDGE", "REBALANCE",
     "PITCH", "FRONTIER", "RISK", "QUANT", "MA", "SHEET", "GLOSSARY",
     "SAVE", "SAVES", "NEWS", "REG", "STATUS", "MENU",
 ]
@@ -273,6 +274,8 @@ class TerminalScene(Scene):
             self.app.scenes.go("crypto", return_to="terminal")
         elif cmd in ("STRUCT", "STRUCTURED", "STRUCTURES"):
             self.app.scenes.go("structured", return_to="terminal")
+        elif cmd in ("CREDIT", "TITRISATION", "ABS", "CLO"):
+            self.app.scenes.go("credit", return_to="terminal")
         elif cmd in ("BUYCRYPTO", "SELLCRYPTO"):
             self._cmd_alt_trade("crypto", cmd, parts[1:])
         elif cmd in ("GP", "CHART", "GRAPH"):
@@ -1182,6 +1185,14 @@ class TerminalScene(Scene):
                       f"{widgets.format_money(res['payoff'], cur)} "
                       f"(P&L {sign}{widgets.format_money(res['pnl'], cur)}).")
             self.app.notify("Produit structuré arrivé à échéance", "info")
+        for res in (summary.get("securitised_due") or []):
+            pos = res["position"]
+            sign = "+" if res["pnl"] >= 0 else ""
+            self._log(f"  🏦 Tranche {pos['name']} échue : perte pool {res['pool_loss']*100:.1f}% → "
+                      f"votre tranche -{res['loss_frac']*100:.0f}% capital · "
+                      f"{widgets.format_money(res['payoff'], cur)} "
+                      f"(P&L {sign}{widgets.format_money(res['pnl'], cur)}).")
+            self.app.notify("Tranche de titrisation dénouée", "info")
         mc = summary.get("margin_call")
         if mc:
             self._log(f"  ⚠ APPEL DE MARGE : liquidation forcée de "

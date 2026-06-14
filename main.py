@@ -34,6 +34,7 @@ from scenes.scene_dilemma import DilemmaScene
 from scenes.scene_intro import IntroScene
 from scenes.scene_academy import AcademyScene
 from scenes.scene_cert import CertScene
+from scenes.scene_deal import DealScene
 
 
 class App:
@@ -76,6 +77,7 @@ class App:
         self.scenes.register("intro", IntroScene(self))
         self.scenes.register("academy", AcademyScene(self))
         self.scenes.register("cert", CertScene(self))
+        self.scenes.register("deal", DealScene(self))
         self.scenes.go("menu")
 
     def notify(self, text, kind="info"):

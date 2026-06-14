@@ -1198,22 +1198,11 @@ class TerminalScene(Scene):
         if arg is None or not arg.isdigit():
             self._log("  Usage : DEAL <id>  (voir DEALS).")
             return
-        res = deals_mod.resolve_deal(p, int(arg))
-        if not res["ok"]:
+        if deals_mod.find_deal(p, int(arg)) is None:
             self._log(f"  Deal #{arg} introuvable.")
             return
-        cur = config.CONTINENTS[p.continent]["currency"]
-        d = res["deal"]
-        if res["success"]:
-            self._log(f"  ✓ Deal #{d['id']} CONCLU : +{widgets.format_money(d['reward_cash'], cur)}, "
-                      f"rep +{d['reward_rep']}.")
-        else:
-            self._log(f"  ✗ Deal #{d['id']} ÉCHOUÉ : -{widgets.format_money(d['penalty_cash'], cur)}, "
-                      f"rep -{d['penalty_rep']}.")
-        if not p.hardcore:
-            self.app.gs.save(config.AUTOSAVE_SLOT)
-        if p.check_game_over():
-            self.app.scenes.go("gameover")
+        # mini-jeu : vraie décision financière (au lieu d'une résolution au dé)
+        self.app.scenes.go("deal", deal_id=int(arg), return_to="terminal")
 
     # --------------------------------------------------------------- update
     def update(self, dt):

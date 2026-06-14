@@ -157,6 +157,33 @@ def success_probability(player, deal):
     return max(0.10, min(0.95, p))
 
 
+def apply_outcome(player, deal_id, quality):
+    """Applique le résultat d'un mini-jeu de deal selon la QUALITÉ du choix :
+      good → succès plein · ok → succès partiel · bad → échec.
+    Retourne un dict résultat, ou {ok: False} si le deal n'existe pas."""
+    deal = find_deal(player, deal_id)
+    if deal is None:
+        return {"ok": False}
+    if quality == "good":
+        player.adjust_cash(deal["reward_cash"])
+        player.adjust_reputation(deal["reward_rep"])
+        player.deals_won += 1
+        player.grade_deals += 1
+        outcome = "success"
+    elif quality == "ok":
+        player.adjust_cash(round(deal["reward_cash"] * 0.5, 2))
+        player.adjust_reputation(max(1, deal["reward_rep"] // 2))
+        player.deals_won += 1
+        player.grade_deals += 1
+        outcome = "partial"
+    else:  # bad
+        player.adjust_cash(-deal["penalty_cash"])
+        player.adjust_reputation(-deal["penalty_rep"])
+        outcome = "fail"
+    player.deals = [d for d in player.deals if d["id"] != deal_id]
+    return {"ok": True, "outcome": outcome, "deal": deal, "quality": quality}
+
+
 def resolve_deal(player, deal_id, rng=None):
     """
     Tente de conclure un deal. Retourne un dict résultat :

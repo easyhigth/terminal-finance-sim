@@ -149,6 +149,46 @@ def test_factor_attribution_empty_before_any_step():
     assert attr["total"] == 0.0  # aucun pas joué -> pas d'attribution
 
 
+# --------------------------------------------------------------- earnings
+def test_earnings_season_is_staggered_and_quarterly():
+    m = Market(seed=44)
+    reporters = set()
+    for _ in range(13):  # un trimestre = 13 pas (EARN_PERIOD)
+        m.step()
+        # chaque pas, une fraction des sociétés publie (~ n/13)
+        assert 0 < len(m.last_earnings) <= m.n
+        reporters.update(r["ticker"] for r in m.last_earnings)
+    # sur un trimestre complet (13 pas), toutes les sociétés ont publié une fois
+    assert len(reporters) == m.n
+
+
+def test_earnings_are_deterministic():
+    a = Market(seed=44); a.fast_forward(30)
+    b = Market(seed=44); b.fast_forward(30)
+    assert a.earnings_log == b.earnings_log
+
+
+def test_earnings_evolve_fundamentals_and_margins_bounded():
+    m = Market(seed=44)
+    tk = m.companies[0]["ticker"]
+    i = m.ticker_idx[tk]
+    rev0 = float(m.revenue[i])
+    m.fast_forward(40)
+    assert float(m.revenue[i]) != rev0  # le CA a bougé via les résultats
+    # les marges restent dans les bornes autour du profil de base
+    assert (0.4 * m._base_net_margin[i] - 1e-9
+            <= m.net_margin[i] <= 1.6 * m._base_net_margin[i] + 1e-9)
+
+
+def test_metrics_reflect_dynamic_fundamentals():
+    m = Market(seed=44)
+    tk = m.companies[0]["ticker"]
+    m.fast_forward(40)
+    mt = m.metrics(tk)
+    assert mt["revenue"] == pytest.approx(float(m.revenue[m.ticker_idx[tk]]))
+    assert "last_earnings" in mt
+
+
 # --------------------------------------------------------------- requêtes
 def test_metrics_and_price_lookup():
     m = Market(seed=11)

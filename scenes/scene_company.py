@@ -77,6 +77,16 @@ class CompanyScene(Scene):
                               (config.SCREEN_WIDTH - 40, 120), fonts.small(),
                               config.COL_TEXT_DIM, align="right")
 
+        # derniers résultats trimestriels (surprise beat/miss)
+        le = mt.get("last_earnings")
+        if le:
+            ecol = config.COL_UP if le["beat"] else config.COL_DOWN
+            verb = "BEAT" if le["beat"] else "MISS"
+            widgets.draw_text(surf, f"RÉSULTATS : {verb}  surprise {le['surprise']*100:+.0f}%  "
+                                    f"·  croissance CA {le['growth']*100:+.1f}%",
+                              (config.SCREEN_WIDTH - 40, 150), fonts.small(bold=True),
+                              ecol, align="right")
+
         # panneau fondamentaux (2 sous-colonnes : valorisation / rentabilité-risque)
         ph = config.footer_y() - 8 - 190
         panel = pygame.Rect(40, 190, 560, ph)

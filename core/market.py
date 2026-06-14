@@ -36,6 +36,12 @@ VOL_SECTOR = 0.012
 VOL_REGION = 0.010
 DRIFT_MULT = 0.3        # atténue les dérives propres des sociétés (anti sur-bull)
 
+# Résultats trimestriels (« earnings ») — saison échelonnée, déterministe
+EARN_PERIOD = 13        # ~13 pas (semaines) = un trimestre ; report échelonné
+SURPRISE_VOL = 0.05     # écart-type de la surprise de résultats (en % de croissance)
+EARN_PRICE_K = 0.9      # conversion surprise -> choc de cours du jour de publication
+EARN_NEWS_THRESH = 0.06 # |surprise| au-delà de laquelle on génère une news
+
 
 class Crisis:
     """Un scénario de crise actif : chocs additionnels sur des facteurs, sur N pas."""
@@ -71,6 +77,14 @@ class Market:
         self.b_region = np.array([c["b_region"] for c in companies], dtype=np.float64)
         self.sigma = np.array([c["sigma"] for c in companies], dtype=np.float64)
         self.drift = np.array([c["drift"] for c in companies], dtype=np.float64) * DRIFT_MULT
+        # fondamentaux DYNAMIQUES (dérivent au fil des résultats trimestriels)
+        self.revenue = np.array([c["revenue"] for c in companies], dtype=np.float64)
+        self.net_margin = np.array([c["net_margin"] for c in companies], dtype=np.float64)
+        self.ebitda_margin = np.array([c["ebitda_margin"] for c in companies], dtype=np.float64)
+        self._base_net_margin = self.net_margin.copy()
+        self._base_ebitda_margin = self.ebitda_margin.copy()
+        self.last_earnings = []      # rapports publiés au dernier pas
+        self.earnings_log = {}       # ticker -> dernier rapport {surprise, growth, beat, step}
         self.sec_id = np.array([self._sector_idx[c["sector"]] for c in companies])
         self.reg_id = np.array([self._region_idx[c["region"]] for c in companies])
         self.ticker_idx = {c["ticker"]: i for i, c in enumerate(companies)}
@@ -148,11 +162,15 @@ class Market:
         F_region = self.rng.normal(0.0, VOL_REGION * vol_mult, size=len(self.regions)) + reg_shock
         eps = self.rng.normal(0.0, 1.0, size=self.n)
 
+        # saison de résultats : choc de cours sur les sociétés qui publient ce pas
+        earnings_shock = self._step_earnings()
+
         ret = (self.drift
                + self.beta * F_world
                + self.b_sector * F_sector[self.sec_id]
                + self.b_region * F_region[self.reg_id]
-               + self.sigma * eps)
+               + self.sigma * eps
+               + earnings_shock)
         # borne les rendements par pas pour éviter les valeurs aberrantes
         np.clip(ret, -0.35, 0.35, out=ret)
         self.prev_price = self.price.copy()   # mémorise pour l'attribution du P&L
@@ -181,6 +199,8 @@ class Market:
         self.crises = [cr for cr in self.crises if cr.steps_left > 0]
 
         self._last_news = self._generate_news(F_world, F_sector, F_region)
+        self._last_news += self._earnings_news()
+        self._last_news = self._last_news[:4]
         return self._last_news
 
     def _step_macro(self):
@@ -203,6 +223,42 @@ class Market:
             self.macro_hist[k].append(m[k]["v"])
             if len(self.macro_hist[k]) > HIST_LEN:
                 self.macro_hist[k].pop(0)
+
+    def _step_earnings(self):
+        """Saison de résultats échelonnée : ~1/EARN_PERIOD des sociétés publient
+        chaque pas (donc chacune une fois par trimestre). Une SURPRISE (beat/miss)
+        fait dériver le CA et les marges et injecte un choc de cours déterministe.
+        Retourne le vecteur de chocs de cours (log) à ajouter au rendement du pas.
+        """
+        shock = np.zeros(self.n)
+        self.last_earnings = []
+        idx = np.arange(self.n)
+        due = idx[(idx % EARN_PERIOD) == (self.step_count % EARN_PERIOD)]
+        if len(due) == 0:
+            return shock
+        # croissance trimestrielle « attendue » (déjà dans les cours), liée à la macro
+        base_growth = 0.005 + (self.macro["growth"]["v"] - 2.0) * 0.0025
+        surprises = self.rng.normal(0.0, SURPRISE_VOL, size=len(due))
+        for k, i in enumerate(due):
+            surprise = float(surprises[k])
+            growth = base_growth + surprise
+            self.revenue[i] *= max(0.5, 1.0 + growth)
+            # marges : petite dérive bornée autour du profil de base du secteur
+            self.net_margin[i] = float(np.clip(
+                self.net_margin[i] + self.rng.normal(0, 0.004),
+                0.4 * self._base_net_margin[i], 1.6 * self._base_net_margin[i]))
+            self.ebitda_margin[i] = float(np.clip(
+                self.ebitda_margin[i] + self.rng.normal(0, 0.004),
+                0.4 * self._base_ebitda_margin[i], 1.6 * self._base_ebitda_margin[i]))
+            # le marché ne réagit qu'à la SURPRISE (la part attendue est déjà priced-in)
+            shock[i] = EARN_PRICE_K * surprise
+            rep = {"ticker": self.companies[i]["ticker"],
+                   "name": self.companies[i]["name"],
+                   "surprise": surprise, "growth": growth,
+                   "beat": surprise >= 0, "step": self.step_count + 1}
+            self.last_earnings.append(rep)
+            self.earnings_log[rep["ticker"]] = rep
+        return shock
 
     def macro_change(self, key):
         """Variation de l'indicateur depuis ~1 an (20 pas) pour l'affichage."""
@@ -260,8 +316,11 @@ class Market:
         price = float(self.price[i])
         shares = c["shares"]
         mktcap = price * shares
-        net_income = c["revenue"] * c["net_margin"]
-        ebitda = c["revenue"] * c["ebitda_margin"]
+        revenue = float(self.revenue[i])        # fondamentaux dynamiques (earnings)
+        net_margin = float(self.net_margin[i])
+        ebitda_margin = float(self.ebitda_margin[i])
+        net_income = revenue * net_margin
+        ebitda = revenue * ebitda_margin
         eps = net_income / shares if shares else 0.0
         pe = price / eps if eps > 0 else None
         ev = mktcap + c["net_debt"]
@@ -269,21 +328,22 @@ class Market:
         # variation depuis le début de l'historique suivi
         hist = self.price_hist.get(ticker)
         chg = ((hist[-1] / hist[0] - 1) * 100.0) if hist and len(hist) > 1 and hist[0] else 0.0
-        ps = mktcap / c["revenue"] if c["revenue"] else None
+        ps = mktcap / revenue if revenue else None
         fcf_yield = (net_income / mktcap * 100) if mktcap else None   # proxy FCF≈RN
         nd_ebitda = c["net_debt"] / ebitda if ebitda > 0 else None
         div_per_share = price * c["div_yield"]
         payout = (div_per_share / eps * 100) if eps > 0 else None
+        last_earn = self.earnings_log.get(ticker)
         return {
             "ticker": ticker, "name": c["name"], "region": c["region"],
             "sector": c["sector"], "price": price, "shares": shares,
-            "mktcap": mktcap, "revenue": c["revenue"], "ebitda": ebitda,
+            "mktcap": mktcap, "revenue": revenue, "ebitda": ebitda,
             "net_income": net_income, "eps": eps, "pe": pe, "ev": ev,
             "ev_ebitda": ev_ebitda, "net_debt": c["net_debt"],
             "div_yield": c["div_yield"], "beta": c["beta"],
-            "net_margin": c["net_margin"], "ebitda_margin": c["ebitda_margin"],
+            "net_margin": net_margin, "ebitda_margin": ebitda_margin,
             "ps": ps, "fcf_yield": fcf_yield, "nd_ebitda": nd_ebitda,
-            "payout": payout, "change_pct": chg,
+            "payout": payout, "change_pct": chg, "last_earnings": last_earn,
         }
 
     def sector_medians(self, sector):
@@ -364,6 +424,20 @@ class Market:
                 news.append({"region": region, "kind": "good" if up else "bad",
                              "text": f"{region} : séance {'haussière' if up else 'baissière'} marquée"})
         return news[:3]
+
+    def _earnings_news(self):
+        """News pour les surprises de résultats les plus marquantes du pas."""
+        news = []
+        big = sorted(self.last_earnings, key=lambda r: -abs(r["surprise"]))
+        for r in big[:2]:
+            if abs(r["surprise"]) < EARN_NEWS_THRESH:
+                break
+            region = next((c["region"] for c in self.companies
+                           if c["ticker"] == r["ticker"]), None)
+            verb = "dépasse les attentes" if r["beat"] else "déçoit"
+            news.append({"region": region, "kind": "good" if r["beat"] else "bad",
+                         "text": f"Résultats : {r['ticker']} {verb} ({r['surprise']*100:+.0f}%)"})
+        return news
 
     def latest_news(self):
         return self._last_news

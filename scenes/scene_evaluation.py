@@ -37,6 +37,7 @@ class EvaluationScene(Scene):
             self.pass_threshold = exam.PASS_THRESHOLD
         self.idx = 0
         self.score = 0
+        self.missed_lessons = []    # ids de leçons des questions ratées (débrief)
         self.state = "intro"        # intro -> question -> feedback -> result
         self.chosen = None          # index mcq choisi
         self.input = ""             # saisie fill/text
@@ -127,7 +128,15 @@ class EvaluationScene(Scene):
         self.chosen = i
         if i == it["answer"]:
             self.score += 1
+        else:
+            self._record_miss(it)
         self.state = "feedback"
+
+    def _record_miss(self, it):
+        """Mémorise la leçon liée à une question ratée (pour le débrief final)."""
+        lid = exam.lesson_for_item(it)
+        if lid and lid not in self.missed_lessons:
+            self.missed_lessons.append(lid)
 
     def _submit(self, it):
         if it["kind"] == "text":
@@ -140,6 +149,8 @@ class EvaluationScene(Scene):
         self.submitted_ok = ok
         if ok:
             self.score += 1
+        else:
+            self._record_miss(it)
         self.state = "feedback"
 
     def _next(self):
@@ -359,17 +370,11 @@ class EvaluationScene(Scene):
     def _draw_result(self, surf):
         ratio = self.score / max(1, len(self.items))
         accent = config.COL_UP if self.passed else config.COL_DOWN
-        panel = pygame.Rect(280, 150, config.SCREEN_WIDTH-560, 380)
-        inner = widgets.draw_panel(surf, panel, "Résultat", accent)
-        cx = panel.centerx
         p = self.app.gs.player
         if self.mode == "cert":
             verdict = "CERTIFICATION RÉUSSIE" if self.passed else "EXAMEN ÉCHOUÉ"
         else:
             verdict = "PROMOTION ACCORDÉE" if self.passed else "ÉVALUATION ÉCHOUÉE"
-        widgets.draw_text(surf, verdict, (cx, inner.y+10), fonts.title(bold=True), accent, align="center")
-        widgets.draw_text(surf, f"Score : {self.score} / {len(self.items)}  ({int(ratio*100)}%)",
-                          (cx, inner.y+62), fonts.head(), config.COL_WHITE, align="center")
         if self.mode == "cert":
             from core import certifications as C
             prog = C.PROGRAMS[self.cert_program]
@@ -392,10 +397,39 @@ class EvaluationScene(Scene):
             msg = [f"Seuil non atteint ({int(self.pass_threshold*100)}% requis).",
                    "−5 réputation. Révisez (LEARN) et retentez.",
                    "Astuce : utilisez la calculatrice et le glossaire (DEFINE)."]
+        # leçons à revoir d'après les questions ratées
+        from data import lessons as lessons_data
+        titles = [lessons_data.get(lid)["title"] for lid in self.missed_lessons
+                  if lessons_data.get(lid)]
+        shown = titles[:4]
+        # hauteur de panneau adaptée au contenu (anti-chevauchement du bouton)
+        lessons_h = (32 + 22 * len(shown) + (20 if len(titles) > len(shown) else 0)
+                     if titles else 0)
+        panel_h = 150 + 32 * len(msg) + lessons_h + 70
+        panel = pygame.Rect(280, max(70, (config.SCREEN_HEIGHT - panel_h) // 2),
+                            config.SCREEN_WIDTH - 560, panel_h)
+        inner = widgets.draw_panel(surf, panel, "Résultat", accent)
+        cx = panel.centerx
+        widgets.draw_text(surf, verdict, (cx, inner.y+10), fonts.title(bold=True), accent, align="center")
+        widgets.draw_text(surf, f"Score : {self.score} / {len(self.items)}  ({int(ratio*100)}%)",
+                          (cx, inner.y+62), fonts.head(), config.COL_WHITE, align="center")
         y = inner.y + 120
         for m in msg:
             widgets.draw_text(surf, m, (cx, y), fonts.body(), config.COL_TEXT, align="center")
             y += 32
-        self.continue_btn.rect.center = (cx, inner.bottom-36)
+        if shown:
+            y += 6
+            widgets.draw_text(surf, "À revoir (LEARN) :", (cx, y),
+                              fonts.small(bold=True), config.COL_AMBER, align="center")
+            y += 26
+            for t in shown:
+                widgets.draw_text(surf, "• " + t, (cx, y),
+                                  fonts.small(), config.COL_TEXT_DIM, align="center")
+                y += 22
+            if len(titles) > len(shown):
+                widgets.draw_text(surf, f"… et {len(titles)-len(shown)} autre(s)",
+                                  (cx, y), fonts.tiny(), config.COL_TEXT_DIM, align="center")
+                y += 20
+        self.continue_btn.rect.center = (cx, inner.bottom-30)
         self.continue_btn.label = "RETOUR AU TERMINAL"
         self.continue_btn.draw(surf)

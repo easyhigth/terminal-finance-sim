@@ -511,6 +511,22 @@ for _fn, _v in _VARIANTS.items():
     _fn.variants = _v
 
 
+# Mapping générateur -> leçon de l'Académie (pour le débrief des erreurs).
+# Les générateurs « variés » (def/formule/concept/graphe) restent sans leçon dédiée.
+GEN_LESSON = {
+    "g_eps": "pe", "g_pe": "pe",
+    "g_ev": "ev_ebitda", "g_ev_ebitda": "ev_ebitda", "g_marketcap_mcq": "capvsev",
+    "g_terminal_value": "dcf", "g_dcf2": "dcf", "g_wacc": "dcf", "g_cagr": "dcf",
+    "g_sharpe": "sharpe", "g_var_param": "var", "g_option_intrinsic": "options",
+    "g_lbo_moic": "lbo", "g_portfolio_ret": "diversification", "g_graph_vol": "beta",
+}
+
+
+def lesson_for_item(item):
+    """Renvoie l'id de leçon associé à un item (ou None)."""
+    return item.get("lesson")
+
+
 def generate(grade_index, rng=None, n=None, difficulty=None):
     """Génère un examen : liste d'items variés, calibrés sur le grade.
     `difficulty` force un tier (utilisé par les certifications)."""
@@ -523,12 +539,14 @@ def generate(grade_index, rng=None, n=None, difficulty=None):
     attempts = 0
     while len(items) < n and attempts < n * 12:
         attempts += 1
-        it = rng.choice(gens)(rng)
+        gen = rng.choice(gens)
+        it = gen(rng)
         if not it:
             continue
         key = it["prompt"]
         if key in seen:
             continue
         seen.add(key)
+        it["lesson"] = GEN_LESSON.get(gen.__name__)   # tag pour le débrief
         items.append(it)
     return items

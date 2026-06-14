@@ -76,6 +76,7 @@ CATALOG = [
         ("BUYCRYPTO / SELLCRYPTO <id> <qté>", "Trader des crypto-actifs"),
         ("STRUCT", "Produits structurés (capital garanti, autocallable...)"),
         ("CREDIT", "Desk crédit : tranches de titrisation & waterfall"),
+        ("ALM", "Gestion actif-passif : gaps de taux, NII, ΔEVE"),
         ("ALLOCATE <ticker> <pct>", "Ajuster une position à pct% de la valeur nette"),
         ("HEDGE [pct]", "Réduire l'exposition (bêta) du portefeuille"),
         ("REBALANCE", "Ramener les positions à poids égaux"),

@@ -270,6 +270,13 @@ class GameState:
                 if roll:
                     p.adjust_cash(roll)
                     dividends += roll
+            # intérêt de la CBDC (actif sûr rémunéré au taux directeur)
+            if getattr(p, "crypto", None):
+                from core import crypto as _crypto
+                cbi = _crypto.interest(p, market, config.DAYS_PER_STEP)
+                if cbi:
+                    p.adjust_cash(cbi)
+                    dividends += cbi
             financing = portfolio.accrue_financing(p, market, config.DAYS_PER_STEP)
             margin_call = portfolio.check_margin_call(p, market)
             # produits structurés arrivés à échéance

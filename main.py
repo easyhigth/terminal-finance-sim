@@ -41,6 +41,7 @@ from scenes.scene_commodities import CommoditiesScene
 from scenes.scene_crypto import CryptoScene
 from scenes.scene_structured import StructuredScene
 from scenes.scene_credit import CreditScene
+from scenes.scene_alm import AlmScene
 
 
 class App:
@@ -51,6 +52,8 @@ class App:
             (config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
         self.clock = pygame.time.Clock()
         self.running = True
+        self.cheats = False           # activé par main_cheat.py (commandes de test)
+        self.advance_on_return = 0    # tics de temps à jouer au retour au terminal
 
         # état de jeu courant (créé à la sélection du continent)
         self.gs = GameState()
@@ -90,6 +93,7 @@ class App:
         self.scenes.register("crypto", CryptoScene(self))
         self.scenes.register("structured", StructuredScene(self))
         self.scenes.register("credit", CreditScene(self))
+        self.scenes.register("alm", AlmScene(self))
         self.scenes.go("menu")
 
     def notify(self, text, kind="info"):

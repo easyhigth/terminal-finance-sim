@@ -76,9 +76,15 @@ class CryptoScene(Scene):
             widgets.draw_text(surf, f"{q['vol']*100:.0f}%", (cols[2][1], y), fonts.small(),
                               config.COL_DOWN if q["vol"] > 1.0 else config.COL_WARN)
             depeg = q["stable"] and q["spot"] < 0.95
-            label = ("Stablecoin" + (" ⚠ DEPEG" if depeg else "")) if q["stable"] else "Crypto"
-            widgets.draw_text(surf, label, (cols[3][1], y), fonts.small(bold=True),
-                              config.COL_DOWN if depeg else (config.COL_CYAN if q["stable"] else config.COL_TEXT_DIM))
+            if q.get("cbdc"):
+                label = f"CBDC +{q['yield']*100:.1f}%/an"
+                lcol = config.COL_UP
+            elif q["stable"]:
+                label = "Stablecoin" + (" ⚠ DEPEG" if depeg else "")
+                lcol = config.COL_DOWN if depeg else config.COL_CYAN
+            else:
+                label, lcol = "Crypto", config.COL_TEXT_DIM
+            widgets.draw_text(surf, label, (cols[3][1], y), fonts.small(bold=True), lcol)
             widgets.draw_text(surf, f"{held:g}", (cols[4][1], y), fonts.small(),
                               config.COL_UP if held else config.COL_TEXT_DIM)
             if self._can_trade():

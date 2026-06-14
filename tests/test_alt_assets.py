@@ -72,6 +72,17 @@ def test_stablecoin_starts_at_peg():
     assert K.spot(m, "USDX") == pytest.approx(1.0, abs=0.05)   # au pair au départ
 
 
+def test_cbdc_is_stable_and_pays_interest():
+    p, m = _setup()
+    assert K.spot(m, "CBDC") == 1.0                 # toujours au pair, jamais de depeg
+    K.buy(p, m, "CBDC", 100_000)
+    rate = m.macro["rate"]["v"] / 100.0
+    coup = K.interest(p, m, days=365)
+    assert coup == pytest.approx(100_000 * rate, rel=1e-6)   # rémunère le taux directeur
+    q = K.quote(m, "CBDC")
+    assert q["cbdc"] and q["vol"] == 0.0
+
+
 def test_alt_assets_in_net_worth():
     p, m = _setup()
     nw0 = pf.net_worth(p, m)

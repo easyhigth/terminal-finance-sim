@@ -36,7 +36,7 @@ CMD_NAMES = [
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS",
     "PORTFOLIO", "BOOK", "BUY", "SELL", "SHORT", "COVER", "MARGIN",
     "BONDS", "BUYBOND", "SELLBOND", "CMDTY", "BUYCMDTY", "SELLCMDTY",
-    "CRYPTO", "BUYCRYPTO", "SELLCRYPTO", "STRUCT", "CREDIT",
+    "CRYPTO", "BUYCRYPTO", "SELLCRYPTO", "STRUCT", "CREDIT", "ALM",
     "ALLOCATE", "HEDGE", "REBALANCE",
     "PITCH", "FRONTIER", "RISK", "QUANT", "MA", "SHEET", "GLOSSARY",
     "SAVE", "SAVES", "NEWS", "REG", "STATUS", "MENU",
@@ -282,6 +282,8 @@ class TerminalScene(Scene):
             self.app.scenes.go("structured", return_to="terminal")
         elif cmd in ("CREDIT", "TITRISATION", "ABS", "CLO"):
             self.app.scenes.go("credit", return_to="terminal")
+        elif cmd in ("ALM", "BANKING"):
+            self.app.scenes.go("alm", return_to="terminal")
         elif cmd in ("BUYCRYPTO", "SELLCRYPTO"):
             self._cmd_alt_trade("crypto", cmd, parts[1:])
         elif cmd in ("GP", "CHART", "GRAPH"):
@@ -397,6 +399,9 @@ class TerminalScene(Scene):
             else:
                 self.app.gs.save(config.SAVE_SLOTS[0])
                 self._log(f"  Partie sauvegardée (slot: {config.SAVE_SLOTS[0]}).")
+        elif getattr(self.app, "cheats", False) and cmd in (
+                "GRADE", "CASH", "REP", "REPUTATION", "CHEAT", "CHEATS", "MAXUNLOCK"):
+            self._cmd_cheat(cmd, parts[1:])
         elif cmd == "NEWS":
             import random
             random.shuffle(self.news)
@@ -652,6 +657,46 @@ class TerminalScene(Scene):
                 line = "   "
             line += w + " "
         self._log(line)
+
+    def _cmd_cheat(self, cmd, args):
+        """Commandes de TEST (mode triche, via main_cheat.py)."""
+        p = self.app.gs.player
+        if cmd in ("CHEAT", "CHEATS"):
+            self._log("  ⚙ TRICHE : GRADE <0-11> · CASH <montant> · REP <0-100> · MAXUNLOCK")
+            self._log(f"  Grades : " + " ".join(f"{i}={g}" for i, g in enumerate(config.GRADES)))
+            return
+        if cmd == "GRADE":
+            if not args or not args[0].lstrip("-").isdigit():
+                self._log("  Usage : GRADE <0-11>  (voir CHEAT pour la liste).")
+                return
+            gi = max(0, min(len(config.GRADES) - 1, int(args[0])))
+            p.grade_index = gi
+            p.grade_deals = 0
+            p.grade_missions = 0
+            p.grade_start_quarter = p.quarter
+            if gi >= 2 and p.track == "General":
+                p.flags["can_choose_track"] = True
+            self._log(f"  ⚙ Grade réglé sur {gi} = {config.GRADES[gi]}.")
+            self._check_badges()
+        elif cmd == "CASH":
+            if not args or not args[0].lstrip("-").replace(".", "").isdigit():
+                self._log("  Usage : CASH <montant>.")
+                return
+            p.cash = float(args[0])
+            self._log(f"  ⚙ Trésorerie réglée sur {widgets.format_money(p.cash, self._cur())}.")
+        elif cmd in ("REP", "REPUTATION"):
+            if not args or not args[0].lstrip("-").isdigit():
+                self._log("  Usage : REP <0-100>.")
+                return
+            p.reputation = max(0, min(100, int(args[0])))
+            self._log(f"  ⚙ Réputation réglée sur {p.reputation}/100.")
+        elif cmd == "MAXUNLOCK":
+            p.grade_index = len(config.GRADES) - 1
+            p.reputation = max(p.reputation, 80)
+            if p.track == "General":
+                p.flags["can_choose_track"] = True
+            self._log(f"  ⚙ Grade max ({config.GRADES[-1]}) : toutes les actions débloquées.")
+            self._check_badges()
 
     def _cmd_eval(self):
         """Ouvre l'examen si TOUS les critères de promotion sont remplis."""

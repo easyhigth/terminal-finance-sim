@@ -16,8 +16,14 @@ COINS = [
     ("SOLR", "Solaris", 150.0, 0.05, 1.20, False),
     ("DOGY", "Dogycoin", 0.15, -0.05, 1.80, False),   # memecoin, espérance négative
     ("USDX", "USDX (stablecoin)", 1.0, 0.0, 0.02, True),
+    ("CBDC", "e-Dollar (CBDC)", 1.0, 0.0, 0.0, False),  # monnaie banque centrale : sûre + rémunérée
 ]
 _BY_ID = {c[0]: c for c in COINS}
+CBDC_IDS = {"CBDC"}
+
+
+def is_cbdc(cid):
+    return cid in CBDC_IDS
 COMMISSION = 0.0015        # frais plus élevés (15 bps)
 _path_cache = {}
 
@@ -56,7 +62,15 @@ def _path(market, cid, n_steps):
     return path
 
 
+def policy_rate(market):
+    if market is not None and hasattr(market, "macro"):
+        return market.macro["rate"]["v"] / 100.0
+    return 0.03
+
+
 def spot(market, cid):
+    if is_cbdc(cid):
+        return 1.0                                   # CBDC arrimée 1:1, jamais de depeg
     step = int(getattr(market, "step_count", 0))
     p = _path(market, cid, step)
     return p[step] * (_BY_ID[cid][2] if _BY_ID[cid][5] else 1.0)  # stable: niveau×base(=1)
@@ -67,7 +81,8 @@ def quote(market, cid):
     if not c:
         return None
     sp = spot(market, cid)
-    return {"id": cid, "name": c[1], "spot": sp, "vol": c[4], "stable": c[5]}
+    return {"id": cid, "name": c[1], "spot": sp, "vol": c[4], "stable": c[5],
+            "cbdc": is_cbdc(cid), "yield": policy_rate(market) if is_cbdc(cid) else 0.0}
 
 
 def all_quotes(market):
@@ -121,6 +136,16 @@ def holdings_value(player, market):
     for cid, pos in getattr(player, "crypto", {}).items():
         if cid in _BY_ID:
             total += spot(market, cid) * pos["qty"]
+    return total
+
+
+def interest(player, market, days):
+    """Intérêt versé par la CBDC (rémunérée au taux directeur), au prorata."""
+    total = 0.0
+    rate = policy_rate(market)
+    for cid, pos in getattr(player, "crypto", {}).items():
+        if is_cbdc(cid):
+            total += spot(market, cid) * pos["qty"] * rate * (days / 365.0)
     return total
 
 

@@ -20,6 +20,11 @@ TERM_PREMIUM = 0.0015     # prime de terme par année de maturité
 # Spread de crédit par rating (sur le niveau de la courbe).
 _RATING_SPREAD = {"AAA": 0.002, "AA": 0.004, "A": 0.007,
                   "BBB": 0.013, "BB": 0.030, "B": 0.055}
+# Perte de crédit ATTENDUE annuelle par rating : le spread d'un high yield ne doit
+# pas être un repas gratuit — il compense un risque de défaut. On la déduit des
+# coupons encaissés (net carry réaliste : un B nette ~ un IG).
+_RATING_LOSS = {"AAA": 0.0, "AA": 0.0005, "A": 0.001,
+                "BBB": 0.004, "BB": 0.020, "B": 0.045}
 
 # (id, nom, émetteur, région, type, rating, coupon, maturité)
 BONDS = [
@@ -143,10 +148,12 @@ def holdings(player, market):
 
 
 def coupons(player, market, days):
-    """Coupons versés sur `days` jours (au prorata annuel)."""
+    """Coupons versés sur `days` jours (au prorata annuel), NETS de la perte de
+    crédit attendue du rating — un high yield ne rapporte pas « gratuitement »."""
     total = 0.0
     for bid, pos in getattr(player, "bonds", {}).items():
         b = _BY_ID.get(bid)
         if b:
-            total += FACE * b[6] * pos["qty"] * (days / 365.0)
+            net_rate = b[6] - _RATING_LOSS.get(b[5], 0.0)
+            total += FACE * net_rate * pos["qty"] * (days / 365.0)
     return total

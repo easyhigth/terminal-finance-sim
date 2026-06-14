@@ -105,6 +105,25 @@ def test_annualized_return_and_vol_in_target_range():
     assert 0.05 < ann_vol < 0.40, f"volatilité annualisée hors cible: {ann_vol:.2%}"
 
 
+def test_equity_risk_premium_positive_across_seeds():
+    """Invariant d'équilibrage : en MOYENNE sur plusieurs graines, l'action
+    rapporte nettement plus que le cash (~3%) — prime de risque positive, sans
+    sur-bull (équités > obligations > cash)."""
+    rets = []
+    for seed in (1, 7, 42, 99, 123, 256, 2024, 555):
+        m = Market(seed=seed)
+        prev = m.price.copy()
+        srs = []
+        for _ in range(8 * STEPS_PER_YEAR):
+            m.step()
+            srs.append(np.mean(np.log(m.price / prev)))
+            prev = m.price.copy()
+        rets.append(np.mean(srs) * STEPS_PER_YEAR)
+    avg = sum(rets) / len(rets)
+    assert avg > 0.045, f"prime de risque actions trop faible: {avg:.2%}"
+    assert avg < 0.15, f"marché trop haussier (sur-bull): {avg:.2%}"
+
+
 # --------------------------------------------------------------- crises
 def test_crisis_depresses_prices():
     base = Market(seed=321); base.fast_forward(20)

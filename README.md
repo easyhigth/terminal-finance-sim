@@ -37,7 +37,10 @@ Prototype jouable — moteur de base + interface Bloomberg + modules financiers 
   - **corrélations réalistes** entre valeurs et entre régions (~0,70) ;
   - une **crise** = un choc injecté sur les bons facteurs (2008 : monde + finance
     effondrés ; tornade : secteur agro ; etc.).
-- Calibré ~**+10–15 %/an** de rendement moyen, ~**19 %** de volatilité.
+- Calibré (12 graines, 10 ans) pour une **prime de risque actions positive** :
+  action moyenne ~**+7 %/an** (vs cash ~3 %, obligations IG ~5 %), volatilité
+  ~**16 %**, indice phare ~**16 %** (dominé par les grandes capi). Une perte sur
+  10 ans reste possible selon l'« époque » de marché.
 - **Déterministe & léger** : l'état se reconstruit exactement via (graine, nb de pas),
   donc les sauvegardes restent minuscules et les prix sont reproductibles.
 - **Carte du monde au centre** du terminal : hubs régionaux affichant l'indice phare,

@@ -28,13 +28,15 @@ from data import companies as comp_data
 
 HIST_LEN = 120          # longueur d'historique conservée (pour les graphes)
 
-# Paramètres des facteurs (par pas ≈ une semaine de marché)
-# Calibrés pour ~8-12% de rendement annuel moyen et ~15-18% de volatilité.
-MU_WORLD = 0.0006       # dérive de marché
+# Paramètres des facteurs (par pas ≈ une semaine de marché). Calibrés (sur 12
+# graines, 10 ans) pour une PRIME DE RISQUE ACTIONS positive : action moyenne
+# ~7%/an (vs cash ~3%, obligations IG ~5%), volatilité ~16%, indice phare ~16%
+# (dominé par les grandes capi). Voir tests/test_market.py.
+MU_WORLD = 0.0011       # dérive de marché (prime de risque actions)
 VOL_WORLD = 0.017
 VOL_SECTOR = 0.012
 VOL_REGION = 0.010
-DRIFT_MULT = 0.3        # atténue les dérives propres des sociétés (anti sur-bull)
+DRIFT_MULT = 0.2        # atténue les dérives propres des sociétés (anti sur-bull)
 
 # Régimes de marché — toile de fond lente (déterministe) par-dessus les crises.
 # Chaque régime module la dérive et la volatilité du facteur MONDE.

@@ -75,8 +75,12 @@ def gross_exposure(player, market):
 
 
 def net_worth(player, market):
-    """Valeur nette = trésorerie (éventuellement négative) + positions signées."""
-    return player.cash + positions_value(player, market)
+    """Valeur nette = trésorerie + positions actions signées + obligations."""
+    nw = player.cash + positions_value(player, market)
+    if getattr(player, "bonds", None):
+        from core import bonds
+        nw += bonds.holdings_value(player, market)
+    return nw
 
 
 def leverage(player, market):

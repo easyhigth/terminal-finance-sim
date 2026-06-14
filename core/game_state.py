@@ -31,6 +31,7 @@ class PlayerState:
     market_seed: int = 0                               # graine du moteur de marché (0 = non initialisé)
     market_step: int = 0                               # nb de pas de marché écoulés (resync au chargement)
     portfolio: dict = field(default_factory=dict)      # holdings : ticker -> {"shares","avg"}
+    bonds: dict = field(default_factory=dict)          # obligations : bond_id -> {"qty","avg"}
     realized_pnl: float = 0.0                          # P&L réalisé cumulé (ventes)
     # ----- progression de carrière -----
     deals_won: int = 0                                 # deals conclus (cumulatif)
@@ -248,6 +249,13 @@ class GameState:
             dividends = portfolio.dividends(p, market, config.DAYS_PER_STEP)
             if dividends:
                 p.adjust_cash(dividends)
+            # coupons obligataires (revenu de portage)
+            if getattr(p, "bonds", None):
+                from core import bonds as _bonds
+                coup = _bonds.coupons(p, market, config.DAYS_PER_STEP)
+                if coup:
+                    p.adjust_cash(coup)
+                    dividends += coup   # agrégé dans le revenu passif affiché
             financing = portfolio.accrue_financing(p, market, config.DAYS_PER_STEP)
             margin_call = portfolio.check_margin_call(p, market)
             nw = portfolio.net_worth(p, market)

@@ -35,7 +35,7 @@ CMD_NAMES = [
     "COMPANY", "FA", "SEARCH", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS",
     "PORTFOLIO", "BOOK", "BUY", "SELL", "SHORT", "COVER", "MARGIN",
-    "ALLOCATE", "HEDGE", "REBALANCE",
+    "BONDS", "BUYBOND", "SELLBOND", "ALLOCATE", "HEDGE", "REBALANCE",
     "PITCH", "FRONTIER", "RISK", "QUANT", "MA", "SHEET", "GLOSSARY",
     "SAVE", "SAVES", "NEWS", "REG", "STATUS", "MENU",
 ]
@@ -260,6 +260,10 @@ class TerminalScene(Scene):
             self._cmd_company(arg)
         elif cmd in ("FA", "FIN", "STATEMENTS", "ETATS"):
             self._cmd_financials(arg)
+        elif cmd in ("BONDS", "BOND", "OBLIGATIONS", "FI"):
+            self.app.scenes.go("bonds", return_to="terminal")
+        elif cmd in ("BUYBOND", "SELLBOND"):
+            self._cmd_bond_trade(cmd, parts[1:])
         elif cmd in ("GP", "CHART", "GRAPH"):
             self._cmd_chart(arg)
         elif cmd in ("RV", "PEERS", "COMPS"):
@@ -433,6 +437,42 @@ class TerminalScene(Scene):
             self._log(f"  Ticker inconnu : {ticker.upper()}. Essayez SEARCH.")
             return
         self.app.scenes.go("company", ticker=ticker.upper(), return_to="terminal")
+
+    def _cmd_bond_trade(self, cmd, args):
+        """BUYBOND/SELLBOND <id> <qté>."""
+        import core.bonds as bonds_mod
+        if not unlocks_mod.unlocked(self.app.gs.player, "trade"):
+            self._log("  🔒 Trading débloqué au grade Associate.")
+            return
+        if len(args) < 1:
+            self._log(f"  Usage : {cmd} <id> <qté>  (voir BONDS).")
+            return
+        bid = args[0].upper()
+        qty = "ALL"
+        if len(args) > 1 and args[1].upper() != "ALL":
+            if not args[1].isdigit():
+                self._log("  Quantité invalide.")
+                return
+            qty = int(args[1])
+        p, m = self.app.gs.player, self.market
+        if cmd == "BUYBOND":
+            if qty == "ALL":
+                self._log("  Précisez une quantité pour l'achat.")
+                return
+            r = bonds_mod.buy_bond(p, m, bid, qty)
+            if r["ok"]:
+                self._log(f"  ✓ Achat {qty} × {bid} @ {r['price']:.2f} = "
+                          f"{widgets.format_money(r['total'], self._cur())}.")
+            else:
+                self._log(f"  Achat refusé ({r['reason']}).")
+        else:
+            r = bonds_mod.sell_bond(p, m, bid, qty)
+            if r["ok"]:
+                self._log(f"  ✓ Vente {int(r['qty'])} × {bid} (P&L réalisé "
+                          f"{r['realized']:+.0f}).")
+            else:
+                self._log(f"  Vente refusée ({r['reason']}).")
+        self._after_trade()
 
     def _cmd_financials(self, ticker):
         """FA <ticker> : états financiers complets (bilan + compte de résultat)."""

@@ -68,6 +68,8 @@ CATALOG = [
         ("SHORT <ticker> <qté>", "Vente à découvert (parier à la baisse)"),
         ("COVER <ticker> <qté|ALL>", "Racheter une position courte"),
         ("MARGIN", "État de marge : equity, levier, pouvoir d'achat"),
+        ("BONDS", "Marché obligataire : YTM, duration, prix (sensibles aux taux)"),
+        ("BUYBOND / SELLBOND <id> <qté>", "Acheter / vendre des obligations"),
         ("ALLOCATE <ticker> <pct>", "Ajuster une position à pct% de la valeur nette"),
         ("HEDGE [pct]", "Réduire l'exposition (bêta) du portefeuille"),
         ("REBALANCE", "Ramener les positions à poids égaux"),

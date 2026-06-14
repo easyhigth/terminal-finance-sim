@@ -128,6 +128,26 @@ def test_margin_call_liquidates_when_equity_collapses():
 
 
 # --------------------------------------------------------------- dividendes
+def test_slippage_grows_with_order_size():
+    p, m = _setup()
+    tk = m.companies[0]["ticker"]
+    # un petit ordre subit surtout le demi-spread ; un ordre énorme subit l'impact
+    small = pf.fill_price(m, tk, 1, "buy")
+    big = pf.fill_price(m, tk, 5_000_000, "buy")
+    mid = m.price_of(tk)
+    assert small > mid                      # demi-spread à l'achat
+    assert big > small                      # impact de marché croissant avec la taille
+    # à la vente, le prix obtenu est sous le mid
+    assert pf.fill_price(m, tk, 1, "sell") < mid
+
+
+def test_slippage_capped():
+    p, m = _setup()
+    tk = m.companies[0]["ticker"]
+    huge = pf.fill_price(m, tk, 10 ** 15, "buy")
+    assert huge <= m.price_of(tk) * (1 + pf.HALF_SPREAD + pf.MAX_SLIPPAGE) + 1e-6
+
+
 def test_short_pays_dividends():
     p, m = _setup()
     # trouve une société qui verse un dividende

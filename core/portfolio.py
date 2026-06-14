@@ -24,6 +24,9 @@ from core import config
 from core import tracks
 
 COMMISSION = 0.001        # 10 points de base par transaction
+HALF_SPREAD = 0.0008      # demi-spread bid/ask de base (8 bps)
+IMPACT_K = 0.12           # coefficient d'impact de marché (slippage selon la taille)
+MAX_SLIPPAGE = 0.05       # impact plafonné à 5 %
 MAINT_MARGIN = 0.25       # equity/exposition mini avant appel de marge
 MARGIN_SPREAD = 0.03      # surcoût annuel sur le taux directeur (emprunt sur marge)
 SHORT_FEE_ANNUAL = 0.01   # frais d'emprunt de titres annuels (notionnel short)
@@ -38,6 +41,21 @@ def max_leverage(grade_index):
 def _commission(player):
     """Commission effective (réduite pour la voie Portfolio)."""
     return COMMISSION * tracks.perk(player, "commission_mult")
+
+
+def fill_price(market, ticker, qty, side):
+    """Prix d'exécution réel (microstructure) = mid ± demi-spread ± impact de marché.
+    L'impact croît avec la taille de l'ordre rapportée à la liquidité (capi) :
+    un gros ordre « mange » le carnet et dégrade le prix obtenu."""
+    i = market.ticker_idx.get(ticker)
+    mid = market.price_of(ticker)
+    if i is None or mid is None:
+        return mid
+    liquidity = float(market.price[i] * market.shares[i])      # capi (proxy de profondeur)
+    order_value = abs(qty) * mid
+    impact = min(MAX_SLIPPAGE, IMPACT_K * (order_value / liquidity)) if liquidity > 0 else 0.0
+    cost_frac = HALF_SPREAD + impact
+    return mid * (1 + cost_frac) if side == "buy" else mid * (1 - cost_frac)
 
 
 def _max_leverage(player):
@@ -139,7 +157,8 @@ def buy(player, market, ticker, qty):
     pos = player.portfolio.get(ticker)
     if pos and pos["shares"] < 0:
         return {"ok": False, "reason": "isshort"}
-    cost = price * qty
+    fill = fill_price(market, ticker, qty, "buy")    # prix d'exécution (spread + impact)
+    cost = fill * qty
     fee = cost * _commission(player)
     cur_shares = pos["shares"] if pos else 0.0
     new_gross = _gross_excluding(player, market, ticker) + abs((cur_shares + qty) * price)
@@ -152,9 +171,10 @@ def buy(player, market, ticker, qty):
         pos["avg"] = (pos["shares"] * pos["avg"] + cost) / n
         pos["shares"] = n
     else:
-        player.portfolio[ticker] = {"shares": float(qty), "avg": price}
+        player.portfolio[ticker] = {"shares": float(qty), "avg": fill}
     market.track_company(ticker)
-    return {"ok": True, "price": price, "qty": qty, "fee": fee, "total": cost + fee}
+    return {"ok": True, "price": fill, "qty": qty, "fee": fee, "total": cost + fee,
+            "slippage": fill - price}
 
 
 def sell(player, market, ticker, qty):
@@ -169,16 +189,17 @@ def sell(player, market, ticker, qty):
         qty = pos["shares"]
     if qty <= 0:
         return {"ok": False, "reason": "qty"}
-    proceeds = price * qty
+    fill = fill_price(market, ticker, qty, "sell")
+    proceeds = fill * qty
     fee = proceeds * _commission(player)
     net = proceeds - fee
-    realized = (price - pos["avg"]) * qty - fee
+    realized = (fill - pos["avg"]) * qty - fee
     player.cash += net
     player.realized_pnl = getattr(player, "realized_pnl", 0.0) + realized
     pos["shares"] -= qty
     if abs(pos["shares"]) <= 1e-9:
         del player.portfolio[ticker]
-    return {"ok": True, "price": price, "qty": qty, "net": net, "fee": fee,
+    return {"ok": True, "price": fill, "qty": qty, "net": net, "fee": fee,
             "realized": realized}
 
 
@@ -196,7 +217,8 @@ def short(player, market, ticker, qty):
     pos = player.portfolio.get(ticker)
     if pos and pos["shares"] > 0:
         return {"ok": False, "reason": "islong"}
-    proceeds = price * qty
+    fill = fill_price(market, ticker, qty, "sell")
+    proceeds = fill * qty
     fee = proceeds * _commission(player)
     cur_shares = pos["shares"] if pos else 0.0
     new_gross = _gross_excluding(player, market, ticker) + abs((cur_shares - qty) * price)
@@ -209,9 +231,9 @@ def short(player, market, ticker, qty):
         pos["avg"] = (abs(pos["shares"]) * pos["avg"] + proceeds) / abs(n)
         pos["shares"] = n
     else:
-        player.portfolio[ticker] = {"shares": float(-qty), "avg": price}
+        player.portfolio[ticker] = {"shares": float(-qty), "avg": fill}
     market.track_company(ticker)
-    return {"ok": True, "price": price, "qty": qty, "fee": fee, "net": proceeds - fee}
+    return {"ok": True, "price": fill, "qty": qty, "fee": fee, "net": proceeds - fee}
 
 
 def cover(player, market, ticker, qty):
@@ -227,15 +249,16 @@ def cover(player, market, ticker, qty):
         qty = short_qty
     if qty <= 0:
         return {"ok": False, "reason": "qty"}
-    cost = price * qty
+    fill = fill_price(market, ticker, qty, "buy")
+    cost = fill * qty
     fee = cost * _commission(player)
-    realized = (pos["avg"] - price) * qty - fee       # short gagne quand le prix baisse
+    realized = (pos["avg"] - fill) * qty - fee        # short gagne quand le prix baisse
     player.cash -= (cost + fee)
     player.realized_pnl = getattr(player, "realized_pnl", 0.0) + realized
     pos["shares"] += qty
     if abs(pos["shares"]) <= 1e-9:
         del player.portfolio[ticker]
-    return {"ok": True, "price": price, "qty": qty, "cost": cost + fee, "fee": fee,
+    return {"ok": True, "price": fill, "qty": qty, "cost": cost + fee, "fee": fee,
             "realized": realized}
 
 

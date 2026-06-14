@@ -65,7 +65,7 @@ class EvaluationScene(Scene):
         self.back_btn = widgets.Button(config.back_button_rect(150), "← QUITTER",
                                        config.COL_TEXT_DIM)
         self.calc_btn = widgets.Button((200, config.SCREEN_HEIGHT-50, 160, 42),
-                                       "🧮 CALCULATRICE", config.COL_CYAN)
+                                       "CALCULATRICE", config.COL_CYAN)
         self.pause_btn = widgets.Button((372, config.SCREEN_HEIGHT-50, 150, 42),
                                         "PAUSE", config.COL_WARN)
 

@@ -63,7 +63,7 @@ class Globe:
         self.rot = 0.0                 # rotation longitude (rad)
         self.tilt = math.radians(18)   # inclinaison de l'axe
         self.grid = _sphere_grid(15)
-        self.land = _land_grid(5)        # points « terre » (continents)
+        self.land = _land_grid(3)        # points « terre » (continents) — fine pour le détail
         self.hover_region = None
 
     # --- Projection orthographique d'un point (lat, lon) en rad ----------

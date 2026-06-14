@@ -139,6 +139,8 @@ class MissionScene(Scene):
         if self.score == total:
             career.log(p, "info", f"Mission '{self.mission['title']}' réussie ({self.score}/{total}).")
         self.app.notify(f"Mission : +{self.rep_gain} réputation", "good")
+        # une mission prend du temps : le terminal avancera d'un tour au retour
+        self.app.advance_on_return = 1
         if not p.hardcore:
             self.app.gs.save(config.AUTOSAVE_SLOT)
         self.state = "result"

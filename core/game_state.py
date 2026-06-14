@@ -36,6 +36,7 @@ class PlayerState:
     crypto: dict = field(default_factory=dict)         # crypto-actifs : id -> {"qty","avg"}
     structured: list = field(default_factory=list)     # produits structurés souscrits
     securitised: list = field(default_factory=list)    # tranches de titrisation détenues
+    eval_state: dict = field(default_factory=dict)     # examen en pause (reprise possible)
     realized_pnl: float = 0.0                          # P&L réalisé cumulé (ventes)
     # ----- progression de carrière -----
     deals_won: int = 0                                 # deals conclus (cumulatif)

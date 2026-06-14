@@ -87,13 +87,19 @@ class TerminalScene(Scene):
             ("MOVERS", "MOVERS"), ("PORTEF.", "PORTFOLIO"), ("MANDATS", "MANDATES"),
             ("TABLEUR", "SHEET"), ("ÉCO", "ECO"), ("ACADÉMIE", "LEARN"),
             ("CERTIF.", "CERT"), ("INBOX", "INBOX"), ("DÉCIDE", "DECIDE"),
-            ("CARRIÈRE", "CAREER"), ("RIVAUX", "RIVALS"), ("AIDE", "COMMANDS"),
+            ("CARRIÈRE", "CAREER"), ("RIVAUX", "RIVALS"),
+            ("SAUVER", "SAVE"), ("AIDE", "COMMANDS"),
         ]
         self.networth_spark = widgets.Sparkline(80)
         for v in p.cash_history[-80:]:
             self.networth_spark.push(v)
         if not p.cash_history:
             self.networth_spark.push(p.cash)
+        # une tâche longue (mission / deal / éval) fait passer le temps comme un ADV
+        if getattr(self.app, "advance_on_return", 0) and not p.game_over:
+            self.app.advance_on_return = 0
+            self._log("  ⏱ Le temps avance pendant que vous travaillez…")
+            self._advance_time()
 
     # --------------------------------------------------------------- events
     def handle_event(self, event):
@@ -650,6 +656,12 @@ class TerminalScene(Scene):
     def _cmd_eval(self):
         """Ouvre l'examen si TOUS les critères de promotion sont remplis."""
         p = self.app.gs.player
+        # un examen mis en pause se reprend directement (peu importe les critères)
+        if isinstance(p.eval_state, dict) and p.eval_state.get("mode") == "promotion" \
+                and p.eval_state.get("items"):
+            self._log("  Reprise de l'examen en pause…")
+            self.app.scenes.go("evaluation")
+            return
         if not p.can_promote():
             self._log("  Vous êtes au grade maximal : aucune promotion possible.")
             return
@@ -1374,8 +1386,9 @@ class TerminalScene(Scene):
     def _draw_rail(self, surf, rect, p):
         inner = widgets.draw_panel(surf, rect, "Commandes", config.COL_AMBER)
         self._rail_rects = {}
-        bh = 26
         gap = 4
+        n = max(1, len(self.rail))
+        bh = max(18, min(26, (inner.h - gap * (n - 1)) // n))   # pas adaptatif
         y = inner.y
         mp = pygame.mouse.get_pos()
         for label, cmd in self.rail:

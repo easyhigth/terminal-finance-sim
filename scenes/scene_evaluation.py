@@ -19,26 +19,39 @@ class EvaluationScene(Scene):
     def on_enter(self, **kwargs):
         self.t = 0.0
         p = self.app.gs.player
-        # mode : "promotion" (par défaut) ou "cert" (examen de certification)
-        self.mode = kwargs.get("mode", "promotion")
         self.cert_program = kwargs.get("program")
-        if self.mode == "cert":
-            from core import certifications as C
-            prog = C.PROGRAMS[self.cert_program]
-            tier = kwargs.get("tier", prog["tier"])
-            self.cert_level = kwargs.get("level", 0)
-            self.items = exam.generate(p.grade_index, difficulty=tier, n=C.EXAM_N)
-            self.pass_threshold = C.PASS_THRESHOLD
-            self.target_grade = f"{prog['name']} niveau {self.cert_level + 1}"
+        self.cert_level = kwargs.get("level", 0)
+        self.mode = kwargs.get("mode", "promotion")
+        saved = p.eval_state if isinstance(p.eval_state, dict) else {}
+        resume = bool(saved) and saved.get("mode") == self.mode and saved.get("items")
+        if resume:
+            # reprise d'un examen mis en pause : on retrouve EXACTEMENT où on était
+            self.items = saved["items"]
+            self.idx = saved.get("idx", 0)
+            self.score = saved.get("score", 0)
+            self.missed_lessons = list(saved.get("missed_lessons", []))
+            self.pass_threshold = saved.get("pass_threshold", exam.PASS_THRESHOLD)
+            self.target_grade = saved.get("target_grade", "")
+            self.cert_program = saved.get("cert_program", self.cert_program)
+            self.cert_level = saved.get("cert_level", self.cert_level)
+            self.state = "question"
         else:
-            target = min(p.grade_index + 1, len(config.GRADES) - 1)
-            self.target_grade = config.GRADES[target]
-            self.items = exam.generate(p.grade_index)
-            self.pass_threshold = exam.PASS_THRESHOLD
-        self.idx = 0
-        self.score = 0
-        self.missed_lessons = []    # ids de leçons des questions ratées (débrief)
-        self.state = "intro"        # intro -> question -> feedback -> result
+            if self.mode == "cert":
+                from core import certifications as C
+                prog = C.PROGRAMS[self.cert_program]
+                tier = kwargs.get("tier", prog["tier"])
+                self.items = exam.generate(p.grade_index, difficulty=tier, n=C.EXAM_N)
+                self.pass_threshold = C.PASS_THRESHOLD
+                self.target_grade = f"{prog['name']} niveau {self.cert_level + 1}"
+            else:
+                target = min(p.grade_index + 1, len(config.GRADES) - 1)
+                self.target_grade = config.GRADES[target]
+                self.items = exam.generate(p.grade_index)
+                self.pass_threshold = exam.PASS_THRESHOLD
+            self.idx = 0
+            self.score = 0
+            self.missed_lessons = []    # ids de leçons des questions ratées (débrief)
+            self.state = "intro"        # intro -> question -> feedback -> result
         self.chosen = None          # index mcq choisi
         self.input = ""             # saisie fill/text
         self.submitted_ok = None
@@ -48,11 +61,27 @@ class EvaluationScene(Scene):
         self.calc = None
         fy = config.SCREEN_HEIGHT - 56
         self.continue_btn = widgets.Button((config.SCREEN_WIDTH//2-130, fy, 260, 44),
-                                           "COMMENCER", config.COL_UP)
+                                           "REPRENDRE" if resume else "COMMENCER", config.COL_UP)
         self.back_btn = widgets.Button(config.back_button_rect(150), "← QUITTER",
                                        config.COL_TEXT_DIM)
         self.calc_btn = widgets.Button((200, config.SCREEN_HEIGHT-50, 160, 42),
                                        "🧮 CALCULATRICE", config.COL_CYAN)
+        self.pause_btn = widgets.Button((372, config.SCREEN_HEIGHT-50, 150, 42),
+                                        "PAUSE", config.COL_WARN)
+
+    def _pause(self):
+        """Sauvegarde la progression de l'examen pour reprendre plus tard."""
+        p = self.app.gs.player
+        p.eval_state = {
+            "mode": self.mode, "items": self.items, "idx": self.idx,
+            "score": self.score, "missed_lessons": list(self.missed_lessons),
+            "pass_threshold": self.pass_threshold, "target_grade": self.target_grade,
+            "cert_program": self.cert_program, "cert_level": self.cert_level,
+        }
+        if not p.hardcore:
+            self.app.gs.save(config.AUTOSAVE_SLOT)
+        self.app.notify("Examen mis en pause — reprenez via EVAL", "info")
+        self.app.scenes.go("terminal")
 
     # ------------------------------------------------------------- helpers
     def _item(self):
@@ -80,6 +109,9 @@ class EvaluationScene(Scene):
             return
         if self.back_btn.handle(event):
             self.app.scenes.go("terminal")
+            return
+        if self.state in ("question", "feedback") and self.pause_btn.handle(event):
+            self._pause()
             return
 
         it = self._item()
@@ -166,6 +198,8 @@ class EvaluationScene(Scene):
     def _finish(self):
         from core import career
         p = self.app.gs.player
+        p.eval_state = {}                 # examen terminé : on efface l'état en pause
+        self.app.advance_on_return = 1    # passer une éval fait avancer le temps d'un tic
         ratio = self.score / max(1, len(self.items))
         self.passed = ratio >= self.pass_threshold
         if self.mode == "cert":
@@ -209,6 +243,7 @@ class EvaluationScene(Scene):
         self.continue_btn.update(mp, dt)
         self.back_btn.update(mp, dt)
         self.calc_btn.update(mp, dt)
+        self.pause_btn.update(mp, dt)
 
     # --------------------------------------------------------------- draw
     def draw(self, surf):
@@ -228,6 +263,7 @@ class EvaluationScene(Scene):
         self.back_btn.draw(surf)
         if self.state in ("question", "feedback"):
             self.calc_btn.draw(surf)
+            self.pause_btn.draw(surf)
         if self.calc is not None:
             self.calc.draw(surf)
 

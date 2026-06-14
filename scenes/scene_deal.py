@@ -50,6 +50,8 @@ class DealScene(Scene):
         self.chosen = i
         self.result = deals_mod.apply_outcome(self.app.gs.player, self.deal_id, ch["quality"])
         self.state = "result"
+        # traiter un deal prend du temps : le terminal avancera d'un tour au retour
+        self.app.advance_on_return = 1
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
         if self.result and self.result["outcome"] == "success":
             self.app.notify(f"Deal conclu : {self.deal['title']}", "good")

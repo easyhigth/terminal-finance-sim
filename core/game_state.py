@@ -1,0 +1,285 @@
+"""
+game_state.py — Modèle de données de l'état de jeu et du joueur.
+Sérialisable en JSON pour la sauvegarde/chargement.
+"""
+import json
+import os
+import time
+from dataclasses import dataclass, field, asdict
+from core import config
+
+
+@dataclass
+class PlayerState:
+    """Toutes les données persistantes du joueur."""
+    name: str = "Trainee"
+    continent: str = "Europe"
+    track: str = "General"          # spécialisation (après Analyst)
+    grade_index: int = 0            # index dans config.GRADES
+    reputation: int = 50            # 0–100
+    cash: float = 0.0               # capital personnel / de la firme
+    firm_name: str = ""             # nom de la boîte si fondée
+    day: int = 1                    # temps de jeu en jours
+    quarter: int = 1                # trimestre courant
+    hardcore: bool = False          # désactive les sauvegardes manuelles
+    competencies: dict = field(default_factory=dict)  # compétence -> niveau 0-100
+    flags: dict = field(default_factory=dict)         # événements/déblocages
+    deals: list = field(default_factory=list)         # deals actifs (dicts)
+    event_log: list = field(default_factory=list)     # historique d'événements récents
+    cash_history: list = field(default_factory=list)  # net worth au fil du temps
+    next_deal_id: int = 1                              # compteur d'identifiants de deals
+    market_seed: int = 0                               # graine du moteur de marché (0 = non initialisé)
+    market_step: int = 0                               # nb de pas de marché écoulés (resync au chargement)
+    portfolio: dict = field(default_factory=dict)      # holdings : ticker -> {"shares","avg"}
+    realized_pnl: float = 0.0                          # P&L réalisé cumulé (ventes)
+    # ----- progression de carrière -----
+    deals_won: int = 0                                 # deals conclus (cumulatif)
+    missions_done: int = 0                             # missions réalisées (cumulatif)
+    grade_deals: int = 0                               # deals conclus depuis l'entrée dans le grade
+    grade_missions: int = 0                            # missions réalisées depuis l'entrée dans le grade
+    grade_start_quarter: int = 1                       # trimestre d'entrée dans le grade courant
+    objectives: list = field(default_factory=list)     # objectifs du trimestre en cours
+    objectives_quarter: int = 0                        # trimestre auquel se rapportent les objectifs
+    journal: list = field(default_factory=list)        # journal de carrière (événements marquants)
+    watchlist: list = field(default_factory=list)      # tickers suivis
+    titles: list = field(default_factory=list)         # titres de prestige obtenus
+    best_cash: float = 0.0                             # meilleure trésorerie atteinte
+    # ----- monde vivant -----
+    inbox: list = field(default_factory=list)          # messages reçus (manager/client/conformité/desk)
+    next_msg_id: int = 1                               # compteur d'identifiants de messages
+    rivals: list = field(default_factory=list)         # concurrents : [{name, firm, track, score}]
+    # ----- décisions & éthique -----
+    heat: int = 0                                      # scrutin réglementaire 0-100 (risque d'enquête)
+    pending_dilemmas: list = field(default_factory=list)  # dilemmes en attente de décision
+    decisions_log: list = field(default_factory=list)  # historique des choix marquants
+    badges: list = field(default_factory=list)         # ids de succès/prestige débloqués
+    # ----- contenu : mandats / recherche / alertes -----
+    mandates: list = field(default_factory=list)       # mandats clients actifs
+    mandate_offers: list = field(default_factory=list)  # offres de mandats en attente
+    next_mandate_id: int = 1
+    research: dict = field(default_factory=dict)        # ticker -> {fair, rating, day}
+    alerts: list = field(default_factory=list)          # [{ticker, price, above}]
+    learned: list = field(default_factory=list)         # ids des leçons lues (Académie)
+    certs: dict = field(default_factory=dict)           # programme -> niveau obtenu (CFA/FRM/CQF)
+    game_over: bool = False
+    game_over_reason: str = ""
+
+    @property
+    def grade(self):
+        return config.GRADES[self.grade_index]
+
+    def can_promote(self):
+        return self.grade_index < len(config.GRADES) - 1
+
+    def promote(self):
+        if self.can_promote():
+            self.grade_index += 1
+            # réinitialise les compteurs propres au grade
+            self.grade_deals = 0
+            self.grade_missions = 0
+            self.grade_start_quarter = self.quarter
+
+    # ----- Économie / réputation ----------------------------------------
+    def adjust_cash(self, delta):
+        self.cash += delta
+
+    def adjust_reputation(self, delta):
+        self.reputation = max(0, min(100, self.reputation + delta))
+
+    def quarter_of_day(self, day=None):
+        d = self.day if day is None else day
+        return (d - 1) // config.DAYS_PER_QUARTER + 1
+
+    def salary_per_step(self):
+        """Salaire net crédité par tour d'avancement, croissant avec le grade."""
+        base = 4_000 + self.grade_index * 9_000
+        return base * (config.DAYS_PER_STEP / 30.0)
+
+    def costs_per_step(self):
+        """Coûts opérationnels par tour (plus élevés aux grades supérieurs)."""
+        base = 2_000 + self.grade_index * 4_500
+        return base * (config.DAYS_PER_STEP / 30.0)
+
+    def check_game_over(self, net_worth=None):
+        """Met à jour game_over si faillite (liquidité ou valeur nette) ou
+        réputation nulle. Retourne bool."""
+        nw = self.cash if net_worth is None else net_worth
+        if self.cash <= config.BANKRUPTCY_CASH or nw <= 0:
+            self.game_over = True
+            self.game_over_reason = (
+                f"Faillite : liquidités à {self.cash:,.0f}, valeur nette {nw:,.0f}. "
+                "Vos créanciers ont saisi la firme.")
+        elif self.reputation <= config.MIN_REPUTATION:
+            self.game_over = True
+            self.game_over_reason = (
+                "Réputation anéantie : vous êtes écarté de la profession.")
+        return self.game_over
+
+
+@dataclass
+class GameState:
+    """Conteneur global : joueur + métadonnées de partie."""
+    player: PlayerState = field(default_factory=PlayerState)
+    created_at: float = field(default_factory=time.time)
+    last_saved: float = 0.0
+    version: str = "0.1.0"
+
+    # ----- Sérialisation -------------------------------------------------
+    def to_dict(self):
+        d = asdict(self)
+        return d
+
+    @classmethod
+    def from_dict(cls, d):
+        gs = cls()
+        gs.created_at = d.get("created_at", time.time())
+        gs.last_saved = d.get("last_saved", 0.0)
+        gs.version = d.get("version", "0.1.0")
+        p = d.get("player", {})
+        gs.player = PlayerState(**{
+            k: p.get(k, getattr(PlayerState(), k))
+            for k in PlayerState().__dataclass_fields__
+        })
+        return gs
+
+    # ----- Fichiers ------------------------------------------------------
+    def save(self, slot="manual"):
+        os.makedirs(config.SAVE_DIR, exist_ok=True)
+        self.last_saved = time.time()
+        path = os.path.join(config.SAVE_DIR, f"{slot}.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(self.to_dict(), f, indent=2)
+        return path
+
+    @classmethod
+    def load(cls, slot="manual"):
+        path = os.path.join(config.SAVE_DIR, f"{slot}.json")
+        if not os.path.exists(path):
+            return None
+        with open(path, "r", encoding="utf-8") as f:
+            return cls.from_dict(json.load(f))
+
+    @staticmethod
+    def delete(slot):
+        """Supprime un slot de sauvegarde. Retourne True si supprimé."""
+        path = os.path.join(config.SAVE_DIR, f"{slot}.json")
+        if os.path.exists(path):
+            os.remove(path)
+            return True
+        return False
+
+    @staticmethod
+    def list_saves():
+        """Retourne la liste des slots de sauvegarde disponibles."""
+        if not os.path.isdir(config.SAVE_DIR):
+            return []
+        out = []
+        for fn in os.listdir(config.SAVE_DIR):
+            if fn.endswith(".json"):
+                out.append(fn[:-5])
+        return sorted(out)
+
+    @staticmethod
+    def slot_meta(slot):
+        """Retourne un résumé d'un slot (sans tout charger), ou None si absent."""
+        path = os.path.join(config.SAVE_DIR, f"{slot}.json")
+        if not os.path.exists(path):
+            return None
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                d = json.load(f)
+        except (OSError, ValueError):
+            return None
+        p = d.get("player", {})
+        gi = p.get("grade_index", 0)
+        grade = config.GRADES[gi] if 0 <= gi < len(config.GRADES) else "?"
+        return {
+            "name": p.get("name", "Trainee"),
+            "grade": grade,
+            "continent": p.get("continent", "?"),
+            "track": p.get("track", "General"),
+            "day": p.get("day", 1),
+            "cash": p.get("cash", 0.0),
+            "hardcore": p.get("hardcore", False),
+            "game_over": p.get("game_over", False),
+            "last_saved": d.get("last_saved", 0.0),
+        }
+
+    # ----- Boucle de temps ----------------------------------------------
+    def advance_step(self, market=None):
+        """
+        Fait avancer le temps d'un tour (config.DAYS_PER_STEP jours) :
+        salaire/coûts, vieillissement des deals, événements de marché,
+        génération éventuelle de nouveaux deals, contrôle de fin de partie.
+        Si `market` est fourni, la valeur nette (cash + positions) est utilisée
+        pour l'historique, le record et le contrôle de faillite.
+        Retourne un dict-résumé pour affichage par le terminal.
+        """
+        from core import events, deals, career   # imports locaux : logique pure, pas de pygame
+        p = self.player
+        if p.game_over:
+            return {"events": [], "expired": [], "new_deals": [],
+                    "net": 0.0, "game_over": True, "quarter_report": None}
+
+        prev_quarter = p.quarter
+        p.day += config.DAYS_PER_STEP
+        p.quarter = p.quarter_of_day()
+
+        # salaire net du tour (salaire - coûts)
+        net = p.salary_per_step() - p.costs_per_step()
+        p.adjust_cash(net)
+
+        # vieillissement des deals : ceux arrivés à échéance non traités pénalisent
+        expired = deals.age_deals(p)
+
+        # événements de marché
+        evts = events.roll_events(p)
+
+        # génération de nouveaux deals (probabilité dépend du grade)
+        new_deals = deals.maybe_generate(p)
+
+        # dividendes des positions (revenu passif) + valeur nette
+        dividends = 0.0
+        if market is not None:
+            from core import portfolio
+            dividends = portfolio.dividends(p, market, config.DAYS_PER_STEP)
+            if dividends:
+                p.adjust_cash(dividends)
+            nw = portfolio.net_worth(p, market)
+        else:
+            nw = p.cash
+
+        # bascule de trimestre : clôture des objectifs + génération des suivants
+        quarter_report = None
+        if p.quarter != prev_quarter:
+            quarter_report = career.close_quarter(p)
+            career.ensure_objectives(p)
+            # secteur mis en avant pour le nouveau trimestre (guidance)
+            import random as _r
+            from data.companies import SECTORS as _SEC
+            p.flags["hot_sector"] = _r.choice(list(_SEC.keys()))
+        p.best_cash = max(p.best_cash, nw)
+
+        # mémorise la valeur nette pour la sparkline du terminal
+        p.cash_history.append(round(nw, 2))
+        if len(p.cash_history) > 80:
+            p.cash_history.pop(0)
+
+        # journal d'événements borné
+        for e in evts + [{"title": x["title"], "kind": "bad",
+                          "desc": "Deal expiré non traité."} for x in expired]:
+            p.event_log.append(e["title"])
+        p.event_log = p.event_log[-12:]
+
+        p.check_game_over(net_worth=nw)
+
+        return {
+            "events": evts,
+            "expired": expired,
+            "new_deals": new_deals,
+            "net": net,
+            "dividends": dividends,
+            "quarter_changed": p.quarter != prev_quarter,
+            "quarter_report": quarter_report,
+            "game_over": p.game_over,
+        }

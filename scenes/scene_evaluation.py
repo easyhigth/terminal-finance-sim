@@ -1,0 +1,401 @@
+"""
+scene_evaluation.py — Examen de promotion (quiz multi-types, niveau « entretien »).
+
+Questions générées par core/exam.py : calculs chiffrés, QCM, lecture de graphe,
+définitions à trous et formules à compléter — 20 à 30 selon le grade, jamais les
+mêmes. Calculatrice intégrée, bouton SUIVANT, explication après chaque réponse.
+Réussite (≥ seuil) → promotion.
+"""
+import pygame
+from core import config
+from core import exam
+from core.scene_manager import Scene
+from ui import fonts, widgets
+
+CHART_COLORS = {"A": config.COL_CYAN, "B": config.COL_AMBER}
+
+
+class EvaluationScene(Scene):
+    def on_enter(self, **kwargs):
+        self.t = 0.0
+        p = self.app.gs.player
+        # mode : "promotion" (par défaut) ou "cert" (examen de certification)
+        self.mode = kwargs.get("mode", "promotion")
+        self.cert_program = kwargs.get("program")
+        if self.mode == "cert":
+            from core import certifications as C
+            prog = C.PROGRAMS[self.cert_program]
+            tier = kwargs.get("tier", prog["tier"])
+            self.cert_level = kwargs.get("level", 0)
+            self.items = exam.generate(p.grade_index, difficulty=tier, n=C.EXAM_N)
+            self.pass_threshold = C.PASS_THRESHOLD
+            self.target_grade = f"{prog['name']} niveau {self.cert_level + 1}"
+        else:
+            target = min(p.grade_index + 1, len(config.GRADES) - 1)
+            self.target_grade = config.GRADES[target]
+            self.items = exam.generate(p.grade_index)
+            self.pass_threshold = exam.PASS_THRESHOLD
+        self.idx = 0
+        self.score = 0
+        self.state = "intro"        # intro -> question -> feedback -> result
+        self.chosen = None          # index mcq choisi
+        self.input = ""             # saisie fill/text
+        self.submitted_ok = None
+        self.answer_rects = {}
+        self.passed = False
+        self.new_title = None
+        self.calc = None
+        fy = config.SCREEN_HEIGHT - 56
+        self.continue_btn = widgets.Button((config.SCREEN_WIDTH//2-130, fy, 260, 44),
+                                           "COMMENCER", config.COL_UP)
+        self.back_btn = widgets.Button(config.back_button_rect(150), "← QUITTER",
+                                       config.COL_TEXT_DIM)
+        self.calc_btn = widgets.Button((200, config.SCREEN_HEIGHT-50, 160, 42),
+                                       "🧮 CALCULATRICE", config.COL_CYAN)
+
+    # ------------------------------------------------------------- helpers
+    def _item(self):
+        return self.items[self.idx] if 0 <= self.idx < len(self.items) else None
+
+    def _is_mcq(self, it):
+        return it["kind"] == "mcq" or (it["kind"] == "graph" and it.get("subkind") == "mcq")
+
+    def _is_input(self, it):
+        return it["kind"] in ("fill", "text") or \
+            (it["kind"] == "graph" and it.get("subkind") == "fill")
+
+    # ------------------------------------------------------------- events
+    def handle_event(self, event):
+        if self.calc is not None and self.calc.handle(event):
+            if self.calc.closed:
+                self.calc = None
+            return
+        if self.calc_btn.handle(event):
+            if self.calc is None:
+                from ui.calculator import Calculator
+                self.calc = Calculator(pos=(config.SCREEN_WIDTH - 260, 110))
+            else:
+                self.calc = None
+            return
+        if self.back_btn.handle(event):
+            self.app.scenes.go("terminal")
+            return
+
+        it = self._item()
+        if event.type == pygame.KEYDOWN:
+            if self.state == "question" and it is not None and self._is_input(it):
+                if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                    self._submit(it)
+                elif event.key == pygame.K_BACKSPACE:
+                    self.input = self.input[:-1]
+                else:
+                    self._type(it, event.unicode)
+            elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                self._advance_via_key()
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.state == "intro" and self.continue_btn.rect.collidepoint(event.pos):
+                self.state = "question"
+            elif self.state == "question" and it is not None and self._is_mcq(it):
+                for i, rect in self.answer_rects.items():
+                    if rect.collidepoint(event.pos):
+                        self._answer_mcq(i, it)
+            elif self.state == "feedback" and self.continue_btn.rect.collidepoint(event.pos):
+                self._next()
+            elif self.state == "result" and self.continue_btn.rect.collidepoint(event.pos):
+                self.app.scenes.go("terminal")
+
+    def _type(self, it, ch):
+        if not ch:
+            return
+        if it["kind"] == "text":
+            if ch.isalnum() or ch in " /.-'éèàçâêôûïü":
+                self.input += ch
+        else:  # fill numérique
+            if ch.isdigit() or ch in ".,-":
+                self.input += ("." if ch == "," else ch)
+
+    def _advance_via_key(self):
+        if self.state == "intro":
+            self.state = "question"
+        elif self.state == "feedback":
+            self._next()
+        elif self.state == "result":
+            self.app.scenes.go("terminal")
+
+    def _answer_mcq(self, i, it):
+        self.chosen = i
+        if i == it["answer"]:
+            self.score += 1
+        self.state = "feedback"
+
+    def _submit(self, it):
+        if it["kind"] == "text":
+            ok = exam.check_text(it, self.input)
+        else:
+            try:
+                ok = exam.check_fill(it, float(self.input.replace(",", ".")))
+            except ValueError:
+                ok = False
+        self.submitted_ok = ok
+        if ok:
+            self.score += 1
+        self.state = "feedback"
+
+    def _next(self):
+        self.idx += 1
+        self.chosen = None
+        self.input = ""
+        self.submitted_ok = None
+        if self.idx >= len(self.items):
+            self._finish()
+        else:
+            self.state = "question"
+
+    def _finish(self):
+        from core import career
+        p = self.app.gs.player
+        ratio = self.score / max(1, len(self.items))
+        self.passed = ratio >= self.pass_threshold
+        if self.mode == "cert":
+            self._finish_cert(p)
+            self.app.gs.save(config.AUTOSAVE_SLOT)
+            self.state = "result"
+            return
+        if self.passed and p.can_promote():
+            p.promote()
+            p.reputation = min(100, p.reputation + 8)
+            if p.grade_index >= 2 and p.track == "General":
+                p.flags["can_choose_track"] = True
+            self.new_title = career.award_promotion(p)
+            career.log(p, "promo", f"Promotion : {p.grade}"
+                       + (f" — titre « {self.new_title} »" if self.new_title else ""))
+            from core import inbox
+            inbox.on_promotion(p)
+            self.app.notify(f"Promotion : {p.grade}", "good")
+            if self.new_title:
+                self.app.notify(f"Titre : {self.new_title}", "prestige")
+        else:
+            p.reputation = max(0, p.reputation - 5)
+        self.app.gs.save(config.AUTOSAVE_SLOT)
+        self.state = "result"
+
+    def _finish_cert(self, p):
+        from core import certifications as C, badges
+        self.new_title = None
+        if self.passed:
+            res = C.pass_stage(p, self.cert_program)
+            self.new_title = res.get("title") if res else None
+            self.app.notify(f"{C.PROGRAMS[self.cert_program]['name']} : niveau réussi", "prestige")
+            for b in badges.check_new(p, self.app.market):
+                self.app.notify(f"🏅 Badge : {b['name']}", "prestige")
+        else:
+            self.app.notify("Examen de certification échoué", "bad")
+
+    def update(self, dt):
+        self.t += dt
+        mp = pygame.mouse.get_pos()
+        self.continue_btn.update(mp, dt)
+        self.back_btn.update(mp, dt)
+        self.calc_btn.update(mp, dt)
+
+    # --------------------------------------------------------------- draw
+    def draw(self, surf):
+        surf.fill(config.COL_BG)
+        p = self.app.gs.player
+        title = "EXAMEN DE CERTIFICATION" if self.mode == "cert" else "ÉVALUATION DE PROMOTION"
+        widgets.draw_text(surf, title, (40, 22), fonts.title(bold=True), config.COL_AMBER)
+        sub = (f"{self.target_grade}    |    Voie : {p.track}" if self.mode == "cert"
+               else f"{p.grade}  →  {self.target_grade}    |    Voie : {p.track}")
+        widgets.draw_text(surf, sub, (42, 72), fonts.small(), config.COL_TEXT_DIM)
+        if self.state == "intro":
+            self._draw_intro(surf)
+        elif self.state in ("question", "feedback"):
+            self._draw_item(surf)
+        elif self.state == "result":
+            self._draw_result(surf)
+        self.back_btn.draw(surf)
+        if self.state in ("question", "feedback"):
+            self.calc_btn.draw(surf)
+        if self.calc is not None:
+            self.calc.draw(surf)
+
+    def _draw_intro(self, surf):
+        panel = pygame.Rect(120, 110, config.SCREEN_WIDTH-240, config.footer_y()-120)
+        inner = widgets.draw_panel(surf, panel, "Brief", config.COL_CYAN)
+        p = self.app.gs.player
+        if self.mode == "cert":
+            intro1 = f"Examen de certification — {self.target_grade}."
+            bank_line = f"{len(self.items)} questions exigeantes, banque dédiée."
+        else:
+            intro1 = f"Entretien technique pour le poste de {self.target_grade}."
+            bank_line = (f"{len(self.items)} questions tirées d'une banque d'environ "
+                         f"{exam.bank_target(p.grade_index)} pour ce grade.")
+        lines = [
+            intro1,
+            "",
+            bank_line,
+            "Types : calculs, QCM, lecture de graphe, définitions et formules à trous.",
+            f"Seuil de réussite : {int(self.pass_threshold*100)}%.",
+            "",
+            "Calcul : tapez votre nombre.  Définition/formule : tapez le ou les mots.",
+            "QCM : cliquez la bonne réponse.  Une CALCULATRICE est disponible.",
+            "",
+            "Réussite → promotion (+réputation).  Échec → −réputation, à retenter.",
+        ]
+        y = inner.y
+        for ln in lines:
+            widgets.draw_text(surf, ln, (inner.x, y), fonts.body(), config.COL_TEXT)
+            y += 30
+        self.continue_btn.label = "COMMENCER"
+        self.continue_btn.draw(surf)
+
+    def _draw_item(self, surf):
+        it = self._item()
+        pw = config.SCREEN_WIDTH - 240
+        n = len(self.items)
+        widgets.draw_text(surf, f"Question {self.idx+1} / {n}", (120, 102),
+                          fonts.small(), config.COL_TEXT_DIM)
+        widgets.draw_progress(surf, (120, 122, pw, 6), self.idx / n, config.COL_AMBER)
+
+        has_chart = bool(it.get("charts"))
+        prompt_w = pw if not has_chart else int(pw * 0.5)
+        if has_chart:
+            self._draw_charts(surf, it, pygame.Rect(120 + prompt_w + 20, 138,
+                                                    pw - prompt_w - 20, 250))
+        # énoncé
+        ppanel = pygame.Rect(120, 138, prompt_w, 118)
+        pinner = widgets.draw_panel(surf, ppanel, "Énoncé", config.COL_AMBER)
+        widgets.draw_text_wrapped(surf, it["prompt"], (pinner.x, pinner.y),
+                                  fonts.body(), config.COL_WHITE, pinner.w, line_gap=5)
+
+        if self._is_mcq(it):
+            self._draw_mcq(surf, it, prompt_w)
+        else:
+            self._draw_input(surf, it, prompt_w)
+
+        if self.state == "feedback":
+            self._draw_feedback(surf, it)
+
+    def _draw_charts(self, surf, it, rect):
+        inner = widgets.draw_panel(surf, rect, "Cours", config.COL_CYAN)
+        names = ["A", "B"] if it.get("chart") == "AB" else [it.get("chart", "A")]
+        for nm in names:
+            s = it["charts"].get(nm)
+            if s:
+                widgets.draw_series(surf, pygame.Rect(inner.x, inner.y+8, inner.w, inner.h-36),
+                                    s, CHART_COLORS.get(nm, config.COL_CYAN), baseline=False)
+        lx = inner.x
+        for nm in names:
+            widgets.draw_text(surf, f"■ Titre {nm}", (lx, inner.bottom-18),
+                              fonts.small(bold=True), CHART_COLORS.get(nm, config.COL_CYAN))
+            lx += 110
+
+    def _draw_mcq(self, surf, it, width):
+        self.answer_rects = {}
+        y = 268
+        for i, choice in enumerate(it["choices"]):
+            rect = pygame.Rect(120, y, width, 46)
+            self.answer_rects[i] = rect
+            if self.state == "feedback":
+                if i == it["answer"]:
+                    bg, border, txt = (16, 40, 26), config.COL_UP, config.COL_UP
+                elif i == self.chosen:
+                    bg, border, txt = (40, 16, 18), config.COL_DOWN, config.COL_DOWN
+                else:
+                    bg, border, txt = config.COL_PANEL, config.COL_BORDER, config.COL_TEXT_DIM
+            else:
+                hover = rect.collidepoint(pygame.mouse.get_pos())
+                bg = config.COL_PANEL_HEAD if hover else config.COL_PANEL
+                border = config.COL_CYAN if hover else config.COL_BORDER
+                txt = config.COL_WHITE if hover else config.COL_TEXT
+            pygame.draw.rect(surf, bg, rect)
+            pygame.draw.rect(surf, border, rect, 1)
+            widgets.draw_text(surf, f"{chr(65+i)}.", (rect.x+12, rect.y+12),
+                              fonts.body(bold=True), border)
+            widgets.draw_text_wrapped(surf, choice, (rect.x+46, rect.y+6),
+                                      fonts.small(), txt, rect.w-60)
+            y += 52
+
+    def _draw_input(self, surf, it, width):
+        kind = "Réponse (texte)" if it["kind"] == "text" else "Réponse (nombre)"
+        widgets.draw_text(surf, kind, (120, 266), fonts.small(bold=True), config.COL_TEXT_DIM)
+        active = self.state == "question"
+        box = pygame.Rect(120, 290, min(520, width), 50)
+        pygame.draw.rect(surf, (6, 8, 12), box)
+        pygame.draw.rect(surf, config.COL_CYAN if active else config.COL_BORDER, box, 2 if active else 1)
+        cur = "_" if (active and int(self.t*2) % 2 == 0) else ""
+        shown = (self.input or "") + cur
+        widgets.draw_text(surf, shown or "tapez votre réponse…", (box.x+12, box.y+14),
+                          fonts.head(bold=True),
+                          config.COL_WHITE if self.input else config.COL_TEXT_DIM)
+        if it.get("unit"):
+            widgets.draw_text(surf, it["unit"], (box.right+12, box.y+14), fonts.head(),
+                              config.COL_TEXT_DIM)
+        widgets.draw_text(surf, "Entrée pour valider.", (box.x, box.bottom+8),
+                          fonts.tiny(), config.COL_TEXT_DIM)
+
+    def _draw_feedback(self, surf, it):
+        if self._is_mcq(it):
+            ok = (self.chosen == it["answer"])
+        else:
+            ok = bool(self.submitted_ok)
+        y = config.footer_y() - 8
+        exp = pygame.Rect(120, 360, config.SCREEN_WIDTH-240, y-360-8)
+        inner = widgets.draw_panel(surf, exp, "Correction", config.COL_CYAN)
+        widgets.draw_text(surf, "✓ Bonne réponse" if ok else "✗ Mauvaise réponse",
+                          (inner.x, inner.y), fonts.small(bold=True),
+                          config.COL_UP if ok else config.COL_DOWN)
+        if not ok and self._is_input(it):
+            exp_ans = (", ".join(it["answers"]) if it["kind"] == "text"
+                       else f"{it['answer']:.2f} {it.get('unit','')}")
+            widgets.draw_text(surf, "Attendu : " + exp_ans, (inner.x+180, inner.y),
+                              fonts.small(), config.COL_TEXT_DIM)
+        widgets.draw_text_wrapped(surf, it["expl"], (inner.x, inner.y+24),
+                                  fonts.small(), config.COL_TEXT, inner.w)
+        self.continue_btn.label = "SUIVANT" if self.idx < len(self.items)-1 else "VOIR RÉSULTAT"
+        self.continue_btn.draw(surf)
+
+    def _draw_result(self, surf):
+        ratio = self.score / max(1, len(self.items))
+        accent = config.COL_UP if self.passed else config.COL_DOWN
+        panel = pygame.Rect(280, 150, config.SCREEN_WIDTH-560, 380)
+        inner = widgets.draw_panel(surf, panel, "Résultat", accent)
+        cx = panel.centerx
+        p = self.app.gs.player
+        if self.mode == "cert":
+            verdict = "CERTIFICATION RÉUSSIE" if self.passed else "EXAMEN ÉCHOUÉ"
+        else:
+            verdict = "PROMOTION ACCORDÉE" if self.passed else "ÉVALUATION ÉCHOUÉE"
+        widgets.draw_text(surf, verdict, (cx, inner.y+10), fonts.title(bold=True), accent, align="center")
+        widgets.draw_text(surf, f"Score : {self.score} / {len(self.items)}  ({int(ratio*100)}%)",
+                          (cx, inner.y+62), fonts.head(), config.COL_WHITE, align="center")
+        if self.mode == "cert":
+            from core import certifications as C
+            prog = C.PROGRAMS[self.cert_program]
+            if self.passed:
+                msg = [f"{prog['name']} — {C.status_label(p, self.cert_program)}.",
+                       "Réputation accrue."]
+                if self.new_title:
+                    msg.append(f"Titre : « {self.new_title} » !")
+            else:
+                msg = [f"Seuil non atteint ({int(self.pass_threshold*100)}% requis).",
+                       "Les frais d'inscription sont perdus.",
+                       "Révisez (LEARN) et retentez plus tard."]
+        elif self.passed:
+            msg = [f"Félicitations. Nouveau grade : {p.grade}.", "+8 réputation."]
+            if self.new_title:
+                msg.append(f"Titre débloqué : « {self.new_title} » !")
+            if p.flags.get("can_choose_track"):
+                msg.append("Vous pouvez choisir une VOIE (TRACK).")
+        else:
+            msg = [f"Seuil non atteint ({int(self.pass_threshold*100)}% requis).",
+                   "−5 réputation. Révisez (LEARN) et retentez.",
+                   "Astuce : utilisez la calculatrice et le glossaire (DEFINE)."]
+        y = inner.y + 120
+        for m in msg:
+            widgets.draw_text(surf, m, (cx, y), fonts.body(), config.COL_TEXT, align="center")
+            y += 32
+        self.continue_btn.rect.center = (cx, inner.bottom-36)
+        self.continue_btn.label = "RETOUR AU TERMINAL"
+        self.continue_btn.draw(surf)

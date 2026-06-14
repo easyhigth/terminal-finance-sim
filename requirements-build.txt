@@ -1,0 +1,4 @@
+# Dépendances nécessaires uniquement pour packager le jeu (.app / .exe).
+# Installer en plus de requirements.txt :
+#   pip install -r requirements.txt -r requirements-build.txt
+pyinstaller>=6.0.0

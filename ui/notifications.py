@@ -1,0 +1,85 @@
+"""
+notifications.py — Centre de notifications (toasts animés).
+
+Une instance unique vit sur l'App (app.notes). N'importe quelle scène peut
+pousser une notification via app.notify(texte, kind). Les toasts s'empilent en
+haut à droite, glissent à l'entrée et s'estompent à la sortie. Dessinés en
+overlay par le SceneManager après la scène courante.
+"""
+import pygame
+from core import config
+from ui import fonts, widgets
+
+_KIND_COLOR = {
+    "good": config.COL_EVENT_GOOD,
+    "bad": config.COL_EVENT_BAD,
+    "warn": config.COL_WARN,
+    "info": config.COL_CYAN,
+    "prestige": config.COL_PRESTIGE,
+}
+
+TTL = 4.0          # durée de vie (s)
+SLIDE = 0.25       # durée d'entrée (s)
+FADE = 0.6         # durée de sortie (s)
+WIDTH = 320
+HEIGHT = 46
+MARGIN = 14
+GAP = 8
+
+
+class NotificationCenter:
+    def __init__(self):
+        self.toasts = []      # actifs : {text, kind, age}
+        self.history = []     # derniers messages (pour un éventuel panneau)
+
+    def push(self, text, kind="info"):
+        self.toasts.append({"text": text, "kind": kind, "age": 0.0})
+        self.history.append({"text": text, "kind": kind})
+        if len(self.history) > 40:
+            self.history.pop(0)
+        # limite le nombre de toasts simultanés
+        if len(self.toasts) > 5:
+            self.toasts.pop(0)
+
+    def update(self, dt):
+        for t in self.toasts:
+            t["age"] += dt
+        self.toasts = [t for t in self.toasts if t["age"] < TTL]
+
+    def draw(self, surf):
+        if not self.toasts:
+            return
+        sw = surf.get_width()
+        # ancrage en bas à droite (empilage vers le haut), au-dessus de la console
+        y = surf.get_height() - 140
+        for t in reversed(self.toasts):
+            age = t["age"]
+            # alpha : fondu d'entrée et de sortie
+            if age < SLIDE:
+                appear = age / SLIDE
+            elif age > TTL - FADE:
+                appear = max(0.0, (TTL - age) / FADE)
+            else:
+                appear = 1.0
+            # glissement horizontal à l'entrée (depuis le bord droit)
+            slide = 1.0 if age >= SLIDE else (age / SLIDE)
+            x = sw - MARGIN - WIDTH + int((1 - slide) * WIDTH)
+            col = _KIND_COLOR.get(t["kind"], config.COL_CYAN)
+
+            chip = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            a = int(235 * appear)
+            chip.fill((0, 0, 0, 0))
+            pygame.draw.rect(chip, (*config.COL_PANEL_HEAD, a), (0, 0, WIDTH, HEIGHT), border_radius=6)
+            pygame.draw.rect(chip, (*col, a), (0, 0, WIDTH, HEIGHT), 1, border_radius=6)
+            pygame.draw.rect(chip, (*col, a), (0, 0, 4, HEIGHT), border_top_left_radius=6,
+                             border_bottom_left_radius=6)
+            # texte (tronqué)
+            font = fonts.small(bold=True)
+            text = t["text"]
+            while font.size(text)[0] > WIDTH - 24 and len(text) > 4:
+                text = text[:-2]
+            img = font.render(text, True, col)
+            img.set_alpha(a)
+            chip.blit(img, (14, (HEIGHT - img.get_height()) // 2))
+            surf.blit(chip, (x, y))
+            y -= HEIGHT + GAP

@@ -124,18 +124,18 @@ class CompanyScene(Scene):
                                   config.COL_WHITE, align="right")
                 y += 26
 
-        # panneau graphe de prix
+        # panneau graphe de prix (chandeliers + moyennes mobiles)
         chart = pygame.Rect(620, 190, config.SCREEN_WIDTH - 660, ph)
-        cinner = widgets.draw_panel(surf, chart, "Cours (historique suivi)", accent)
+        cinner = widgets.draw_panel(surf, chart, "Cours — chandeliers (historique suivi)", accent)
         hist = m.track_company(self.ticker)
         if hist and len(hist) >= 2:
-            spark = widgets.Sparkline(maxlen=len(hist))
-            for v in hist:
-                spark.push(v)
-            spark.draw(surf, pygame.Rect(cinner.x, cinner.y + 20,
-                                         cinner.w, cinner.h - 60))
+            widgets.draw_candles(surf, pygame.Rect(cinner.x, cinner.y + 22,
+                                                   cinner.w, cinner.h - 60), hist,
+                                 n_candles=32, sma_windows=(10, 30))
+            widgets.draw_text(surf, "MA10", (cinner.x, cinner.y), fonts.tiny(), config.COL_AMBER)
+            widgets.draw_text(surf, "MA30", (cinner.x + 52, cinner.y), fonts.tiny(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, f"haut {max(hist):,.2f}  bas {min(hist):,.2f}",
-                              (cinner.x, cinner.bottom - 20), fonts.tiny(), config.COL_TEXT_DIM)
+                              (cinner.right, cinner.y), fonts.tiny(), config.COL_TEXT_DIM, align="right")
         else:
             widgets.draw_text_wrapped(
                 surf, "Historique en cours de constitution. Avancez le temps (ADV) "

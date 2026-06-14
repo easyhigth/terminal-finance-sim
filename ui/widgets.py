@@ -224,6 +224,80 @@ def draw_series(surf, rect, vals, color=None, baseline=True):
     pygame.draw.circle(surf, col, pts[-1], 2)
 
 
+def _aggregate_ohlc(closes, n_candles):
+    """Agrège une série de clôtures en `n_candles` bougies OHLC."""
+    n = len(closes)
+    n_candles = max(1, min(n_candles, n))
+    bucket = max(1, n // n_candles)
+    candles = []
+    i = 0
+    while i < n:
+        grp = closes[i:i + bucket]
+        if grp:
+            candles.append((grp[0], max(grp), min(grp), grp[-1]))  # O, H, L, C
+        i += bucket
+    return candles
+
+
+def _sma(vals, window):
+    """Moyenne mobile simple (renvoie une liste de même longueur, None au début)."""
+    out = []
+    s = 0.0
+    for i, v in enumerate(vals):
+        s += v
+        if i >= window:
+            s -= vals[i - window]
+        out.append(s / window if i >= window - 1 else None)
+    return out
+
+
+def draw_candles(surf, rect, closes, n_candles=32, sma_windows=(10, 30)):
+    """Dessine un graphe en chandeliers à partir d'une série de clôtures, avec
+    des moyennes mobiles optionnelles (en nombre de pas). Les bougies sont
+    agrégées depuis les clôtures (open/high/low/close par groupe de pas)."""
+    rect = pygame.Rect(rect)
+    if not closes or len(closes) < 2:
+        return
+    candles = _aggregate_ohlc(closes, n_candles)
+    lo = min(min(c[2] for c in candles), min(closes))
+    hi = max(max(c[1] for c in candles), max(closes))
+    span = (hi - lo) or 1.0
+
+    def yof(v):
+        return rect.bottom - int((v - lo) / span * rect.h)
+
+    n = len(candles)
+    slot = rect.w / n
+    bw = max(2, int(slot * 0.6))
+    for k, (o, h, l, c) in enumerate(candles):
+        cx = int(rect.x + (k + 0.5) * slot)
+        up = c >= o
+        col = config.COL_UP if up else config.COL_DOWN
+        # mèche
+        pygame.draw.line(surf, col, (cx, yof(h)), (cx, yof(l)), 1)
+        # corps
+        y_top, y_bot = yof(max(o, c)), yof(min(o, c))
+        body = pygame.Rect(cx - bw // 2, y_top, bw, max(1, y_bot - y_top))
+        pygame.draw.rect(surf, col, body)
+
+    # moyennes mobiles (sur la série de clôtures brute, ré-échantillonnée par bougie)
+    ma_cols = [config.COL_AMBER, config.COL_TEXT_DIM]
+    bucket = max(1, len(closes) // max(1, n))
+    for wi, w in enumerate(sma_windows or ()):
+        if len(closes) <= w:
+            continue
+        ma = _sma(closes, w)
+        pts = []
+        for k in range(n):
+            idx = min(len(closes) - 1, k * bucket + bucket - 1)
+            if ma[idx] is None:
+                continue
+            cx = int(rect.x + (k + 0.5) * slot)
+            pts.append((cx, yof(ma[idx])))
+        if len(pts) >= 2:
+            pygame.draw.aalines(surf, ma_cols[wi % len(ma_cols)], False, pts)
+
+
 # ---------------------------------------------------------------------------
 # BARRE DE PROGRESSION / JAUGE
 # ---------------------------------------------------------------------------

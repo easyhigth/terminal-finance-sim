@@ -24,6 +24,7 @@ from core import dilemmas as dilemmas_mod
 from core import badges as badges_mod
 from core import mandates as mandates_mod
 from core import unlocks as unlocks_mod
+from core.i18n import t as _t
 from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.worldmap import WorldMap
@@ -1429,7 +1430,7 @@ class TerminalScene(Scene):
             w.draw(surf)
 
     def _draw_rail(self, surf, rect, p):
-        inner = widgets.draw_panel(surf, rect, "Commandes", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, rect, _t("term.commands"), config.COL_AMBER)
         self._rail_rects = {}
         gap = 4
         n = max(1, len(self.rail))
@@ -1461,13 +1462,13 @@ class TerminalScene(Scene):
                 widgets.draw_text(surf, f"G{g}", (br.right - 8, br.y + 7),
                                   fonts.tiny(), config.COL_TEXT_DIM, align="right")
             else:
-                txt = label
+                txt = _t("rail." + cmd)
                 if cmd == "INBOX":
                     u = inbox_mod.unread_count(p)
                     if u:
-                        txt = f"{label} ({u})"
+                        txt = f"{txt} ({u})"
                 elif cmd == "DECIDE" and p.pending_dilemmas:
-                    txt = f"{label} !"
+                    txt = f"{txt} !"
                 widgets.draw_text(surf, txt, (br.x + 10, br.y + 7),
                                   fonts.small(bold=hover), acc if hover else config.COL_TEXT)
             y += bh + gap
@@ -1507,7 +1508,7 @@ class TerminalScene(Scene):
 
     def _draw_indices(self, surf, rect):
         inner = widgets.draw_panel(surf, rect,
-                                   f"Indices · {self.market.regime_label()}", config.COL_AMBER)
+                                   f'{_t("term.indices")} · {self.market.regime_label()}', config.COL_AMBER)
         self._index_rects = {}
         defs = self.market.index_defs
         n = max(1, len(defs))
@@ -1532,13 +1533,13 @@ class TerminalScene(Scene):
             y += step
 
     def _draw_health(self, surf, rect, p, info):
-        inner = widgets.draw_panel(surf, rect, "Santé financière", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, rect, _t("term.health"), config.COL_AMBER)
         cur = info["currency"]
         pos_val = pf_mod.positions_value(p, self.market)
         nw = p.cash + pos_val
         upnl = pf_mod.unrealized_pnl(p, self.market)
         nw_col = config.COL_UP if nw >= 0 else config.COL_DOWN
-        widgets.draw_text(surf, "Valeur nette", (inner.x, inner.y), fonts.small(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _t("term.networth"), (inner.x, inner.y), fonts.small(bold=True), config.COL_TEXT_DIM)
         widgets.draw_text(surf, widgets.format_money(nw, cur), (inner.x, inner.y + 18),
                           fonts.head(bold=True), nw_col)
         # cash + positions + P&L latent sur une ligne
@@ -1563,7 +1564,7 @@ class TerminalScene(Scene):
                               (inner.x, inner.y + 162), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_feed(self, surf, rect, info):
-        inner = widgets.draw_panel(surf, rect, "Flux & événements", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, rect, _t("term.feed"), config.COL_CYAN)
         y = inner.y
         cur = info["currency"]
         for e in self.recent_events[:3]:
@@ -1584,7 +1585,7 @@ class TerminalScene(Scene):
                 return
 
     def _draw_top_companies(self, surf, rect, p):
-        inner = widgets.draw_panel(surf, rect, f"Top sociétés — {p.continent}", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, rect, f'{_t("term.topco")} — {p.continent}', config.COL_CYAN)
         cur = config.CONTINENTS[p.continent]["currency"]
         self._topco_rects = {}
         mp = pygame.mouse.get_pos()
@@ -1612,7 +1613,7 @@ class TerminalScene(Scene):
             prio = config.COL_PRIO_CRITICAL
         elif p.pending_dilemmas or any(d["days_left"] <= config.DAYS_PER_STEP * 2 for d in p.deals):
             prio = config.COL_PRIO_URGENT
-        inner = widgets.draw_panel(surf, rect, "Priorités", config.COL_AMBER, prio=prio)
+        inner = widgets.draw_panel(surf, rect, _t("term.priorities"), config.COL_AMBER, prio=prio)
         y = inner.y
         # 1) prochain objectif non atteint
         widgets.draw_text(surf, "OBJECTIF", (inner.x, y), fonts.tiny(bold=True), config.COL_CYAN)

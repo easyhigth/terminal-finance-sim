@@ -4,6 +4,7 @@ Affiche le globe interactif + panneaux réglementaires par région.
 """
 import pygame
 from core import config
+from core.i18n import t
 from core.scene_manager import Scene
 from core.game_state import GameState, PlayerState
 from ui import fonts, widgets
@@ -16,12 +17,12 @@ class ContinentScene(Scene):
         self.selected = None
         self.hardcore = kwargs.get("hardcore", False)
         fy = config.SCREEN_HEIGHT - 50
-        self.back_btn = widgets.Button((40, fy, 150, 42), "← RETOUR", config.COL_TEXT_DIM)
+        self.back_btn = widgets.Button((40, fy, 150, 42), t("common.back"), config.COL_TEXT_DIM)
         self.hardcore_btn = widgets.Button(
-            (200, fy, 250, 42), "MODE HARDCORE : OFF", config.COL_WARN)
+            (200, fy, 250, 42), t("continent.hardcore_off"), config.COL_WARN)
         self.confirm_btn = widgets.Button(
             (config.SCREEN_WIDTH-300, fy, 260, 42),
-            "CONFIRMER ET DÉMARRER", config.COL_UP, enabled=False)
+            t("continent.confirm"), config.COL_UP, enabled=False)
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -39,7 +40,7 @@ class ContinentScene(Scene):
             self.app.scenes.go("menu")
         if self.hardcore_btn.handle(event):
             self.hardcore = not self.hardcore
-            self.hardcore_btn.label = f"MODE HARDCORE : {'ON' if self.hardcore else 'OFF'}"
+            self.hardcore_btn.label = t("continent.hardcore_on") if self.hardcore else t("continent.hardcore_off")
             self.hardcore_btn.accent = config.COL_DOWN if self.hardcore else config.COL_WARN
         if self.confirm_btn.handle(event) and self.selected:
             gs = GameState()
@@ -66,13 +67,13 @@ class ContinentScene(Scene):
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "CHOISISSEZ VOTRE PLACE FINANCIÈRE",
+        widgets.draw_text(surf, t("continent.title"),
                           (40, 30), fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Chaque région impose son propre régulateur, ses normes comptables et ses contraintes.",
+        widgets.draw_text(surf, t("continent.subtitle"),
                           (42, 80), fonts.small(), config.COL_TEXT_DIM)
 
         self.globe.draw(surf)
-        widgets.draw_text(surf, "Cliquez sur une région du globe, ou sur une fiche →",
+        widgets.draw_text(surf, t("continent.hint"),
                           (345, 565), fonts.small(), config.COL_TEXT_DIM, align="center")
 
         # cartes réglementaires à droite, en grille 2 colonnes (7 régions)
@@ -96,7 +97,7 @@ class ContinentScene(Scene):
                               fonts.body(bold=True), accent)
             widgets.draw_text(surf, info["regulator"], (x+12, y+34),
                               fonts.small(), config.COL_TEXT)
-            widgets.draw_text(surf, f"Devise : {info['currency']}", (x+12, y+54),
+            widgets.draw_text(surf, f"{t('continent.currency')} : {info['currency']}", (x+12, y+54),
                               fonts.tiny(), config.COL_TEXT_DIM)
             widgets.draw_text_wrapped(surf, info["blurb"], (x+12, y+74),
                                       fonts.tiny(), config.COL_NEUTRAL, cw-24, line_gap=2)

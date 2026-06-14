@@ -153,7 +153,8 @@ class WorldMap:
         for nx, ny in LAND_DOTS:
             surf.set_at(self._to_screen(rect, nx, ny), LAND_DOT)
 
-        widgets.draw_text(surf, "MONDE — cliquez une région pour zoomer",
+        from core.i18n import t as _t
+        widgets.draw_text(surf, _t("term.world_hint"),
                           (rect.x + 10, rect.y + 8), fonts.tiny(), config.COL_TEXT_DIM)
 
         for p in self.pings:

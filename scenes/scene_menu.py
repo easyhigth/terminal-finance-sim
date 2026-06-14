@@ -5,6 +5,7 @@ Bouton CONTINUER (reprend l'autosave) + résumé de la dernière partie.
 import math
 import pygame
 from core import config
+from core.i18n import t, toggle_lang, get_lang
 from core.scene_manager import Scene
 from core.game_state import GameState
 from ui import fonts, widgets
@@ -21,11 +22,14 @@ class MenuScene(Scene):
         y0 = 392
         self.auto = GameState.slot_meta(config.AUTOSAVE_SLOT)
         self.buttons = {
-            "continue": widgets.Button((cx-bw//2, y0,              bw, bh), "CONTINUER", config.COL_UP),
-            "new":      widgets.Button((cx-bw//2, y0+(bh+gap),     bw, bh), "NOUVELLE CARRIÈRE", config.COL_AMBER),
-            "load":     widgets.Button((cx-bw//2, y0+(bh+gap)*2,   bw, bh), "CHARGER / SAUVEGARDES", config.COL_CYAN),
-            "quit":     widgets.Button((cx-bw//2, y0+(bh+gap)*3,   bw, bh), "QUITTER", config.COL_DOWN),
+            "continue": widgets.Button((cx-bw//2, y0,              bw, bh), t("menu.continue"), config.COL_UP),
+            "new":      widgets.Button((cx-bw//2, y0+(bh+gap),     bw, bh), t("menu.new"), config.COL_AMBER),
+            "load":     widgets.Button((cx-bw//2, y0+(bh+gap)*2,   bw, bh), t("menu.load"), config.COL_CYAN),
+            "quit":     widgets.Button((cx-bw//2, y0+(bh+gap)*3,   bw, bh), t("menu.quit"), config.COL_DOWN),
         }
+        # bouton de langue (en haut à droite)
+        self.lang_btn = widgets.Button((config.SCREEN_WIDTH-150, 40, 110, 34),
+                                       f"LANG : {get_lang().upper()}", config.COL_CYAN)
         self.buttons["continue"].enabled = self.auto is not None
         self.buttons["load"].enabled = len(GameState.list_saves()) > 0
         self.t = 0.0
@@ -39,6 +43,10 @@ class MenuScene(Scene):
         self.app.scenes.go("gameover" if gs.player.game_over else "terminal")
 
     def handle_event(self, event):
+        if self.lang_btn.handle(event):
+            toggle_lang()
+            self.on_enter()       # reconstruit les libellés dans la nouvelle langue
+            return
         for key, btn in self.buttons.items():
             if btn.handle(event):
                 if key == "continue" and btn.enabled:
@@ -55,6 +63,7 @@ class MenuScene(Scene):
         mp = pygame.mouse.get_pos()
         for btn in self.buttons.values():
             btn.update(mp, dt)
+        self.lang_btn.update(mp, dt)
 
     def _draw_backdrop(self, surf):
         """Fond animé discret : chandeliers boursiers stylisés qui défilent."""
@@ -91,11 +100,11 @@ class MenuScene(Scene):
         # logo / titre
         widgets.draw_text(surf, "TERMINAL", (cx, 132), fonts.huge(bold=True),
                           config.COL_AMBER, align="center")
-        widgets.draw_text(surf, "FINANCE CAREER SIMULATOR", (cx, 212),
+        widgets.draw_text(surf, t("menu.subtitle"), (cx, 212),
                           fonts.head(), config.COL_TEXT, align="center")
         pulse = 120 + int(60 * (math.sin(self.t * 2) * 0.5 + 0.5))
         pygame.draw.line(surf, (pulse, pulse//2, 0), (cx-220, 267), (cx+220, 267), 1)
-        widgets.draw_text(surf, "De stagiaire à la tête d'une firme mondiale.",
+        widgets.draw_text(surf, t("menu.tagline"),
                           (cx, 287), fonts.small(), config.COL_TEXT_DIM, align="center")
 
         # résumé de la dernière partie (autosave)
@@ -104,6 +113,8 @@ class MenuScene(Scene):
 
         for btn in self.buttons.values():
             btn.draw(surf)
+        self.lang_btn.label = f"LANG : {get_lang().upper()}"
+        self.lang_btn.draw(surf)
 
         widgets.draw_text(surf, "v0.3.0 — alpha",
                           (config.SCREEN_WIDTH-10, config.SCREEN_HEIGHT-22),
@@ -115,7 +126,7 @@ class MenuScene(Scene):
         panel = pygame.Rect(cx - 250, 320, 500, 58)
         pygame.draw.rect(surf, config.COL_PANEL, panel)
         pygame.draw.rect(surf, config.COL_BORDER, panel, 1)
-        widgets.draw_text(surf, "DERNIÈRE PARTIE", (panel.x + 12, panel.y + 8),
+        widgets.draw_text(surf, t("menu.last_run"), (panel.x + 12, panel.y + 8),
                           fonts.tiny(bold=True), config.COL_CYAN)
         status = "GAME OVER" if m["game_over"] else m["grade"]
         line = f"{m['name']} · {status} · {m['continent']} · J{m['day']} · {widgets.format_money(m['cash'], cur)}"

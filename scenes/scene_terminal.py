@@ -399,6 +399,8 @@ class TerminalScene(Scene):
             self.app.scenes.go("glossary", return_to="terminal")
         elif cmd in ("PORTFOLIO", "PORTEFEUILLE", "BOOK", "POSITIONS", "PRT"):
             self.app.scenes.go("book", return_to="terminal")
+        elif cmd in ("PA", "ANALYSE", "ANALYTICS", "DETAIL", "PORT"):
+            self.app.scenes.go("analytics", return_to="terminal")
         elif cmd in ("FRONTIER", "MARKOWITZ", "FRONTIERE"):
             self.app.scenes.go("portfolio")
         elif cmd in ("BUY", "ACHETER"):

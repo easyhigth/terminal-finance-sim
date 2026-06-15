@@ -239,7 +239,7 @@ class EvaluationScene(Scene):
             self.new_title = res.get("title") if res else None
             self.app.notify(_L(f"{C.PROGRAMS[self.cert_program]['name']} : niveau réussi", f"{C.PROGRAMS[self.cert_program]['name']}: level passed"), "prestige")
             for b in badges.check_new(p, self.app.market):
-                self.app.notify(_L(f"🏅 Badge : {b['name']}", f"🏅 Badge: {b['name']}"), "prestige")
+                self.app.notify(_L(f"★ Badge : {b['name']}", f"★ Badge: {b['name']}"), "prestige")
         else:
             self.app.notify(_L("Examen de certification échoué","Certification exam failed"), "bad")
 

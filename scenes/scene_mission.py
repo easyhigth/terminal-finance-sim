@@ -157,8 +157,9 @@ class MissionScene(Scene):
     def draw(self, surf):
         surf.fill(config.COL_BG)
         p = self.app.gs.player
-        widgets.draw_text(surf, "MISSION — " + self.mission["title"], (40, 24),
-                          fonts.title(bold=True), config.COL_AMBER)
+        widgets.draw_text_scaled(surf, "MISSION — " + self.mission["title"], (40, 24),
+                                 fonts.title(bold=True), config.COL_AMBER,
+                                 config.SCREEN_WIDTH - 80)
         widgets.draw_text(surf, f"{p.grade}  ·  {M.grade_focus(p.grade_index)}",
                           (42, 76), fonts.small(), config.COL_TEXT_DIM)
 

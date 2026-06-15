@@ -44,7 +44,7 @@ class AcademyScene(Scene):
             if len(p.learned) >= len(L.LESSONS):
                 from core import badges
                 for b in badges.check_new(p, self.app.market):
-                    self.app.notify(f"🏅 Badge : {b['name']}", "prestige")
+                    self.app.notify(f"★ Badge : {b['name']}", "prestige")
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -100,8 +100,10 @@ class AcademyScene(Scene):
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect)
                 mark = "✓" if read else "•"
                 col = config.COL_UP if read else config.COL_TEXT
-                widgets.draw_text(surf, f"{mark} {lesson['title']}", (linner.x + 6, y),
-                                  fonts.small(bold=sel), col if not sel else config.COL_WHITE)
+                font = fonts.small(bold=sel)
+                label = widgets.fit_text(f"{mark} {lesson['title']}", font, linner.w - 8)
+                widgets.draw_text(surf, label, (linner.x + 6, y),
+                                  font, col if not sel else config.COL_WHITE)
                 y += 22
             y += 6
         surf.set_clip(prev_clip)

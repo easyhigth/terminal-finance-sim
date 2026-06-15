@@ -246,7 +246,7 @@ class TerminalScene(Scene):
         feat = unlocks_mod.CMD_FEATURE.get(cmd)
         if feat and not unlocks_mod.unlocked(p, feat):
             g = unlocks_mod.required_grade(feat)
-            self._log(_L(f"  🔒 {unlocks_mod.feature_label(feat)}", f"  🔒 {unlocks_mod.feature_label(feat)}"),
+            self._log(_L(f"  ⊘ {unlocks_mod.feature_label(feat)}", f"  ⊘ {unlocks_mod.feature_label(feat)}"),
                       _L(f"     débloqué au grade {config.GRADES[g]} (vous : {p.grade}).",
                          f"     unlocked at grade {config.GRADES[g]} (you: {p.grade})."))
             return
@@ -508,7 +508,7 @@ class TerminalScene(Scene):
         """BUYBOND/SELLBOND <id> <qté>."""
         import core.bonds as bonds_mod
         if not unlocks_mod.unlocked(self.app.gs.player, "trade"):
-            self._log(_L("  🔒 Trading débloqué au grade Associate.","  🔒 Trading unlocked at Associate grade."))
+            self._log(_L("  ⊘ Trading débloqué au grade Associate.","  ⊘ Trading unlocked at Associate grade."))
             return
         if len(args) < 1:
             self._log(_L(f"  Usage : {cmd} <id> <qté>  (voir BONDS).", f"  Usage: {cmd} <id> <qty>  (see BONDS)."))
@@ -549,7 +549,7 @@ class TerminalScene(Scene):
         import importlib
         mod = importlib.import_module(f"core.{asset}")
         if not unlocks_mod.unlocked(self.app.gs.player, "trade"):
-            self._log(_L("  🔒 Trading débloqué au grade Associate.","  🔒 Trading unlocked at Associate grade."))
+            self._log(_L("  ⊘ Trading débloqué au grade Associate.","  ⊘ Trading unlocked at Associate grade."))
             return
         if len(args) < 1:
             self._log(_L(f"  Usage : {cmd} <id> <qté>.", f"  Usage: {cmd} <id> <qty>."))
@@ -1031,7 +1031,7 @@ class TerminalScene(Scene):
                 continue
             crossed = (price >= a["price"]) if a["above"] else (price <= a["price"])
             if crossed:
-                self._log(_L(f"  🔔 ALERTE {a['ticker']} : cours {price:.2f} a franchi {a['price']:.2f}.", f"  🔔 ALERT {a['ticker']}: price {price:.2f} crossed {a['price']:.2f}."))
+                self._log(_L(f"  ⚠ ALERTE {a['ticker']} : cours {price:.2f} a franchi {a['price']:.2f}.", f"  ⚠ ALERT {a['ticker']}: price {price:.2f} crossed {a['price']:.2f}."))
                 self.app.notify(f"Alerte {a['ticker']} @ {price:.2f}", "warn")
                 inbox_mod.push(p, "desk", "Desk", f"Alerte cours : {a['ticker']}",
                                f"{a['ticker']} a franchi votre seuil de {a['price']:.2f} "
@@ -1056,7 +1056,7 @@ class TerminalScene(Scene):
     def _check_badges(self):
         """Attribue les nouveaux badges et notifie (toast + journal)."""
         for b in badges_mod.check_new(self.app.gs.player, self.market):
-            self.app.notify(f"🏅 Badge : {b['name']}", "prestige")
+            self.app.notify(f"★ Badge : {b['name']}", "prestige")
             career_mod.log(self.app.gs.player, "info", f"Badge débloqué : {b['name']}")
 
     def _cmd_buy(self, args):
@@ -1294,8 +1294,8 @@ class TerminalScene(Scene):
                   f"  +{config.DAYS_PER_STEP}d → day {p.day} (Q{p.quarter}). "
                   f"Turn balance: {widgets.format_money(summary['net'], cur)}"))
         if summary.get("dividends", 0) > 0:
-            self._log(_L(f"  💰 Dividendes encaissés : +{widgets.format_money(summary['dividends'], cur)}",
-                          f"  💰 Income received: +{widgets.format_money(summary['dividends'], cur)}"))
+            self._log(_L(f"  ◆ Dividendes encaissés : +{widgets.format_money(summary['dividends'], cur)}",
+                          f"  ◆ Income received: +{widgets.format_money(summary['dividends'], cur)}"))
         # débrief « pourquoi mon portefeuille a bougé » : attribution par facteur
         if p.portfolio:
             holdings = {t: pos["shares"] for t, pos in p.portfolio.items()}
@@ -1303,37 +1303,37 @@ class TerminalScene(Scene):
             if abs(attr["total"]) > 1.0:
                 fm_ = lambda v: widgets.format_money(v, cur)
                 own = attr["specific"] + attr["drift"]   # part propre + dérive de base
-                self._log(_L(f"  📊 Positions {fm_(attr['total'])} = marché {fm_(attr['world'])}"
+                self._log(_L(f"  ≡ Positions {fm_(attr['total'])} = marché {fm_(attr['world'])}"
                           f" · secteur {fm_(attr['sector'])} · région {fm_(attr['region'])}"
                           f" · propre {fm_(own)}",
-                          f"  📊 Positions {fm_(attr['total'])} = market {fm_(attr['world'])}"
+                          f"  ≡ Positions {fm_(attr['total'])} = market {fm_(attr['world'])}"
                           f" · sector {fm_(attr['sector'])} · region {fm_(attr['region'])}"
                           f" · idiosyncratic {fm_(own)}"))
         # financement (intérêts sur marge + frais de short) et appel de marge
         fin = summary.get("financing")
         if fin and fin["total"] > 1.0:
-            self._log(_L(f"  💸 Frais de financement : -{widgets.format_money(fin['total'], cur)} "
+            self._log(_L(f"  ◆ Frais de financement : -{widgets.format_money(fin['total'], cur)} "
                       f"(intérêts marge + emprunt de titres).",
-                      f"  💸 Financing cost: -{widgets.format_money(fin['total'], cur)} "
+                      f"  ◆ Financing cost: -{widgets.format_money(fin['total'], cur)} "
                       f"(margin interest + stock borrow)."))
         for res in (summary.get("structured_due") or []):
             pr = res["product"]
             sign = "+" if res["pnl"] >= 0 else ""
-            self._log(_L(f"  📦 Produit structuré échu : {pr['name']} → "
+            self._log(_L(f"  ◼ Produit structuré échu : {pr['name']} → "
                       f"{widgets.format_money(res['payoff'], cur)} "
                       f"(P&L {sign}{widgets.format_money(res['pnl'], cur)}).",
-                      f"  📦 Structured product matured: {pr['name']} → "
+                      f"  ◼ Structured product matured: {pr['name']} → "
                       f"{widgets.format_money(res['payoff'], cur)} "
                       f"(P&L {sign}{widgets.format_money(res['pnl'], cur)})."))
             self.app.notify(_L("Produit structuré arrivé à échéance","Structured product matured"), "info")
         for res in (summary.get("securitised_due") or []):
             pos = res["position"]
             sign = "+" if res["pnl"] >= 0 else ""
-            self._log(_L(f"  🏦 Tranche {pos['name']} échue : perte pool {res['pool_loss']*100:.1f}% → "
+            self._log(_L(f"  ◼ Tranche {pos['name']} échue : perte pool {res['pool_loss']*100:.1f}% → "
                       f"votre tranche -{res['loss_frac']*100:.0f}% capital · "
                       f"{widgets.format_money(res['payoff'], cur)} "
                       f"(P&L {sign}{widgets.format_money(res['pnl'], cur)}).",
-                      f"  🏦 Tranche {pos['name']} matured: pool loss {res['pool_loss']*100:.1f}% → "
+                      f"  ◼ Tranche {pos['name']} matured: pool loss {res['pool_loss']*100:.1f}% → "
                       f"your tranche -{res['loss_frac']*100:.0f}% capital · "
                       f"{widgets.format_money(res['payoff'], cur)} "
                       f"(P&L {sign}{widgets.format_money(res['pnl'], cur)})."))
@@ -1569,7 +1569,7 @@ class TerminalScene(Scene):
             pygame.draw.rect(surf, acc, br, 1, border_radius=4)
             if locked:
                 g = unlocks_mod.required_grade(unlocks_mod.CMD_FEATURE[cmd])
-                widgets.draw_text(surf, f"🔒 {label}", (br.x + 8, br.y + 7),
+                widgets.draw_text(surf, f"⊘ {label}", (br.x + 8, br.y + 7),
                                   fonts.small(), config.COL_TEXT_DIM)
                 widgets.draw_text(surf, f"G{g}", (br.right - 8, br.y + 7),
                                   fonts.tiny(), config.COL_TEXT_DIM, align="right")

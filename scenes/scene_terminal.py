@@ -24,6 +24,7 @@ from core import dilemmas as dilemmas_mod
 from core import badges as badges_mod
 from core import mandates as mandates_mod
 from core import unlocks as unlocks_mod
+from core import history as history_mod
 from core.i18n import t as _t
 from core.scene_manager import Scene
 from ui import fonts, widgets
@@ -1287,6 +1288,20 @@ class TerminalScene(Scene):
             career_mod.log(p, "crisis", scenario["name"])
             self.app.notify(scenario["name"], scenario["kind"])
             if scenario["kind"] == "bad":
+                p.flags["crises"] = p.flags.get("crises", 0) + 1
+        # événement HISTORIQUE scénarisé (campagne déterministe dans le temps)
+        hist = history_mod.maybe_trigger(p, m)
+        if hist:
+            from core.i18n import get_lang
+            hname, hstory = history_mod.localized(hist["event"], get_lang())
+            self.worldmap.push_news([{"region": None, "kind": hist["kind"], "text": hname}])
+            self.recent_events.insert(0, {"title": "★ " + hname, "kind": hist["kind"],
+                                          "cash": 0, "rep": 0})
+            self._log(f"  ★ {hname} — {hstory[:64]}…")
+            inbox_mod.on_crisis(p, hname, hist["kind"])
+            career_mod.log(p, "crisis", hname)
+            self.app.notify(hname, hist["kind"])
+            if hist["kind"] == "bad":
                 p.flags["crises"] = p.flags.get("crises", 0) + 1
         if summary.get("quarter_changed"):
             self._log(f"  ── Nouveau trimestre : T{p.quarter} ──")

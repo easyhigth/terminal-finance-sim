@@ -404,7 +404,7 @@ class TerminalScene(Scene):
             else:
                 self._log(_L("  Aucune décision en attente.","  No pending decision."))
         elif cmd in ("RIVALS", "RIVAUX", "LEADERBOARD"):
-            self._cmd_rivals()
+            self.app.scenes.go("rivals", return_to="terminal")
         elif cmd in ("MANDATES", "MANDATS"):
             self._cmd_mandates()
         elif cmd in ("MANDATE", "MANDAT"):
@@ -912,19 +912,6 @@ class TerminalScene(Scene):
         self._open_window(f"CALENDRIER — Jour {p.day}",
                           [("Échéance", 200), ("Délai", 60), ("Type", 80)], rows)
 
-    def _cmd_rivals(self):
-        p = self.app.gs.player
-        cur = self._cur()
-        board = rivals_mod.leaderboard(p, self.market)
-        rows = []
-        for row in board:
-            col = config.COL_AMBER if row["is_player"] else config.COL_TEXT
-            rows.append((f"{row['rank']}", (row["name"][:20], col),
-                         widgets.format_money(row["score"], cur)))
-        self._open_window("CLASSEMENT — rivaux",
-                          [("#", 30), ("Banquier", 160), ("Score", 90)],
-                          rows, accent=config.COL_PRESTIGE)
-
     # ------------------------------------------------------------- mandats
     def _cmd_mandates(self):
         p = self.app.gs.player
@@ -1300,12 +1287,29 @@ class TerminalScene(Scene):
         info = config.CONTINENTS[p.continent]
         cur = info["currency"]
         self.networth_spark.push(pf_mod.net_worth(p, m))
-        # concurrents : progression + sniping des deals expirés
+        # concurrents : progression + sniping des deals expirés + actions actives
+        for r in p.rivals:
+            r["mood"] = "flat"          # réinitialise l'humeur du tour
         rivals_mod.step(p, m)
         for d in summary["expired"]:
             rival = rivals_mod.snipe(p, d, random)
             inbox_mod.on_deal_sniped(p, d, rival)
             career_mod.log(p, "deal", f"{rival} rafle « {d['title']} »")
+        # rivaux ACTIFS : percées, snipe de deals en retard, débauchage de mandats
+        for ev in rivals_mod.act(p, m, random):
+            self.recent_events.insert(0, {"title": ev["text"][:70], "kind": ev["kind"]})
+            self.worldmap.push_news([{"region": p.continent, "kind": ev["kind"],
+                                      "text": ev["rival"]}])
+            career_mod.log(p, "deal" if ev["type"] in ("snipe", "poach") else "info",
+                           ev["text"])
+            self.app.notify(ev["text"][:60], ev["kind"])
+            if ev["type"] == "snipe":
+                inbox_mod.on_deal_sniped(p, ev["deal"], ev["rival"])
+            elif ev["type"] == "poach":
+                inbox_mod.push(p, "client", f"Mandat — {ev['client']}", "Mandat perdu",
+                               f"{ev['rival']} a décroché le mandat de {ev['client']} "
+                               "pendant que vous hésitiez. Soyez plus décidé.")
+        self.recent_events = self.recent_events[:8]
         self._log(_L(f"  +{config.DAYS_PER_STEP}j → jour {p.day} (T{p.quarter}). "
                   f"Solde du tour : {widgets.format_money(summary['net'], cur)}",
                   f"  +{config.DAYS_PER_STEP}d → day {p.day} (Q{p.quarter}). "

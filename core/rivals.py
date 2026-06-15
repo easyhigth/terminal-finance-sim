@@ -30,6 +30,7 @@ def ensure(player, rng=None):
         player.rivals.append({
             "name": prof["name"], "firm": prof["firm"], "track": prof["track"],
             "score": round(config.START_CASH * rng.uniform(0.7, 1.7), 2),
+            "last": "se positionne sur le marché", "mood": "flat",
         })
 
 
@@ -43,6 +44,9 @@ def step(player, market, rng=None):
         growth = 0.003 + 0.6 * world + rng.gauss(0.0, 0.018)
         growth = max(-0.12, min(0.12, growth))
         r["score"] = max(1000.0, r["score"] * (1 + growth))
+        # humeur d'affichage (n'écrase pas une action marquante du tour)
+        if r.get("mood", "flat") == "flat" or "last" not in r:
+            r["mood"] = "up" if growth > 0.01 else "down" if growth < -0.01 else "flat"
 
 
 def player_score(player, market):
@@ -81,4 +85,82 @@ def snipe(player, deal, rng=None):
     rival = rng.choice(same) if same else rng.choice(player.rivals)
     # un deal raflé profite au rival, mais sans le faire exploser (fraction)
     rival["score"] += deal.get("reward_cash", 0) * 0.3
+    _set_action(rival, f"rafle « {deal.get('title','?')} »", "up")
     return rival["name"]
+
+
+# ---------------------------------------------------------------------------
+# RIVAUX ACTIFS — ils agissent chaque tour, de façon visible
+# ---------------------------------------------------------------------------
+ACT_SURGE_PROB = 0.12      # un rival réalise un gros coup (bond de score)
+ACT_SNIPE_PROB = 0.18      # un rival rafle un deal du joueur sur le point d'expirer
+ACT_POACH_PROB = 0.14      # un rival débauche un mandat en attente
+SNIPE_DAYS_THRESHOLD = 8   # un deal devient « vulnérable » sous ce nb de jours
+
+
+def _set_action(rival, text, mood="flat"):
+    rival["last"] = text
+    rival["mood"] = mood
+
+
+def _rival_of_track(player, track, rng):
+    same = [r for r in player.rivals if r["track"] == track]
+    return rng.choice(same) if same else rng.choice(player.rivals)
+
+
+def nemesis(player, market):
+    """Rival immédiatement au-dessus du joueur au classement (ou None si 1er)."""
+    board = leaderboard(player, market)
+    for i, row in enumerate(board):
+        if row["is_player"]:
+            return board[i - 1] if i > 0 else None
+    return None
+
+
+def act(player, market, rng=None):
+    """Actions VISIBLES des rivaux ce tour. Modifie l'état (retire deals/mandats
+    raflés, fait grimper les scores) et retourne une liste d'événements :
+    {type, text, rival, kind, deal?/title?}. Le terminal en tire inbox/news/toasts."""
+    rng = rng or random
+    ensure(player, rng)
+    events = []
+    pscore = player_score(player, market)
+
+    # 1) PERCÉE : un rival réalise un gros coup -> bond de score (peut dépasser le joueur)
+    if rng.random() < ACT_SURGE_PROB:
+        r = rng.choice(player.rivals)
+        before = r["score"]
+        r["score"] = before * (1.0 + rng.uniform(0.10, 0.28))
+        passed = before <= pscore < r["score"]
+        _set_action(r, "conclut une opération majeure", "up")
+        txt = f"{r['name']} ({r['firm']}) conclut une opération de premier plan"
+        events.append({"type": "surge", "rival": r["name"], "kind": "bad" if passed else "info",
+                       "text": txt + (" et vous double au classement." if passed else ".")})
+
+    # 2) SNIPING d'un deal du joueur sur le point d'expirer (pression : agir vite)
+    if player.deals and rng.random() < ACT_SNIPE_PROB:
+        vulnerable = [d for d in player.deals if d["days_left"] <= SNIPE_DAYS_THRESHOLD]
+        if vulnerable:
+            d = rng.choice(vulnerable)
+            r = _rival_of_track(player, d.get("kind"), rng)
+            player.deals = [x for x in player.deals if x["id"] != d["id"]]
+            r["score"] += d.get("reward_cash", 0) * 0.3
+            player.adjust_reputation(-2)
+            _set_action(r, f"vous coiffe sur « {d['title']} »", "up")
+            events.append({"type": "snipe", "rival": r["name"], "kind": "bad",
+                           "deal": d, "title": d["title"],
+                           "text": f"{r['name']} vous coiffe au poteau sur « {d['title']} » "
+                                   f"(−2 réputation)."})
+
+    # 3) DÉBAUCHAGE d'un mandat en attente d'acceptation
+    if getattr(player, "mandate_offers", None) and rng.random() < ACT_POACH_PROB:
+        o = rng.choice(player.mandate_offers)
+        player.mandate_offers = [x for x in player.mandate_offers if x.get("id") != o.get("id")]
+        r = rng.choice(player.rivals)
+        r["score"] += o.get("capital", 0) * 0.02
+        client = o.get("client", "un client")
+        _set_action(r, f"décroche le mandat {client}", "up")
+        events.append({"type": "poach", "rival": r["name"], "kind": "bad", "client": client,
+                       "text": f"{r['name']} décroche le mandat de {client} que vous étudiiez."})
+
+    return events

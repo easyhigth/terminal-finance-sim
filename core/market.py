@@ -26,7 +26,15 @@ import numpy as np
 
 from data import companies as comp_data
 
-HIST_LEN = 120          # longueur d'historique conservée (pour les graphes)
+HIST_LEN = 400          # ~5.4 ans d'historique conservé (pour les graphes)
+
+# Passé reconstruit AVANT le jour 1 d'une nouvelle partie : les graphes ont ainsi
+# de l'ancienneté dès le début (analyse technique, vol, bêta, corrélations...).
+# Le marché restant déterministe (graine, nb de pas), ce passé est simplement le
+# fait de démarrer la carrière à market_step = WARMUP_STEPS.
+STEPS_PER_YEAR = 73     # ~365 jours / DAYS_PER_STEP(5) — pas de marché par an
+WARMUP_YEARS = 5
+WARMUP_STEPS = WARMUP_YEARS * STEPS_PER_YEAR   # = 365 pas (~5 ans) de préhistoire
 
 # Paramètres des facteurs (par pas ≈ une semaine de marché). Calibrés (sur 12
 # graines, 10 ans) pour une PRIME DE RISQUE ACTIONS positive : action moyenne
@@ -126,6 +134,9 @@ class Market:
         # historiques
         self.index_hist = {d[0]: [self.index_value(d[0])] for d in index_defs}
         self.price_hist = {}     # ticker -> liste de prix (rempli paresseusement)
+        # historique COMPLET (toutes sociétés) : snapshots du vecteur de prix, borné
+        # à HIST_LEN. Permet de grapher n'importe quel actif sans suivi préalable.
+        self.price_hist_all = [self.price.copy()]
         self.last_world = 0.0
         self.last_sector = np.zeros(len(self.sectors))
         self.last_region = np.zeros(len(self.regions))
@@ -217,6 +228,10 @@ class Market:
             hist.append(float(self.price[self.ticker_idx[tk]]))
             if len(hist) > HIST_LEN:
                 hist.pop(0)
+        # historique complet (toutes sociétés)
+        self.price_hist_all.append(self.price.copy())
+        if len(self.price_hist_all) > HIST_LEN:
+            self.price_hist_all.pop(0)
 
         # crises : décrément
         for cr in self.crises:
@@ -345,10 +360,20 @@ class Market:
         return self.index_hist.get(name, [])
 
     def track_company(self, ticker):
-        """Démarre le suivi d'historique d'une société (au 1er accès)."""
+        """Démarre le suivi d'historique d'une société (au 1er accès).
+        L'historique est pré-rempli depuis le passé complet (5 ans de préhistoire)."""
         if ticker not in self.price_hist and ticker in self.ticker_idx:
-            self.price_hist[ticker] = [float(self.price[self.ticker_idx[ticker]])]
+            self.price_hist[ticker] = self.history_of(ticker)
         return self.price_hist.get(ticker, [])
+
+    def history_of(self, ticker, n=None):
+        """Historique de prix complet d'une société (depuis la préhistoire de 5 ans).
+        `n` borne au dernier n points si fourni. Retourne une liste de floats."""
+        i = self.ticker_idx.get(ticker)
+        if i is None:
+            return []
+        snaps = self.price_hist_all[-n:] if n else self.price_hist_all
+        return [float(s[i]) for s in snaps]
 
     def price_of(self, ticker):
         i = self.ticker_idx.get(ticker)
@@ -372,9 +397,9 @@ class Market:
         pe = price / eps if eps > 0 else None
         ev = mktcap + c["net_debt"]
         ev_ebitda = ev / ebitda if ebitda > 0 else None
-        # variation depuis le début de l'historique suivi
-        hist = self.price_hist.get(ticker)
-        chg = ((hist[-1] / hist[0] - 1) * 100.0) if hist and len(hist) > 1 and hist[0] else 0.0
+        # variation sur 1 an (YoY) — disponible dès le jour 1 grâce à la préhistoire
+        hist = self.history_of(ticker, STEPS_PER_YEAR + 1)
+        chg = ((hist[-1] / hist[0] - 1) * 100.0) if len(hist) > 1 and hist[0] else 0.0
         ps = mktcap / revenue if revenue else None
         fcf_yield = (net_income / mktcap * 100) if mktcap else None   # proxy FCF≈RN
         nd_ebitda = c["net_debt"] / ebitda if ebitda > 0 else None

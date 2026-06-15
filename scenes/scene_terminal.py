@@ -257,6 +257,7 @@ class TerminalScene(Scene):
                     "  ADV advance · COMMANDS full catalogue",
                     "  MARKET indices · TOP [region] · MOVERS",
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
+                    "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC charts",
                     "  SECTOR · REGION · SCREEN · RANKING · CALENDAR",
                     "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE",
                     "  RESEARCH <tk> · ALERT <tk> <px> · MANDATES · PITCH",
@@ -274,6 +275,7 @@ class TerminalScene(Scene):
                     "  ADV avancer · COMMANDS catalogue complet",
                     "  MARKET indices · TOP [region] · MOVERS",
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
+                    "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC graphes",
                     "  SECTOR · REGION · SCREEN · RANKING · CALENDAR",
                     "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE",
                     "  RESEARCH <tk> · ALERT <tk> <px> · MANDATES · PITCH",
@@ -319,7 +321,27 @@ class TerminalScene(Scene):
         elif cmd in ("BUYCRYPTO", "SELLCRYPTO"):
             self._cmd_alt_trade("crypto", cmd, parts[1:])
         elif cmd in ("GP", "CHART", "GRAPH"):
-            self._cmd_chart(arg)
+            self._cmd_graph("line", parts[1:])
+        elif cmd in ("GPC", "CANDLE", "CANDLES"):
+            self._cmd_graph("candles", parts[1:])
+        elif cmd in ("GPO", "BARS"):
+            self._cmd_graph("bars", parts[1:])
+        elif cmd in ("GPCH", "CHANGE", "PERF"):
+            self._cmd_graph("change", parts[1:])
+        elif cmd in ("COMP", "COMPGRAPH"):
+            self._cmd_graph("compare", parts[1:])
+        elif cmd in ("HS", "SPREAD", "RATIO"):
+            self._cmd_graph("spread", parts[1:])
+        elif cmd in ("HVOL", "VOL", "VOLATILITY"):
+            self._cmd_graph("vol", parts[1:])
+        elif cmd in ("BETA", "REG"):
+            self._cmd_graph("beta", parts[1:])
+        elif cmd in ("CORR", "CORRELATION", "MATRIX"):
+            self._cmd_graph("corr", parts[1:])
+        elif cmd in ("GEG", "MACROGRAPH"):
+            self._cmd_graph("macro", parts[1:])
+        elif cmd in ("GC", "CURVE", "YIELDCURVE", "YCRV"):
+            self._cmd_graph("curve", parts[1:])
         elif cmd in ("RV", "PEERS", "COMPS"):
             self._cmd_rv(arg)
         elif cmd in ("ECO", "MACRO", "ECONOMY"):
@@ -596,23 +618,18 @@ class TerminalScene(Scene):
         else:
             self._log(_L(f"  Résultats : {', '.join(res)}", f"  Results: {', '.join(res)}"))
 
-    def _cmd_chart(self, ticker):
-        """GP — graphe de prix d'une société (fenêtre déplaçable)."""
-        if not ticker:
-            self._log(_L("  Usage : GP <ticker>  (graphe de prix).","  Usage: GP <ticker>  (price chart)."))
-            return
-        tk = ticker.upper()
-        if self.market.price_of(tk) is None:
-            self._log(_L(f"  Ticker inconnu : {tk}.", f"  Unknown ticker: {tk}."))
-            return
-        from ui.datawindow import DataWindow
-        hist = self.market.track_company(tk)
-        self.datawins.append(DataWindow(f"{tk} — cours", [], [],
-                                        pos=(self.rail_w + 60, 110),
-                                        accent=config.COL_AMBER, chart=list(hist)))
-        self.datawins = self.datawins[-5:]
-        if len(hist) < 2:
-            self._log(_L(f"  {tk} : historique en constitution (ADV pour le remplir).", f"  {tk}: history building up (ADV to fill it)."))
+    def _cmd_graph(self, kind, args):
+        """Ouvre l'atelier de graphes analytiques (5 ans d'historique disponibles
+        dès le jour 1). `kind` choisit le type ; `args` les tickers éventuels."""
+        tickers = [a.upper() for a in args]
+        # valide les tickers fournis (les types macro/courbe n'en ont pas besoin)
+        if kind not in ("macro", "curve"):
+            bad = [t for t in tickers if self.market.price_of(t) is None]
+            if bad:
+                self._log(_L(f"  Ticker inconnu : {', '.join(bad)}.",
+                             f"  Unknown ticker: {', '.join(bad)}."))
+                tickers = [t for t in tickers if t not in bad]
+        self.app.scenes.go("graph", kind=kind, tickers=tickers, return_to="terminal")
 
     def _cmd_rv(self, ticker):
         """RV — valeur relative : multiples de la société vs médianes du secteur."""

@@ -18,15 +18,21 @@ class BookScene(Scene):
         self.market = self.app.ensure_market()
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
+        self.analytics_btn = widgets.Button(
+            (250, config.SCREEN_HEIGHT - 50, 230, 42), "ANALYSE DÉTAILLÉE (PA)", config.COL_CYAN)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.go(self.return_to)
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+        if self.analytics_btn.handle(event):
+            self.app.scenes.go("analytics", return_to="terminal")
 
     def update(self, dt):
-        self.back_btn.update(pygame.mouse.get_pos(), dt)
+        mp = pygame.mouse.get_pos()
+        self.back_btn.update(mp, dt)
+        self.analytics_btn.update(mp, dt)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -116,3 +122,4 @@ class BookScene(Scene):
                                   (ainner.x, ainner.bottom - 18), fonts.tiny(), config.COL_WARN)
 
         self.back_btn.draw(surf)
+        self.analytics_btn.draw(surf)

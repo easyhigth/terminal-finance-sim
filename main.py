@@ -44,6 +44,8 @@ from scenes.scene_credit import CreditScene
 from scenes.scene_alm import AlmScene
 from scenes.scene_graph import GraphScene
 from scenes.scene_rivals import RivalsScene
+from scenes.scene_analytics import AnalyticsScene
+from scenes.scene_tutorials import TutorialsScene
 
 
 class App:
@@ -98,6 +100,8 @@ class App:
         self.scenes.register("alm", AlmScene(self))
         self.scenes.register("graph", GraphScene(self))
         self.scenes.register("rivals", RivalsScene(self))
+        self.scenes.register("analytics", AnalyticsScene(self))
+        self.scenes.register("tutorials", TutorialsScene(self))
         self.scenes.go("menu")
 
     def notify(self, text, kind="info"):

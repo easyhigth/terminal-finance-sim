@@ -383,6 +383,8 @@ class TerminalScene(Scene):
             self._cmd_eco()
         elif cmd in ("LEARN", "ACADEMY", "ACADEMIE", "APPRENDRE"):
             self.app.scenes.go("academy", return_to="terminal")
+        elif cmd in ("TUTO", "TUTORIAL", "TUTORIELS", "HOWTO", "GUIDE"):
+            self.app.scenes.go("tutorials", return_to="terminal")
         elif cmd in ("CERT", "CERTS", "CERTIFICATIONS", "CFA", "FRM"):
             self.app.scenes.go("cert", return_to="terminal")
         elif cmd in ("DEFINE", "DEF", "GLO"):
@@ -399,6 +401,8 @@ class TerminalScene(Scene):
             self.app.scenes.go("glossary", return_to="terminal")
         elif cmd in ("PORTFOLIO", "PORTEFEUILLE", "BOOK", "POSITIONS", "PRT"):
             self.app.scenes.go("book", return_to="terminal")
+        elif cmd in ("PA", "ANALYSE", "ANALYTICS", "DETAIL", "PORT"):
+            self.app.scenes.go("analytics", return_to="terminal")
         elif cmd in ("FRONTIER", "MARKOWITZ", "FRONTIERE"):
             self.app.scenes.go("portfolio")
         elif cmd in ("BUY", "ACHETER"):

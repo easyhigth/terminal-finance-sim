@@ -48,6 +48,7 @@ CATALOG = [
     ]),
     ("Savoir & macro", [
         ("LEARN / ACADEMY", "Académie : leçons (DCF, Sharpe, VaR, options…)"),
+        ("TUTO / GUIDE", "Tutoriels illustrés : acheter/vendre, bonds, futures…"),
         ("GLOSSARY", "Glossaire des termes financiers"),
         ("DEFINE <terme>", "Définition rapide. Ex : DEFINE WACC"),
         ("ECO / MACRO", "Indicateurs : taux, inflation, croissance, chômage"),
@@ -85,6 +86,7 @@ CATALOG = [
     ]),
     ("Portefeuille & trading", [
         ("PORTFOLIO / BOOK / PRT", "Livre de positions (valeur nette, P&L)"),
+        ("PA / ANALYSE", "Analyse détaillée : poids, risque, corrél., frontière"),
         ("BUY <tk> <qté>", "Acheter des actions. Ex : BUY MVC 100"),
         ("SELL <tk> <qté|ALL>", "Vendre des actions"),
         ("SHORT <tk> <qté>", "Vente à découvert (parier à la baisse)"),

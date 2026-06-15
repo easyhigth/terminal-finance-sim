@@ -61,6 +61,7 @@ class GraphScene(Scene):
         self.input = ""
         self._type_rects = {}
         self._period_rects = {}
+        self._suggest_rects = []
         self.back_btn = widgets.Button(
             config.back_button_rect(180), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.mode_btn = widgets.Button(
@@ -78,6 +79,10 @@ class GraphScene(Scene):
             elif event.unicode and event.unicode.isprintable() and len(self.input) < 8:
                 self.input += event.unicode.upper()
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for rr, tk in self._suggest_rects:
+                if rr.collidepoint(event.pos):
+                    self._commit_input(ticker=tk)
+                    return
             for code, rect in self._type_rects.items():
                 if rect.collidepoint(event.pos):
                     self.kind = _KIND_BY_CODE[code]
@@ -91,12 +96,15 @@ class GraphScene(Scene):
             self.spread_mode = "diff" if self.spread_mode == "ratio" else "ratio"
             self.mode_btn.label = f"SPREAD : {self.spread_mode.upper()}"
 
-    def _commit_input(self):
-        tk = self.input.strip().upper()
+    def _commit_input(self, ticker=None):
+        # recherche intelligente : résout un nom/ticker partiel vers un ticker
+        q = ticker if ticker is not None else self.input.strip()
         self.input = ""
-        if not tk or self.market.price_of(tk) is None:
-            if tk:
-                self.app.notify(f"Ticker inconnu : {tk}", "bad")
+        if not q:
+            return
+        tk = q if ticker is not None else self.market.resolve(q)
+        if not tk:
+            self.app.notify(f"Aucun résultat : {q}", "bad")
             return
         if self.kind in _MULTI:
             if tk not in self.tickers:
@@ -140,6 +148,7 @@ class GraphScene(Scene):
         self.back_btn.draw(surf)
         if self.kind == "spread":
             self.mode_btn.draw(surf)
+        self._draw_suggestions(surf)   # overlay : au-dessus du graphe
 
     def _draw_type_tabs(self, surf):
         self._type_rects = {}
@@ -170,16 +179,39 @@ class GraphScene(Scene):
             img = font.render(plabel, True, config.COL_CYAN if sel else config.COL_TEXT)
             surf.blit(img, img.get_rect(center=rect.center))
             x += 60
-        # saisie d'actif (droite)
+        # saisie d'actif (droite) + recherche intelligente par nom OU ticker
         if self.kind not in _NO_ASSET:
-            hint = "+ TICKER" if self.kind in _MULTI else "TICKER"
-            box = pygame.Rect(320, y, 280, 26)
+            hint = "+ NOM/TICKER" if self.kind in _MULTI else "NOM/TICKER"
+            box = pygame.Rect(320, y, 300, 26)
+            self._input_box = box
             pygame.draw.rect(surf, config.COL_PANEL, box)
-            pygame.draw.rect(surf, config.COL_BORDER, box, 1)
+            pygame.draw.rect(surf, config.COL_CYAN if self.input else config.COL_BORDER, box, 1)
             widgets.draw_text(surf, f"{hint} ▸ {self.input}_", (box.x + 8, box.y + 5),
                               fonts.small(), config.COL_TEXT)
-            widgets.draw_text(surf, "Entrée pour valider", (box.right + 12, box.y + 5),
-                              fonts.tiny(), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, "tapez un nom, ex. « mavric » → MVC",
+                              (box.right + 12, box.y + 5), fonts.tiny(), config.COL_TEXT_DIM)
+        else:
+            self._input_box = None
+
+    def _draw_suggestions(self, surf):
+        """Menu déroulant de recherche intelligente (dessiné EN DERNIER, au-dessus
+        du graphe) : nom déformé → ticker, cliquable."""
+        self._suggest_rects = []
+        box = getattr(self, "_input_box", None)
+        if not box or not self.input.strip():
+            return
+        sy = box.bottom + 2
+        for tk, nm in self.market.suggest(self.input, 8):
+            rr = pygame.Rect(box.x, sy, box.w + 220, 22)
+            self._suggest_rects.append((rr, tk))
+            hov = rr.collidepoint(pygame.mouse.get_pos())
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL, rr)
+            pygame.draw.rect(surf, config.COL_CYAN if hov else config.COL_BORDER, rr, 1)
+            widgets.draw_text(surf, tk, (rr.x + 8, rr.y + 3), fonts.small(bold=True),
+                              config.COL_AMBER)
+            widgets.draw_text(surf, widgets.fit_text(nm, fonts.tiny(), rr.w - 90),
+                              (rr.x + 80, rr.y + 4), fonts.tiny(), config.COL_TEXT_DIM)
+            sy += 22
 
     # ----------------------------------------------------- helpers de tracé
     def _plot_axes(self, surf, rect, lo, hi, y_fmt=lambda v: f"{v:.0f}", rows=5):

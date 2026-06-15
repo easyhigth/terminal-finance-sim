@@ -554,12 +554,15 @@ class TerminalScene(Scene):
 
     def _cmd_company(self, ticker):
         if not ticker:
-            self._log(_L("  Usage : COMPANY <ticker>  (ex: COMPANY MVC).","  Usage: COMPANY <ticker>  (e.g. COMPANY MVC)."))
+            self._log(_L("  Usage : COMPANY <nom ou ticker>  (ex: COMPANY MVC, ou COMPANY mavric).",
+                         "  Usage: COMPANY <name or ticker>  (e.g. COMPANY MVC, or COMPANY mavric)."))
             return
-        if self.market.price_of(ticker.upper()) is None:
-            self._log(_L(f"  Ticker inconnu : {ticker.upper()}. Essayez SEARCH.", f"  Unknown ticker: {ticker.upper()}. Try SEARCH."))
+        tk = self.market.resolve(ticker)
+        if tk is None:
+            self._log(_L(f"  Aucun résultat : {ticker}. Essayez SEARCH.",
+                         f"  No match: {ticker}. Try SEARCH."))
             return
-        self.app.scenes.go("company", ticker=ticker.upper(), return_to="terminal")
+        self.app.scenes.go("company", ticker=tk, return_to="terminal")
 
     def _cmd_bond_trade(self, cmd, args):
         """BUYBOND/SELLBOND <id> <qté>."""
@@ -635,12 +638,15 @@ class TerminalScene(Scene):
     def _cmd_financials(self, ticker):
         """FA <ticker> : états financiers complets (bilan + compte de résultat)."""
         if not ticker:
-            self._log(_L("  Usage : FA <ticker>  (états financiers ; ex: FA MVC).","  Usage: FA <ticker>  (financial statements; e.g. FA MVC)."))
+            self._log(_L("  Usage : FA <nom ou ticker>  (états financiers ; ex: FA MVC).",
+                         "  Usage: FA <name or ticker>  (financial statements; e.g. FA MVC)."))
             return
-        if self.market.price_of(ticker.upper()) is None:
-            self._log(_L(f"  Ticker inconnu : {ticker.upper()}. Essayez SEARCH.", f"  Unknown ticker: {ticker.upper()}. Try SEARCH."))
+        tk = self.market.resolve(ticker)
+        if tk is None:
+            self._log(_L(f"  Aucun résultat : {ticker}. Essayez SEARCH.",
+                         f"  No match: {ticker}. Try SEARCH."))
             return
-        self.app.scenes.go("financials", ticker=ticker.upper(), return_to="terminal")
+        self.app.scenes.go("financials", ticker=tk, return_to="terminal")
 
     def _cmd_search(self, terms):
         q = " ".join(terms) if terms else ""
@@ -656,14 +662,15 @@ class TerminalScene(Scene):
     def _cmd_graph(self, kind, args):
         """Ouvre l'atelier de graphes analytiques (5 ans d'historique disponibles
         dès le jour 1). `kind` choisit le type ; `args` les tickers éventuels."""
-        tickers = [a.upper() for a in args]
-        # valide les tickers fournis (les types macro/courbe n'en ont pas besoin)
+        # recherche intelligente : résout chaque argument (nom OU ticker partiel)
+        tickers = []
         if kind not in ("macro", "curve"):
-            bad = [t for t in tickers if self.market.price_of(t) is None]
-            if bad:
-                self._log(_L(f"  Ticker inconnu : {', '.join(bad)}.",
-                             f"  Unknown ticker: {', '.join(bad)}."))
-                tickers = [t for t in tickers if t not in bad]
+            for a in args:
+                tk = self.market.resolve(a)
+                if tk:
+                    tickers.append(tk)
+                else:
+                    self._log(_L(f"  Aucun résultat : {a}.", f"  No match: {a}."))
         self.app.scenes.go("graph", kind=kind, tickers=tickers, return_to="terminal")
 
     def _cmd_rv(self, ticker):
@@ -671,9 +678,10 @@ class TerminalScene(Scene):
         if not ticker:
             self._log(_L("  Usage : RV <ticker>  (valeur relative vs pairs).","  Usage: RV <ticker>  (relative value vs peers)."))
             return
-        mt = self.market.metrics(ticker.upper())
+        tk = self.market.resolve(ticker)
+        mt = self.market.metrics(tk) if tk else None
         if not mt:
-            self._log(_L(f"  Ticker inconnu : {ticker.upper()}.", f"  Unknown ticker: {ticker.upper()}."))
+            self._log(_L(f"  Aucun résultat : {ticker}.", f"  No match: {ticker}."))
             return
         med = self.market.sector_medians(mt["sector"])
 
@@ -859,10 +867,11 @@ class TerminalScene(Scene):
         if len(args) < 2:
             self._log(_L("  Usage : COMPARE <ticker1> <ticker2>","  Usage: COMPARE <ticker1> <ticker2>"))
             return
-        a, b = args[0].upper(), args[1].upper()
-        ma, mb = self.market.metrics(a), self.market.metrics(b)
+        a, b = self.market.resolve(args[0]), self.market.resolve(args[1])
+        ma = self.market.metrics(a) if a else None
+        mb = self.market.metrics(b) if b else None
         if not ma or not mb:
-            self._log(_L("  Un des tickers est inconnu.","  One of the tickers is unknown."))
+            self._log(_L("  Un des termes est introuvable.","  One of the terms has no match."))
             return
         def fmt(m, key, f):
             v = m[key]
@@ -1004,10 +1013,10 @@ class TerminalScene(Scene):
         if not ticker:
             self._log(_L("  Usage : RESEARCH <ticker>","  Usage: RESEARCH <ticker>"))
             return
-        tk = ticker.upper()
-        mt = self.market.metrics(tk)
+        tk = self.market.resolve(ticker)
+        mt = self.market.metrics(tk) if tk else None
         if not mt:
-            self._log(_L(f"  Ticker inconnu : {tk}.", f"  Unknown ticker: {tk}."))
+            self._log(_L(f"  Aucun résultat : {ticker}.", f"  No match: {ticker}."))
             return
         # valeur intrinsèque simplifiée : BPA capitalisé à un P/E « juste » sectoriel
         fair_pe = {"Tech": 24, "Semicon": 22, "Luxe": 22, "Sante": 19, "Conso": 18,
@@ -1034,15 +1043,15 @@ class TerminalScene(Scene):
         if len(args) < 2:
             self._log(_L("  Usage : ALERT <ticker> <prix>","  Usage: ALERT <ticker> <price>"))
             return
-        tk = args[0].upper()
+        tk = self.market.resolve(args[0])
         try:
             price = float(args[1].replace(",", "."))
         except ValueError:
             self._log(_L("  Prix invalide.","  Invalid price."))
             return
-        cur_price = self.market.price_of(tk)
+        cur_price = self.market.price_of(tk) if tk else None
         if cur_price is None:
-            self._log(_L(f"  Ticker inconnu : {tk}.", f"  Unknown ticker: {tk}."))
+            self._log(_L(f"  Aucun résultat : {args[0]}.", f"  No match: {args[0]}."))
             return
         self.market.track_company(tk)
         p.alerts.append({"ticker": tk, "price": price, "above": price > cur_price})

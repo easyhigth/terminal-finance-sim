@@ -237,3 +237,32 @@ def test_metrics_and_price_lookup():
     # un ticker inconnu renvoie None proprement
     assert m.price_of("ZZZINEXISTANT") is None
     assert m.metrics("ZZZINEXISTANT") is None
+
+
+# --------------------------------------------------------------- recherche
+def test_resolve_exact_ticker():
+    m = Market(seed=3)
+    tk = m.companies[0]["ticker"]
+    assert m.resolve(tk) == tk
+    assert m.resolve(tk.lower()) == tk
+
+
+def test_resolve_by_name_fragment():
+    m = Market(seed=3)
+    c = m.companies[10]
+    frag = c["name"].split()[0][:4]          # fragment du nom
+    assert m.resolve(frag) is not None       # résout vers une société
+
+
+def test_resolve_unknown_returns_none():
+    m = Market(seed=3)
+    assert m.resolve("zzzznope") is None
+    assert m.resolve("") is None
+
+
+def test_suggest_ranks_exact_first():
+    m = Market(seed=3)
+    tk = m.companies[5]["ticker"]
+    sug = m.suggest(tk)
+    assert sug and sug[0][0] == tk
+    assert len(sug) <= 8

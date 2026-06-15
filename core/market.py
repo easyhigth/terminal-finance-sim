@@ -471,6 +471,34 @@ class Market:
                 break
         return out
 
+    def suggest(self, query, limit=8):
+        """Recherche INTELLIGENTE : suggestions (ticker, name) pour une saisie
+        libre (ticker ou nom, partiel), classées par pertinence — exact, puis
+        préfixe, puis sous-chaîne. Évite d'avoir à connaître les tickers par cœur."""
+        q = query.strip().lower()
+        if not q:
+            return []
+        exact, prefix, contains = [], [], []
+        for c in self.companies:
+            tk, nm = c["ticker"].lower(), c["name"].lower()
+            pair = (c["ticker"], c["name"])
+            if tk == q:
+                exact.append(pair)
+            elif tk.startswith(q) or nm.startswith(q):
+                prefix.append(pair)
+            elif q in tk or q in nm:
+                contains.append(pair)
+        return (exact + prefix + contains)[:limit]
+
+    def resolve(self, query):
+        """Meilleur ticker correspondant à une recherche libre, ou None.
+        'MVC' -> MVC ; 'mavric' -> MVC ; 'comp' -> 1re société contenant 'comp'."""
+        q = query.strip().upper()
+        if q in self.ticker_idx:
+            return q
+        hits = self.suggest(query, 1)
+        return hits[0][0] if hits else None
+
     # -------------------------------------------------------------- news
     def _generate_news(self, F_world, F_sector, F_region):
         """Génère 0..3 news selon l'ampleur des chocs du pas (pour la carte)."""

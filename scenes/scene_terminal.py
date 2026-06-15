@@ -726,7 +726,7 @@ class TerminalScene(Scene):
         """Commandes de TEST (mode triche, via main_cheat.py)."""
         p = self.app.gs.player
         if cmd in ("CHEAT", "CHEATS"):
-            self._log(_L("  ⚙ TRICHE : GRADE <0-11> · CASH <montant> · REP <0-100> · MAXUNLOCK","  ⚙ CHEAT: GRADE <0-11> · CASH <amount> · REP <0-100> · MAXUNLOCK"))
+            self._log(_L("  ⊕ TRICHE : GRADE <0-11> · CASH <montant> · REP <0-100> · MAXUNLOCK","  ⊕ CHEAT: GRADE <0-11> · CASH <amount> · REP <0-100> · MAXUNLOCK"))
             self._log(_L("  Grades : ","  Grades: ") + " ".join(f"{i}={g}" for i, g in enumerate(config.GRADES)))
             return
         if cmd == "GRADE":
@@ -740,26 +740,26 @@ class TerminalScene(Scene):
             p.grade_start_quarter = p.quarter
             if gi >= 2 and p.track == "General":
                 p.flags["can_choose_track"] = True
-            self._log(_L(f"  ⚙ Grade réglé sur {gi} = {config.GRADES[gi]}.", f"  ⚙ Grade set to {gi} = {config.GRADES[gi]}."))
+            self._log(_L(f"  ⊕ Grade réglé sur {gi} = {config.GRADES[gi]}.", f"  ⊕ Grade set to {gi} = {config.GRADES[gi]}."))
             self._check_badges()
         elif cmd == "CASH":
             if not args or not args[0].lstrip("-").replace(".", "").isdigit():
                 self._log(_L("  Usage : CASH <montant>.","  Usage: CASH <amount>."))
                 return
             p.cash = float(args[0])
-            self._log(_L(f"  ⚙ Trésorerie réglée sur {widgets.format_money(p.cash, self._cur())}.", f"  ⚙ Cash set to {widgets.format_money(p.cash, self._cur())}."))
+            self._log(_L(f"  ⊕ Trésorerie réglée sur {widgets.format_money(p.cash, self._cur())}.", f"  ⊕ Cash set to {widgets.format_money(p.cash, self._cur())}."))
         elif cmd in ("REP", "REPUTATION"):
             if not args or not args[0].lstrip("-").isdigit():
                 self._log(_L("  Usage : REP <0-100>.","  Usage: REP <0-100>."))
                 return
             p.reputation = max(0, min(100, int(args[0])))
-            self._log(_L(f"  ⚙ Réputation réglée sur {p.reputation}/100.", f"  ⚙ Reputation set to {p.reputation}/100."))
+            self._log(_L(f"  ⊕ Réputation réglée sur {p.reputation}/100.", f"  ⊕ Reputation set to {p.reputation}/100."))
         elif cmd == "MAXUNLOCK":
             p.grade_index = len(config.GRADES) - 1
             p.reputation = max(p.reputation, 80)
             if p.track == "General":
                 p.flags["can_choose_track"] = True
-            self._log(_L(f"  ⚙ Grade max ({config.GRADES[-1]}) : toutes les actions débloquées.", f"  ⚙ Top grade ({config.GRADES[-1]}): all actions unlocked."))
+            self._log(_L(f"  ⊕ Grade max ({config.GRADES[-1]}) : toutes les actions débloquées.", f"  ⊕ Top grade ({config.GRADES[-1]}): all actions unlocked."))
             self._check_badges()
 
     def _cmd_eval(self):
@@ -1073,7 +1073,7 @@ class TerminalScene(Scene):
     def _check_badges(self):
         """Attribue les nouveaux badges et notifie (toast + journal)."""
         for b in badges_mod.check_new(self.app.gs.player, self.market):
-            self.app.notify(f"★ Badge : {b['name']}", "prestige")
+            self.app.notify(f"✶ Badge : {b['name']}", "prestige")
             career_mod.log(self.app.gs.player, "info", f"Badge débloqué : {b['name']}")
 
     def _cmd_buy(self, args):
@@ -1336,21 +1336,21 @@ class TerminalScene(Scene):
         for res in (summary.get("structured_due") or []):
             pr = res["product"]
             sign = "+" if res["pnl"] >= 0 else ""
-            self._log(_L(f"  ◼ Produit structuré échu : {pr['name']} → "
+            self._log(_L(f"  ■ Produit structuré échu : {pr['name']} → "
                       f"{widgets.format_money(res['payoff'], cur)} "
                       f"(P&L {sign}{widgets.format_money(res['pnl'], cur)}).",
-                      f"  ◼ Structured product matured: {pr['name']} → "
+                      f"  ■ Structured product matured: {pr['name']} → "
                       f"{widgets.format_money(res['payoff'], cur)} "
                       f"(P&L {sign}{widgets.format_money(res['pnl'], cur)})."))
             self.app.notify(_L("Produit structuré arrivé à échéance","Structured product matured"), "info")
         for res in (summary.get("securitised_due") or []):
             pos = res["position"]
             sign = "+" if res["pnl"] >= 0 else ""
-            self._log(_L(f"  ◼ Tranche {pos['name']} échue : perte pool {res['pool_loss']*100:.1f}% → "
+            self._log(_L(f"  ■ Tranche {pos['name']} échue : perte pool {res['pool_loss']*100:.1f}% → "
                       f"votre tranche -{res['loss_frac']*100:.0f}% capital · "
                       f"{widgets.format_money(res['payoff'], cur)} "
                       f"(P&L {sign}{widgets.format_money(res['pnl'], cur)}).",
-                      f"  ◼ Tranche {pos['name']} matured: pool loss {res['pool_loss']*100:.1f}% → "
+                      f"  ■ Tranche {pos['name']} matured: pool loss {res['pool_loss']*100:.1f}% → "
                       f"your tranche -{res['loss_frac']*100:.0f}% capital · "
                       f"{widgets.format_money(res['payoff'], cur)} "
                       f"(P&L {sign}{widgets.format_money(res['pnl'], cur)})."))
@@ -1393,9 +1393,9 @@ class TerminalScene(Scene):
             from core.i18n import get_lang
             hname, hstory = history_mod.localized(hist["event"], get_lang())
             self.worldmap.push_news([{"region": None, "kind": hist["kind"], "text": hname}])
-            self.recent_events.insert(0, {"title": "★ " + hname, "kind": hist["kind"],
+            self.recent_events.insert(0, {"title": "✶ " + hname, "kind": hist["kind"],
                                           "cash": 0, "rep": 0})
-            self._log(f"  ★ {hname} — {hstory[:64]}…")
+            self._log(f"  ✶ {hname} — {hstory[:64]}…")
             inbox_mod.on_crisis(p, hname, hist["kind"])
             career_mod.log(p, "crisis", hname)
             self.app.notify(hname, hist["kind"])
@@ -1412,7 +1412,7 @@ class TerminalScene(Scene):
             inbox_mod.on_quarter(p, summary.get("quarter_report"))
             hot = p.flags.get("hot_sector")
             if hot:
-                self._log(_L(f"  ★ Secteur à surveiller ce trimestre : {hot}.", f"  ★ Sector to watch this quarter: {hot}."))
+                self._log(_L(f"  ✶ Secteur à surveiller ce trimestre : {hot}.", f"  ✶ Sector to watch this quarter: {hot}."))
                 self.app.notify(_L(f"Secteur du trimestre : {hot}", f"Sector of the quarter: {hot}"), "info")
             # mandats arrivés à échéance
             for res in mandates_mod.evaluate_due(p, m):
@@ -1435,9 +1435,9 @@ class TerminalScene(Scene):
         # nouvelle offre de mandat éventuelle
         offer = mandates_mod.maybe_offer(p, random)
         if offer:
-            self._log(_L(f"  ★ OFFRE DE MANDAT : {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
+            self._log(_L(f"  ✶ OFFRE DE MANDAT : {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
                       f"(MANDATES pour voir).",
-                      f"  ★ MANDATE OFFER: {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
+                      f"  ✶ MANDATE OFFER: {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
                       f"(type MANDATES to view)."))
             self.app.notify(_L(f"Offre de mandat : {offer['client']}", f"Mandate offer: {offer['client']}"), "info")
             inbox_mod.push(p, "client", offer["client"], "Proposition de mandat",
@@ -1447,7 +1447,7 @@ class TerminalScene(Scene):
         # alertes de prix
         self._check_alerts()
         for d in summary["new_deals"]:
-            self._log(_L(f"  ★ Nouveau deal #{d['id']} : {d['title']} ({d['days_left']}j)", f"  ★ New deal #{d['id']}: {d['title']} ({d['days_left']}d)"))
+            self._log(_L(f"  ✶ Nouveau deal #{d['id']} : {d['title']} ({d['days_left']}j)", f"  ✶ New deal #{d['id']}: {d['title']} ({d['days_left']}d)"))
         # messages d'ambiance / conformité
         inbox_mod.on_step(p, m, summary, random)
         # scrutin réglementaire : décroissance + risque d'enquête
@@ -1461,7 +1461,7 @@ class TerminalScene(Scene):
         # dilemme éventuel à trancher
         dil = dilemmas_mod.maybe_trigger(p, random)
         if dil:
-            self._log(_L(f"  ⚖ DÉCISION REQUISE : {dil['title']} — tapez DECIDE.", f"  ⚖ DECISION REQUIRED: {dil['title']} — type DECIDE."))
+            self._log(_L(f"  § DÉCISION REQUISE : {dil['title']} — tapez DECIDE.", f"  § DECISION REQUIRED: {dil['title']} — type DECIDE."))
             self.app.notify(_L(f"Décision requise : {dil['title']}", f"Decision required: {dil['title']}"), "warn")
         # bilan de trimestre / quarter en toast
         if summary.get("quarter_changed") and summary.get("quarter_report") \
@@ -1472,7 +1472,7 @@ class TerminalScene(Scene):
         self._check_badges()
         unread = inbox_mod.unread_count(p)
         if unread:
-            self._log(_L(f"  ✉ {unread} message(s) non lu(s) — tapez INBOX.", f"  ✉ {unread} unread message(s) — type INBOX."))
+            self._log(_L(f"  @ {unread} message(s) non lu(s) — tapez INBOX.", f"  @ {unread} unread message(s) — type INBOX."))
         if not p.hardcore:
             gs.save(config.AUTOSAVE_SLOT)
         if summary["game_over"] or p.check_game_over():
@@ -1616,7 +1616,7 @@ class TerminalScene(Scene):
         # badge messagerie (non-lus)
         unread = inbox_mod.unread_count(p)
         if unread:
-            widgets.draw_badge(surf, f"✉ {unread}", (config.SCREEN_WIDTH - 70, 9),
+            widgets.draw_badge(surf, f"@ {unread}", (config.SCREEN_WIDTH - 70, 9),
                                config.COL_CYAN, align="right")
         widgets.draw_text(surf, f"{info['currency']}", (config.SCREEN_WIDTH - 90, 10),
                           fonts.body(bold=True), accent, align="right")

@@ -44,7 +44,7 @@ class AcademyScene(Scene):
             if len(p.learned) >= len(L.LESSONS):
                 from core import badges
                 for b in badges.check_new(p, self.app.market):
-                    self.app.notify(f"★ Badge : {b['name']}", "prestige")
+                    self.app.notify(f"✶ Badge : {b['name']}", "prestige")
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:

@@ -435,7 +435,9 @@ class EvaluationScene(Scene):
                    "Astuce : utilisez la calculatrice et le glossaire (DEFINE)."]
         # leçons à revoir d'après les questions ratées
         from data import lessons as lessons_data
-        titles = [lessons_data.get(lid)["title"] for lid in self.missed_lessons
+        from core.i18n import get_lang
+        _lang = get_lang()
+        titles = [lessons_data.title_for(lid, _lang) for lid in self.missed_lessons
                   if lessons_data.get(lid)]
         shown = titles[:4]
         # hauteur de panneau adaptée au contenu (anti-chevauchement du bouton)

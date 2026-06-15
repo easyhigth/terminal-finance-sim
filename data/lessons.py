@@ -256,3 +256,35 @@ def get(lesson_id):
         if l["id"] == lesson_id:
             return l
     return None
+
+
+# ---- accès localisé (FR / EN) ---------------------------------------------
+from data.lessons_en import LESSONS_EN, TOPIC_EN
+
+
+def _localize_lesson(l):
+    e = LESSONS_EN.get(l["id"], {})
+    return {"id": l["id"], "topic": TOPIC_EN.get(l["topic"], l["topic"]),
+            "title": e.get("title", l["title"]), "body": e.get("body", l["body"]),
+            "formula": e.get("formula", l["formula"]),
+            "example": e.get("example", l["example"]),
+            "takeaway": e.get("takeaway", l["takeaway"])}
+
+
+def localized(lang):
+    """Renvoie (liste de leçons, liste de thèmes) dans la langue."""
+    if lang == "en":
+        return [_localize_lesson(l) for l in LESSONS], [TOPIC_EN.get(t, t) for t in TOPICS]
+    return LESSONS, TOPICS
+
+
+def get_localized(lesson_id, lang):
+    l = get(lesson_id)
+    if l and lang == "en":
+        return _localize_lesson(l)
+    return l
+
+
+def title_for(lesson_id, lang):
+    l = get_localized(lesson_id, lang)
+    return l["title"] if l else lesson_id

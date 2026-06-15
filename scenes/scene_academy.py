@@ -17,6 +17,10 @@ _TOPIC_COL = {
     "Taux": config.COL_CYAN, "Crédit": config.COL_DOWN, "Marché": config.COL_AMBER,
     "Performance": config.COL_UP, "Comportement": config.COL_WARN,
     "ESG": config.COL_UP, "Banque": config.COL_CYAN,
+    # thèmes EN
+    "Valuation": config.COL_AMBER, "Risk": config.COL_DOWN, "Derivatives": config.COL_WARN,
+    "Rates": config.COL_CYAN, "Credit": config.COL_DOWN, "Market": config.COL_AMBER,
+    "Banking": config.COL_CYAN,
 }
 
 
@@ -61,25 +65,27 @@ class AcademyScene(Scene):
         self.back_btn.update(pygame.mouse.get_pos(), dt)
 
     def draw(self, surf):
+        from core.i18n import t, get_lang
+        lang = get_lang()
+        lessons_loc, topics_loc = L.localized(lang)
         surf.fill(config.COL_BG)
         p = self.app.gs.player
-        widgets.draw_text(surf, "ACADÉMIE DE FINANCE", (40, 22),
+        widgets.draw_text(surf, t("academy.title"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, f"{len(p.learned)}/{len(L.LESSONS)} leçons lues · "
-                                "cliquez une leçon pour l'étudier",
+        widgets.draw_text(surf, t("academy.progress", n=len(p.learned), m=len(L.LESSONS)),
                           (42, 72), fonts.small(), config.COL_TEXT_DIM)
 
         # liste à gauche, groupée par thème
         ph = config.footer_y() - 8 - 100
         listp = pygame.Rect(40, 100, 360, ph)
-        linner = widgets.draw_panel(surf, listp, "Programme", config.COL_CYAN)
+        linner = widgets.draw_panel(surf, listp, t("academy.program"), config.COL_CYAN)
         self.row_rects = {}
         # liste défilante : on clippe au panneau et on décale de self.scroll
         prev_clip = surf.get_clip()
         surf.set_clip(linner)
         y = linner.y - self.scroll
-        for topic in L.TOPICS:
-            lessons_t = [x for x in L.LESSONS if x["topic"] == topic]
+        for topic in topics_loc:
+            lessons_t = [x for x in lessons_loc if x["topic"] == topic]
             if not lessons_t:
                 continue
             widgets.draw_text(surf, topic.upper(), (linner.x, y),
@@ -106,8 +112,8 @@ class AcademyScene(Scene):
 
         # lecture à droite
         readp = pygame.Rect(420, 100, config.SCREEN_WIDTH - 460, ph)
-        rinner = widgets.draw_panel(surf, readp, "Leçon", config.COL_AMBER)
-        lesson = L.get(self.sel)
+        rinner = widgets.draw_panel(surf, readp, t("academy.lesson"), config.COL_AMBER)
+        lesson = L.get_localized(self.sel, lang)
         if lesson:
             tcol = _TOPIC_COL.get(lesson["topic"], config.COL_AMBER)
             widgets.draw_badge(surf, lesson["topic"], (rinner.x, rinner.y), tcol)
@@ -116,9 +122,9 @@ class AcademyScene(Scene):
             y = rinner.y + 64
             y += widgets.draw_text_wrapped(surf, lesson["body"], (rinner.x, y),
                                            fonts.body(), config.COL_TEXT, rinner.w, line_gap=5) + 14
-            for label, key, col in [("FORMULE", "formula", config.COL_CYAN),
-                                    ("EXEMPLE", "example", config.COL_TEXT),
-                                    ("À RETENIR", "takeaway", config.COL_UP)]:
+            for label, key, col in [(t("academy.formula"), "formula", config.COL_CYAN),
+                                    (t("academy.example"), "example", config.COL_TEXT),
+                                    (t("academy.takeaway"), "takeaway", config.COL_UP)]:
                 widgets.draw_text(surf, label, (rinner.x, y), fonts.tiny(bold=True), col)
                 y += 18
                 y += widgets.draw_text_wrapped(surf, lesson[key], (rinner.x, y),

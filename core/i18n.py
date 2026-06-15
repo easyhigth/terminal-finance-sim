@@ -87,6 +87,14 @@ TR = {
         "gloss.terms": "Termes",
         "gloss.definition": "Définition",
         "gloss.all": "Tous",
+        # académie
+        "academy.title": "ACADÉMIE DE FINANCE",
+        "academy.progress": "{n}/{m} leçons lues · cliquez une leçon pour l'étudier",
+        "academy.program": "Programme",
+        "academy.lesson": "Leçon",
+        "academy.formula": "FORMULE",
+        "academy.example": "EXEMPLE",
+        "academy.takeaway": "À RETENIR",
         # écran de sélection
         "continent.title": "CHOISISSEZ VOTRE PLACE FINANCIÈRE",
         "continent.subtitle": "Chaque région impose son propre régulateur, ses normes "
@@ -148,6 +156,14 @@ TR = {
         "gloss.terms": "Terms",
         "gloss.definition": "Definition",
         "gloss.all": "All",
+        # academy
+        "academy.title": "FINANCE ACADEMY",
+        "academy.progress": "{n}/{m} lessons read · click a lesson to study",
+        "academy.program": "Program",
+        "academy.lesson": "Lesson",
+        "academy.formula": "FORMULA",
+        "academy.example": "EXAMPLE",
+        "academy.takeaway": "KEY TAKEAWAY",
         # selection screen
         "continent.title": "CHOOSE YOUR FINANCIAL HUB",
         "continent.subtitle": "Each region has its own regulator, accounting "

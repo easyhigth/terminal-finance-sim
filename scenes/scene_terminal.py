@@ -68,7 +68,21 @@ class TerminalScene(Scene):
         self.cmd = ""
         self.entered = []          # historique des commandes saisies (↑/↓)
         self.hist_pos = None
-        self.cmd_history = ["> Bienvenue. Tapez HELP, ou COMMANDS pour tout voir."]
+        # journal de la console : conservé entre les allers-retours (scrollback),
+        # réinitialisé seulement sur une nouvelle partie.
+        p0 = self.app.gs.player
+        fresh = (p0.day == 1 and not p0.cash_history)
+        if not hasattr(self, "cmd_history") or fresh:
+            self.cmd_history = ["> Bienvenue. Tapez HELP, ou COMMANDS pour tout voir."]
+        self.console_expanded = getattr(self, "console_expanded", False)
+        self.console_scroll = 0    # 0 = bas (dernier message) ; >0 = remonte
+        self._console_rect_cache = None
+        self._console_btns = {}
+        # commande pré-remplie depuis le catalogue (clic « copier »)
+        pending = getattr(self.app, "pending_input", None)
+        if pending:
+            self.cmd = pending
+            self.app.pending_input = None
         p = self.app.gs.player
         if p.cash == 0 and p.day == 1 and not p.cash_history:
             p.cash = config.START_CASH
@@ -124,8 +138,23 @@ class TerminalScene(Scene):
                     w.clicked_row = None
                 self.datawins = [x for x in self.datawins if not x.closed]
                 return
-        # 2) souris : rail latéral + carte
+        # 1bis) molette sur la console : défile l'historique
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            if self._console_rect().collidepoint(pygame.mouse.get_pos()):
+                self._scroll_console(3 if event.button == 4 else -3)
+                return
+        # 2) souris : boutons console + rail latéral + carte
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for key, rect in self._console_btns.items():
+                if rect.collidepoint(event.pos):
+                    if key == "expand":
+                        self.console_expanded = not self.console_expanded
+                        self.console_scroll = min(self.console_scroll, self._console_max_scroll())
+                    elif key == "up":
+                        self._scroll_console(3)
+                    elif key == "down":
+                        self._scroll_console(-3)
+                    return
             for label, rect in self._rail_rects.items():
                 if rect.collidepoint(event.pos):
                     self._run_command(dict(self.rail)[label])
@@ -169,6 +198,10 @@ class TerminalScene(Scene):
                 self._recall(-1)
             elif event.key == pygame.K_DOWN:
                 self._recall(1)
+            elif event.key == pygame.K_PAGEUP:
+                self._scroll_console(self._console_visible_lines() - 1)
+            elif event.key == pygame.K_PAGEDOWN:
+                self._scroll_console(-(self._console_visible_lines() - 1))
             elif event.key == pygame.K_TAB:
                 self._autocomplete()
             else:
@@ -197,7 +230,8 @@ class TerminalScene(Scene):
 
     def _log(self, *lines):
         self.cmd_history += list(lines)
-        self.cmd_history = self.cmd_history[-9:]
+        self.cmd_history = self.cmd_history[-400:]   # backlog défilable
+        self.console_scroll = 0                       # revient au bas (dernier message)
 
     def _recall(self, direction):
         """Navigue dans l'historique des commandes saisies (↑ = -1, ↓ = +1)."""
@@ -237,6 +271,7 @@ class TerminalScene(Scene):
         cmd = parts[0].upper()
         arg = parts[1] if len(parts) > 1 else None
         self.cmd_history.append(f"> {raw}")
+        self.console_scroll = 0          # toute saisie ramène la vue au bas
         if not self.entered or self.entered[-1] != raw:
             self.entered.append(raw)
             self.entered = self.entered[-30:]
@@ -1524,7 +1559,7 @@ class TerminalScene(Scene):
 
         M = config.MARGIN
         top = config.TOPBAR_H + config.TICKER_H + M
-        console_h = 74
+        console_h = self._console_height()
         bottom = config.SCREEN_HEIGHT - console_h - M     # bas de la zone de contenu
         avail_h = bottom - top
 
@@ -1556,7 +1591,7 @@ class TerminalScene(Scene):
         self._draw_top_companies(surf, pygame.Rect(rx, top, col_r_w, half), p)
         self._draw_career(surf, pygame.Rect(rx, top + half + gap, col_r_w, avail_h - half - gap), p)
 
-        self._draw_console(surf, console_h)
+        self._draw_console(surf)
 
         # overlay : fenêtres de données déplaçables
         for w in self.datawins:
@@ -1814,19 +1849,75 @@ class TerminalScene(Scene):
             widgets.draw_text_wrapped(surf, f"{nxt[0]} — grade {config.GRADES[nxt[1]]}",
                                       (inner.x, y + 16), fonts.tiny(), config.COL_PRESTIGE, inner.w)
 
-    def _draw_console(self, surf, height=74):
-        rect = pygame.Rect(config.MARGIN, config.SCREEN_HEIGHT - height - config.MARGIN,
-                           config.SCREEN_WIDTH - 2 * config.MARGIN, height)
+    CONSOLE_LINE_H = 16
+
+    def _console_visible_lines(self):
+        return 13 if self.console_expanded else 4
+
+    def _console_height(self):
+        # lignes visibles + bandeau (en-tête) + ligne de saisie
+        return self._console_visible_lines() * self.CONSOLE_LINE_H + 40
+
+    def _console_rect(self):
+        h = self._console_height()
+        return pygame.Rect(config.MARGIN, config.SCREEN_HEIGHT - h - config.MARGIN,
+                           config.SCREEN_WIDTH - 2 * config.MARGIN, h)
+
+    def _console_max_scroll(self):
+        return max(0, len(self.cmd_history) - self._console_visible_lines())
+
+    def _scroll_console(self, delta):
+        self.console_scroll = max(0, min(self._console_max_scroll(),
+                                         self.console_scroll + delta))
+
+    def _draw_console(self, surf):
+        rect = self._console_rect()
         pygame.draw.rect(surf, (6, 8, 12), rect)
         pygame.draw.rect(surf, config.COL_BORDER, rect, 1)
-        y = rect.y + 5
-        for line in self.cmd_history[-3:]:
-            widgets.draw_text(surf, line, (rect.x + 10, y), fonts.small(), config.COL_AMBER_DIM)
-            y += 15
+        self._console_btns = {}
+
+        # bandeau : titre + position de défilement + boutons (scroll / agrandir)
+        head_y = rect.y + 4
+        nvis = self._console_visible_lines()
+        total = len(self.cmd_history)
+        widgets.draw_text(surf, "CONSOLE", (rect.x + 10, head_y),
+                          fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        if self.console_scroll > 0:
+            widgets.draw_text(surf, f"▲ historique +{self.console_scroll}",
+                              (rect.x + 90, head_y), fonts.tiny(), config.COL_WARN)
+        # boutons à droite : [▲][▼][AGRANDIR/RÉDUIRE]
+        bx = rect.right - 10
+        exp_label = "RÉDUIRE" if self.console_expanded else "AGRANDIR"
+        ew = fonts.tiny(bold=True).size(exp_label)[0] + 16
+        exp_rect = pygame.Rect(bx - ew, head_y - 2, ew, 16); bx = exp_rect.x - 6
+        for key, rr, lab in (("expand", exp_rect, exp_label),):
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD, rr)
+            pygame.draw.rect(surf, config.COL_AMBER, rr, 1)
+            widgets.draw_text(surf, lab, rr.center, fonts.tiny(bold=True),
+                              config.COL_AMBER, align="center")
+            self._console_btns[key] = rr
+        for key, sym in (("down", "▼"), ("up", "▲")):
+            rr = pygame.Rect(bx - 18, head_y - 2, 16, 16); bx = rr.x - 4
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD, rr)
+            pygame.draw.rect(surf, config.COL_BORDER, rr, 1)
+            widgets.draw_text(surf, sym, rr.center, fonts.tiny(bold=True),
+                              config.COL_TEXT, align="center")
+            self._console_btns[key] = rr
+
+        # lignes : fenêtre [start:start+nvis] selon le défilement (0 = bas)
+        start = max(0, total - nvis - self.console_scroll)
+        window = self.cmd_history[start:start + nvis]
+        y = rect.y + 22
+        for line in window:
+            col = config.COL_AMBER if line.startswith(">") else config.COL_AMBER_DIM
+            widgets.draw_text(surf, widgets.fit_text(line, fonts.small(), rect.w - 24),
+                              (rect.x + 10, y), fonts.small(), col)
+            y += self.CONSOLE_LINE_H
+
+        # ligne de saisie (toujours en bas)
         cursor = "_" if int(self.t * 2) % 2 == 0 else " "
         r = widgets.draw_text(surf, f"CMD> {self.cmd}", (rect.x + 10, rect.bottom - 20),
                               fonts.small(bold=True), config.COL_AMBER)
-        # suggestion fantôme (Tab pour compléter)
         ghost = self._ghost()
         gx = r.right
         if ghost:

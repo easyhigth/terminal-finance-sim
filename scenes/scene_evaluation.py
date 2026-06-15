@@ -9,10 +9,16 @@ Réussite (≥ seuil) → promotion.
 import pygame
 from core import config
 from core import exam
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
 CHART_COLORS = {"A": config.COL_CYAN, "B": config.COL_AMBER}
+
+
+def _L(fr, en):
+    """Renvoie la version FR ou EN selon la langue courante."""
+    return en if get_lang() == "en" else fr
 
 
 class EvaluationScene(Scene):
@@ -61,11 +67,11 @@ class EvaluationScene(Scene):
         self.calc = None
         fy = config.SCREEN_HEIGHT - 56
         self.continue_btn = widgets.Button((config.SCREEN_WIDTH//2-130, fy, 260, 44),
-                                           "REPRENDRE" if resume else "COMMENCER", config.COL_UP)
-        self.back_btn = widgets.Button(config.back_button_rect(150), "← QUITTER",
+                                           (_L("REPRENDRE","RESUME") if resume else _L("COMMENCER","START")), config.COL_UP)
+        self.back_btn = widgets.Button(config.back_button_rect(150), _L("← QUITTER","← QUIT"),
                                        config.COL_TEXT_DIM)
         self.calc_btn = widgets.Button((200, config.SCREEN_HEIGHT-50, 160, 42),
-                                       "CALCULATRICE", config.COL_CYAN)
+                                       _L("CALCULATRICE","CALCULATOR"), config.COL_CYAN)
         self.pause_btn = widgets.Button((372, config.SCREEN_HEIGHT-50, 150, 42),
                                         "PAUSE", config.COL_WARN)
 
@@ -80,7 +86,7 @@ class EvaluationScene(Scene):
         }
         if not p.hardcore:
             self.app.gs.save(config.AUTOSAVE_SLOT)
-        self.app.notify("Examen mis en pause — reprenez via EVAL", "info")
+        self.app.notify(_L("Examen mis en pause — reprenez via EVAL","Exam paused — resume via EVAL"), "info")
         self.app.scenes.go("terminal")
 
     # ------------------------------------------------------------- helpers
@@ -217,9 +223,9 @@ class EvaluationScene(Scene):
                        + (f" — titre « {self.new_title} »" if self.new_title else ""))
             from core import inbox
             inbox.on_promotion(p)
-            self.app.notify(f"Promotion : {p.grade}", "good")
+            self.app.notify(_L(f"Promotion : {p.grade}", f"Promotion: {p.grade}"), "good")
             if self.new_title:
-                self.app.notify(f"Titre : {self.new_title}", "prestige")
+                self.app.notify(_L(f"Titre : {self.new_title}", f"Title: {self.new_title}"), "prestige")
         else:
             p.reputation = max(0, p.reputation - 5)
         self.app.gs.save(config.AUTOSAVE_SLOT)
@@ -231,11 +237,11 @@ class EvaluationScene(Scene):
         if self.passed:
             res = C.pass_stage(p, self.cert_program)
             self.new_title = res.get("title") if res else None
-            self.app.notify(f"{C.PROGRAMS[self.cert_program]['name']} : niveau réussi", "prestige")
+            self.app.notify(_L(f"{C.PROGRAMS[self.cert_program]['name']} : niveau réussi", f"{C.PROGRAMS[self.cert_program]['name']}: level passed"), "prestige")
             for b in badges.check_new(p, self.app.market):
-                self.app.notify(f"🏅 Badge : {b['name']}", "prestige")
+                self.app.notify(_L(f"🏅 Badge : {b['name']}", f"🏅 Badge: {b['name']}"), "prestige")
         else:
-            self.app.notify("Examen de certification échoué", "bad")
+            self.app.notify(_L("Examen de certification échoué","Certification exam failed"), "bad")
 
     def update(self, dt):
         self.t += dt
@@ -249,10 +255,10 @@ class EvaluationScene(Scene):
     def draw(self, surf):
         surf.fill(config.COL_BG)
         p = self.app.gs.player
-        title = "EXAMEN DE CERTIFICATION" if self.mode == "cert" else "ÉVALUATION DE PROMOTION"
+        title = _L("EXAMEN DE CERTIFICATION","CERTIFICATION EXAM") if self.mode == "cert" else _L("ÉVALUATION DE PROMOTION","PROMOTION EXAM")
         widgets.draw_text(surf, title, (40, 22), fonts.title(bold=True), config.COL_AMBER)
-        sub = (f"{self.target_grade}    |    Voie : {p.track}" if self.mode == "cert"
-               else f"{p.grade}  →  {self.target_grade}    |    Voie : {p.track}")
+        sub = (_L(f"{self.target_grade}    |    Voie : {p.track}", f"{self.target_grade}    |    Track: {p.track}") if self.mode == "cert"
+               else _L(f"{p.grade}  →  {self.target_grade}    |    Voie : {p.track}", f"{p.grade}  →  {self.target_grade}    |    Track: {p.track}"))
         widgets.draw_text(surf, sub, (42, 72), fonts.small(), config.COL_TEXT_DIM)
         if self.state == "intro":
             self._draw_intro(surf)
@@ -272,29 +278,28 @@ class EvaluationScene(Scene):
         inner = widgets.draw_panel(surf, panel, "Brief", config.COL_CYAN)
         p = self.app.gs.player
         if self.mode == "cert":
-            intro1 = f"Examen de certification — {self.target_grade}."
-            bank_line = f"{len(self.items)} questions exigeantes, banque dédiée."
+            intro1 = _L(f"Examen de certification — {self.target_grade}.", f"Certification exam — {self.target_grade}.")
+            bank_line = _L(f"{len(self.items)} questions exigeantes, banque dédiée.", f"{len(self.items)} demanding questions, dedicated bank.")
         else:
-            intro1 = f"Entretien technique pour le poste de {self.target_grade}."
-            bank_line = (f"{len(self.items)} questions tirées d'une banque d'environ "
-                         f"{exam.bank_target(p.grade_index)} pour ce grade.")
+            intro1 = _L(f"Entretien technique pour le poste de {self.target_grade}.", f"Technical interview for the {self.target_grade} role.")
+            bank_line = _L(f"{len(self.items)} questions tirées d'une banque d'environ {exam.bank_target(p.grade_index)} pour ce grade.", f"{len(self.items)} questions drawn from a bank of about {exam.bank_target(p.grade_index)} for this grade.")
         lines = [
             intro1,
             "",
             bank_line,
-            "Types : calculs, QCM, lecture de graphe, définitions et formules à trous.",
-            f"Seuil de réussite : {int(self.pass_threshold*100)}%.",
+            _L("Types : calculs, QCM, lecture de graphe, définitions et formules à trous.", "Types: calculations, MCQ, chart reading, fill-in definitions and formulas."),
+            _L(f"Seuil de réussite : {int(self.pass_threshold*100)}%.", f"Pass threshold: {int(self.pass_threshold*100)}%."),
             "",
-            "Calcul : tapez votre nombre.  Définition/formule : tapez le ou les mots.",
-            "QCM : cliquez la bonne réponse.  Une CALCULATRICE est disponible.",
+            _L("Calcul : tapez votre nombre.  Définition/formule : tapez le ou les mots.", "Calculation: type your number.  Definition/formula: type the word(s)."),
+            _L("QCM : cliquez la bonne réponse.  Une CALCULATRICE est disponible.", "MCQ: click the right answer.  A CALCULATOR is available."),
             "",
-            "Réussite → promotion (+réputation).  Échec → −réputation, à retenter.",
+            _L("Réussite → promotion (+réputation).  Échec → −réputation, à retenter.", "Pass → promotion (+reputation).  Fail → −reputation, retry later."),
         ]
         y = inner.y
         for ln in lines:
             widgets.draw_text(surf, ln, (inner.x, y), fonts.body(), config.COL_TEXT)
             y += 30
-        self.continue_btn.label = "COMMENCER"
+        self.continue_btn.label = _L("COMMENCER","START")
         self.continue_btn.draw(surf)
 
     def _draw_item(self, surf):
@@ -312,7 +317,7 @@ class EvaluationScene(Scene):
                                                     pw - prompt_w - 20, 250))
         # énoncé
         ppanel = pygame.Rect(120, 138, prompt_w, 118)
-        pinner = widgets.draw_panel(surf, ppanel, "Énoncé", config.COL_AMBER)
+        pinner = widgets.draw_panel(surf, ppanel, _L("Énoncé","Prompt"), config.COL_AMBER)
         widgets.draw_text_wrapped(surf, it["prompt"], (pinner.x, pinner.y),
                                   fonts.body(), config.COL_WHITE, pinner.w, line_gap=5)
 
@@ -325,7 +330,7 @@ class EvaluationScene(Scene):
             self._draw_feedback(surf, it)
 
     def _draw_charts(self, surf, it, rect):
-        inner = widgets.draw_panel(surf, rect, "Cours", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, rect, _L("Cours","Price"), config.COL_CYAN)
         names = ["A", "B"] if it.get("chart") == "AB" else [it.get("chart", "A")]
         for nm in names:
             s = it["charts"].get(nm)
@@ -334,7 +339,7 @@ class EvaluationScene(Scene):
                                     s, CHART_COLORS.get(nm, config.COL_CYAN), baseline=False)
         lx = inner.x
         for nm in names:
-            widgets.draw_text(surf, f"■ Titre {nm}", (lx, inner.bottom-18),
+            widgets.draw_text(surf, _L(f"■ Titre {nm}", f"■ Stock {nm}"), (lx, inner.bottom-18),
                               fonts.small(bold=True), CHART_COLORS.get(nm, config.COL_CYAN))
             lx += 110
 
@@ -365,7 +370,7 @@ class EvaluationScene(Scene):
             y += 52
 
     def _draw_input(self, surf, it, width):
-        kind = "Réponse (texte)" if it["kind"] == "text" else "Réponse (nombre)"
+        kind = _L("Réponse (texte)","Answer (text)") if it["kind"] == "text" else _L("Réponse (nombre)","Answer (number)")
         widgets.draw_text(surf, kind, (120, 266), fonts.small(bold=True), config.COL_TEXT_DIM)
         active = self.state == "question"
         box = pygame.Rect(120, 290, min(520, width), 50)
@@ -373,13 +378,13 @@ class EvaluationScene(Scene):
         pygame.draw.rect(surf, config.COL_CYAN if active else config.COL_BORDER, box, 2 if active else 1)
         cur = "_" if (active and int(self.t*2) % 2 == 0) else ""
         shown = (self.input or "") + cur
-        widgets.draw_text(surf, shown or "tapez votre réponse…", (box.x+12, box.y+14),
+        widgets.draw_text(surf, shown or _L("tapez votre réponse…","type your answer…"), (box.x+12, box.y+14),
                           fonts.head(bold=True),
                           config.COL_WHITE if self.input else config.COL_TEXT_DIM)
         if it.get("unit"):
             widgets.draw_text(surf, it["unit"], (box.right+12, box.y+14), fonts.head(),
                               config.COL_TEXT_DIM)
-        widgets.draw_text(surf, "Entrée pour valider.", (box.x, box.bottom+8),
+        widgets.draw_text(surf, _L("Entrée pour valider.","Press Enter to submit."), (box.x, box.bottom+8),
                           fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_feedback(self, surf, it):
@@ -389,18 +394,18 @@ class EvaluationScene(Scene):
             ok = bool(self.submitted_ok)
         y = config.footer_y() - 8
         exp = pygame.Rect(120, 360, config.SCREEN_WIDTH-240, y-360-8)
-        inner = widgets.draw_panel(surf, exp, "Correction", config.COL_CYAN)
-        widgets.draw_text(surf, "✓ Bonne réponse" if ok else "✗ Mauvaise réponse",
+        inner = widgets.draw_panel(surf, exp, _L("Correction","Feedback"), config.COL_CYAN)
+        widgets.draw_text(surf, _L("✓ Bonne réponse","✓ Correct") if ok else _L("✗ Mauvaise réponse","✗ Wrong"),
                           (inner.x, inner.y), fonts.small(bold=True),
                           config.COL_UP if ok else config.COL_DOWN)
         if not ok and self._is_input(it):
             exp_ans = (", ".join(it["answers"]) if it["kind"] == "text"
                        else f"{it['answer']:.2f} {it.get('unit','')}")
-            widgets.draw_text(surf, "Attendu : " + exp_ans, (inner.x+180, inner.y),
+            widgets.draw_text(surf, _L("Attendu : ","Expected: ") + exp_ans, (inner.x+180, inner.y),
                               fonts.small(), config.COL_TEXT_DIM)
         widgets.draw_text_wrapped(surf, it["expl"], (inner.x, inner.y+24),
                                   fonts.small(), config.COL_TEXT, inner.w)
-        self.continue_btn.label = "SUIVANT" if self.idx < len(self.items)-1 else "VOIR RÉSULTAT"
+        self.continue_btn.label = _L("SUIVANT","NEXT") if self.idx < len(self.items)-1 else _L("VOIR RÉSULTAT","SEE RESULT")
         self.continue_btn.draw(surf)
 
     def _draw_result(self, surf):
@@ -408,31 +413,31 @@ class EvaluationScene(Scene):
         accent = config.COL_UP if self.passed else config.COL_DOWN
         p = self.app.gs.player
         if self.mode == "cert":
-            verdict = "CERTIFICATION RÉUSSIE" if self.passed else "EXAMEN ÉCHOUÉ"
+            verdict = _L("CERTIFICATION RÉUSSIE","CERTIFICATION PASSED") if self.passed else _L("EXAMEN ÉCHOUÉ","EXAM FAILED")
         else:
-            verdict = "PROMOTION ACCORDÉE" if self.passed else "ÉVALUATION ÉCHOUÉE"
+            verdict = _L("PROMOTION ACCORDÉE","PROMOTION GRANTED") if self.passed else _L("ÉVALUATION ÉCHOUÉE","EVALUATION FAILED")
         if self.mode == "cert":
             from core import certifications as C
             prog = C.PROGRAMS[self.cert_program]
             if self.passed:
                 msg = [f"{prog['name']} — {C.status_label(p, self.cert_program)}.",
-                       "Réputation accrue."]
+                       _L("Réputation accrue.","Reputation boosted.")]
                 if self.new_title:
-                    msg.append(f"Titre : « {self.new_title} » !")
+                    msg.append(_L(f"Titre : « {self.new_title} » !", f"Title: “{self.new_title}”!"))
             else:
-                msg = [f"Seuil non atteint ({int(self.pass_threshold*100)}% requis).",
-                       "Les frais d'inscription sont perdus.",
-                       "Révisez (LEARN) et retentez plus tard."]
+                msg = [_L(f"Seuil non atteint ({int(self.pass_threshold*100)}% requis).", f"Threshold not met ({int(self.pass_threshold*100)}% required)."),
+                       _L("Les frais d'inscription sont perdus.","The entry fee is forfeited."),
+                       _L("Révisez (LEARN) et retentez plus tard.","Study (LEARN) and retry later.")]
         elif self.passed:
-            msg = [f"Félicitations. Nouveau grade : {p.grade}.", "+8 réputation."]
+            msg = [_L(f"Félicitations. Nouveau grade : {p.grade}.", f"Congratulations. New grade: {p.grade}."), _L("+8 réputation.","+8 reputation.")]
             if self.new_title:
-                msg.append(f"Titre débloqué : « {self.new_title} » !")
+                msg.append(_L(f"Titre débloqué : « {self.new_title} » !", f"Title unlocked: “{self.new_title}”!"))
             if p.flags.get("can_choose_track"):
-                msg.append("Vous pouvez choisir une VOIE (TRACK).")
+                msg.append(_L("Vous pouvez choisir une VOIE (TRACK).","You can choose a TRACK."))
         else:
-            msg = [f"Seuil non atteint ({int(self.pass_threshold*100)}% requis).",
-                   "−5 réputation. Révisez (LEARN) et retentez.",
-                   "Astuce : utilisez la calculatrice et le glossaire (DEFINE)."]
+            msg = [_L(f"Seuil non atteint ({int(self.pass_threshold*100)}% requis).", f"Threshold not met ({int(self.pass_threshold*100)}% required)."),
+                   _L("−5 réputation. Révisez (LEARN) et retentez.","−5 reputation. Study (LEARN) and retry."),
+                   _L("Astuce : utilisez la calculatrice et le glossaire (DEFINE).","Tip: use the calculator and the glossary (DEFINE).")]
         # leçons à revoir d'après les questions ratées
         from data import lessons as lessons_data
         from core.i18n import get_lang
@@ -446,10 +451,10 @@ class EvaluationScene(Scene):
         panel_h = 150 + 32 * len(msg) + lessons_h + 70
         panel = pygame.Rect(280, max(70, (config.SCREEN_HEIGHT - panel_h) // 2),
                             config.SCREEN_WIDTH - 560, panel_h)
-        inner = widgets.draw_panel(surf, panel, "Résultat", accent)
+        inner = widgets.draw_panel(surf, panel, _L("Résultat","Result"), accent)
         cx = panel.centerx
         widgets.draw_text(surf, verdict, (cx, inner.y+10), fonts.title(bold=True), accent, align="center")
-        widgets.draw_text(surf, f"Score : {self.score} / {len(self.items)}  ({int(ratio*100)}%)",
+        widgets.draw_text(surf, _L(f"Score : {self.score} / {len(self.items)}  ({int(ratio*100)}%)", f"Score: {self.score} / {len(self.items)}  ({int(ratio*100)}%)"),
                           (cx, inner.y+62), fonts.head(), config.COL_WHITE, align="center")
         y = inner.y + 120
         for m in msg:
@@ -457,7 +462,7 @@ class EvaluationScene(Scene):
             y += 32
         if shown:
             y += 6
-            widgets.draw_text(surf, "À revoir (LEARN) :", (cx, y),
+            widgets.draw_text(surf, _L("À revoir (LEARN) :","Review (LEARN):"), (cx, y),
                               fonts.small(bold=True), config.COL_AMBER, align="center")
             y += 26
             for t in shown:
@@ -465,9 +470,9 @@ class EvaluationScene(Scene):
                                   fonts.small(), config.COL_TEXT_DIM, align="center")
                 y += 22
             if len(titles) > len(shown):
-                widgets.draw_text(surf, f"… et {len(titles)-len(shown)} autre(s)",
+                widgets.draw_text(surf, _L(f"… et {len(titles)-len(shown)} autre(s)", f"… and {len(titles)-len(shown)} more"),
                                   (cx, y), fonts.tiny(), config.COL_TEXT_DIM, align="center")
                 y += 20
         self.continue_btn.rect.center = (cx, inner.bottom-30)
-        self.continue_btn.label = "RETOUR AU TERMINAL"
+        self.continue_btn.label = _L("RETOUR AU TERMINAL","BACK TO TERMINAL")
         self.continue_btn.draw(surf)

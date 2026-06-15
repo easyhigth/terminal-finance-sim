@@ -48,6 +48,7 @@ CATALOG = [
     ]),
     ("Savoir & macro", [
         ("LEARN / ACADEMY", "Académie : leçons (DCF, Sharpe, VaR, options…)"),
+        ("TUTO / GUIDE", "Tutoriels illustrés : acheter/vendre, bonds, futures…"),
         ("GLOSSARY", "Glossaire des termes financiers"),
         ("DEFINE <terme>", "Définition rapide. Ex : DEFINE WACC"),
         ("ECO / MACRO", "Indicateurs : taux, inflation, croissance, chômage"),

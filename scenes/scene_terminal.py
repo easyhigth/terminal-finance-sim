@@ -383,6 +383,8 @@ class TerminalScene(Scene):
             self._cmd_eco()
         elif cmd in ("LEARN", "ACADEMY", "ACADEMIE", "APPRENDRE"):
             self.app.scenes.go("academy", return_to="terminal")
+        elif cmd in ("TUTO", "TUTORIAL", "TUTORIELS", "HOWTO", "GUIDE"):
+            self.app.scenes.go("tutorials", return_to="terminal")
         elif cmd in ("CERT", "CERTS", "CERTIFICATIONS", "CFA", "FRM"):
             self.app.scenes.go("cert", return_to="terminal")
         elif cmd in ("DEFINE", "DEF", "GLO"):

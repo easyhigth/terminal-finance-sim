@@ -34,6 +34,8 @@ class AcademyScene(Scene):
         self._max_scroll = 0
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
+        self.tuto_btn = widgets.Button(
+            (260, config.SCREEN_HEIGHT - 50, 230, 42), "TUTORIELS « COMMENT FAIRE »", config.COL_CYAN)
 
     def _mark_read(self, lesson_id):
         p = self.app.gs.player
@@ -51,6 +53,8 @@ class AcademyScene(Scene):
             self.app.scenes.go(self.return_to)
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+        if self.tuto_btn.handle(event):
+            self.app.scenes.go("tutorials", return_to="academy")
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 4:
             self.scroll = max(0, self.scroll - 40)
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 5:
@@ -62,7 +66,9 @@ class AcademyScene(Scene):
                     self._mark_read(lid)
 
     def update(self, dt):
-        self.back_btn.update(pygame.mouse.get_pos(), dt)
+        mp = pygame.mouse.get_pos()
+        self.back_btn.update(mp, dt)
+        self.tuto_btn.update(mp, dt)
 
     def draw(self, surf):
         from core.i18n import t, get_lang
@@ -133,3 +139,4 @@ class AcademyScene(Scene):
                                                fonts.small(), config.COL_TEXT, rinner.w, line_gap=4) + 12
 
         self.back_btn.draw(surf)
+        self.tuto_btn.draw(surf)

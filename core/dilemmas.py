@@ -234,7 +234,7 @@ def apply_choice(player, dilemma, option_index):
     player.decisions_log.append({"day": player.day, "title": dilemma["title"],
                                  "choice": opt["label"]})
     from core import career
-    tag = "⚖" if dilemma["category"] in ("ethique", "reglementaire") else "★"
+    tag = "§" if dilemma["category"] in ("ethique", "reglementaire") else "✶"
     career.log(player, "info", f"{tag} {dilemma['title']} → {opt['label']}")
     return opt
 

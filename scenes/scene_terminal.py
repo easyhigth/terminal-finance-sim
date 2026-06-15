@@ -68,7 +68,21 @@ class TerminalScene(Scene):
         self.cmd = ""
         self.entered = []          # historique des commandes saisies (↑/↓)
         self.hist_pos = None
-        self.cmd_history = ["> Bienvenue. Tapez HELP, ou COMMANDS pour tout voir."]
+        # journal de la console : conservé entre les allers-retours (scrollback),
+        # réinitialisé seulement sur une nouvelle partie.
+        p0 = self.app.gs.player
+        fresh = (p0.day == 1 and not p0.cash_history)
+        if not hasattr(self, "cmd_history") or fresh:
+            self.cmd_history = ["> Bienvenue. Tapez HELP, ou COMMANDS pour tout voir."]
+        self.console_expanded = getattr(self, "console_expanded", False)
+        self.console_scroll = 0    # 0 = bas (dernier message) ; >0 = remonte
+        self._console_rect_cache = None
+        self._console_btns = {}
+        # commande pré-remplie depuis le catalogue (clic « copier »)
+        pending = getattr(self.app, "pending_input", None)
+        if pending:
+            self.cmd = pending
+            self.app.pending_input = None
         p = self.app.gs.player
         if p.cash == 0 and p.day == 1 and not p.cash_history:
             p.cash = config.START_CASH
@@ -124,8 +138,23 @@ class TerminalScene(Scene):
                     w.clicked_row = None
                 self.datawins = [x for x in self.datawins if not x.closed]
                 return
-        # 2) souris : rail latéral + carte
+        # 1bis) molette sur la console : défile l'historique
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            if self._console_rect().collidepoint(pygame.mouse.get_pos()):
+                self._scroll_console(3 if event.button == 4 else -3)
+                return
+        # 2) souris : boutons console + rail latéral + carte
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for key, rect in self._console_btns.items():
+                if rect.collidepoint(event.pos):
+                    if key == "expand":
+                        self.console_expanded = not self.console_expanded
+                        self.console_scroll = min(self.console_scroll, self._console_max_scroll())
+                    elif key == "up":
+                        self._scroll_console(3)
+                    elif key == "down":
+                        self._scroll_console(-3)
+                    return
             for label, rect in self._rail_rects.items():
                 if rect.collidepoint(event.pos):
                     self._run_command(dict(self.rail)[label])
@@ -169,6 +198,10 @@ class TerminalScene(Scene):
                 self._recall(-1)
             elif event.key == pygame.K_DOWN:
                 self._recall(1)
+            elif event.key == pygame.K_PAGEUP:
+                self._scroll_console(self._console_visible_lines() - 1)
+            elif event.key == pygame.K_PAGEDOWN:
+                self._scroll_console(-(self._console_visible_lines() - 1))
             elif event.key == pygame.K_TAB:
                 self._autocomplete()
             else:
@@ -197,7 +230,8 @@ class TerminalScene(Scene):
 
     def _log(self, *lines):
         self.cmd_history += list(lines)
-        self.cmd_history = self.cmd_history[-9:]
+        self.cmd_history = self.cmd_history[-400:]   # backlog défilable
+        self.console_scroll = 0                       # revient au bas (dernier message)
 
     def _recall(self, direction):
         """Navigue dans l'historique des commandes saisies (↑ = -1, ↓ = +1)."""
@@ -237,6 +271,7 @@ class TerminalScene(Scene):
         cmd = parts[0].upper()
         arg = parts[1] if len(parts) > 1 else None
         self.cmd_history.append(f"> {raw}")
+        self.console_scroll = 0          # toute saisie ramène la vue au bas
         if not self.entered or self.entered[-1] != raw:
             self.entered.append(raw)
             self.entered = self.entered[-30:]
@@ -404,7 +439,7 @@ class TerminalScene(Scene):
             else:
                 self._log(_L("  Aucune décision en attente.","  No pending decision."))
         elif cmd in ("RIVALS", "RIVAUX", "LEADERBOARD"):
-            self._cmd_rivals()
+            self.app.scenes.go("rivals", return_to="terminal")
         elif cmd in ("MANDATES", "MANDATS"):
             self._cmd_mandates()
         elif cmd in ("MANDATE", "MANDAT"):
@@ -519,12 +554,15 @@ class TerminalScene(Scene):
 
     def _cmd_company(self, ticker):
         if not ticker:
-            self._log(_L("  Usage : COMPANY <ticker>  (ex: COMPANY MVC).","  Usage: COMPANY <ticker>  (e.g. COMPANY MVC)."))
+            self._log(_L("  Usage : COMPANY <nom ou ticker>  (ex: COMPANY MVC, ou COMPANY mavric).",
+                         "  Usage: COMPANY <name or ticker>  (e.g. COMPANY MVC, or COMPANY mavric)."))
             return
-        if self.market.price_of(ticker.upper()) is None:
-            self._log(_L(f"  Ticker inconnu : {ticker.upper()}. Essayez SEARCH.", f"  Unknown ticker: {ticker.upper()}. Try SEARCH."))
+        tk = self.market.resolve(ticker)
+        if tk is None:
+            self._log(_L(f"  Aucun résultat : {ticker}. Essayez SEARCH.",
+                         f"  No match: {ticker}. Try SEARCH."))
             return
-        self.app.scenes.go("company", ticker=ticker.upper(), return_to="terminal")
+        self.app.scenes.go("company", ticker=tk, return_to="terminal")
 
     def _cmd_bond_trade(self, cmd, args):
         """BUYBOND/SELLBOND <id> <qté>."""
@@ -600,12 +638,15 @@ class TerminalScene(Scene):
     def _cmd_financials(self, ticker):
         """FA <ticker> : états financiers complets (bilan + compte de résultat)."""
         if not ticker:
-            self._log(_L("  Usage : FA <ticker>  (états financiers ; ex: FA MVC).","  Usage: FA <ticker>  (financial statements; e.g. FA MVC)."))
+            self._log(_L("  Usage : FA <nom ou ticker>  (états financiers ; ex: FA MVC).",
+                         "  Usage: FA <name or ticker>  (financial statements; e.g. FA MVC)."))
             return
-        if self.market.price_of(ticker.upper()) is None:
-            self._log(_L(f"  Ticker inconnu : {ticker.upper()}. Essayez SEARCH.", f"  Unknown ticker: {ticker.upper()}. Try SEARCH."))
+        tk = self.market.resolve(ticker)
+        if tk is None:
+            self._log(_L(f"  Aucun résultat : {ticker}. Essayez SEARCH.",
+                         f"  No match: {ticker}. Try SEARCH."))
             return
-        self.app.scenes.go("financials", ticker=ticker.upper(), return_to="terminal")
+        self.app.scenes.go("financials", ticker=tk, return_to="terminal")
 
     def _cmd_search(self, terms):
         q = " ".join(terms) if terms else ""
@@ -621,14 +662,15 @@ class TerminalScene(Scene):
     def _cmd_graph(self, kind, args):
         """Ouvre l'atelier de graphes analytiques (5 ans d'historique disponibles
         dès le jour 1). `kind` choisit le type ; `args` les tickers éventuels."""
-        tickers = [a.upper() for a in args]
-        # valide les tickers fournis (les types macro/courbe n'en ont pas besoin)
+        # recherche intelligente : résout chaque argument (nom OU ticker partiel)
+        tickers = []
         if kind not in ("macro", "curve"):
-            bad = [t for t in tickers if self.market.price_of(t) is None]
-            if bad:
-                self._log(_L(f"  Ticker inconnu : {', '.join(bad)}.",
-                             f"  Unknown ticker: {', '.join(bad)}."))
-                tickers = [t for t in tickers if t not in bad]
+            for a in args:
+                tk = self.market.resolve(a)
+                if tk:
+                    tickers.append(tk)
+                else:
+                    self._log(_L(f"  Aucun résultat : {a}.", f"  No match: {a}."))
         self.app.scenes.go("graph", kind=kind, tickers=tickers, return_to="terminal")
 
     def _cmd_rv(self, ticker):
@@ -636,9 +678,10 @@ class TerminalScene(Scene):
         if not ticker:
             self._log(_L("  Usage : RV <ticker>  (valeur relative vs pairs).","  Usage: RV <ticker>  (relative value vs peers)."))
             return
-        mt = self.market.metrics(ticker.upper())
+        tk = self.market.resolve(ticker)
+        mt = self.market.metrics(tk) if tk else None
         if not mt:
-            self._log(_L(f"  Ticker inconnu : {ticker.upper()}.", f"  Unknown ticker: {ticker.upper()}."))
+            self._log(_L(f"  Aucun résultat : {ticker}.", f"  No match: {ticker}."))
             return
         med = self.market.sector_medians(mt["sector"])
 
@@ -726,7 +769,7 @@ class TerminalScene(Scene):
         """Commandes de TEST (mode triche, via main_cheat.py)."""
         p = self.app.gs.player
         if cmd in ("CHEAT", "CHEATS"):
-            self._log(_L("  ⚙ TRICHE : GRADE <0-11> · CASH <montant> · REP <0-100> · MAXUNLOCK","  ⚙ CHEAT: GRADE <0-11> · CASH <amount> · REP <0-100> · MAXUNLOCK"))
+            self._log(_L("  ⊕ TRICHE : GRADE <0-11> · CASH <montant> · REP <0-100> · MAXUNLOCK","  ⊕ CHEAT: GRADE <0-11> · CASH <amount> · REP <0-100> · MAXUNLOCK"))
             self._log(_L("  Grades : ","  Grades: ") + " ".join(f"{i}={g}" for i, g in enumerate(config.GRADES)))
             return
         if cmd == "GRADE":
@@ -740,26 +783,26 @@ class TerminalScene(Scene):
             p.grade_start_quarter = p.quarter
             if gi >= 2 and p.track == "General":
                 p.flags["can_choose_track"] = True
-            self._log(_L(f"  ⚙ Grade réglé sur {gi} = {config.GRADES[gi]}.", f"  ⚙ Grade set to {gi} = {config.GRADES[gi]}."))
+            self._log(_L(f"  ⊕ Grade réglé sur {gi} = {config.GRADES[gi]}.", f"  ⊕ Grade set to {gi} = {config.GRADES[gi]}."))
             self._check_badges()
         elif cmd == "CASH":
             if not args or not args[0].lstrip("-").replace(".", "").isdigit():
                 self._log(_L("  Usage : CASH <montant>.","  Usage: CASH <amount>."))
                 return
             p.cash = float(args[0])
-            self._log(_L(f"  ⚙ Trésorerie réglée sur {widgets.format_money(p.cash, self._cur())}.", f"  ⚙ Cash set to {widgets.format_money(p.cash, self._cur())}."))
+            self._log(_L(f"  ⊕ Trésorerie réglée sur {widgets.format_money(p.cash, self._cur())}.", f"  ⊕ Cash set to {widgets.format_money(p.cash, self._cur())}."))
         elif cmd in ("REP", "REPUTATION"):
             if not args or not args[0].lstrip("-").isdigit():
                 self._log(_L("  Usage : REP <0-100>.","  Usage: REP <0-100>."))
                 return
             p.reputation = max(0, min(100, int(args[0])))
-            self._log(_L(f"  ⚙ Réputation réglée sur {p.reputation}/100.", f"  ⚙ Reputation set to {p.reputation}/100."))
+            self._log(_L(f"  ⊕ Réputation réglée sur {p.reputation}/100.", f"  ⊕ Reputation set to {p.reputation}/100."))
         elif cmd == "MAXUNLOCK":
             p.grade_index = len(config.GRADES) - 1
             p.reputation = max(p.reputation, 80)
             if p.track == "General":
                 p.flags["can_choose_track"] = True
-            self._log(_L(f"  ⚙ Grade max ({config.GRADES[-1]}) : toutes les actions débloquées.", f"  ⚙ Top grade ({config.GRADES[-1]}): all actions unlocked."))
+            self._log(_L(f"  ⊕ Grade max ({config.GRADES[-1]}) : toutes les actions débloquées.", f"  ⊕ Top grade ({config.GRADES[-1]}): all actions unlocked."))
             self._check_badges()
 
     def _cmd_eval(self):
@@ -824,10 +867,11 @@ class TerminalScene(Scene):
         if len(args) < 2:
             self._log(_L("  Usage : COMPARE <ticker1> <ticker2>","  Usage: COMPARE <ticker1> <ticker2>"))
             return
-        a, b = args[0].upper(), args[1].upper()
-        ma, mb = self.market.metrics(a), self.market.metrics(b)
+        a, b = self.market.resolve(args[0]), self.market.resolve(args[1])
+        ma = self.market.metrics(a) if a else None
+        mb = self.market.metrics(b) if b else None
         if not ma or not mb:
-            self._log(_L("  Un des tickers est inconnu.","  One of the tickers is unknown."))
+            self._log(_L("  Un des termes est introuvable.","  One of the terms has no match."))
             return
         def fmt(m, key, f):
             v = m[key]
@@ -912,19 +956,6 @@ class TerminalScene(Scene):
         self._open_window(f"CALENDRIER — Jour {p.day}",
                           [("Échéance", 200), ("Délai", 60), ("Type", 80)], rows)
 
-    def _cmd_rivals(self):
-        p = self.app.gs.player
-        cur = self._cur()
-        board = rivals_mod.leaderboard(p, self.market)
-        rows = []
-        for row in board:
-            col = config.COL_AMBER if row["is_player"] else config.COL_TEXT
-            rows.append((f"{row['rank']}", (row["name"][:20], col),
-                         widgets.format_money(row["score"], cur)))
-        self._open_window("CLASSEMENT — rivaux",
-                          [("#", 30), ("Banquier", 160), ("Score", 90)],
-                          rows, accent=config.COL_PRESTIGE)
-
     # ------------------------------------------------------------- mandats
     def _cmd_mandates(self):
         p = self.app.gs.player
@@ -982,10 +1013,10 @@ class TerminalScene(Scene):
         if not ticker:
             self._log(_L("  Usage : RESEARCH <ticker>","  Usage: RESEARCH <ticker>"))
             return
-        tk = ticker.upper()
-        mt = self.market.metrics(tk)
+        tk = self.market.resolve(ticker)
+        mt = self.market.metrics(tk) if tk else None
         if not mt:
-            self._log(_L(f"  Ticker inconnu : {tk}.", f"  Unknown ticker: {tk}."))
+            self._log(_L(f"  Aucun résultat : {ticker}.", f"  No match: {ticker}."))
             return
         # valeur intrinsèque simplifiée : BPA capitalisé à un P/E « juste » sectoriel
         fair_pe = {"Tech": 24, "Semicon": 22, "Luxe": 22, "Sante": 19, "Conso": 18,
@@ -1012,15 +1043,15 @@ class TerminalScene(Scene):
         if len(args) < 2:
             self._log(_L("  Usage : ALERT <ticker> <prix>","  Usage: ALERT <ticker> <price>"))
             return
-        tk = args[0].upper()
+        tk = self.market.resolve(args[0])
         try:
             price = float(args[1].replace(",", "."))
         except ValueError:
             self._log(_L("  Prix invalide.","  Invalid price."))
             return
-        cur_price = self.market.price_of(tk)
+        cur_price = self.market.price_of(tk) if tk else None
         if cur_price is None:
-            self._log(_L(f"  Ticker inconnu : {tk}.", f"  Unknown ticker: {tk}."))
+            self._log(_L(f"  Aucun résultat : {args[0]}.", f"  No match: {args[0]}."))
             return
         self.market.track_company(tk)
         p.alerts.append({"ticker": tk, "price": price, "above": price > cur_price})
@@ -1073,7 +1104,7 @@ class TerminalScene(Scene):
     def _check_badges(self):
         """Attribue les nouveaux badges et notifie (toast + journal)."""
         for b in badges_mod.check_new(self.app.gs.player, self.market):
-            self.app.notify(f"★ Badge : {b['name']}", "prestige")
+            self.app.notify(f"✶ Badge : {b['name']}", "prestige")
             career_mod.log(self.app.gs.player, "info", f"Badge débloqué : {b['name']}")
 
     def _cmd_buy(self, args):
@@ -1300,12 +1331,29 @@ class TerminalScene(Scene):
         info = config.CONTINENTS[p.continent]
         cur = info["currency"]
         self.networth_spark.push(pf_mod.net_worth(p, m))
-        # concurrents : progression + sniping des deals expirés
+        # concurrents : progression + sniping des deals expirés + actions actives
+        for r in p.rivals:
+            r["mood"] = "flat"          # réinitialise l'humeur du tour
         rivals_mod.step(p, m)
         for d in summary["expired"]:
             rival = rivals_mod.snipe(p, d, random)
             inbox_mod.on_deal_sniped(p, d, rival)
             career_mod.log(p, "deal", f"{rival} rafle « {d['title']} »")
+        # rivaux ACTIFS : percées, snipe de deals en retard, débauchage de mandats
+        for ev in rivals_mod.act(p, m, random):
+            self.recent_events.insert(0, {"title": ev["text"][:70], "kind": ev["kind"]})
+            self.worldmap.push_news([{"region": p.continent, "kind": ev["kind"],
+                                      "text": ev["rival"]}])
+            career_mod.log(p, "deal" if ev["type"] in ("snipe", "poach") else "info",
+                           ev["text"])
+            self.app.notify(ev["text"][:60], ev["kind"])
+            if ev["type"] == "snipe":
+                inbox_mod.on_deal_sniped(p, ev["deal"], ev["rival"])
+            elif ev["type"] == "poach":
+                inbox_mod.push(p, "client", f"Mandat — {ev['client']}", "Mandat perdu",
+                               f"{ev['rival']} a décroché le mandat de {ev['client']} "
+                               "pendant que vous hésitiez. Soyez plus décidé.")
+        self.recent_events = self.recent_events[:8]
         self._log(_L(f"  +{config.DAYS_PER_STEP}j → jour {p.day} (T{p.quarter}). "
                   f"Solde du tour : {widgets.format_money(summary['net'], cur)}",
                   f"  +{config.DAYS_PER_STEP}d → day {p.day} (Q{p.quarter}). "
@@ -1336,21 +1384,21 @@ class TerminalScene(Scene):
         for res in (summary.get("structured_due") or []):
             pr = res["product"]
             sign = "+" if res["pnl"] >= 0 else ""
-            self._log(_L(f"  ◼ Produit structuré échu : {pr['name']} → "
+            self._log(_L(f"  ■ Produit structuré échu : {pr['name']} → "
                       f"{widgets.format_money(res['payoff'], cur)} "
                       f"(P&L {sign}{widgets.format_money(res['pnl'], cur)}).",
-                      f"  ◼ Structured product matured: {pr['name']} → "
+                      f"  ■ Structured product matured: {pr['name']} → "
                       f"{widgets.format_money(res['payoff'], cur)} "
                       f"(P&L {sign}{widgets.format_money(res['pnl'], cur)})."))
             self.app.notify(_L("Produit structuré arrivé à échéance","Structured product matured"), "info")
         for res in (summary.get("securitised_due") or []):
             pos = res["position"]
             sign = "+" if res["pnl"] >= 0 else ""
-            self._log(_L(f"  ◼ Tranche {pos['name']} échue : perte pool {res['pool_loss']*100:.1f}% → "
+            self._log(_L(f"  ■ Tranche {pos['name']} échue : perte pool {res['pool_loss']*100:.1f}% → "
                       f"votre tranche -{res['loss_frac']*100:.0f}% capital · "
                       f"{widgets.format_money(res['payoff'], cur)} "
                       f"(P&L {sign}{widgets.format_money(res['pnl'], cur)}).",
-                      f"  ◼ Tranche {pos['name']} matured: pool loss {res['pool_loss']*100:.1f}% → "
+                      f"  ■ Tranche {pos['name']} matured: pool loss {res['pool_loss']*100:.1f}% → "
                       f"your tranche -{res['loss_frac']*100:.0f}% capital · "
                       f"{widgets.format_money(res['payoff'], cur)} "
                       f"(P&L {sign}{widgets.format_money(res['pnl'], cur)})."))
@@ -1393,9 +1441,9 @@ class TerminalScene(Scene):
             from core.i18n import get_lang
             hname, hstory = history_mod.localized(hist["event"], get_lang())
             self.worldmap.push_news([{"region": None, "kind": hist["kind"], "text": hname}])
-            self.recent_events.insert(0, {"title": "★ " + hname, "kind": hist["kind"],
+            self.recent_events.insert(0, {"title": "✶ " + hname, "kind": hist["kind"],
                                           "cash": 0, "rep": 0})
-            self._log(f"  ★ {hname} — {hstory[:64]}…")
+            self._log(f"  ✶ {hname} — {hstory[:64]}…")
             inbox_mod.on_crisis(p, hname, hist["kind"])
             career_mod.log(p, "crisis", hname)
             self.app.notify(hname, hist["kind"])
@@ -1412,7 +1460,7 @@ class TerminalScene(Scene):
             inbox_mod.on_quarter(p, summary.get("quarter_report"))
             hot = p.flags.get("hot_sector")
             if hot:
-                self._log(_L(f"  ★ Secteur à surveiller ce trimestre : {hot}.", f"  ★ Sector to watch this quarter: {hot}."))
+                self._log(_L(f"  ✶ Secteur à surveiller ce trimestre : {hot}.", f"  ✶ Sector to watch this quarter: {hot}."))
                 self.app.notify(_L(f"Secteur du trimestre : {hot}", f"Sector of the quarter: {hot}"), "info")
             # mandats arrivés à échéance
             for res in mandates_mod.evaluate_due(p, m):
@@ -1435,9 +1483,9 @@ class TerminalScene(Scene):
         # nouvelle offre de mandat éventuelle
         offer = mandates_mod.maybe_offer(p, random)
         if offer:
-            self._log(_L(f"  ★ OFFRE DE MANDAT : {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
+            self._log(_L(f"  ✶ OFFRE DE MANDAT : {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
                       f"(MANDATES pour voir).",
-                      f"  ★ MANDATE OFFER: {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
+                      f"  ✶ MANDATE OFFER: {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
                       f"(type MANDATES to view)."))
             self.app.notify(_L(f"Offre de mandat : {offer['client']}", f"Mandate offer: {offer['client']}"), "info")
             inbox_mod.push(p, "client", offer["client"], "Proposition de mandat",
@@ -1447,7 +1495,7 @@ class TerminalScene(Scene):
         # alertes de prix
         self._check_alerts()
         for d in summary["new_deals"]:
-            self._log(_L(f"  ★ Nouveau deal #{d['id']} : {d['title']} ({d['days_left']}j)", f"  ★ New deal #{d['id']}: {d['title']} ({d['days_left']}d)"))
+            self._log(_L(f"  ✶ Nouveau deal #{d['id']} : {d['title']} ({d['days_left']}j)", f"  ✶ New deal #{d['id']}: {d['title']} ({d['days_left']}d)"))
         # messages d'ambiance / conformité
         inbox_mod.on_step(p, m, summary, random)
         # scrutin réglementaire : décroissance + risque d'enquête
@@ -1461,7 +1509,7 @@ class TerminalScene(Scene):
         # dilemme éventuel à trancher
         dil = dilemmas_mod.maybe_trigger(p, random)
         if dil:
-            self._log(_L(f"  ⚖ DÉCISION REQUISE : {dil['title']} — tapez DECIDE.", f"  ⚖ DECISION REQUIRED: {dil['title']} — type DECIDE."))
+            self._log(_L(f"  § DÉCISION REQUISE : {dil['title']} — tapez DECIDE.", f"  § DECISION REQUIRED: {dil['title']} — type DECIDE."))
             self.app.notify(_L(f"Décision requise : {dil['title']}", f"Decision required: {dil['title']}"), "warn")
         # bilan de trimestre / quarter en toast
         if summary.get("quarter_changed") and summary.get("quarter_report") \
@@ -1472,7 +1520,7 @@ class TerminalScene(Scene):
         self._check_badges()
         unread = inbox_mod.unread_count(p)
         if unread:
-            self._log(_L(f"  ✉ {unread} message(s) non lu(s) — tapez INBOX.", f"  ✉ {unread} unread message(s) — type INBOX."))
+            self._log(_L(f"  @ {unread} message(s) non lu(s) — tapez INBOX.", f"  @ {unread} unread message(s) — type INBOX."))
         if not p.hardcore:
             gs.save(config.AUTOSAVE_SLOT)
         if summary["game_over"] or p.check_game_over():
@@ -1520,7 +1568,7 @@ class TerminalScene(Scene):
 
         M = config.MARGIN
         top = config.TOPBAR_H + config.TICKER_H + M
-        console_h = 74
+        console_h = self._console_height()
         bottom = config.SCREEN_HEIGHT - console_h - M     # bas de la zone de contenu
         avail_h = bottom - top
 
@@ -1552,7 +1600,7 @@ class TerminalScene(Scene):
         self._draw_top_companies(surf, pygame.Rect(rx, top, col_r_w, half), p)
         self._draw_career(surf, pygame.Rect(rx, top + half + gap, col_r_w, avail_h - half - gap), p)
 
-        self._draw_console(surf, console_h)
+        self._draw_console(surf)
 
         # overlay : fenêtres de données déplaçables
         for w in self.datawins:
@@ -1616,7 +1664,7 @@ class TerminalScene(Scene):
         # badge messagerie (non-lus)
         unread = inbox_mod.unread_count(p)
         if unread:
-            widgets.draw_badge(surf, f"✉ {unread}", (config.SCREEN_WIDTH - 70, 9),
+            widgets.draw_badge(surf, f"@ {unread}", (config.SCREEN_WIDTH - 70, 9),
                                config.COL_CYAN, align="right")
         widgets.draw_text(surf, f"{info['currency']}", (config.SCREEN_WIDTH - 90, 10),
                           fonts.body(bold=True), accent, align="right")
@@ -1810,19 +1858,75 @@ class TerminalScene(Scene):
             widgets.draw_text_wrapped(surf, f"{nxt[0]} — grade {config.GRADES[nxt[1]]}",
                                       (inner.x, y + 16), fonts.tiny(), config.COL_PRESTIGE, inner.w)
 
-    def _draw_console(self, surf, height=74):
-        rect = pygame.Rect(config.MARGIN, config.SCREEN_HEIGHT - height - config.MARGIN,
-                           config.SCREEN_WIDTH - 2 * config.MARGIN, height)
+    CONSOLE_LINE_H = 16
+
+    def _console_visible_lines(self):
+        return 13 if self.console_expanded else 4
+
+    def _console_height(self):
+        # lignes visibles + bandeau (en-tête) + ligne de saisie
+        return self._console_visible_lines() * self.CONSOLE_LINE_H + 40
+
+    def _console_rect(self):
+        h = self._console_height()
+        return pygame.Rect(config.MARGIN, config.SCREEN_HEIGHT - h - config.MARGIN,
+                           config.SCREEN_WIDTH - 2 * config.MARGIN, h)
+
+    def _console_max_scroll(self):
+        return max(0, len(self.cmd_history) - self._console_visible_lines())
+
+    def _scroll_console(self, delta):
+        self.console_scroll = max(0, min(self._console_max_scroll(),
+                                         self.console_scroll + delta))
+
+    def _draw_console(self, surf):
+        rect = self._console_rect()
         pygame.draw.rect(surf, (6, 8, 12), rect)
         pygame.draw.rect(surf, config.COL_BORDER, rect, 1)
-        y = rect.y + 5
-        for line in self.cmd_history[-3:]:
-            widgets.draw_text(surf, line, (rect.x + 10, y), fonts.small(), config.COL_AMBER_DIM)
-            y += 15
+        self._console_btns = {}
+
+        # bandeau : titre + position de défilement + boutons (scroll / agrandir)
+        head_y = rect.y + 4
+        nvis = self._console_visible_lines()
+        total = len(self.cmd_history)
+        widgets.draw_text(surf, "CONSOLE", (rect.x + 10, head_y),
+                          fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        if self.console_scroll > 0:
+            widgets.draw_text(surf, f"▲ historique +{self.console_scroll}",
+                              (rect.x + 90, head_y), fonts.tiny(), config.COL_WARN)
+        # boutons à droite : [▲][▼][AGRANDIR/RÉDUIRE]
+        bx = rect.right - 10
+        exp_label = "RÉDUIRE" if self.console_expanded else "AGRANDIR"
+        ew = fonts.tiny(bold=True).size(exp_label)[0] + 16
+        exp_rect = pygame.Rect(bx - ew, head_y - 2, ew, 16); bx = exp_rect.x - 6
+        for key, rr, lab in (("expand", exp_rect, exp_label),):
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD, rr)
+            pygame.draw.rect(surf, config.COL_AMBER, rr, 1)
+            widgets.draw_text(surf, lab, rr.center, fonts.tiny(bold=True),
+                              config.COL_AMBER, align="center")
+            self._console_btns[key] = rr
+        for key, sym in (("down", "▼"), ("up", "▲")):
+            rr = pygame.Rect(bx - 18, head_y - 2, 16, 16); bx = rr.x - 4
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD, rr)
+            pygame.draw.rect(surf, config.COL_BORDER, rr, 1)
+            widgets.draw_text(surf, sym, rr.center, fonts.tiny(bold=True),
+                              config.COL_TEXT, align="center")
+            self._console_btns[key] = rr
+
+        # lignes : fenêtre [start:start+nvis] selon le défilement (0 = bas)
+        start = max(0, total - nvis - self.console_scroll)
+        window = self.cmd_history[start:start + nvis]
+        y = rect.y + 22
+        for line in window:
+            col = config.COL_AMBER if line.startswith(">") else config.COL_AMBER_DIM
+            widgets.draw_text(surf, widgets.fit_text(line, fonts.small(), rect.w - 24),
+                              (rect.x + 10, y), fonts.small(), col)
+            y += self.CONSOLE_LINE_H
+
+        # ligne de saisie (toujours en bas)
         cursor = "_" if int(self.t * 2) % 2 == 0 else " "
         r = widgets.draw_text(surf, f"CMD> {self.cmd}", (rect.x + 10, rect.bottom - 20),
                               fonts.small(bold=True), config.COL_AMBER)
-        # suggestion fantôme (Tab pour compléter)
         ghost = self._ghost()
         gx = r.right
         if ghost:

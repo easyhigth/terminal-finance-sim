@@ -1,6 +1,9 @@
 """
-scene_commands.py — Catalogue complet des commandes du terminal.
-Ouvert via la commande COMMANDS (ou ?). Liste catégorisée, consultable.
+scene_commands.py — Catalogue COMPLET des commandes du terminal.
+
+Ouvert via COMMANDS (ou ?). Liste catégorisée, DÉFILABLE (molette / ▲▼ / PgUp-
+PgDn), sans chevauchement. Cliquer une commande la COPIE : elle est pré-remplie
+dans le terminal (et placée dans le presse-papiers si disponible), prête à lancer.
 """
 import pygame
 from core import config
@@ -8,42 +11,64 @@ from core.scene_manager import Scene
 from ui import fonts, widgets
 
 
-# Source unique de vérité des commandes (catégorie -> [(cmd, description)]).
+# Source unique de vérité (catégorie -> [(libellé, description)]). Couvre toutes
+# les commandes du parseur (alias regroupés). Les triches sont volontairement
+# exclues (mode main_cheat uniquement).
 CATALOG = [
     ("Navigation & système", [
         ("HELP", "Aide rapide (commandes essentielles)"),
         ("COMMANDS / ?", "Ce catalogue complet"),
-        ("STATUS", "Votre situation (grade, cash, réputation, temps)"),
+        ("STATUS", "Votre situation : grade, cash, réputation, temps"),
+        ("ADV / NEXT / T", "Avancer le temps de 5 jours (un pas de marché)"),
         ("MENU / ESC", "Retour au menu principal"),
-        ("SAVES", "Gestion des sauvegardes (slots)"),
         ("SAVE", "Sauvegarde manuelle (désactivée en hardcore)"),
+        ("SAVES / LOAD", "Gestion des sauvegardes (slots)"),
     ]),
-    ("Temps & carrière", [
-        ("ADV / NEXT", "Avancer le temps de 5 jours (un pas de marché)"),
+    ("Carrière & progression", [
         ("MISSION", "Jouer la mission du grade (réputation + honoraire)"),
-        ("CAREER", "Tableau de bord : roadmap, objectifs, stats, journal"),
-        ("ROADMAP / OBJECTIVES / HISTORY", "Raccourcis vers l'écran carrière"),
-        ("INBOX / MAIL", "Messagerie (manager, clients, conformité, desk)"),
-        ("RIVALS", "Classement face aux banquiers concurrents"),
-        ("DECIDE", "Trancher un dilemme en attente (éthique/réglementaire)"),
         ("EVAL", "Examen de promotion (critères combinés requis)"),
+        ("CAREER", "Tableau de bord : roadmap, objectifs, stats, journal"),
+        ("ROADMAP / OBJECTIVES", "Raccourcis vers l'écran carrière"),
+        ("HISTORY / JOURNAL", "Journal de carrière"),
+        ("TRACK", "Choisir / voir sa voie de spécialisation"),
         ("CERT", "Certifications CFA / FRM / CQF (boost de carrière)"),
-        ("TRACK", "Choisir/voir sa voie de spécialisation"),
+    ]),
+    ("Monde vivant", [
+        ("INBOX / MAIL", "Messagerie (manager, clients, conformité, desk)"),
+        ("DECIDE / DILEMMA", "Trancher un dilemme en attente (éthique/régl.)"),
+        ("RIVALS", "Rivaux : classement, némésis, dernières actions"),
+        ("MANDATES", "Voir offres et mandats clients en cours"),
+        ("MANDATE ACCEPT <id>", "Accepter un mandat (objectif + risque)"),
+        ("MANDATE DECLINE <id>", "Refuser une offre de mandat"),
+        ("DEALS", "Lister les deals / opportunités en cours"),
+        ("DEAL <id>", "Traiter un deal avant son échéance"),
+        ("CALENDAR / CAL", "Échéances : trimestre et deals"),
+        ("NEWS", "Actualités du continent"),
+        ("REG", "Cadre réglementaire de la région"),
     ]),
     ("Savoir & macro", [
-        ("LEARN", "Académie : leçons de finance (DCF, Sharpe, VaR, options...)"),
+        ("LEARN / ACADEMY", "Académie : leçons (DCF, Sharpe, VaR, options…)"),
+        ("GLOSSARY", "Glossaire des termes financiers"),
+        ("DEFINE <terme>", "Définition rapide. Ex : DEFINE WACC"),
         ("ECO / MACRO", "Indicateurs : taux, inflation, croissance, chômage"),
-        ("DEFINE <terme>", "Définition rapide (glossaire). Ex: DEFINE WACC"),
-        ("RESEARCH <ticker>", "Valeur intrinsèque + reco analyste"),
-        ("RV <ticker>", "Valeur relative : multiples vs pairs du secteur"),
     ]),
-    ("Fonctions style Bloomberg", [
-        ("DES / FA <tk>", "Fiche société / fondamentaux"),
-        ("RV <tk>", "Relative value (pairs)"),
-        ("WEI", "World Equity Indices (indices mondiaux)"),
-        ("EQS", "Equity Screener (filtre value)"),
-        ("ECO", "Économie / macro"),
-        ("PRT", "Portfolio (livre)"),
+    ("Marché & sociétés", [
+        ("MARKET / WEI", "Indices mondiaux (C&D 500, KAK 40, NKX 225…)"),
+        ("TOP [region] / RANKING", "Meilleures sociétés (USA / Europe / Asia…)"),
+        ("MOVERS", "Plus fortes hausses / baisses du dernier pas"),
+        ("COMPANY / DES <tk>", "Fiche société type Bloomberg. Ex : DES MVC"),
+        ("FA <tk>", "États financiers : résultat + bilan (N/N-1/N-2)"),
+        ("RV <tk>", "Valeur relative : multiples vs pairs du secteur"),
+        ("SEARCH <texte>", "Rechercher une société par nom ou ticker"),
+        ("SECTOR [nom]", "Vue par secteur"),
+        ("REGION [nom]", "Vue par région"),
+        ("SCREEN / EQS", "Filtre value (P/E bas, grandes capis)"),
+        ("BENCHMARK", "Votre performance vs indice régional"),
+        ("WATCHLIST <ADD/REMOVE> <tk>", "Suivre des valeurs"),
+        ("COMPARE <t1> <t2>", "Comparer deux sociétés (multiples)"),
+        ("RESEARCH <tk>", "Valeur intrinsèque + reco analyste"),
+        ("ALERT <tk> <prix>", "Alerte au franchissement d'un cours"),
+        ("ALERTS", "Lister vos alertes de cours"),
     ]),
     ("Graphes analytiques (5 ans d'historique dès le jour 1)", [
         ("GP <tk>", "Ligne de prix + moyennes mobiles MM20/MM50"),
@@ -58,120 +83,180 @@ CATALOG = [
         ("GEG", "Indicateurs macro superposés (taux, inflation, PIB…)"),
         ("GC / YCRV", "Courbe des taux (maturité × rendement)"),
     ]),
-    ("Marché & sociétés", [
-        ("MARKET / INDEX", "Vue des indices mondiaux (C&D 500, KAK 40, NKX 225...)"),
-        ("TOP [region] / RANKING", "Meilleures sociétés (USA / Europe / Asia)"),
-        ("MOVERS", "Plus fortes hausses / baisses du dernier pas"),
-        ("COMPANY <ticker>", "Fiche société type Bloomberg (ex: COMPANY MVC)"),
-        ("FA <ticker>", "États financiers : compte de résultat + bilan (N/N-1/N-2)"),
-        ("SEARCH <texte>", "Rechercher une société par nom/ticker"),
-        ("WATCHLIST [ADD/REMOVE <tk>]", "Suivre des valeurs"),
-        ("COMPARE <t1> <t2>", "Comparer deux sociétés"),
-        ("SECTOR [nom] / REGION [nom]", "Vue par secteur / région"),
-        ("SCREEN", "Filtre value (P/E bas, grandes capis)"),
-        ("BENCHMARK", "Votre performance vs indice régional"),
-        ("CALENDAR", "Échéances : trimestre et deals"),
-        ("NEWS / REG", "Actualités / cadre réglementaire"),
-    ]),
     ("Portefeuille & trading", [
-        ("PORTFOLIO / BOOK", "Livre de positions (valeur nette, P&L)"),
-        ("BUY <ticker> <qté>", "Acheter des actions (ex: BUY MVC 100)"),
-        ("SELL <ticker> <qté|ALL>", "Vendre des actions"),
-        ("SHORT <ticker> <qté>", "Vente à découvert (parier à la baisse)"),
-        ("COVER <ticker> <qté|ALL>", "Racheter une position courte"),
+        ("PORTFOLIO / BOOK / PRT", "Livre de positions (valeur nette, P&L)"),
+        ("BUY <tk> <qté>", "Acheter des actions. Ex : BUY MVC 100"),
+        ("SELL <tk> <qté|ALL>", "Vendre des actions"),
+        ("SHORT <tk> <qté>", "Vente à découvert (parier à la baisse)"),
+        ("COVER <tk> <qté|ALL>", "Racheter une position courte"),
         ("MARGIN", "État de marge : equity, levier, pouvoir d'achat"),
-        ("BONDS", "Marché obligataire : YTM, duration, prix (sensibles aux taux)"),
-        ("BUYBOND / SELLBOND <id> <qté>", "Acheter / vendre des obligations"),
-        ("CMDTY", "Matières premières : courbe de futures, contango/backwardation"),
-        ("BUYCMDTY / SELLCMDTY <id> <qté>", "Trader des contrats de commodities"),
-        ("CRYPTO", "Crypto-actifs & stablecoin (volatil, risque de depeg)"),
-        ("BUYCRYPTO / SELLCRYPTO <id> <qté>", "Trader des crypto-actifs"),
-        ("STRUCT", "Produits structurés (capital garanti, autocallable...)"),
-        ("CREDIT", "Desk crédit : tranches de titrisation & waterfall"),
-        ("ALM", "Gestion actif-passif : gaps de taux, NII, ΔEVE"),
-        ("ALLOCATE <ticker> <pct>", "Ajuster une position à pct% de la valeur nette"),
+        ("ALLOCATE <tk> <pct>", "Ajuster une position à pct% de la valeur nette"),
         ("HEDGE [pct]", "Réduire l'exposition (bêta) du portefeuille"),
         ("REBALANCE", "Ramener les positions à poids égaux"),
-        ("RESEARCH <ticker>", "Estimer une valeur intrinsèque + reco"),
-        ("ALERT <ticker> <prix>", "Alerte au franchissement d'un cours"),
+        ("FRONTIER", "Frontière efficiente, optimisation Sharpe"),
         ("PITCH", "Démarcher un client pour un mandat"),
     ]),
-    ("Mandats clients", [
-        ("MANDATES", "Voir offres et mandats en cours"),
-        ("MANDATE ACCEPT <id>", "Accepter un mandat (objectif + risque)"),
-        ("MANDATE DECLINE <id>", "Refuser une offre de mandat"),
-    ]),
-    ("Opérations & deals", [
-        ("DEALS", "Lister les deals/opportunités en cours"),
-        ("DEAL <id>", "Traiter un deal avant son échéance"),
+    ("Classes d'actifs", [
+        ("BONDS", "Marché obligataire : YTM, duration, prix"),
+        ("BUYBOND / SELLBOND <id> <qté>", "Acheter / vendre des obligations"),
+        ("CMDTY", "Matières premières : futures, contango/backwardation"),
+        ("BUYCMDTY / SELLCMDTY <id> <qté>", "Trader des commodities"),
+        ("CRYPTO", "Crypto-actifs & stablecoin (volatil, depeg)"),
+        ("BUYCRYPTO / SELLCRYPTO <id> <qté>", "Trader des crypto-actifs"),
+        ("STRUCT", "Produits structurés (capital garanti, autocallable…)"),
+        ("CREDIT", "Desk crédit : tranches de titrisation & waterfall"),
+        ("ALM", "Gestion actif-passif : gaps de taux, NII, ΔEVE"),
     ]),
     ("Modules d'analyse", [
-        ("FRONTIER", "Frontière efficiente, optimisation Sharpe"),
-        ("MA", "M&A : LBO, accretion/dilution"),
+        ("MA", "M&A : LBO, accretion / dilution"),
         ("RISK", "VaR / CVaR, stress tests"),
         ("QUANT", "Black-Scholes, Greeks, payoff"),
-        ("SHEET", "Tableur intégré (formules)"),
-        ("GLOSSARY", "Glossaire des termes financiers"),
+        ("SHEET / TABLEUR", "Tableur intégré (formules)"),
     ]),
 ]
 
 
+def _copy_text(label):
+    """Texte à pré-remplir/copier depuis un libellé : commande sans placeholders.
+    Ex : 'BUY <tk> <qté>' -> 'BUY ' ; 'DES / FA <tk>' -> 'DES ' ; 'MARGIN' -> 'MARGIN'."""
+    base = label.split("/")[0].strip()        # 1er alias
+    cut = base.split("<")[0].strip()          # retire les placeholders
+    has_arg = "<" in label
+    return (cut + " ") if has_arg else cut
+
+
+def _try_clipboard(text):
+    """Copie best-effort dans le presse-papiers système (silencieux si indispo)."""
+    try:
+        import pygame.scrap as scrap
+        if not scrap.get_init():
+            scrap.init()
+        scrap.put(pygame.SCRAP_TEXT, text.encode("utf-8"))
+    except Exception:
+        pass
+
+
 class CommandsScene(Scene):
+    HEAD_H = 26          # hauteur d'un en-tête de catégorie
+    ITEM_H = 36          # hauteur d'une commande (libellé + description)
+    CAT_GAP = 14         # espace après une catégorie
+    COLS = 2
+
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
+        self.scroll = 0
+        self._hit = []                 # [(rect, label)] pour le clic (coord. écran)
         self.back_btn = widgets.Button(
             config.back_button_rect(220), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
+        self._layout()
 
+    # ------------------------------------------------------------- layout
+    def _viewport(self):
+        return pygame.Rect(40, 110, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - 110)
+
+    def _layout(self):
+        """Répartit les catégories en COLS colonnes équilibrées (greedy)."""
+        self._col_w = (self._viewport().w - 24 * (self.COLS - 1)) // self.COLS
+        col_blocks = [[] for _ in range(self.COLS)]
+        col_h = [0] * self.COLS
+        for cat, items in CATALOG:
+            h = self.HEAD_H + len(items) * self.ITEM_H + self.CAT_GAP
+            ci = min(range(self.COLS), key=lambda i: col_h[i])
+            col_blocks[ci].append((cat, items))
+            col_h[ci] += h
+        self._col_blocks = col_blocks
+        self._content_h = max(col_h) if col_h else 0
+
+    def _max_scroll(self):
+        return max(0, self._content_h - self._viewport().h)
+
+    # ------------------------------------------------------------- events
     def handle_event(self, event):
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.app.scenes.go(self.return_to)
+            elif event.key == pygame.K_PAGEUP:
+                self.scroll = max(0, self.scroll - 240)
+            elif event.key == pygame.K_PAGEDOWN:
+                self.scroll = min(self._max_scroll(), self.scroll + 240)
+            elif event.key == pygame.K_HOME:
+                self.scroll = 0
+            elif event.key == pygame.K_END:
+                self.scroll = self._max_scroll()
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 4:
+                self.scroll = max(0, self.scroll - 60)
+            elif event.button == 5:
+                self.scroll = min(self._max_scroll(), self.scroll + 60)
+            elif event.button == 1:
+                for rect, label in self._hit:
+                    if rect.collidepoint(event.pos):
+                        self._copy(label)
+                        return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+
+    def _copy(self, label):
+        text = _copy_text(label)
+        self.app.pending_input = text          # pré-rempli dans le terminal au retour
+        _try_clipboard(text)
+        self.app.notify(f"Copié : {text.strip()} — collé dans le terminal", "good")
 
     def update(self, dt):
         self.back_btn.update(pygame.mouse.get_pos(), dt)
 
+    # -------------------------------------------------------------- draw
     def draw(self, surf):
         surf.fill(config.COL_BG)
         widgets.draw_text(surf, "CATALOGUE DES COMMANDES", (40, 24),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Tout se pilote au clavier depuis le terminal. "
-                                "Les commandes sont insensibles à la casse.",
+        widgets.draw_text(surf, "Cliquez une commande pour la copier dans le terminal · "
+                                "molette / ▲▼ PgUp-PgDn pour défiler · insensible à la casse.",
                           (42, 76), fonts.small(), config.COL_TEXT_DIM)
 
-        # 4 colonnes : commande puis description (1 ligne tronquée) en dessous.
-        # Placement dans la colonne la moins remplie, borné au footer réservé.
-        cols = 4
-        gap = 20
-        col_w = (config.SCREEN_WIDTH - 80 - gap * (cols - 1)) // cols
-        col_x = [40 + i * (col_w + gap) for i in range(cols)]
-        top = 112
-        col_y = [top] * cols
-        item_h = 34
-        cat_h = 26
+        vp = self._viewport()
+        self._hit = []
+        prev_clip = surf.get_clip()
+        surf.set_clip(vp)
+        mouse = pygame.mouse.get_pos()
+        for ci, blocks in enumerate(self._col_blocks):
+            x = vp.x + ci * (self._col_w + 24)
+            y = vp.y - self.scroll
+            for cat, items in blocks:
+                widgets.draw_text(surf, widgets.fit_text(cat.upper(), fonts.small(bold=True),
+                                                         self._col_w),
+                                  (x, y), fonts.small(bold=True), config.COL_CYAN)
+                pygame.draw.line(surf, config.COL_BORDER, (x, y + 19), (x + self._col_w, y + 19), 1)
+                y += self.HEAD_H
+                for label, desc in items:
+                    row = pygame.Rect(x - 4, y - 2, self._col_w + 8, self.ITEM_H - 2)
+                    hovered = row.collidepoint(mouse) and vp.collidepoint(mouse)
+                    if hovered:
+                        pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=4)
+                    if vp.top - self.ITEM_H < y < vp.bottom:
+                        self._hit.append((row.copy(), label))
+                        widgets.draw_text(surf, widgets.fit_text(label, fonts.small(bold=True),
+                                                                 self._col_w - 8),
+                                          (x, y), fonts.small(bold=True),
+                                          config.COL_WHITE if hovered else config.COL_AMBER)
+                        widgets.draw_text(surf, widgets.fit_text(desc, fonts.tiny(),
+                                                                 self._col_w - 12),
+                                          (x + 12, y + 17), fonts.tiny(), config.COL_TEXT_DIM)
+                    y += self.ITEM_H
+                y += self.CAT_GAP
+        surf.set_clip(prev_clip)
 
-        def cat_height(items):
-            return cat_h + len(items) * item_h + 14
-
-        dfont = fonts.tiny()
-        for cat, items in CATALOG:
-            ci = min(range(cols), key=lambda i: col_y[i])
-            x = col_x[ci]
-            y = col_y[ci]
-            widgets.draw_text(surf, cat.upper(), (x, y), fonts.small(bold=True), config.COL_CYAN)
-            pygame.draw.line(surf, config.COL_BORDER, (x, y + 19), (x + col_w, y + 19), 1)
-            y += 26
-            for cmd, desc in items:
-                widgets.draw_text(surf, cmd, (x, y), fonts.small(bold=True), config.COL_AMBER)
-                # description sur une seule ligne, tronquée à la largeur de colonne
-                s = desc
-                while dfont.size(s)[0] > col_w - 14 and len(s) > 4:
-                    s = s[:-2]
-                if s != desc:
-                    s = s[:-1] + "…"
-                widgets.draw_text(surf, s, (x + 12, y + 17), dfont, config.COL_TEXT_DIM)
-                y += item_h
-            y += 14
-            col_y[ci] = y
-
+        # barre de défilement
+        self._draw_scrollbar(surf, vp)
         self.back_btn.draw(surf)
+
+    def _draw_scrollbar(self, surf, vp):
+        ms = self._max_scroll()
+        if ms <= 0:
+            return
+        track = pygame.Rect(vp.right + 6, vp.y, 6, vp.h)
+        pygame.draw.rect(surf, config.COL_PANEL, track, border_radius=3)
+        frac = vp.h / self._content_h
+        bar_h = max(24, int(vp.h * frac))
+        bar_y = vp.y + int((vp.h - bar_h) * (self.scroll / ms))
+        pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 6, bar_h), border_radius=3)

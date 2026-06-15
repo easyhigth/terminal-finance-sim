@@ -25,8 +25,13 @@ from core import badges as badges_mod
 from core import mandates as mandates_mod
 from core import unlocks as unlocks_mod
 from core import history as history_mod
-from core.i18n import t as _t
+from core.i18n import t as _t, get_lang
 from core.scene_manager import Scene
+
+
+def _L(fr, en):
+    """Renvoie la version FR ou EN selon la langue courante (logs de la console)."""
+    return en if get_lang() == "en" else fr
 from ui import fonts, widgets
 from ui.worldmap import WorldMap
 
@@ -106,7 +111,7 @@ class TerminalScene(Scene):
         # une tâche longue (mission / deal / éval) fait passer le temps comme un ADV
         if getattr(self.app, "advance_on_return", 0) and not p.game_over:
             self.app.advance_on_return = 0
-            self._log("  ⏱ Le temps avance pendant que vous travaillez…")
+            self._log(_L("  ⏱ Le temps avance pendant que vous travaillez…","  ⏱ Time advances while you work…"))
             self._advance_time()
 
     # --------------------------------------------------------------- events
@@ -241,27 +246,46 @@ class TerminalScene(Scene):
         feat = unlocks_mod.CMD_FEATURE.get(cmd)
         if feat and not unlocks_mod.unlocked(p, feat):
             g = unlocks_mod.required_grade(feat)
-            self._log(f"  🔒 {unlocks_mod.feature_label(feat)}",
-                      f"     débloqué au grade {config.GRADES[g]} (vous : {p.grade}).")
+            self._log(_L(f"  🔒 {unlocks_mod.feature_label(feat)}", f"  🔒 {unlocks_mod.feature_label(feat)}"),
+                      _L(f"     débloqué au grade {config.GRADES[g]} (vous : {p.grade}).",
+                         f"     unlocked at grade {config.GRADES[g]} (you: {p.grade})."))
             return
 
         if cmd == "HELP":
-            self._log(
-                "  ADV avancer · COMMANDS catalogue complet",
-                "  MARKET indices · TOP [region] · MOVERS",
-                "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
-                "  SECTOR · REGION · SCREEN · RANKING · CALENDAR",
-                "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE",
-                "  RESEARCH <tk> · ALERT <tk> <px> · MANDATES · PITCH",
-                "  LEARN académie · CERT certifications · ECO macro",
-                "  RV <tk> · DEFINE <terme>",
-                "  MISSION travailler · DEALS / DEAL <id>",
-                "  INBOX messagerie · RIVALS classement",
-                "  DECIDE décisions · CAREER carrière",
-                "  EVAL promotion · TRACK voie",
-                "  PORTFOLIO·MA·RISK·QUANT·SHEET·GLOSSARY",
-                "  STATUS · SAVE · SAVES · REG · MENU",
-            )
+            if get_lang() == "en":
+                self._log(
+                    "  ADV advance · COMMANDS full catalogue",
+                    "  MARKET indices · TOP [region] · MOVERS",
+                    "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
+                    "  SECTOR · REGION · SCREEN · RANKING · CALENDAR",
+                    "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE",
+                    "  RESEARCH <tk> · ALERT <tk> <px> · MANDATES · PITCH",
+                    "  LEARN academy · CERT certifications · ECO macro",
+                    "  RV <tk> · DEFINE <term>",
+                    "  MISSION work · DEALS / DEAL <id>",
+                    "  INBOX messages · RIVALS leaderboard",
+                    "  DECIDE decisions · CAREER career",
+                    "  EVAL promotion · TRACK specialisation",
+                    "  PORTFOLIO·MA·RISK·QUANT·SHEET·GLOSSARY",
+                    "  STATUS · SAVE · SAVES · REG · MENU",
+                )
+            else:
+                self._log(
+                    "  ADV avancer · COMMANDS catalogue complet",
+                    "  MARKET indices · TOP [region] · MOVERS",
+                    "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
+                    "  SECTOR · REGION · SCREEN · RANKING · CALENDAR",
+                    "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE",
+                    "  RESEARCH <tk> · ALERT <tk> <px> · MANDATES · PITCH",
+                    "  LEARN académie · CERT certifications · ECO macro",
+                    "  RV <tk> · DEFINE <terme>",
+                    "  MISSION travailler · DEALS / DEAL <id>",
+                    "  INBOX messagerie · RIVALS classement",
+                    "  DECIDE décisions · CAREER carrière",
+                    "  EVAL promotion · TRACK voie",
+                    "  PORTFOLIO·MA·RISK·QUANT·SHEET·GLOSSARY",
+                    "  STATUS · SAVE · SAVES · REG · MENU",
+                )
         elif cmd in ("COMMANDS", "?", "CMD"):
             self.app.scenes.go("commands", return_to="terminal")
         elif cmd in ("ADV", "NEXT", "ADVANCE", "T"):
@@ -356,7 +380,7 @@ class TerminalScene(Scene):
             if p.pending_dilemmas:
                 self.app.scenes.go("dilemma", return_to="terminal")
             else:
-                self._log("  Aucune décision en attente.")
+                self._log(_L("  Aucune décision en attente.","  No pending decision."))
         elif cmd in ("RIVALS", "RIVAUX", "LEADERBOARD"):
             self._cmd_rivals()
         elif cmd in ("MANDATES", "MANDATS"):
@@ -391,37 +415,46 @@ class TerminalScene(Scene):
             if p.flags.get("can_choose_track") or p.grade_index >= 2:
                 self.app.scenes.go("track")
             else:
-                self._log("  Voies disponibles à partir du grade Analyst.")
+                self._log(_L("  Voies disponibles à partir du grade Analyst.","  Tracks available from Analyst grade."))
         elif cmd == "STATUS":
             info = config.CONTINENTS[p.continent]
-            self._log(
-                f"  Nom        : {p.name}",
-                f"  Grade      : {p.grade}  |  Voie : {p.track}",
-                f"  Trésorerie : {widgets.format_money(p.cash, info['currency'])}",
-                f"  Réputation : {p.reputation}/100",
-                f"  Temps      : jour {p.day} (T{p.quarter})",
-            )
+            if get_lang() == "en":
+                self._log(
+                    f"  Name       : {p.name}",
+                    f"  Grade      : {p.grade}  |  Track: {p.track}",
+                    f"  Cash       : {widgets.format_money(p.cash, info['currency'])}",
+                    f"  Reputation : {p.reputation}/100",
+                    f"  Time       : day {p.day} (Q{p.quarter})",
+                )
+            else:
+                self._log(
+                    f"  Nom        : {p.name}",
+                    f"  Grade      : {p.grade}  |  Voie : {p.track}",
+                    f"  Trésorerie : {widgets.format_money(p.cash, info['currency'])}",
+                    f"  Réputation : {p.reputation}/100",
+                    f"  Temps      : jour {p.day} (T{p.quarter})",
+                )
         elif cmd == "SAVE":
             if p.hardcore:
-                self._log("  [HARDCORE] Sauvegarde manuelle désactivée.")
+                self._log(_L("  [HARDCORE] Sauvegarde manuelle désactivée.","  [HARDCORE] Manual save disabled."))
             else:
                 self.app.gs.save(config.SAVE_SLOTS[0])
-                self._log(f"  Partie sauvegardée (slot: {config.SAVE_SLOTS[0]}).")
+                self._log(_L(f"  Partie sauvegardée (slot: {config.SAVE_SLOTS[0]}).", f"  Game saved (slot: {config.SAVE_SLOTS[0]})."))
         elif getattr(self.app, "cheats", False) and cmd in (
                 "GRADE", "CASH", "REP", "REPUTATION", "CHEAT", "CHEATS", "MAXUNLOCK"):
             self._cmd_cheat(cmd, parts[1:])
         elif cmd == "NEWS":
             import random
             random.shuffle(self.news)
-            self._log("  Flux d'actualités rafraîchi.")
+            self._log(_L("  Flux d'actualités rafraîchi.","  News feed refreshed."))
         elif cmd == "REG":
             info = config.CONTINENTS[p.continent]
-            self._log(f"  Régulateur : {info['regulator']}",
-                      f"  Cadre      : {info['framework']}")
+            self._log(_L(f"  Régulateur : {info['regulator']}", f"  Regulator  : {info['regulator']}"),
+                      _L(f"  Cadre      : {info['framework']}", f"  Framework  : {info['framework']}"))
         elif cmd == "MENU":
             self.app.scenes.go("menu")
         else:
-            self._log(f"  Commande inconnue : {raw}. Tapez COMMANDS.")
+            self._log(_L(f"  Commande inconnue : {raw}. Tapez COMMANDS.", f"  Unknown command: {raw}. Type COMMANDS."))
 
     # ------------------------------------------------------- commandes marché
     def _cmd_market(self):
@@ -434,7 +467,7 @@ class TerminalScene(Scene):
                          (f"{'+' if chg>=0 else ''}{chg:.2f}%", ccol)))
         self._open_window("INDICES MONDIAUX", [("Indice", 110), ("Valeur", 90),
                                                ("Var.", 80)], rows)
-        self._log("  Indices ouverts (fenêtre).")
+        self._log(_L("  Indices ouverts (fenêtre).","  Indices opened (window)."))
 
     def _match_region(self, name):
         if not name:
@@ -464,10 +497,10 @@ class TerminalScene(Scene):
 
     def _cmd_company(self, ticker):
         if not ticker:
-            self._log("  Usage : COMPANY <ticker>  (ex: COMPANY MVC).")
+            self._log(_L("  Usage : COMPANY <ticker>  (ex: COMPANY MVC).","  Usage: COMPANY <ticker>  (e.g. COMPANY MVC)."))
             return
         if self.market.price_of(ticker.upper()) is None:
-            self._log(f"  Ticker inconnu : {ticker.upper()}. Essayez SEARCH.")
+            self._log(_L(f"  Ticker inconnu : {ticker.upper()}. Essayez SEARCH.", f"  Unknown ticker: {ticker.upper()}. Try SEARCH."))
             return
         self.app.scenes.go("company", ticker=ticker.upper(), return_to="terminal")
 
@@ -475,36 +508,40 @@ class TerminalScene(Scene):
         """BUYBOND/SELLBOND <id> <qté>."""
         import core.bonds as bonds_mod
         if not unlocks_mod.unlocked(self.app.gs.player, "trade"):
-            self._log("  🔒 Trading débloqué au grade Associate.")
+            self._log(_L("  🔒 Trading débloqué au grade Associate.","  🔒 Trading unlocked at Associate grade."))
             return
         if len(args) < 1:
-            self._log(f"  Usage : {cmd} <id> <qté>  (voir BONDS).")
+            self._log(_L(f"  Usage : {cmd} <id> <qté>  (voir BONDS).", f"  Usage: {cmd} <id> <qty>  (see BONDS)."))
             return
         bid = args[0].upper()
         qty = "ALL"
         if len(args) > 1 and args[1].upper() != "ALL":
             if not args[1].isdigit():
-                self._log("  Quantité invalide.")
+                self._log(_L("  Quantité invalide.","  Invalid quantity."))
                 return
             qty = int(args[1])
         p, m = self.app.gs.player, self.market
         if cmd == "BUYBOND":
             if qty == "ALL":
-                self._log("  Précisez une quantité pour l'achat.")
+                self._log(_L("  Précisez une quantité pour l'achat.","  Specify a quantity to buy."))
                 return
             r = bonds_mod.buy_bond(p, m, bid, qty)
             if r["ok"]:
-                self._log(f"  ✓ Achat {qty} × {bid} @ {r['price']:.2f} = "
-                          f"{widgets.format_money(r['total'], self._cur())}.")
+                self._log(_L(f"  ✓ Achat {qty} × {bid} @ {r['price']:.2f} = "
+                          f"{widgets.format_money(r['total'], self._cur())}.",
+                          f"  ✓ Bought {qty} × {bid} @ {r['price']:.2f} = "
+                          f"{widgets.format_money(r['total'], self._cur())}."))
             else:
-                self._log(f"  Achat refusé ({r['reason']}).")
+                self._log(_L(f"  Achat refusé ({r['reason']}).", f"  Buy rejected ({r['reason']})."))
         else:
             r = bonds_mod.sell_bond(p, m, bid, qty)
             if r["ok"]:
-                self._log(f"  ✓ Vente {int(r['qty'])} × {bid} (P&L réalisé "
-                          f"{r['realized']:+.0f}).")
+                self._log(_L(f"  ✓ Vente {int(r['qty'])} × {bid} (P&L réalisé "
+                          f"{r['realized']:+.0f}).",
+                          f"  ✓ Sold {int(r['qty'])} × {bid} (realised P&L "
+                          f"{r['realized']:+.0f})."))
             else:
-                self._log(f"  Vente refusée ({r['reason']}).")
+                self._log(_L(f"  Vente refusée ({r['reason']}).", f"  Sell rejected ({r['reason']})."))
         self._after_trade()
 
     def _cmd_alt_trade(self, asset, cmd, args):
@@ -512,61 +549,61 @@ class TerminalScene(Scene):
         import importlib
         mod = importlib.import_module(f"core.{asset}")
         if not unlocks_mod.unlocked(self.app.gs.player, "trade"):
-            self._log("  🔒 Trading débloqué au grade Associate.")
+            self._log(_L("  🔒 Trading débloqué au grade Associate.","  🔒 Trading unlocked at Associate grade."))
             return
         if len(args) < 1:
-            self._log(f"  Usage : {cmd} <id> <qté>.")
+            self._log(_L(f"  Usage : {cmd} <id> <qté>.", f"  Usage: {cmd} <id> <qty>."))
             return
         cid = args[0].upper()
         qty = "ALL"
         if len(args) > 1 and args[1].upper() != "ALL":
             if not args[1].isdigit():
-                self._log("  Quantité invalide.")
+                self._log(_L("  Quantité invalide.","  Invalid quantity."))
                 return
             qty = int(args[1])
         p, m = self.app.gs.player, self.market
         if cmd.startswith("BUY"):
             if qty == "ALL":
-                self._log("  Précisez une quantité pour l'achat.")
+                self._log(_L("  Précisez une quantité pour l'achat.","  Specify a quantity to buy."))
                 return
             r = mod.buy(p, m, cid, qty)
-            self._log(f"  ✓ Achat {qty} {cid} @ {r['price']:.2f}." if r["ok"]
-                      else f"  Achat refusé ({r['reason']}).")
+            self._log(_L(f"  ✓ Achat {qty} {cid} @ {r['price']:.2f}.", f"  ✓ Bought {qty} {cid} @ {r['price']:.2f}.") if r["ok"]
+                      else _L(f"  Achat refusé ({r['reason']}).", f"  Buy rejected ({r['reason']})."))
         else:
             r = mod.sell(p, m, cid, qty)
-            self._log(f"  ✓ Vente {cid} (P&L réalisé {r['realized']:+.0f})." if r["ok"]
-                      else f"  Vente refusée ({r['reason']}).")
+            self._log(_L(f"  ✓ Vente {cid} (P&L réalisé {r['realized']:+.0f}).", f"  ✓ Sold {cid} (realised P&L {r['realized']:+.0f}).") if r["ok"]
+                      else _L(f"  Vente refusée ({r['reason']}).", f"  Sell rejected ({r['reason']})."))
         self._after_trade()
 
     def _cmd_financials(self, ticker):
         """FA <ticker> : états financiers complets (bilan + compte de résultat)."""
         if not ticker:
-            self._log("  Usage : FA <ticker>  (états financiers ; ex: FA MVC).")
+            self._log(_L("  Usage : FA <ticker>  (états financiers ; ex: FA MVC).","  Usage: FA <ticker>  (financial statements; e.g. FA MVC)."))
             return
         if self.market.price_of(ticker.upper()) is None:
-            self._log(f"  Ticker inconnu : {ticker.upper()}. Essayez SEARCH.")
+            self._log(_L(f"  Ticker inconnu : {ticker.upper()}. Essayez SEARCH.", f"  Unknown ticker: {ticker.upper()}. Try SEARCH."))
             return
         self.app.scenes.go("financials", ticker=ticker.upper(), return_to="terminal")
 
     def _cmd_search(self, terms):
         q = " ".join(terms) if terms else ""
         if not q:
-            self._log("  Usage : SEARCH <nom ou ticker>.")
+            self._log(_L("  Usage : SEARCH <nom ou ticker>.","  Usage: SEARCH <name or ticker>."))
             return
         res = self.market.search(q)
         if not res:
-            self._log(f"  Aucune société pour « {q} ».")
+            self._log(_L(f"  Aucune société pour « {q} ».", f"  No company for “{q}”."))
         else:
-            self._log(f"  Résultats : {', '.join(res)}")
+            self._log(_L(f"  Résultats : {', '.join(res)}", f"  Results: {', '.join(res)}"))
 
     def _cmd_chart(self, ticker):
         """GP — graphe de prix d'une société (fenêtre déplaçable)."""
         if not ticker:
-            self._log("  Usage : GP <ticker>  (graphe de prix).")
+            self._log(_L("  Usage : GP <ticker>  (graphe de prix).","  Usage: GP <ticker>  (price chart)."))
             return
         tk = ticker.upper()
         if self.market.price_of(tk) is None:
-            self._log(f"  Ticker inconnu : {tk}.")
+            self._log(_L(f"  Ticker inconnu : {tk}.", f"  Unknown ticker: {tk}."))
             return
         from ui.datawindow import DataWindow
         hist = self.market.track_company(tk)
@@ -575,16 +612,16 @@ class TerminalScene(Scene):
                                         accent=config.COL_AMBER, chart=list(hist)))
         self.datawins = self.datawins[-5:]
         if len(hist) < 2:
-            self._log(f"  {tk} : historique en constitution (ADV pour le remplir).")
+            self._log(_L(f"  {tk} : historique en constitution (ADV pour le remplir).", f"  {tk}: history building up (ADV to fill it)."))
 
     def _cmd_rv(self, ticker):
         """RV — valeur relative : multiples de la société vs médianes du secteur."""
         if not ticker:
-            self._log("  Usage : RV <ticker>  (valeur relative vs pairs).")
+            self._log(_L("  Usage : RV <ticker>  (valeur relative vs pairs).","  Usage: RV <ticker>  (relative value vs peers)."))
             return
         mt = self.market.metrics(ticker.upper())
         if not mt:
-            self._log(f"  Ticker inconnu : {ticker.upper()}.")
+            self._log(_L(f"  Ticker inconnu : {ticker.upper()}.", f"  Unknown ticker: {ticker.upper()}."))
             return
         med = self.market.sector_medians(mt["sector"])
 
@@ -637,7 +674,7 @@ class TerminalScene(Scene):
         """DEFINE — définition d'un terme du glossaire."""
         q = " ".join(terms).strip()
         if not q:
-            self._log("  Usage : DEFINE <terme>  (ex: DEFINE WACC). Voir aussi GLOSSARY.")
+            self._log(_L("  Usage : DEFINE <terme>  (ex: DEFINE WACC). Voir aussi GLOSSARY.","  Usage: DEFINE <term>  (e.g. DEFINE WACC). See also GLOSSARY."))
             return
         from data import glossary_data
         from core.i18n import get_lang
@@ -654,7 +691,7 @@ class TerminalScene(Scene):
                     hit = (term, cat, definition)
                     break
         if not hit:
-            self._log(f"  « {q} » introuvable au glossaire. Tapez GLOSSARY pour parcourir.")
+            self._log(_L(f"  « {q} » introuvable au glossaire. Tapez GLOSSARY pour parcourir.", f"  “{q}” not found in the glossary. Type GLOSSARY to browse."))
             return
         term, cat, definition = hit
         self._log(f"  [{cat}] {term} :")
@@ -672,12 +709,12 @@ class TerminalScene(Scene):
         """Commandes de TEST (mode triche, via main_cheat.py)."""
         p = self.app.gs.player
         if cmd in ("CHEAT", "CHEATS"):
-            self._log("  ⚙ TRICHE : GRADE <0-11> · CASH <montant> · REP <0-100> · MAXUNLOCK")
-            self._log(f"  Grades : " + " ".join(f"{i}={g}" for i, g in enumerate(config.GRADES)))
+            self._log(_L("  ⚙ TRICHE : GRADE <0-11> · CASH <montant> · REP <0-100> · MAXUNLOCK","  ⚙ CHEAT: GRADE <0-11> · CASH <amount> · REP <0-100> · MAXUNLOCK"))
+            self._log(_L("  Grades : ","  Grades: ") + " ".join(f"{i}={g}" for i, g in enumerate(config.GRADES)))
             return
         if cmd == "GRADE":
             if not args or not args[0].lstrip("-").isdigit():
-                self._log("  Usage : GRADE <0-11>  (voir CHEAT pour la liste).")
+                self._log(_L("  Usage : GRADE <0-11>  (voir CHEAT pour la liste).","  Usage: GRADE <0-11>  (see CHEAT for the list)."))
                 return
             gi = max(0, min(len(config.GRADES) - 1, int(args[0])))
             p.grade_index = gi
@@ -686,26 +723,26 @@ class TerminalScene(Scene):
             p.grade_start_quarter = p.quarter
             if gi >= 2 and p.track == "General":
                 p.flags["can_choose_track"] = True
-            self._log(f"  ⚙ Grade réglé sur {gi} = {config.GRADES[gi]}.")
+            self._log(_L(f"  ⚙ Grade réglé sur {gi} = {config.GRADES[gi]}.", f"  ⚙ Grade set to {gi} = {config.GRADES[gi]}."))
             self._check_badges()
         elif cmd == "CASH":
             if not args or not args[0].lstrip("-").replace(".", "").isdigit():
-                self._log("  Usage : CASH <montant>.")
+                self._log(_L("  Usage : CASH <montant>.","  Usage: CASH <amount>."))
                 return
             p.cash = float(args[0])
-            self._log(f"  ⚙ Trésorerie réglée sur {widgets.format_money(p.cash, self._cur())}.")
+            self._log(_L(f"  ⚙ Trésorerie réglée sur {widgets.format_money(p.cash, self._cur())}.", f"  ⚙ Cash set to {widgets.format_money(p.cash, self._cur())}."))
         elif cmd in ("REP", "REPUTATION"):
             if not args or not args[0].lstrip("-").isdigit():
-                self._log("  Usage : REP <0-100>.")
+                self._log(_L("  Usage : REP <0-100>.","  Usage: REP <0-100>."))
                 return
             p.reputation = max(0, min(100, int(args[0])))
-            self._log(f"  ⚙ Réputation réglée sur {p.reputation}/100.")
+            self._log(_L(f"  ⚙ Réputation réglée sur {p.reputation}/100.", f"  ⚙ Reputation set to {p.reputation}/100."))
         elif cmd == "MAXUNLOCK":
             p.grade_index = len(config.GRADES) - 1
             p.reputation = max(p.reputation, 80)
             if p.track == "General":
                 p.flags["can_choose_track"] = True
-            self._log(f"  ⚙ Grade max ({config.GRADES[-1]}) : toutes les actions débloquées.")
+            self._log(_L(f"  ⚙ Grade max ({config.GRADES[-1]}) : toutes les actions débloquées.", f"  ⚙ Top grade ({config.GRADES[-1]}): all actions unlocked."))
             self._check_badges()
 
     def _cmd_eval(self):
@@ -714,18 +751,18 @@ class TerminalScene(Scene):
         # un examen mis en pause se reprend directement (peu importe les critères)
         if isinstance(p.eval_state, dict) and p.eval_state.get("mode") == "promotion" \
                 and p.eval_state.get("items"):
-            self._log("  Reprise de l'examen en pause…")
+            self._log(_L("  Reprise de l'examen en pause…","  Resuming the paused exam…"))
             self.app.scenes.go("evaluation")
             return
         if not p.can_promote():
-            self._log("  Vous êtes au grade maximal : aucune promotion possible.")
+            self._log(_L("  Vous êtes au grade maximal : aucune promotion possible.","  You are at the top grade: no promotion possible."))
             return
         if not career_mod.promotion_ready(p):
-            self._log("  Critères de promotion non remplis :")
+            self._log(_L("  Critères de promotion non remplis :","  Promotion criteria not met:"))
             for r in career_mod.promotion_requirements(p):
                 if not r["met"]:
-                    self._log(f"   ○ {r['label']} : {int(r['current'])}/{int(r['target'])}")
-            self._log("  Voir CAREER pour la roadmap complète.")
+                    self._log(_L(f"   ○ {r['label']} : {int(r['current'])}/{int(r['target'])}", f"   ○ {r['label']}: {int(r['current'])}/{int(r['target'])}"))
+            self._log(_L("  Voir CAREER pour la roadmap complète.","  See CAREER for the full roadmap."))
             return
         self.app.scenes.go("evaluation")
 
@@ -734,7 +771,7 @@ class TerminalScene(Scene):
         p = self.app.gs.player
         if not args:
             if not p.watchlist:
-                self._log("  Watchlist vide. WATCHLIST ADD <ticker> pour suivre une valeur.")
+                self._log(_L("  Watchlist vide. WATCHLIST ADD <ticker> pour suivre une valeur.","  Watchlist empty. WATCHLIST ADD <ticker> to follow a stock."))
                 return
             rows = []
             for tk in p.watchlist:
@@ -750,30 +787,30 @@ class TerminalScene(Scene):
         tk = args[1].upper() if len(args) > 1 else None
         if op in ("ADD", "+") and tk:
             if self.market.price_of(tk) is None:
-                self._log(f"  Ticker inconnu : {tk}.")
+                self._log(_L(f"  Ticker inconnu : {tk}.", f"  Unknown ticker: {tk}."))
             elif tk in p.watchlist:
-                self._log(f"  {tk} est déjà dans la watchlist.")
+                self._log(_L(f"  {tk} est déjà dans la watchlist.", f"  {tk} is already in the watchlist."))
             else:
                 p.watchlist.append(tk)
                 self.market.track_company(tk)
-                self._log(f"  {tk} ajouté à la watchlist.")
+                self._log(_L(f"  {tk} ajouté à la watchlist.", f"  {tk} added to the watchlist."))
         elif op in ("REMOVE", "RM", "-") and tk:
             if tk in p.watchlist:
                 p.watchlist.remove(tk)
-                self._log(f"  {tk} retiré de la watchlist.")
+                self._log(_L(f"  {tk} retiré de la watchlist.", f"  {tk} removed from the watchlist."))
             else:
-                self._log(f"  {tk} n'est pas dans la watchlist.")
+                self._log(_L(f"  {tk} n'est pas dans la watchlist.", f"  {tk} is not in the watchlist."))
         else:
-            self._log("  Usage : WATCHLIST [ADD|REMOVE <ticker>]")
+            self._log(_L("  Usage : WATCHLIST [ADD|REMOVE <ticker>]","  Usage: WATCHLIST [ADD|REMOVE <ticker>]"))
 
     def _cmd_compare(self, args):
         if len(args) < 2:
-            self._log("  Usage : COMPARE <ticker1> <ticker2>")
+            self._log(_L("  Usage : COMPARE <ticker1> <ticker2>","  Usage: COMPARE <ticker1> <ticker2>"))
             return
         a, b = args[0].upper(), args[1].upper()
         ma, mb = self.market.metrics(a), self.market.metrics(b)
         if not ma or not mb:
-            self._log("  Un des tickers est inconnu.")
+            self._log(_L("  Un des tickers est inconnu.","  One of the tickers is unknown."))
             return
         def fmt(m, key, f):
             v = m[key]
@@ -792,7 +829,7 @@ class TerminalScene(Scene):
     def _cmd_sector(self, name):
         if not name:
             secs = ", ".join(self.market.sectors)
-            self._log("  Secteurs : " + secs[:60], "  " + secs[60:])
+            self._log(_L("  Secteurs : ","  Sectors: ") + secs[:60], "  " + secs[60:])
             return
         key = None
         for s in self.market.sectors:
@@ -800,7 +837,7 @@ class TerminalScene(Scene):
                 key = s
                 break
         if not key:
-            self._log(f"  Secteur inconnu : {name}.")
+            self._log(_L(f"  Secteur inconnu : {name}.", f"  Unknown sector: {name}."))
             return
         members = [c for c in self.market.companies if c["sector"] == key]
         members.sort(key=lambda c: self.market.price_of(c["ticker"]) * c["shares"], reverse=True)
@@ -814,7 +851,7 @@ class TerminalScene(Scene):
     def _cmd_region(self, name):
         region = self._match_region(name)
         idxs = [n for n, r, *_ in self.market.index_defs if r == region]
-        self._log(f"  Région {region} — indices : {', '.join(idxs)}")
+        self._log(_L(f"  Région {region} — indices : {', '.join(idxs)}", f"  Region {region} — indices: {', '.join(idxs)}"))
         for n in idxs:
             self._log(f"   {n:9s} {self.market.index_value(n):>12,.0f}  {self.market.index_change_pct(n):+.2f}%")
 
@@ -839,9 +876,11 @@ class TerminalScene(Scene):
         ref = next((n for n, r in idx.items() if r == p.continent), "C&D 500")
         hist = self.market.index_history(ref)
         perf = ((hist[-1] / hist[0] - 1) * 100) if len(hist) > 1 and hist[0] else 0.0
-        self._log(f"  Benchmark régional {ref} : {perf:+.1f}% depuis le suivi.")
-        self._log(f"  Votre trésorerie : {widgets.format_money(p.cash, config.CONTINENTS[p.continent]['currency'])} "
-                  f"(record {widgets.format_money(max(p.best_cash, p.cash), config.CONTINENTS[p.continent]['currency'])}).")
+        self._log(_L(f"  Benchmark régional {ref} : {perf:+.1f}% depuis le suivi.", f"  Regional benchmark {ref}: {perf:+.1f}% since tracking."))
+        self._log(_L(f"  Votre trésorerie : {widgets.format_money(p.cash, config.CONTINENTS[p.continent]['currency'])} "
+                  f"(record {widgets.format_money(max(p.best_cash, p.cash), config.CONTINENTS[p.continent]['currency'])}).",
+                  f"  Your cash: {widgets.format_money(p.cash, config.CONTINENTS[p.continent]['currency'])} "
+                  f"(high {widgets.format_money(max(p.best_cash, p.cash), config.CONTINENTS[p.continent]['currency'])})."))
 
     def _cmd_calendar(self):
         p = self.app.gs.player
@@ -894,27 +933,29 @@ class TerminalScene(Scene):
         self._open_window("MANDATS CLIENTS",
                           [("Mandat", 170), ("Perf/Obj", 90), ("Risque", 90),
                            ("Échéance", 80)], rows, accent=config.COL_PRESTIGE)
-        self._log("  MANDATE ACCEPT <id> / MANDATE DECLINE <id> pour gérer.")
+        self._log(_L("  MANDATE ACCEPT <id> / MANDATE DECLINE <id> pour gérer.","  MANDATE ACCEPT <id> / MANDATE DECLINE <id> to manage."))
 
     def _cmd_mandate(self, args):
         p = self.app.gs.player
         if len(args) < 2 or not args[1].isdigit():
-            self._log("  Usage : MANDATE ACCEPT|DECLINE <id>")
+            self._log(_L("  Usage : MANDATE ACCEPT|DECLINE <id>","  Usage: MANDATE ACCEPT|DECLINE <id>"))
             return
         op, mid = args[0].upper(), int(args[1])
         if op in ("ACCEPT", "ACCEPTER"):
             res = mandates_mod.accept(p, mid, self.market)
             if res == "full":
-                self._log(f"  Déjà {mandates_mod.MAX_ACTIVE} mandats en cours.")
+                self._log(_L(f"  Déjà {mandates_mod.MAX_ACTIVE} mandats en cours.", f"  Already {mandates_mod.MAX_ACTIVE} active mandates."))
             elif res:
-                self._log(f"  ✓ Mandat #{mid} accepté : {res['client']} — objectif "
-                          f"+{res['target_pct']:.0f}% en {res['horizon']}T, bêta ≤ {res['max_beta']:.2f}.")
+                self._log(_L(f"  ✓ Mandat #{mid} accepté : {res['client']} — objectif "
+                          f"+{res['target_pct']:.0f}% en {res['horizon']}T, bêta ≤ {res['max_beta']:.2f}.",
+                          f"  ✓ Mandate #{mid} accepted: {res['client']} — target "
+                          f"+{res['target_pct']:.0f}% in {res['horizon']}Q, beta ≤ {res['max_beta']:.2f}."))
                 career_mod.log(p, "deal", f"Mandat accepté : {res['client']}")
             else:
-                self._log(f"  Offre #{mid} introuvable.")
+                self._log(_L(f"  Offre #{mid} introuvable.", f"  Offer #{mid} not found."))
         elif op in ("DECLINE", "REFUSER"):
-            self._log("  Offre déclinée." if mandates_mod.decline(p, mid)
-                      else f"  Offre #{mid} introuvable.")
+            self._log(_L("  Offre déclinée.","  Offer declined.") if mandates_mod.decline(p, mid)
+                      else _L(f"  Offre #{mid} introuvable.", f"  Offer #{mid} not found."))
         if not p.hardcore:
             self.app.gs.save(config.AUTOSAVE_SLOT)
 
@@ -922,12 +963,12 @@ class TerminalScene(Scene):
     def _cmd_research(self, ticker):
         p = self.app.gs.player
         if not ticker:
-            self._log("  Usage : RESEARCH <ticker>")
+            self._log(_L("  Usage : RESEARCH <ticker>","  Usage: RESEARCH <ticker>"))
             return
         tk = ticker.upper()
         mt = self.market.metrics(tk)
         if not mt:
-            self._log(f"  Ticker inconnu : {tk}.")
+            self._log(_L(f"  Ticker inconnu : {tk}.", f"  Unknown ticker: {tk}."))
             return
         # valeur intrinsèque simplifiée : BPA capitalisé à un P/E « juste » sectoriel
         fair_pe = {"Tech": 24, "Semicon": 22, "Luxe": 22, "Sante": 19, "Conso": 18,
@@ -941,8 +982,10 @@ class TerminalScene(Scene):
                           "upside": round(upside, 1), "day": p.day}
         rcol = (config.COL_UP if rating == "ACHAT" else
                 config.COL_DOWN if rating == "VENTE" else config.COL_WARN)
-        self._log(f"  Recherche {tk} : valeur intrinsèque {fair:.2f} "
-                  f"(potentiel {upside:+.0f}%) → {rating}.")
+        self._log(_L(f"  Recherche {tk} : valeur intrinsèque {fair:.2f} "
+                  f"(potentiel {upside:+.0f}%) → {rating}.",
+                  f"  Research {tk}: intrinsic value {fair:.2f} "
+                  f"(upside {upside:+.0f}%) → {rating}."))
         self.app.notify(f"{tk} : {rating} ({upside:+.0f}%)",
                         "good" if rating == "ACHAT" else "bad" if rating == "VENTE" else "info")
 
@@ -950,27 +993,27 @@ class TerminalScene(Scene):
     def _cmd_alert(self, args):
         p = self.app.gs.player
         if len(args) < 2:
-            self._log("  Usage : ALERT <ticker> <prix>")
+            self._log(_L("  Usage : ALERT <ticker> <prix>","  Usage: ALERT <ticker> <price>"))
             return
         tk = args[0].upper()
         try:
             price = float(args[1].replace(",", "."))
         except ValueError:
-            self._log("  Prix invalide.")
+            self._log(_L("  Prix invalide.","  Invalid price."))
             return
         cur_price = self.market.price_of(tk)
         if cur_price is None:
-            self._log(f"  Ticker inconnu : {tk}.")
+            self._log(_L(f"  Ticker inconnu : {tk}.", f"  Unknown ticker: {tk}."))
             return
         self.market.track_company(tk)
         p.alerts.append({"ticker": tk, "price": price, "above": price > cur_price})
         sens = "au-dessus de" if price > cur_price else "en-dessous de"
-        self._log(f"  Alerte posée : {tk} {sens} {price:.2f} (cours {cur_price:.2f}).")
+        self._log(_L(f"  Alerte posée : {tk} {sens} {price:.2f} (cours {cur_price:.2f}).", f"  Alert set: {tk} {sens} {price:.2f} (price {cur_price:.2f})."))
 
     def _cmd_alerts(self):
         p = self.app.gs.player
         if not p.alerts:
-            self._log("  Aucune alerte active.")
+            self._log(_L("  Aucune alerte active.","  No active alert."))
             return
         rows = [((a["ticker"], config.COL_AMBER), f"{a['price']:.2f}",
                  "↑" if a["above"] else "↓",
@@ -988,7 +1031,7 @@ class TerminalScene(Scene):
                 continue
             crossed = (price >= a["price"]) if a["above"] else (price <= a["price"])
             if crossed:
-                self._log(f"  🔔 ALERTE {a['ticker']} : cours {price:.2f} a franchi {a['price']:.2f}.")
+                self._log(_L(f"  🔔 ALERTE {a['ticker']} : cours {price:.2f} a franchi {a['price']:.2f}.", f"  🔔 ALERT {a['ticker']}: price {price:.2f} crossed {a['price']:.2f}."))
                 self.app.notify(f"Alerte {a['ticker']} @ {price:.2f}", "warn")
                 inbox_mod.push(p, "desk", "Desk", f"Alerte cours : {a['ticker']}",
                                f"{a['ticker']} a franchi votre seuil de {a['price']:.2f} "
@@ -1018,7 +1061,7 @@ class TerminalScene(Scene):
 
     def _cmd_buy(self, args):
         if len(args) < 2 or not args[1].lstrip("-").isdigit():
-            self._log("  Usage : BUY <ticker> <quantité>")
+            self._log(_L("  Usage : BUY <ticker> <quantité>","  Usage: BUY <ticker> <quantity>"))
             return
         tk, qty = args[0].upper(), int(args[1])
         res = pf_mod.buy(self.app.gs.player, self.market, tk, qty)
@@ -1027,39 +1070,44 @@ class TerminalScene(Scene):
                       "isshort": f"position courte ouverte sur {tk} — utilisez COVER",
                       "leverage": f"levier max atteint ({res.get('max_leverage',0):.1f}x)"
                       }.get(res["reason"], res["reason"])
-            self._log(f"  Achat refusé : {reason}.")
+            self._log(_L(f"  Achat refusé : {reason}.", f"  Buy rejected: {reason}."))
             return
-        self._log(f"  ✓ Achat {qty} {tk} @ {res['price']:.2f} = "
-                  f"{widgets.format_money(res['total'], self._cur())} (frais inclus).")
+        self._log(_L(f"  ✓ Achat {qty} {tk} @ {res['price']:.2f} = "
+                     f"{widgets.format_money(res['total'], self._cur())} (frais inclus).",
+                     f"  ✓ Bought {qty} {tk} @ {res['price']:.2f} = "
+                     f"{widgets.format_money(res['total'], self._cur())} (fees incl.)."))
         if res["total"] > 60000:
             career_mod.log(self.app.gs.player, "deal", f"Achat {qty} {tk}")
         self._after_trade()
 
     def _cmd_sell(self, args):
         if not args:
-            self._log("  Usage : SELL <ticker> <quantité|ALL>")
+            self._log(_L("  Usage : SELL <ticker> <quantité|ALL>","  Usage: SELL <ticker> <quantity|ALL>"))
             return
         tk = args[0].upper()
         qty = "ALL"
         if len(args) > 1 and args[1].upper() != "ALL":
             if not args[1].isdigit():
-                self._log("  Quantité invalide.")
+                self._log(_L("  Quantité invalide.","  Invalid quantity."))
                 return
             qty = int(args[1])
         res = pf_mod.sell(self.app.gs.player, self.market, tk, qty)
         if not res["ok"]:
-            self._log(f"  Vente refusée : {'aucune position' if res['reason']=='noposition' else res['reason']}.")
+            self._log(_L(f"  Vente refusée : {'aucune position' if res['reason']=='noposition' else res['reason']}.", f"  Sell rejected: {'no position' if res['reason']=='noposition' else res['reason']}."))
             return
         sign = "+" if res["realized"] >= 0 else ""
-        self._log(f"  ✓ Vente {int(res['qty'])} {tk} @ {res['price']:.2f} = "
-                  f"{widgets.format_money(res['net'], self._cur())}  "
-                  f"(P&L réalisé {sign}{widgets.format_money(res['realized'], self._cur())}).")
+        self._log(_L(f"  ✓ Vente {int(res['qty'])} {tk} @ {res['price']:.2f} = "
+                     f"{widgets.format_money(res['net'], self._cur())}  "
+                     f"(P&L réalisé {sign}{widgets.format_money(res['realized'], self._cur())}).",
+                     f"  ✓ Sold {int(res['qty'])} {tk} @ {res['price']:.2f} = "
+                     f"{widgets.format_money(res['net'], self._cur())}  "
+                     f"(realised P&L {sign}{widgets.format_money(res['realized'], self._cur())})."))
         self._after_trade()
 
     def _cmd_short(self, args):
         """SHORT <ticker> <quantité> : vente à découvert (pari à la baisse)."""
         if len(args) < 2 or not args[1].isdigit():
-            self._log("  Usage : SHORT <ticker> <quantité>  (parier à la baisse)")
+            self._log(_L("  Usage : SHORT <ticker> <quantité>  (parier à la baisse)","  Usage: SHORT <ticker> <quantity>  (bet on a fall)"))
             return
         tk, qty = args[0].upper(), int(args[1])
         res = pf_mod.short(self.app.gs.player, self.market, tk, qty)
@@ -1068,32 +1116,37 @@ class TerminalScene(Scene):
                       "islong": f"position longue ouverte sur {tk} — vendez-la d'abord",
                       "leverage": f"levier max atteint ({res.get('max_leverage',0):.1f}x)"
                       }.get(res["reason"], res["reason"])
-            self._log(f"  Short refusé : {reason}.")
+            self._log(_L(f"  Short refusé : {reason}.", f"  Short rejected: {reason}."))
             return
-        self._log(f"  ✓ Short {qty} {tk} @ {res['price']:.2f} = "
-                  f"+{widgets.format_money(res['net'], self._cur())} en cash "
-                  "(à racheter via COVER).")
+        self._log(_L(f"  ✓ Short {qty} {tk} @ {res['price']:.2f} = "
+                     f"+{widgets.format_money(res['net'], self._cur())} en cash "
+                     "(à racheter via COVER).",
+                     f"  ✓ Shorted {qty} {tk} @ {res['price']:.2f} = "
+                     f"+{widgets.format_money(res['net'], self._cur())} cash "
+                     "(buy back via COVER)."))
         self._after_trade()
 
     def _cmd_cover(self, args):
         """COVER <ticker> <quantité|ALL> : rachète une position courte."""
         if not args:
-            self._log("  Usage : COVER <ticker> <quantité|ALL>")
+            self._log(_L("  Usage : COVER <ticker> <quantité|ALL>","  Usage: COVER <ticker> <quantity|ALL>"))
             return
         tk = args[0].upper()
         qty = "ALL"
         if len(args) > 1 and args[1].upper() != "ALL":
             if not args[1].isdigit():
-                self._log("  Quantité invalide.")
+                self._log(_L("  Quantité invalide.","  Invalid quantity."))
                 return
             qty = int(args[1])
         res = pf_mod.cover(self.app.gs.player, self.market, tk, qty)
         if not res["ok"]:
-            self._log(f"  Rachat refusé : {'aucune position courte' if res['reason']=='noshort' else res['reason']}.")
+            self._log(_L(f"  Rachat refusé : {'aucune position courte' if res['reason']=='noshort' else res['reason']}.", f"  Cover rejected: {'no short position' if res['reason']=='noshort' else res['reason']}."))
             return
         sign = "+" if res["realized"] >= 0 else ""
-        self._log(f"  ✓ Cover {int(res['qty'])} {tk} @ {res['price']:.2f} "
-                  f"(P&L réalisé {sign}{widgets.format_money(res['realized'], self._cur())}).")
+        self._log(_L(f"  ✓ Cover {int(res['qty'])} {tk} @ {res['price']:.2f} "
+                     f"(P&L réalisé {sign}{widgets.format_money(res['realized'], self._cur())}).",
+                     f"  ✓ Covered {int(res['qty'])} {tk} @ {res['price']:.2f} "
+                     f"(realised P&L {sign}{widgets.format_money(res['realized'], self._cur())})."))
         self._after_trade()
 
     def _cmd_margin(self):
@@ -1101,24 +1154,30 @@ class TerminalScene(Scene):
         st = pf_mod.margin_status(self.app.gs.player, self.market)
         cur = self._cur()
         lev = "∞" if st["leverage"] == float("inf") else f"{st['leverage']:.2f}x"
-        self._log(f"  Marge — equity {widgets.format_money(st['equity'], cur)} · "
-                  f"exposition {widgets.format_money(st['gross'], cur)} · levier {lev} "
-                  f"(max {st['max_leverage']:.1f}x)")
-        self._log(f"  Pouvoir d'achat {widgets.format_money(st['buying_power'], cur)} · "
-                  f"capital emprunté {widgets.format_money(st['borrowed'], cur)}"
-                  + ("  ⚠ APPEL DE MARGE IMMINENT" if st["margin_call"] else ""))
+        self._log(_L(f"  Marge — equity {widgets.format_money(st['equity'], cur)} · "
+                     f"exposition {widgets.format_money(st['gross'], cur)} · levier {lev} "
+                     f"(max {st['max_leverage']:.1f}x)",
+                     f"  Margin — equity {widgets.format_money(st['equity'], cur)} · "
+                     f"exposure {widgets.format_money(st['gross'], cur)} · leverage {lev} "
+                     f"(max {st['max_leverage']:.1f}x)"))
+        self._log(_L(f"  Pouvoir d'achat {widgets.format_money(st['buying_power'], cur)} · "
+                     f"capital emprunté {widgets.format_money(st['borrowed'], cur)}"
+                     + ("  ⚠ APPEL DE MARGE IMMINENT" if st["margin_call"] else ""),
+                     f"  Buying power {widgets.format_money(st['buying_power'], cur)} · "
+                     f"borrowed {widgets.format_money(st['borrowed'], cur)}"
+                     + ("  ⚠ MARGIN CALL IMMINENT" if st["margin_call"] else "")))
 
     def _cmd_allocate(self, args):
         """ALLOCATE <ticker> <pct> : ajuste la position à pct% de la valeur nette."""
         if len(args) < 2 or not args[1].replace(".", "").isdigit():
-            self._log("  Usage : ALLOCATE <ticker> <pourcentage>")
+            self._log(_L("  Usage : ALLOCATE <ticker> <pourcentage>","  Usage: ALLOCATE <ticker> <percentage>"))
             return
         p = self.app.gs.player
         tk = args[0].upper()
         pct = float(args[1])
         price = self.market.price_of(tk)
         if price is None:
-            self._log(f"  Ticker inconnu : {tk}.")
+            self._log(_L(f"  Ticker inconnu : {tk}.", f"  Unknown ticker: {tk}."))
             return
         nw = pf_mod.net_worth(p, self.market)
         target_val = nw * pct / 100.0
@@ -1126,7 +1185,7 @@ class TerminalScene(Scene):
         cur_val = cur_shares * price
         diff = target_val - cur_val
         if abs(diff) < price:
-            self._log("  Position déjà proche de la cible.")
+            self._log(_L("  Position déjà proche de la cible.","  Position already close to target."))
             return
         if diff > 0:
             qty = int(diff // price)
@@ -1141,12 +1200,14 @@ class TerminalScene(Scene):
         """HEDGE <pct> : lève du cash en vendant pct% de chaque position."""
         p = self.app.gs.player
         if not p.portfolio:
-            self._log("  Aucune position à couvrir.")
+            self._log(_L("  Aucune position à couvrir.","  No position to hedge."))
             return
         beta = pf_mod.portfolio_beta(p, self.market)
         if arg is None or not arg.replace(".", "").isdigit():
-            self._log(f"  Bêta du portefeuille : {beta:.2f}. "
-                      "HEDGE <pct> pour réduire l'exposition (vendre une part vers le cash).")
+            self._log(_L(f"  Bêta du portefeuille : {beta:.2f}. "
+                         "HEDGE <pct> pour réduire l'exposition (vendre une part vers le cash).",
+                         f"  Portfolio beta: {beta:.2f}. "
+                         "HEDGE <pct> to cut exposure (sell part into cash)."))
             return
         pct = max(0.0, min(100.0, float(arg)))
         for tk, pos in list(p.portfolio.items()):
@@ -1157,15 +1218,17 @@ class TerminalScene(Scene):
                 pf_mod.sell(p, self.market, tk, qty)
             else:                           # short -> on rachète
                 pf_mod.cover(p, self.market, tk, qty)
-        self._log(f"  Couverture : exposition réduite de {pct:.0f}%. "
-                  f"Nouveau bêta {pf_mod.portfolio_beta(p, self.market):.2f}.")
+        self._log(_L(f"  Couverture : exposition réduite de {pct:.0f}%. "
+                  f"Nouveau bêta {pf_mod.portfolio_beta(p, self.market):.2f}.",
+                  f"  Hedge: exposure cut by {pct:.0f}%. "
+                  f"New beta {pf_mod.portfolio_beta(p, self.market):.2f}."))
         self._after_trade()
 
     def _cmd_rebalance(self):
         """REBALANCE : ramène les positions à poids égaux."""
         p = self.app.gs.player
         if len(p.portfolio) < 2:
-            self._log("  Rééquilibrage : au moins 2 positions nécessaires.")
+            self._log(_L("  Rééquilibrage : au moins 2 positions nécessaires.","  Rebalance: at least 2 positions required."))
             return
         pos_val = pf_mod.positions_value(p, self.market)
         target = pos_val / len(p.portfolio)
@@ -1182,7 +1245,7 @@ class TerminalScene(Scene):
                 pf_mod.buy(p, self.market, tk, qty)
             else:
                 pf_mod.sell(p, self.market, tk, qty)
-        self._log(f"  Portefeuille rééquilibré à poids égaux ({len(p.portfolio)} lignes).")
+        self._log(_L(f"  Portefeuille rééquilibré à poids égaux ({len(p.portfolio)} lignes).", f"  Portfolio rebalanced to equal weights ({len(p.portfolio)} lines)."))
         self._after_trade()
 
     def _cmd_pitch(self):
@@ -1193,12 +1256,12 @@ class TerminalScene(Scene):
         if random.random() < prob:
             d = deals_mod.maybe_generate(p)
             if d:
-                self._log(f"  ✓ Pitch réussi : nouveau mandat #{d[0]['id']} — {d[0]['title']}.")
+                self._log(_L(f"  ✓ Pitch réussi : nouveau mandat #{d[0]['id']} — {d[0]['title']}.", f"  ✓ Pitch won: new mandate #{d[0]['id']} — {d[0]['title']}."))
             else:
-                self._log("  ✓ Pitch réussi, mais votre pipeline de deals est déjà plein.")
+                self._log(_L("  ✓ Pitch réussi, mais votre pipeline de deals est déjà plein.","  ✓ Pitch won, but your deal pipeline is already full."))
         else:
             p.adjust_reputation(-1)
-            self._log("  ✗ Pitch infructueux. Le client passe son tour (-1 réputation).")
+            self._log(_L("  ✗ Pitch infructueux. Le client passe son tour (-1 réputation).","  ✗ Pitch failed. The client passes (-1 reputation)."))
         if not p.hardcore:
             self.app.gs.save(config.AUTOSAVE_SLOT)
 
@@ -1226,10 +1289,13 @@ class TerminalScene(Scene):
             rival = rivals_mod.snipe(p, d, random)
             inbox_mod.on_deal_sniped(p, d, rival)
             career_mod.log(p, "deal", f"{rival} rafle « {d['title']} »")
-        self._log(f"  +{config.DAYS_PER_STEP}j → jour {p.day} (T{p.quarter}). "
-                  f"Solde du tour : {widgets.format_money(summary['net'], cur)}")
+        self._log(_L(f"  +{config.DAYS_PER_STEP}j → jour {p.day} (T{p.quarter}). "
+                  f"Solde du tour : {widgets.format_money(summary['net'], cur)}",
+                  f"  +{config.DAYS_PER_STEP}d → day {p.day} (Q{p.quarter}). "
+                  f"Turn balance: {widgets.format_money(summary['net'], cur)}"))
         if summary.get("dividends", 0) > 0:
-            self._log(f"  💰 Dividendes encaissés : +{widgets.format_money(summary['dividends'], cur)}")
+            self._log(_L(f"  💰 Dividendes encaissés : +{widgets.format_money(summary['dividends'], cur)}",
+                          f"  💰 Income received: +{widgets.format_money(summary['dividends'], cur)}"))
         # débrief « pourquoi mon portefeuille a bougé » : attribution par facteur
         if p.portfolio:
             holdings = {t: pos["shares"] for t, pos in p.portfolio.items()}
@@ -1237,35 +1303,50 @@ class TerminalScene(Scene):
             if abs(attr["total"]) > 1.0:
                 fm_ = lambda v: widgets.format_money(v, cur)
                 own = attr["specific"] + attr["drift"]   # part propre + dérive de base
-                self._log(f"  📊 Positions {fm_(attr['total'])} = marché {fm_(attr['world'])}"
+                self._log(_L(f"  📊 Positions {fm_(attr['total'])} = marché {fm_(attr['world'])}"
                           f" · secteur {fm_(attr['sector'])} · région {fm_(attr['region'])}"
-                          f" · propre {fm_(own)}")
+                          f" · propre {fm_(own)}",
+                          f"  📊 Positions {fm_(attr['total'])} = market {fm_(attr['world'])}"
+                          f" · sector {fm_(attr['sector'])} · region {fm_(attr['region'])}"
+                          f" · idiosyncratic {fm_(own)}"))
         # financement (intérêts sur marge + frais de short) et appel de marge
         fin = summary.get("financing")
         if fin and fin["total"] > 1.0:
-            self._log(f"  💸 Frais de financement : -{widgets.format_money(fin['total'], cur)} "
-                      f"(intérêts marge + emprunt de titres).")
+            self._log(_L(f"  💸 Frais de financement : -{widgets.format_money(fin['total'], cur)} "
+                      f"(intérêts marge + emprunt de titres).",
+                      f"  💸 Financing cost: -{widgets.format_money(fin['total'], cur)} "
+                      f"(margin interest + stock borrow)."))
         for res in (summary.get("structured_due") or []):
             pr = res["product"]
             sign = "+" if res["pnl"] >= 0 else ""
-            self._log(f"  📦 Produit structuré échu : {pr['name']} → "
+            self._log(_L(f"  📦 Produit structuré échu : {pr['name']} → "
                       f"{widgets.format_money(res['payoff'], cur)} "
-                      f"(P&L {sign}{widgets.format_money(res['pnl'], cur)}).")
-            self.app.notify("Produit structuré arrivé à échéance", "info")
+                      f"(P&L {sign}{widgets.format_money(res['pnl'], cur)}).",
+                      f"  📦 Structured product matured: {pr['name']} → "
+                      f"{widgets.format_money(res['payoff'], cur)} "
+                      f"(P&L {sign}{widgets.format_money(res['pnl'], cur)})."))
+            self.app.notify(_L("Produit structuré arrivé à échéance","Structured product matured"), "info")
         for res in (summary.get("securitised_due") or []):
             pos = res["position"]
             sign = "+" if res["pnl"] >= 0 else ""
-            self._log(f"  🏦 Tranche {pos['name']} échue : perte pool {res['pool_loss']*100:.1f}% → "
+            self._log(_L(f"  🏦 Tranche {pos['name']} échue : perte pool {res['pool_loss']*100:.1f}% → "
                       f"votre tranche -{res['loss_frac']*100:.0f}% capital · "
                       f"{widgets.format_money(res['payoff'], cur)} "
-                      f"(P&L {sign}{widgets.format_money(res['pnl'], cur)}).")
-            self.app.notify("Tranche de titrisation dénouée", "info")
+                      f"(P&L {sign}{widgets.format_money(res['pnl'], cur)}).",
+                      f"  🏦 Tranche {pos['name']} matured: pool loss {res['pool_loss']*100:.1f}% → "
+                      f"your tranche -{res['loss_frac']*100:.0f}% capital · "
+                      f"{widgets.format_money(res['payoff'], cur)} "
+                      f"(P&L {sign}{widgets.format_money(res['pnl'], cur)})."))
+            self.app.notify(_L("Tranche de titrisation dénouée","Securitisation tranche settled"), "info")
         mc = summary.get("margin_call")
         if mc:
-            self._log(f"  ⚠ APPEL DE MARGE : liquidation forcée de "
+            self._log(_L(f"  ⚠ APPEL DE MARGE : liquidation forcée de "
                       f"{widgets.format_money(mc['liquidated'], cur)} "
-                      f"(pénalité {widgets.format_money(mc['penalty'], cur)}).")
-            self.app.notify("Appel de marge : liquidation forcée", "bad")
+                      f"(pénalité {widgets.format_money(mc['penalty'], cur)}).",
+                      f"  ⚠ MARGIN CALL: forced liquidation of "
+                      f"{widgets.format_money(mc['liquidated'], cur)} "
+                      f"(penalty {widgets.format_money(mc['penalty'], cur)})."))
+            self.app.notify(_L("Appel de marge : liquidation forcée","Margin call: forced liquidation"), "bad")
         # news marché en tête du flux
         self.recent_events = [{"title": n["text"], "kind": n["kind"], "cash": 0, "rep": 0}
                               for n in market_news] + summary["events"] + self.recent_events
@@ -1276,14 +1357,14 @@ class TerminalScene(Scene):
             extra += (f" rep{e['rep']:+d}" if e["rep"] else "")
             self._log(f"  {tag} {e['title']}{extra}")
         for d in summary["expired"]:
-            self._log(f"  ✕ Deal expiré : {d['title']} (raflé par un rival)")
+            self._log(_L(f"  ✕ Deal expiré : {d['title']} (raflé par un rival)", f"  ✕ Deal expired: {d['title']} (snatched by a rival)"))
         # crise/boom : narration (carte + flux + journal + inbox)
         if scenario:
             self.worldmap.push_news([{"region": None, "kind": scenario["kind"],
                                       "text": scenario["name"]}])
             self.recent_events.insert(0, {"title": "⚠ " + scenario["name"],
                                           "kind": scenario["kind"], "cash": 0, "rep": 0})
-            self._log(f"  ⚠ ÉVÉNEMENT : {scenario['name']} — {scenario['story'][:50]}…")
+            self._log(_L(f"  ⚠ ÉVÉNEMENT : {scenario['name']} — {scenario['story'][:50]}…", f"  ⚠ EVENT: {scenario['name']} — {scenario['story'][:50]}…"))
             inbox_mod.on_crisis(p, scenario["name"], scenario["kind"])
             career_mod.log(p, "crisis", scenario["name"])
             self.app.notify(scenario["name"], scenario["kind"])
@@ -1304,38 +1385,44 @@ class TerminalScene(Scene):
             if hist["kind"] == "bad":
                 p.flags["crises"] = p.flags.get("crises", 0) + 1
         if summary.get("quarter_changed"):
-            self._log(f"  ── Nouveau trimestre : T{p.quarter} ──")
+            self._log(_L(f"  ── Nouveau trimestre : T{p.quarter} ──", f"  ── New quarter: Q{p.quarter} ──"))
             qr = summary.get("quarter_report")
             if qr and qr["total"]:
-                self._log(f"  Bilan T{p.quarter-1} : {qr['done']}/{qr['total']} objectifs, "
-                          f"+{qr['rep']} rép, +{widgets.format_money(qr['cash'], cur)}")
+                self._log(_L(f"  Bilan T{p.quarter-1} : {qr['done']}/{qr['total']} objectifs, "
+                          f"+{qr['rep']} rép, +{widgets.format_money(qr['cash'], cur)}",
+                          f"  Q{p.quarter-1} review: {qr['done']}/{qr['total']} objectives, "
+                          f"+{qr['rep']} rep, +{widgets.format_money(qr['cash'], cur)}"))
             inbox_mod.on_quarter(p, summary.get("quarter_report"))
             hot = p.flags.get("hot_sector")
             if hot:
-                self._log(f"  ★ Secteur à surveiller ce trimestre : {hot}.")
-                self.app.notify(f"Secteur du trimestre : {hot}", "info")
+                self._log(_L(f"  ★ Secteur à surveiller ce trimestre : {hot}.", f"  ★ Sector to watch this quarter: {hot}."))
+                self.app.notify(_L(f"Secteur du trimestre : {hot}", f"Sector of the quarter: {hot}"), "info")
             # mandats arrivés à échéance
             for res in mandates_mod.evaluate_due(p, m):
                 mm = res["mandate"]
                 if res["ok"]:
-                    self._log(f"  ✓ MANDAT réussi : {mm['client']} (+{res['growth']:.1f}%) "
-                              f"→ +{widgets.format_money(mm['reward_cash'], cur)}, rép +{mm['reward_rep']}.")
-                    self.app.notify(f"Mandat réussi : {mm['client']}", "good")
+                    self._log(_L(f"  ✓ MANDAT réussi : {mm['client']} (+{res['growth']:.1f}%) "
+                              f"→ +{widgets.format_money(mm['reward_cash'], cur)}, rép +{mm['reward_rep']}.",
+                              f"  ✓ MANDATE won: {mm['client']} (+{res['growth']:.1f}%) "
+                              f"→ +{widgets.format_money(mm['reward_cash'], cur)}, rep +{mm['reward_rep']}."))
+                    self.app.notify(_L(f"Mandat réussi : {mm['client']}", f"Mandate won: {mm['client']}"), "good")
                     inbox_mod.push(p, "client", mm["client"], "Mandat rempli avec succès",
                                    f"Performance de {res['growth']:.1f}% conforme à nos attentes. "
                                    "Commission versée. Au plaisir de retravailler ensemble.")
                 else:
-                    self._log(f"  ✗ MANDAT échoué : {mm['client']} (rép -{mm['penalty_rep']}).")
-                    self.app.notify(f"Mandat échoué : {mm['client']}", "bad")
+                    self._log(_L(f"  ✗ MANDAT échoué : {mm['client']} (rép -{mm['penalty_rep']}).", f"  ✗ MANDATE failed: {mm['client']} (rep -{mm['penalty_rep']})."))
+                    self.app.notify(_L(f"Mandat échoué : {mm['client']}", f"Mandate failed: {mm['client']}"), "bad")
                     inbox_mod.push(p, "client", mm["client"], "Mandat non rempli",
                                    "Les objectifs n'ont pas été atteints. Nous confions "
                                    "désormais notre capital ailleurs.")
         # nouvelle offre de mandat éventuelle
         offer = mandates_mod.maybe_offer(p, random)
         if offer:
-            self._log(f"  ★ OFFRE DE MANDAT : {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
-                      f"(MANDATES pour voir).")
-            self.app.notify(f"Offre de mandat : {offer['client']}", "info")
+            self._log(_L(f"  ★ OFFRE DE MANDAT : {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
+                      f"(MANDATES pour voir).",
+                      f"  ★ MANDATE OFFER: {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
+                      f"(type MANDATES to view)."))
+            self.app.notify(_L(f"Offre de mandat : {offer['client']}", f"Mandate offer: {offer['client']}"), "info")
             inbox_mod.push(p, "client", offer["client"], "Proposition de mandat",
                            f"Nous souhaitons vous confier {widgets.format_money(offer['capital'], cur)} : "
                            f"objectif +{offer['target_pct']:.0f}% en {offer['horizon']} trimestres, "
@@ -1343,30 +1430,32 @@ class TerminalScene(Scene):
         # alertes de prix
         self._check_alerts()
         for d in summary["new_deals"]:
-            self._log(f"  ★ Nouveau deal #{d['id']} : {d['title']} ({d['days_left']}j)")
+            self._log(_L(f"  ★ Nouveau deal #{d['id']} : {d['title']} ({d['days_left']}j)", f"  ★ New deal #{d['id']}: {d['title']} ({d['days_left']}d)"))
         # messages d'ambiance / conformité
         inbox_mod.on_step(p, m, summary, random)
         # scrutin réglementaire : décroissance + risque d'enquête
         inv = dilemmas_mod.maybe_investigate(p, random)
         if inv:
-            self._log(f"  ⚠ ENQUÊTE RÉGLEMENTAIRE : amende "
-                      f"{widgets.format_money(inv['fine'], cur)}, réputation -{inv['rep_loss']}.")
-            self.app.notify("Enquête réglementaire : sanction", "bad")
+            self._log(_L(f"  ⚠ ENQUÊTE RÉGLEMENTAIRE : amende "
+                      f"{widgets.format_money(inv['fine'], cur)}, réputation -{inv['rep_loss']}.",
+                      f"  ⚠ REGULATORY INVESTIGATION: fine "
+                      f"{widgets.format_money(inv['fine'], cur)}, reputation -{inv['rep_loss']}."))
+            self.app.notify(_L("Enquête réglementaire : sanction","Regulatory investigation: penalty"), "bad")
         # dilemme éventuel à trancher
         dil = dilemmas_mod.maybe_trigger(p, random)
         if dil:
-            self._log(f"  ⚖ DÉCISION REQUISE : {dil['title']} — tapez DECIDE.")
-            self.app.notify(f"Décision requise : {dil['title']}", "warn")
+            self._log(_L(f"  ⚖ DÉCISION REQUISE : {dil['title']} — tapez DECIDE.", f"  ⚖ DECISION REQUIRED: {dil['title']} — type DECIDE."))
+            self.app.notify(_L(f"Décision requise : {dil['title']}", f"Decision required: {dil['title']}"), "warn")
         # bilan de trimestre / quarter en toast
         if summary.get("quarter_changed") and summary.get("quarter_report") \
                 and summary["quarter_report"]["total"]:
             qr = summary["quarter_report"]
-            self.app.notify(f"Bilan T{p.quarter-1} : {qr['done']}/{qr['total']} objectifs", "info")
+            self.app.notify(_L(f"Bilan T{p.quarter-1} : {qr['done']}/{qr['total']} objectifs", f"Q{p.quarter-1} review: {qr['done']}/{qr['total']} objectives"), "info")
         # badges éventuels
         self._check_badges()
         unread = inbox_mod.unread_count(p)
         if unread:
-            self._log(f"  ✉ {unread} message(s) non lu(s) — tapez INBOX.")
+            self._log(_L(f"  ✉ {unread} message(s) non lu(s) — tapez INBOX.", f"  ✉ {unread} unread message(s) — type INBOX."))
         if not p.hardcore:
             gs.save(config.AUTOSAVE_SLOT)
         if summary["game_over"] or p.check_game_over():
@@ -1377,10 +1466,10 @@ class TerminalScene(Scene):
     def _cmd_deals(self):
         p = self.app.gs.player
         if not p.deals:
-            self._log("  Aucun deal en cours. Avancez le temps (ADV) pour en générer.")
+            self._log(_L("  Aucun deal en cours. Avancez le temps (ADV) pour en générer.","  No active deals. Advance time (ADV) to generate some."))
             return
         cur = config.CONTINENTS[p.continent]["currency"]
-        self._log("  Deals en cours :")
+        self._log(_L("  Deals en cours :","  Active deals:"))
         for d in p.deals:
             prob = deals_mod.success_probability(p, d)
             self._log(f"   #{d['id']} {d['title']} [{d['kind']}] {d['days_left']}j  "
@@ -1389,10 +1478,10 @@ class TerminalScene(Scene):
     def _cmd_deal(self, arg):
         p = self.app.gs.player
         if arg is None or not arg.isdigit():
-            self._log("  Usage : DEAL <id>  (voir DEALS).")
+            self._log(_L("  Usage : DEAL <id>  (voir DEALS).","  Usage: DEAL <id>  (see DEALS)."))
             return
         if deals_mod.find_deal(p, int(arg)) is None:
-            self._log(f"  Deal #{arg} introuvable.")
+            self._log(_L(f"  Deal #{arg} introuvable.", f"  Deal #{arg} not found."))
             return
         # mini-jeu : vraie décision financière (au lieu d'une résolution au dé)
         self.app.scenes.go("deal", deal_id=int(arg), return_to="terminal")

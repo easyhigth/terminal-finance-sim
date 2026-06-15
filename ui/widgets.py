@@ -25,6 +25,41 @@ def draw_text(surf, text, pos, font, color=config.COL_TEXT, align="left"):
     return rect
 
 
+def fit_text(text, font, max_width, ellipsis="…"):
+    """Tronque `text` avec une ellipse pour qu'il tienne dans `max_width` pixels."""
+    if max_width <= 0 or font.size(text)[0] <= max_width:
+        return text
+    while text and font.size(text + ellipsis)[0] > max_width:
+        text = text[:-1]
+    return (text.rstrip() + ellipsis) if text else ellipsis
+
+
+def draw_text_fit(surf, text, pos, font, color=config.COL_TEXT, max_width=0, align="left"):
+    """Comme draw_text mais tronque le texte (…) pour tenir dans `max_width`."""
+    if max_width:
+        text = fit_text(text, font, max_width)
+    return draw_text(surf, text, pos, font, color, align)
+
+
+def draw_text_scaled(surf, text, pos, font, color, max_width, align="left"):
+    """Dessine du texte sur une seule ligne, réduit à l'échelle s'il dépasse
+    `max_width` (utile pour les titres longs qui ne doivent pas sortir de l'écran)."""
+    img = font.render(text, True, color)
+    w = img.get_width()
+    if max_width and w > max_width:
+        h = max(1, int(img.get_height() * (max_width / w)))
+        img = pygame.transform.smoothscale(img, (max_width, h))
+    rect = img.get_rect()
+    if align == "left":
+        rect.topleft = pos
+    elif align == "center":
+        rect.midtop = pos
+    elif align == "right":
+        rect.topright = pos
+    surf.blit(img, rect)
+    return rect
+
+
 def draw_text_wrapped(surf, text, pos, font, color, max_width, line_gap=4):
     """Dessine un paragraphe en gérant le retour à la ligne. Retourne la hauteur."""
     words = text.split(" ")

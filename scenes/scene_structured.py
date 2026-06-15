@@ -82,7 +82,7 @@ class StructuredScene(Scene):
         hold = S.holdings(p, m)
         if not hold:
             widgets.draw_text(surf, "Aucun produit en cours." if self._can_trade()
-                              else "🔒 trading débloqué au grade Associate.",
+                              else "⊘ trading débloqué au grade Associate.",
                               (pinner.x, pinner.y), fonts.small(), config.COL_TEXT_DIM)
         else:
             y = pinner.y

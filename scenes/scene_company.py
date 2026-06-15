@@ -25,6 +25,8 @@ class CompanyScene(Scene):
             (40, config.SCREEN_HEIGHT - 70, 200, 46), "← TERMINAL", config.COL_TEXT_DIM)
         self.fa_btn = widgets.Button(
             (250, config.SCREEN_HEIGHT - 70, 220, 46), "ÉTATS FINANCIERS (FA)", config.COL_CYAN)
+        self.graph_btn = widgets.Button(
+            (480, config.SCREEN_HEIGHT - 70, 160, 46), "GRAPHE (GP)", config.COL_AMBER)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -33,11 +35,14 @@ class CompanyScene(Scene):
             self.app.scenes.go(self.return_to)
         if self.fa_btn.handle(event):
             self.app.scenes.go("financials", ticker=self.ticker, return_to=self.return_to)
+        if self.graph_btn.handle(event):
+            self.app.scenes.go("graph", kind="line", tickers=[self.ticker], return_to="terminal")
 
     def update(self, dt):
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp, dt)
         self.fa_btn.update(mp, dt)
+        self.graph_btn.update(mp, dt)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -66,7 +71,7 @@ class CompanyScene(Scene):
         chg_col = config.COL_UP if chg >= 0 else config.COL_DOWN
         widgets.draw_text(surf, f"{mt['price']:,.2f} {cur}", (config.SCREEN_WIDTH - 40, 30),
                           fonts.title(bold=True), config.COL_WHITE, align="right")
-        widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.2f}% (suivi)",
+        widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.2f}% (1 an)",
                           (config.SCREEN_WIDTH - 40, 84), fonts.head(), chg_col, align="right")
 
         # reco de recherche (si disponible) ou invite
@@ -132,7 +137,7 @@ class CompanyScene(Scene):
 
         # panneau graphe de prix (chandeliers + moyennes mobiles)
         chart = pygame.Rect(620, 190, config.SCREEN_WIDTH - 660, ph)
-        cinner = widgets.draw_panel(surf, chart, "Cours — chandeliers (historique suivi)", accent)
+        cinner = widgets.draw_panel(surf, chart, "Cours — chandeliers (5 ans)", accent)
         hist = m.track_company(self.ticker)
         if hist and len(hist) >= 2:
             widgets.draw_candles(surf, pygame.Rect(cinner.x, cinner.y + 22,
@@ -150,3 +155,4 @@ class CompanyScene(Scene):
 
         self.back_btn.draw(surf)
         self.fa_btn.draw(surf)
+        self.graph_btn.draw(surf)

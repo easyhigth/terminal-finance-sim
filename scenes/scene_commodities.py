@@ -95,7 +95,7 @@ class CommoditiesScene(Scene):
             y += 32
         hv = C.holdings_value(p, m)
         widgets.draw_text(surf, f"Valeur commodities détenue : {widgets.format_money(hv, cur)}"
-                          + ("" if self._can_trade() else "   🔒 trading débloqué au grade Associate"),
+                          + ("" if self._can_trade() else "   ⊘ trading débloqué au grade Associate"),
                           (inner.x, inner.bottom - 22), fonts.small(bold=True),
                           config.COL_UP if hv else config.COL_TEXT_DIM)
         self.back_btn.draw(surf)

@@ -55,7 +55,7 @@ class CareerScene(Scene):
         colw = (config.SCREEN_WIDTH - 4 * M) // 3
         x1, x2, x3 = M, M * 2 + colw, M * 3 + colw * 2
         # journal en bas pleine largeur ; panneaux du haut au-dessus
-        journal_h = 120
+        journal_h = 140
         gap = 12
         row_h = bottom - top - journal_h - gap
         road_h = int(row_h * 0.54)
@@ -141,12 +141,14 @@ class CareerScene(Scene):
             ("Scrutin réglementaire", f"{p.heat}/100"),
             ("Temps", f"jour {p.day} (T{p.quarter})"),
         ]
+        # pas de ligne adaptatif : toutes les lignes tiennent dans le panneau
+        step = max(18, min(25, inner.h // len(rows)))
         y = inner.y
         for label, val in rows:
             widgets.draw_text(surf, label, (inner.x, y), fonts.small(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, val, (inner.right, y), fonts.small(bold=True),
                               config.COL_WHITE, align="right")
-            y += 25
+            y += step
 
     def _draw_objectives(self, surf, rect, p):
         inner = widgets.draw_panel(surf, rect, f"Objectifs — T{p.quarter}", config.COL_DEAL)
@@ -178,14 +180,19 @@ class CareerScene(Scene):
             widgets.draw_text(surf, "Votre histoire s'écrira ici : promotions, deals, crises…",
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
             return
-        # deux colonnes d'entrées récentes (les plus récentes en haut)
-        entries = list(reversed(p.journal))[:12]
+        # deux colonnes d'entrées récentes (les plus récentes en haut) ; le nombre
+        # de lignes par colonne s'adapte à la hauteur du panneau (anti-débordement)
+        line_h = 22
+        rows_per_col = max(1, inner.h // line_h)
+        entries = list(reversed(p.journal))[:rows_per_col * 2]
         colw = inner.w // 2 - 10
         for i, e in enumerate(entries):
-            col = i // 6
-            row = i % 6
+            col = i // rows_per_col
+            row = i % rows_per_col
             x = inner.x + col * (colw + 20)
-            y = inner.y + row * 26
+            y = inner.y + row * line_h
             tag = _KIND_COLORS.get(e["kind"], config.COL_TEXT_DIM)
             widgets.draw_text(surf, f"J{e['day']}", (x, y), fonts.tiny(bold=True), tag)
-            widgets.draw_text(surf, e["text"][:46], (x + 46, y), fonts.tiny(), config.COL_TEXT)
+            font = fonts.tiny()
+            widgets.draw_text(surf, widgets.fit_text(e["text"], font, colw - 46),
+                              (x + 46, y), font, config.COL_TEXT)

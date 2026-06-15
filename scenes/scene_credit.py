@@ -90,7 +90,7 @@ class CreditScene(Scene):
         if held:
             sub += "  ·  " + ", ".join(f"{h['name']} ({h['years_left']:.1f}a)" for h in held)
         if not self._can_trade():
-            sub = "🔒 trading débloqué au grade Associate."
+            sub = "⊘ trading débloqué au grade Associate."
         widgets.draw_text(surf, sub, (inner.x, inner.bottom - 22), fonts.small(bold=True),
                           config.COL_UP if hv else config.COL_TEXT_DIM)
         self.back_btn.draw(surf)

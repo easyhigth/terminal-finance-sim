@@ -226,7 +226,7 @@ class RiskScene(Scene):
                           fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_metrics(self, surf):
-        panel = pygame.Rect(40, 400, 360, 270)
+        panel = pygame.Rect(40, 400, 360, config.footer_y() - 408)
         inner = widgets.draw_panel(surf, panel, "Métriques de risque", config.COL_DOWN)
         # sélecteur de confiance
         self._conf_btns = {}
@@ -259,7 +259,7 @@ class RiskScene(Scene):
             y += 33
 
     def _draw_stress(self, surf):
-        panel = pygame.Rect(416, 400, 560, 270)
+        panel = pygame.Rect(416, 400, 560, config.footer_y() - 408)
         inner = widgets.draw_panel(surf, panel, "Stress Tests — scénarios", config.COL_WARN)
         self._scenario_btns = {}
         names = list(risk_mod.STRESS) if self.real else list(STRESS_SCENARIOS)
@@ -271,8 +271,9 @@ class RiskScene(Scene):
             sel = (self.scenario == name)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect)
             pygame.draw.rect(surf, config.COL_WARN if sel else config.COL_BORDER, rect, 1)
-            img = fonts.tiny(bold=sel).render(name, True,
-                                              config.COL_WARN if sel else config.COL_TEXT)
+            font = fonts.tiny(bold=sel)
+            img = font.render(widgets.fit_text(name, font, w - 8), True,
+                              config.COL_WARN if sel else config.COL_TEXT)
             surf.blit(img, img.get_rect(center=rect.center))
             x += w + 6
 

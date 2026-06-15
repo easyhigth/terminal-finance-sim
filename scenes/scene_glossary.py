@@ -96,7 +96,9 @@ class GlossaryScene(Scene):
             if sel:
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect)
             col = config.COL_CYAN if sel else config.COL_TEXT
-            widgets.draw_text(surf, label, (inner.x+4, y+2), fonts.small(bold=sel), col)
+            font = fonts.small(bold=sel)
+            widgets.draw_text(surf, widgets.fit_text(label, font, inner.w - 8),
+                              (inner.x+4, y+2), font, col)
             y += cstep
 
         # --- Colonne termes ---
@@ -113,8 +115,10 @@ class GlossaryScene(Scene):
             if sel:
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect)
             col = config.COL_AMBER if sel else config.COL_TEXT
-            widgets.draw_text(surf, glossary_data.display_name(term, lang),
-                              (inner2.x+4, y+2), fonts.small(bold=sel), col)
+            font = fonts.small(bold=sel)
+            widgets.draw_text(surf, widgets.fit_text(
+                glossary_data.display_name(term, lang), font, inner2.w - 8),
+                (inner2.x+4, y+2), font, col)
             y += 30
 
         # --- Définition ---

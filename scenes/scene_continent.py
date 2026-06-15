@@ -58,8 +58,10 @@ class ContinentScene(Scene):
             )
             scen.apply(gs.player, scen.SCENARIOS[self.scen_idx]["id"])  # conditions de départ
             import random as _r
+            from core import market as _mkt
             gs.player.market_seed = _r.randint(1, 2_000_000_000)
-            gs.player.market_step = 0
+            # démarre la carrière après 5 ans de marché : les graphes ont un passé
+            gs.player.market_step = _mkt.WARMUP_STEPS
             self.app.gs = gs
             self.app.market = None   # forcera la (re)création du marché
             gs.save(config.AUTOSAVE_SLOT)

@@ -9,6 +9,10 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pytest
 
+# pygame n'est pas installé en CI (qui ne pose que numpy/scipy/pytest) : on saute
+# proprement ce module au lieu de casser toute la collecte pytest.
+pytest.importorskip("pygame")
+
 from ui import widgets
 
 

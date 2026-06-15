@@ -28,6 +28,12 @@ PASS_THRESHOLD = 0.70
 _GLOSS_ITEMS = list(GLOSSARY.items())
 
 
+def _L(fr, en):
+    """Renvoie la version FR ou EN selon la langue courante du jeu."""
+    from core.i18n import get_lang
+    return en if get_lang() == "en" else fr
+
+
 def num_questions(grade_index):
     """20 questions au grade 0, +1 par grade, plafonné à 30."""
     return min(30, 20 + grade_index)
@@ -129,61 +135,61 @@ def _firm(rng):
 def g_eps(rng):
     ni = _money(rng, 50, 5000, 10)
     sh = _money(rng, 20, 2000, 5)
-    return _fill(f"Résultat net {ni}M, {sh}M d'actions. BPA (EPS) ≈ ? (par action)",
-                 ni / sh, "BPA = Résultat net / Nombre d'actions.", tol=0.03)
+    return _fill(_L(f"Résultat net {ni}M, {sh}M d'actions. BPA (EPS) ≈ ? (par action)", f"Net income {ni}M, {sh}M shares. EPS ≈ ? (per share)"),
+                 ni / sh, _L("BPA = Résultat net / Nombre d'actions.", "EPS = Net income / Shares."), tol=0.03)
 
 
 def g_pe(rng):
     price = round(rng.uniform(20, 400), 2)
     eps = round(rng.uniform(2, 25), 2)
-    return _fill(f"Cours {price}, BPA {eps}. P/E ≈ ? (en x)",
-                 price / eps, "P/E = Cours / BPA.", abstol=0.3, unit="x")
+    return _fill(_L(f"Cours {price}, BPA {eps}. P/E ≈ ? (en x)", f"Price {price}, EPS {eps}. P/E ≈ ? (x)"),
+                 price / eps, _L("P/E = Cours / BPA.", "P/E = Price / EPS."), abstol=0.3, unit="x")
 
 
 def g_net_margin(rng):
     rev = _money(rng, 200, 9000, 10)
     ni = _money(rng, 5, int(rev * 0.3), 5)
-    return _fill(f"Chiffre d'affaires {rev}M, résultat net {ni}M. Marge nette ≈ ? (%)",
-                 ni / rev * 100, "Marge nette = Résultat net / Chiffre d'affaires.",
+    return _fill(_L(f"Chiffre d'affaires {rev}M, résultat net {ni}M. Marge nette ≈ ? (%)", f"Revenue {rev}M, net income {ni}M. Net margin ≈ ? (%)"),
+                 ni / rev * 100, _L("Marge nette = Résultat net / Chiffre d'affaires.", "Net margin = Net income / Revenue."),
                  abstol=0.6, unit="%")
 
 
 def g_gross_margin(rng):
     rev = _money(rng, 200, 9000, 10)
     cogs = _money(rng, int(rev * 0.3), int(rev * 0.85), 10)
-    return _fill(f"CA {rev}M, coût des ventes {cogs}M. Marge brute ≈ ? (%)",
-                 (rev - cogs) / rev * 100, "Marge brute = (CA − COGS) / CA.",
+    return _fill(_L(f"CA {rev}M, coût des ventes {cogs}M. Marge brute ≈ ? (%)", f"Revenue {rev}M, COGS {cogs}M. Gross margin ≈ ? (%)"),
+                 (rev - cogs) / rev * 100, _L("Marge brute = (CA − COGS) / CA.", "Gross margin = (Revenue − COGS) / Revenue."),
                  abstol=0.6, unit="%")
 
 
 def g_roe(rng):
     ni = _money(rng, 20, 2000, 10)
     eq = _money(rng, int(ni * 1.5), int(ni * 12), 10)
-    return _fill(f"Résultat net {ni}M, capitaux propres {eq}M. ROE ≈ ? (%)",
-                 ni / eq * 100, "ROE = Résultat net / Capitaux propres.",
+    return _fill(_L(f"Résultat net {ni}M, capitaux propres {eq}M. ROE ≈ ? (%)", f"Net income {ni}M, equity {eq}M. ROE ≈ ? (%)"),
+                 ni / eq * 100, _L("ROE = Résultat net / Capitaux propres.", "ROE = Net income / Equity."),
                  abstol=0.6, unit="%")
 
 
 def g_current_ratio(rng):
     ca = _money(rng, 100, 5000, 10)
     cl = _money(rng, 50, int(ca * 1.5), 10)
-    return _fill(f"Actifs courants {ca}M, passifs courants {cl}M. Current ratio ≈ ? (x)",
-                 ca / cl, "Current ratio = Actifs courants / Passifs courants.",
+    return _fill(_L(f"Actifs courants {ca}M, passifs courants {cl}M. Current ratio ≈ ? (x)", f"Current assets {ca}M, current liabilities {cl}M. Current ratio ≈ ? (x)"),
+                 ca / cl, _L("Current ratio = Actifs courants / Passifs courants.", "Current ratio = Current assets / Current liabilities."),
                  abstol=0.05, unit="x")
 
 
 def g_debt_equity(rng):
     debt = _money(rng, 50, 5000, 10)
     eq = _money(rng, 50, 5000, 10)
-    return _fill(f"Dette {debt}M, capitaux propres {eq}M. Ratio D/E ≈ ? (x)",
-                 debt / eq, "D/E = Dette / Capitaux propres.", abstol=0.05, unit="x")
+    return _fill(_L(f"Dette {debt}M, capitaux propres {eq}M. Ratio D/E ≈ ? (x)", f"Debt {debt}M, equity {eq}M. D/E ≈ ? (x)"),
+                 debt / eq, _L("D/E = Dette / Capitaux propres.", "D/E = Debt / Equity."), abstol=0.05, unit="x")
 
 
 def g_div_yield(rng):
     price = round(rng.uniform(20, 300), 1)
     dps = round(rng.uniform(0.2, 10), 2)
-    return _fill(f"Cours {price}, dividende par action {dps}. Rendement ≈ ? (%)",
-                 dps / price * 100, "Rendement = Dividende par action / Cours.",
+    return _fill(_L(f"Cours {price}, dividende par action {dps}. Rendement ≈ ? (%)", f"Price {price}, dividend per share {dps}. Yield ≈ ? (%)"),
+                 dps / price * 100, _L("Rendement = Dividende par action / Cours.", "Yield = Dividend per share / Price."),
                  abstol=0.15, unit="%")
 
 
@@ -193,8 +199,8 @@ def g_marketcap_mcq(rng):
     cap = price * sh
     opts = [f"{cap/1000:.1f}B", f"{cap/1000*0.4:.1f}B",
             f"{cap/1000*1.8:.1f}B", f"{cap/1000*0.12:.1f}B"]
-    return _mcq(f"{_firm(rng)} cote {price} pour {sh}M d'actions. Capitalisation ≈ ?",
-                opts, 0, "Capitalisation = Cours × Nombre d'actions.", rng)
+    return _mcq(_L(f"{_firm(rng)} cote {price} pour {sh}M d'actions. Capitalisation ≈ ?", f"{_firm(rng)} trades at {price} with {sh}M shares. Market cap ≈ ?"),
+                opts, 0, _L("Capitalisation = Cours × Nombre d'actions.", "Market cap = Price × Shares."), rng)
 
 
 # ----- définitions à trous (texte) -----
@@ -223,9 +229,9 @@ _DEFS = [
 
 
 def g_def(rng):
-    prompt, answers, kw = rng.choice(_DEFS)
-    return _text("Complétez : " + prompt, answers,
-                 "Réponse attendue : " + answers[0] + ".", keywords=kw)
+    prompt, answers, kw = rng.choice(_L(_DEFS, _DEFS_EN))
+    return _text(_L("Complétez : ", "Fill in: ") + prompt, answers,
+                 _L("Réponse attendue : ", "Expected answer: ") + answers[0] + ".", keywords=kw)
 
 
 # ----- formules à compléter (sans chiffres) -----
@@ -240,10 +246,34 @@ _FORMULAS = [
 ]
 
 
+# ----- versions EN des banques def/formule -----
+_DEFS_EN = [
+    ("The ___ measures return on equity (net income / equity).", ["ROE", "return on equity"], ["roe"]),
+    ("___ is earnings before interest, taxes, depreciation and amortization.", ["EBITDA"], ["ebitda"]),
+    ("Market ___ is the share price times the number of shares.", ["cap", "capitalisation", "capitalization"], ["cap"]),
+    ("The ___ ratio relates price to earnings per share and gauges how expensive a stock is.", ["PE", "P/E", "price earnings"], ["pe"]),
+    ("On a balance sheet, Assets = Liabilities + ___.", ["equity", "shareholders equity"], ["equity"]),
+    ("Free ___ flow (FCF) is the cash generated after capex.", ["cash", "cash flow", "free cash flow"], ["cash"]),
+    ("___ measures the dispersion of returns; it is a risk measure.", ["volatility"], ["volat"]),
+    ("___ measures an asset's sensitivity to the market (systematic risk).", ["beta"], ["beta"]),
+    ("___ spreads risk across weakly-correlated assets.", ["diversification"], ["diversif"]),
+    ("___ Value (EV) adds net debt to market cap.", ["Enterprise", "enterprise value"], ["enterprise"]),
+]
+_FORMULAS_EN = [
+    ("ROE = Net income / ___", ["equity", "shareholders equity"], ["equity"]),
+    ("Net margin = Net income / ___", ["revenue", "sales"], ["rev"]),
+    ("P/E = Price / ___", ["EPS", "earnings per share"], ["eps"]),
+    ("EV = Market cap + ___", ["net debt"], ["debt"]),
+    ("Current ratio = Current assets / ___", ["current liabilities"], ["liab"]),
+    ("Dividend yield = Dividend per share / ___", ["price"], ["price"]),
+    ("D/E = Debt / ___", ["equity", "shareholders equity"], ["equity"]),
+]
+
+
 def g_formula_basic(rng):
-    f, answers, kw = rng.choice(_FORMULAS)
-    return _text("Complétez la formule : " + f, answers,
-                 "Réponse : " + answers[0] + ".", keywords=kw)
+    f, answers, kw = rng.choice(_L(_FORMULAS, _FORMULAS_EN))
+    return _text(_L("Complétez la formule : ", "Complete the formula: ") + f, answers,
+                 _L("Réponse : ", "Answer: ") + answers[0] + ".", keywords=kw)
 
 
 def g_concept0(rng):
@@ -255,11 +285,13 @@ def g_graph_trend(rng):
     ret = rng.uniform(-0.012, 0.012)
     A = _walk(rng, n, ret, rng.uniform(0.02, 0.045), rng.uniform(60, 200))
     r = (A[-1] / A[0] - 1) * 100
-    trend = "haussière" if r > 5 else "baissière" if r < -5 else "latérale"
-    return _mcq("Quelle est la tendance générale du titre affiché ?",
-                ["haussière", "baissière", "latérale"],
-                {"haussière": 0, "baissière": 1, "latérale": 2}[trend],
-                f"Le titre passe de {A[0]:.0f} à {A[-1]:.0f} ({r:+.1f}%) : {trend}.",
+    idx = 0 if r > 5 else 1 if r < -5 else 2
+    labels = _L(["haussière", "baissière", "latérale"], ["upward", "downward", "sideways"])
+    return _mcq(_L("Quelle est la tendance générale du titre affiché ?",
+                   "What is the overall trend of the shown stock?"),
+                labels, idx,
+                _L(f"Le titre passe de {A[0]:.0f} à {A[-1]:.0f} ({r:+.1f}%) : {labels[idx]}.",
+                   f"The stock goes from {A[0]:.0f} to {A[-1]:.0f} ({r:+.1f}%): {labels[idx]}."),
                 rng, charts={"A": A}, chart="A")
 
 
@@ -269,15 +301,15 @@ def g_graph_trend(rng):
 def g_ev(rng):
     cap = _money(rng, 500, 9000, 10)
     nd = _money(rng, -300, 4000, 10)
-    return _fill(f"Capitalisation {cap}M, dette nette {nd}M. EV ≈ ? (M)",
-                 cap + nd, "EV = Capitalisation + Dette nette.", abstol=1, unit="M")
+    return _fill(_L(f"Capitalisation {cap}M, dette nette {nd}M. EV ≈ ? (M)", f"Market cap {cap}M, net debt {nd}M. EV ≈ ? (M)"),
+                 cap + nd, _L("EV = Capitalisation + Dette nette.", "EV = Market cap + Net debt."), abstol=1, unit="M")
 
 
 def g_ev_ebitda(rng):
     ev = _money(rng, 800, 12000, 10)
     ebitda = _money(rng, 80, int(ev / 5), 10)
     return _fill(f"EV {ev}M, EBITDA {ebitda}M. EV/EBITDA ≈ ? (x)",
-                 ev / ebitda, "Multiple = EV / EBITDA.", abstol=0.3, unit="x")
+                 ev / ebitda, _L("Multiple = EV / EBITDA.", "Multiple = EV / EBITDA."), abstol=0.3, unit="x")
 
 
 def g_terminal_value(rng):
@@ -285,9 +317,8 @@ def g_terminal_value(rng):
     wacc = round(rng.uniform(0.07, 0.11), 3)
     g = round(rng.uniform(0.01, 0.03), 3)
     vt = fcf * (1 + g) / (wacc - g)
-    return _fill(f"FCF {fcf}M, WACC {wacc*100:.1f}%, croissance terminale {g*100:.1f}%. "
-                 f"Valeur terminale (Gordon) ≈ ? (M)",
-                 vt, "VT = FCF×(1+g) / (WACC − g).", tol=0.03, unit="M")
+    return _fill(_L(f"FCF {fcf}M, WACC {wacc*100:.1f}%, croissance terminale {g*100:.1f}%. Valeur terminale (Gordon) ≈ ? (M)", f"FCF {fcf}M, WACC {wacc*100:.1f}%, terminal growth {g*100:.1f}%. Terminal value (Gordon) ≈ ? (M)"),
+                 vt, _L("VT = FCF×(1+g) / (WACC − g).", "TV = FCF×(1+g) / (WACC − g)."), tol=0.03, unit="M")
 
 
 def g_wacc(rng):
@@ -297,9 +328,8 @@ def g_wacc(rng):
     rd = round(rng.uniform(0.03, 0.07), 3)
     t = round(rng.uniform(0.20, 0.30), 2)
     wacc = we * re + wd * rd * (1 - t)
-    return _fill(f"Poids fonds propres {we}, dette {wd} ; coût FP {re*100:.1f}%, "
-                 f"coût dette {rd*100:.1f}%, impôt {t*100:.0f}%. WACC ≈ ? (%)",
-                 wacc * 100, "WACC = We·Re + Wd·Rd·(1−impôt).", abstol=0.3, unit="%")
+    return _fill(_L(f"Poids fonds propres {we}, dette {wd} ; coût FP {re*100:.1f}%, coût dette {rd*100:.1f}%, impôt {t*100:.0f}%. WACC ≈ ? (%)", f"Equity weight {we}, debt {wd}; cost of equity {re*100:.1f}%, cost of debt {rd*100:.1f}%, tax {t*100:.0f}%. WACC ≈ ? (%)"),
+                 wacc * 100, _L("WACC = We·Re + Wd·Rd·(1−impôt).", "WACC = We·Re + Wd·Rd·(1−tax)."), abstol=0.3, unit="%")
 
 
 def g_cagr(rng):
@@ -307,9 +337,9 @@ def g_cagr(rng):
     yrs = rng.randint(3, 8)
     growth = rng.uniform(0.03, 0.18)
     vN = v0 * (1 + growth) ** yrs
-    return _fill(f"Une valeur passe de {v0} à {vN:.0f} en {yrs} ans. CAGR ≈ ? (%)",
+    return _fill(_L(f"Une valeur passe de {v0} à {vN:.0f} en {yrs} ans. CAGR ≈ ? (%)", f"A value goes from {v0} to {vN:.0f} in {yrs} years. CAGR ≈ ? (%)"),
                  ((vN / v0) ** (1 / yrs) - 1) * 100,
-                 "CAGR = (Vf/Vi)^(1/n) − 1.", abstol=0.4, unit="%")
+                 _L("CAGR = (Vf/Vi)^(1/n) − 1.", "CAGR = (Vf/Vi)^(1/n) − 1."), abstol=0.4, unit="%")
 
 
 def g_dcf2(rng):
@@ -317,12 +347,14 @@ def g_dcf2(rng):
     cf2 = _money(rng, 50, 400, 5)
     r = round(rng.uniform(0.06, 0.12), 3)
     pv = cf1 / (1 + r) + cf2 / (1 + r) ** 2
-    return _fill(f"Flux de {cf1} dans 1 an et {cf2} dans 2 ans, taux {r*100:.1f}%. "
-                 f"Valeur actuelle ≈ ?",
-                 pv, "VA = Σ CF_t / (1+r)^t.", tol=0.03)
+    return _fill(_L(f"Flux de {cf1} dans 1 an et {cf2} dans 2 ans, taux {r*100:.1f}%. Valeur actuelle ≈ ?", f"Cash flows {cf1} in 1y and {cf2} in 2y, rate {r*100:.1f}%. Present value ≈ ?"),
+                 pv, _L("VA = Σ CF_t / (1+r)^t.", "PV = Σ CF_t / (1+r)^t."), tol=0.03)
 
 
 def g_def_valo(rng):
+    from core.i18n import get_lang
+    if get_lang() == "en":
+        return g_def(rng)
     defs = [
         ("Le ___ actualise les flux de trésorerie futurs au WACC (valeur intrinsèque).",
          ["DCF", "discounted cash flow"], ["dcf"]),
@@ -338,6 +370,9 @@ def g_def_valo(rng):
 
 
 def g_formula_valo(rng):
+    from core.i18n import get_lang
+    if get_lang() == "en":
+        return g_formula_basic(rng)
     fs = [
         ("Valeur terminale = FCF×(1+g) / (WACC − ___)", ["g", "croissance"], ["g"]),
         ("WACC = We·Re + Wd·Rd·(1 − ___)", ["impôt", "taux d'impôt", "tax"], ["impo"]),
@@ -356,8 +391,8 @@ def g_graph_return(rng):
     n = rng.randint(24, 40)
     A = _walk(rng, n, rng.uniform(-0.008, 0.01), rng.uniform(0.02, 0.05), rng.uniform(80, 200))
     r = (A[-1] / A[0] - 1) * 100
-    return _fill("Rendement total du titre affiché sur la période ? (%)",
-                 r, "Rendement = (Vf/Vi − 1) × 100.", abstol=2.5, unit="%",
+    return _fill(_L("Rendement total du titre affiché sur la période ? (%)", "Total return of the shown stock over the period? (%)"),
+                 r, _L("Rendement = (Vf/Vi − 1) × 100.", "Return = (Vf/Vi − 1) × 100."), abstol=2.5, unit="%",
                  charts={"A": A}, chart="A")
 
 
@@ -368,9 +403,8 @@ def g_sharpe(rng):
     rdt = round(rng.uniform(0.04, 0.20), 3)
     rf = round(rng.uniform(0.0, 0.04), 3)
     vol = round(rng.uniform(0.08, 0.25), 3)
-    return _fill(f"Rendement {rdt*100:.1f}%, taux sans risque {rf*100:.1f}%, "
-                 f"volatilité {vol*100:.1f}%. Ratio de Sharpe ≈ ?",
-                 (rdt - rf) / vol, "Sharpe = (rendement − rf) / volatilité.", abstol=0.05)
+    return _fill(_L(f"Rendement {rdt*100:.1f}%, taux sans risque {rf*100:.1f}%, volatilité {vol*100:.1f}%. Ratio de Sharpe ≈ ?", f"Return {rdt*100:.1f}%, risk-free {rf*100:.1f}%, volatility {vol*100:.1f}%. Sharpe ratio ≈ ?"),
+                 (rdt - rf) / vol, _L("Sharpe = (rendement − rf) / volatilité.", "Sharpe = (return − rf) / volatility."), abstol=0.05)
 
 
 def g_lbo_moic(rng):
@@ -378,9 +412,8 @@ def g_lbo_moic(rng):
     exit_ev = _money(rng, int(entry_eq * 2), int(entry_eq * 8), 5)
     net_debt = _money(rng, 0, int(exit_ev * 0.5), 5)
     exit_eq = exit_ev - net_debt
-    return _fill(f"Equity investi {entry_eq}, EV de sortie {exit_ev}, dette nette à la "
-                 f"sortie {net_debt}. MOIC ≈ ? (x)",
-                 exit_eq / entry_eq, "MOIC = Equity de sortie / Equity investi.",
+    return _fill(_L(f"Equity investi {entry_eq}, EV de sortie {exit_ev}, dette nette à la sortie {net_debt}. MOIC ≈ ? (x)", f"Equity invested {entry_eq}, exit EV {exit_ev}, net debt at exit {net_debt}. MOIC ≈ ? (x)"),
+                 exit_eq / entry_eq, _L("MOIC = Equity de sortie / Equity investi.", "MOIC = Exit equity / Invested equity."),
                  abstol=0.1, unit="x")
 
 
@@ -390,9 +423,8 @@ def g_option_intrinsic(rng):
     is_call = rng.random() < 0.5
     val = max(S - K, 0) if is_call else max(K - S, 0)
     typ = "call" if is_call else "put"
-    return _fill(f"Un {typ} de strike {K}, sous-jacent à {S}. Valeur intrinsèque à "
-                 f"l'échéance ≈ ?",
-                 val, "Call = max(S−K,0) ; Put = max(K−S,0).", abstol=0.5)
+    return _fill(_L(f"Un {typ} de strike {K}, sous-jacent à {S}. Valeur intrinsèque à l'échéance ≈ ?", f"A {typ} struck at {K}, underlying at {S}. Intrinsic value at expiry ≈ ?"),
+                 val, _L("Call = max(S−K,0) ; Put = max(K−S,0).", "Call = max(S−K,0); Put = max(K−S,0)."), abstol=0.5)
 
 
 def g_var_param(rng):
@@ -401,9 +433,8 @@ def g_var_param(rng):
     z = rng.choice([1.65, 2.33])
     var = notional * z * vol
     conf = "95%" if z == 1.65 else "99%"
-    return _fill(f"Position {notional}M, volatilité quotidienne {vol*100:.2f}%, z({conf})={z}. "
-                 f"VaR 1 jour ≈ ? (M)",
-                 var, "VaR ≈ notionnel × z × volatilité.", tol=0.04, unit="M")
+    return _fill(_L(f"Position {notional}M, volatilité quotidienne {vol*100:.2f}%, z({conf})={z}. VaR 1 jour ≈ ? (M)", f"Position {notional}M, daily volatility {vol*100:.2f}%, z({conf})={z}. 1-day VaR ≈ ? (M)"),
+                 var, _L("VaR ≈ notionnel × z × volatilité.", "VaR ≈ notional × z × volatility."), tol=0.04, unit="M")
 
 
 def g_portfolio_ret(rng):
@@ -411,13 +442,15 @@ def g_portfolio_ret(rng):
     wb = round(1 - wa, 2)
     ra = round(rng.uniform(0.02, 0.15), 3)
     rb = round(rng.uniform(0.02, 0.15), 3)
-    return _fill(f"Poids {wa}/{wb}, rendements {ra*100:.1f}%/{rb*100:.1f}%. "
-                 f"Rendement du portefeuille ≈ ? (%)",
-                 (wa * ra + wb * rb) * 100, "Rdt portefeuille = Σ w_i · r_i.",
+    return _fill(_L(f"Poids {wa}/{wb}, rendements {ra*100:.1f}%/{rb*100:.1f}%. Rendement du portefeuille ≈ ? (%)", f"Weights {wa}/{wb}, returns {ra*100:.1f}%/{rb*100:.1f}%. Portfolio return ≈ ? (%)"),
+                 (wa * ra + wb * rb) * 100, _L("Rdt portefeuille = Σ w_i · r_i.", "Portfolio return = Σ w_i · r_i."),
                  abstol=0.2, unit="%")
 
 
 def g_def_adv(rng):
+    from core.i18n import get_lang
+    if get_lang() == "en":
+        return g_def(rng)
     defs = [
         ("La ___ (VaR) est la perte non dépassée avec une forte probabilité sur un horizon.",
          ["value at risk", "VaR"], ["risk"]),
@@ -437,6 +470,9 @@ def g_def_adv(rng):
 
 
 def g_formula_adv(rng):
+    from core.i18n import get_lang
+    if get_lang() == "en":
+        return g_formula_basic(rng)
     fs = [
         ("Sharpe = (rendement − rf) / ___", ["volatilité", "écart-type", "sigma"], ["volat"]),
         ("CAPM : E[r] = rf + β·(E[rm] − ___)", ["rf", "taux sans risque"], ["rf"]),
@@ -457,9 +493,11 @@ def g_graph_vol(rng):
     A = _walk(rng, n, rng.uniform(-0.005, 0.008), rng.uniform(0.015, 0.03), rng.uniform(80, 180))
     B = _walk(rng, n, rng.uniform(-0.005, 0.008), rng.uniform(0.035, 0.06), rng.uniform(80, 180))
     va, vb = _stdev_logret(A), _stdev_logret(B)
-    return _mcq("Lequel des deux titres est le PLUS volatil ?", ["Titre A", "Titre B"],
+    return _mcq(_L("Lequel des deux titres est le PLUS volatil ?", "Which of the two stocks is the MORE volatile?"),
+                _L(["Titre A", "Titre B"], ["Stock A", "Stock B"]),
                 0 if va > vb else 1,
-                "La volatilité se lit à l'amplitude des oscillations (écart-type des rendements).",
+                _L("La volatilité se lit à l'amplitude des oscillations (écart-type des rendements).",
+                   "Volatility shows in the size of the swings (standard deviation of returns)."),
                 rng, charts={"A": A, "B": B}, chart="AB")
 
 
@@ -467,6 +505,9 @@ def g_graph_vol(rng):
 # Banque conceptuelle existante (QCM) réutilisée pour la variété
 # ---------------------------------------------------------------------------
 def _concept_from_bank(rng, max_grade):
+    from core.i18n import get_lang
+    if get_lang() == "en":
+        return g_def(rng)               # banque conceptuelle FR -> repli def EN
     from data.question_bank import QUESTIONS
     pool = [q for q in QUESTIONS if q["grade"] <= max_grade]
     if not pool:
@@ -483,56 +524,55 @@ def g_gordon(rng):
     d1 = round(rng.uniform(1.0, 8.0), 2)
     re = rng.choice([0.07, 0.08, 0.09, 0.10, 0.11, 0.12])
     g = rng.choice([0.01, 0.02, 0.03, 0.04])
-    return _fill(f"Dividende attendu {d1}, coût des fonds propres {re*100:.0f}%, "
-                 f"croissance {g*100:.0f}%. Prix par le modèle de Gordon ≈ ?",
-                 d1 / (re - g), "Gordon : P = D1 / (re − g).", tol=0.03)
+    return _fill(_L(f"Dividende attendu {d1}, coût des fonds propres {re*100:.0f}%, croissance {g*100:.0f}%. Prix par le modèle de Gordon ≈ ?", f"Expected dividend {d1}, cost of equity {re*100:.0f}%, growth {g*100:.0f}%. Gordon-model price ≈ ?"),
+                 d1 / (re - g), _L("Gordon : P = D1 / (re − g).", "Gordon: P = D1 / (re − g)."), tol=0.03)
 
 
 def g_forward(rng):
     S = _money(rng, 50, 400, 5)
     r = rng.choice([0.02, 0.03, 0.04, 0.05])
     T = rng.choice([1, 2, 3])
-    return _fill(f"Spot {S}, taux {r*100:.0f}%, {T} an(s), sans dividende. "
-                 "Prix forward ≈ ?", S * ((1 + r) ** T),
-                 "Cost of carry : F = S·(1+r)^T.", tol=0.02)
+    return _fill(_L(f"Spot {S}, taux {r*100:.0f}%, {T} an(s), sans dividende. ", f"Spot {S}, rate {r*100:.0f}%, {T}y, no dividend. ") + 
+                 _L("Prix forward ≈ ?", "Forward price ≈ ?"), S * ((1 + r) ** T),
+                 _L("Cost of carry : F = S·(1+r)^T.", "Cost of carry: F = S·(1+r)^T."), tol=0.02)
 
 
 def g_real_rate(rng):
     n = rng.choice([3, 4, 5, 6, 7, 8])
     i = rng.choice([1, 2, 3, 4, 5])
     rr = ((1 + n / 100) / (1 + i / 100) - 1) * 100
-    return _fill(f"Taux nominal {n}%, inflation {i}%. Taux réel ≈ ? (%)",
-                 rr, "Fisher : (1+nominal)/(1+inflation) − 1.", abstol=0.3, unit="%")
+    return _fill(_L(f"Taux nominal {n}%, inflation {i}%. Taux réel ≈ ? (%)", f"Nominal rate {n}%, inflation {i}%. Real rate ≈ ? (%)"),
+                 rr, _L("Fisher : (1+nominal)/(1+inflation) − 1.", "Fisher: (1+nominal)/(1+inflation) − 1."), abstol=0.3, unit="%")
 
 
 def g_expected_loss(rng):
     pd = rng.choice([1, 2, 3, 5, 8])
     lgd = rng.choice([30, 40, 45, 60])
     ead = _money(rng, 2, 50, 1)
-    return _fill(f"PD {pd}%, LGD {lgd}%, EAD {ead}M. Perte attendue (EL) ≈ ? (M)",
-                 pd / 100 * lgd / 100 * ead, "EL = PD × LGD × EAD.", abstol=0.05)
+    return _fill(_L(f"PD {pd}%, LGD {lgd}%, EAD {ead}M. Perte attendue (EL) ≈ ? (M)", f"PD {pd}%, LGD {lgd}%, EAD {ead}M. Expected loss (EL) ≈ ? (M)"),
+                 pd / 100 * lgd / 100 * ead, _L("EL = PD × LGD × EAD.", "EL = PD × LGD × EAD."), abstol=0.05)
 
 
 def g_treynor(rng):
     R = rng.choice([8, 10, 12, 14])
     beta = round(rng.uniform(0.6, 1.8), 1)
-    return _fill(f"Rendement {R}%, sans risque 2%, bêta {beta}. Ratio de Treynor ≈ ?",
-                 (R - 2) / 100 / beta, "Treynor = (R − rf) / β.", abstol=0.004)
+    return _fill(_L(f"Rendement {R}%, sans risque 2%, bêta {beta}. Ratio de Treynor ≈ ?", f"Return {R}%, risk-free 2%, beta {beta}. Treynor ratio ≈ ?"),
+                 (R - 2) / 100 / beta, _L("Treynor = (R − rf) / β.", "Treynor = (R − rf) / β."), abstol=0.004)
 
 
 def g_dscr(rng):
     cf = _money(rng, 90, 400, 10)
     ds = _money(rng, 40, int(cf), 10)
-    return _fill(f"Cash flow disponible {cf}M, service de la dette {ds}M. DSCR ≈ ? (x)",
-                 cf / ds, "DSCR = cash flow disponible / service de la dette.",
+    return _fill(_L(f"Cash flow disponible {cf}M, service de la dette {ds}M. DSCR ≈ ? (x)", f"Available cash flow {cf}M, debt service {ds}M. DSCR ≈ ? (x)"),
+                 cf / ds, _L("DSCR = cash flow disponible / service de la dette.", "DSCR = available cash flow / debt service."),
                  abstol=0.05, unit="x")
 
 
 def g_cet1(rng):
     cap = _money(rng, 40, 220, 5)
     rwa = _money(rng, 600, 3000, 50)
-    return _fill(f"Fonds propres durs {cap}M, RWA {rwa}M. Ratio CET1 ≈ ? (%)",
-                 cap / rwa * 100, "CET1 = fonds propres durs / RWA.", abstol=0.3, unit="%")
+    return _fill(_L(f"Fonds propres durs {cap}M, RWA {rwa}M. Ratio CET1 ≈ ? (%)", f"Core capital {cap}M, RWA {rwa}M. CET1 ratio ≈ ? (%)"),
+                 cap / rwa * 100, _L("CET1 = fonds propres durs / RWA.", "CET1 = core capital / RWA."), abstol=0.3, unit="%")
 
 
 def g_roll(rng):
@@ -540,33 +580,40 @@ def g_roll(rng):
     far = _money(rng, 80, 120, 1)
     while far == near:
         far = _money(rng, 80, 120, 1)
-    return _fill(f"Future proche {near}, future lointain {far}. Roll yield ≈ ? (%)",
+    return _fill(_L(f"Future proche {near}, future lointain {far}. Roll yield ≈ ? (%)", f"Near future {near}, far future {far}. Roll yield ≈ ? (%)"),
                  (near - far) / far * 100,
-                 "Roll yield = (proche − lointain) / lointain.", abstol=0.4, unit="%")
+                 _L("Roll yield = (proche − lointain) / lointain.", "Roll yield = (near − far) / far."), abstol=0.4, unit="%")
 
 
 def g_drawdown(rng):
     peak = _money(rng, 100, 150, 5)
     trough = _money(rng, 50, int(peak * 0.9), 5)
-    return _fill(f"Une valeur nette grimpe à {peak} puis chute à {trough}. "
-                 "Max drawdown ≈ ? (%)", (peak - trough) / peak * 100,
-                 "Max drawdown = (pic − creux) / pic.", abstol=0.6, unit="%")
+    return _fill(_L(f"Une valeur nette grimpe à {peak} puis chute à {trough}. Max drawdown ≈ ? (%)", f"Net worth climbs to {peak} then falls to {trough}. Max drawdown ≈ ? (%)"), (peak - trough) / peak * 100,
+                 _L("Max drawdown = (pic − creux) / pic.", "Max drawdown = (peak − trough) / peak."), abstol=0.6, unit="%")
 
 
 def g_contango(rng):
     if rng.random() < 0.5:
-        return _mcq("Les futures cotent AU-DESSUS du spot (courbe ascendante). C'est…",
-                    ["Contango (roll yield négatif)", "Backwardation (roll yield positif)",
-                     "Une inversion de la courbe des taux", "Un short squeeze"], 0,
-                    "Futures > spot = contango ; rouler les contrats coûte.", rng)
-    return _mcq("Les futures cotent EN DESSOUS du spot (courbe descendante). C'est…",
-                ["Backwardation (roll yield positif)", "Contango (roll yield négatif)",
-                 "Un défaut de livraison", "Un dividende exceptionnel"], 0,
-                "Futures < spot = backwardation ; rouler les contrats rapporte.", rng)
+        return _mcq(_L("Les futures cotent AU-DESSUS du spot (courbe ascendante). C'est…",
+                       "Futures trade ABOVE spot (upward curve). This is…"),
+                    _L(["Contango (roll yield négatif)", "Backwardation (roll yield positif)",
+                        "Une inversion de la courbe des taux", "Un short squeeze"],
+                       ["Contango (negative roll yield)", "Backwardation (positive roll yield)",
+                        "A yield-curve inversion", "A short squeeze"]), 0,
+                    _L("Futures > spot = contango ; rouler les contrats coûte.",
+                       "Futures > spot = contango; rolling contracts costs."), rng)
+    return _mcq(_L("Les futures cotent EN DESSOUS du spot (courbe descendante). C'est…",
+                   "Futures trade BELOW spot (downward curve). This is…"),
+                _L(["Backwardation (roll yield positif)", "Contango (roll yield négatif)",
+                    "Un défaut de livraison", "Un dividende exceptionnel"],
+                   ["Backwardation (positive roll yield)", "Contango (negative roll yield)",
+                    "A delivery default", "A special dividend"]), 0,
+                _L("Futures < spot = backwardation ; rouler les contrats rapporte.",
+                   "Futures < spot = backwardation; rolling contracts pays."), rng)
 
 
 def g_behavioural(rng):
-    qs = [("Un investisseur vend vite ses gagnants et conserve ses perdants. Biais ?",
+    qs = _L([("Un investisseur vend vite ses gagnants et conserve ses perdants. Biais ?",
            ["Disposition effect", "Herding", "Carry", "Convexité"], 0,
            "Vendre les gagnants / garder les perdants = disposition effect."),
           ("Suivre le consensus et amplifier une bulle, c'est…",
@@ -574,18 +621,33 @@ def g_behavioural(rng):
            "Suivre la foule = herding (comportement de troupeau)."),
           ("Rester fixé sur son prix d'achat pour décider de vendre, c'est…",
            ["Biais d'ancrage", "Disposition effect", "Slippage", "Carry"], 0,
-           "Se référer à un prix de référence = biais d'ancrage.")]
+           "Se référer à un prix de référence = biais d'ancrage.")],
+         [("An investor quickly sells winners and holds losers. Which bias?",
+           ["Disposition effect", "Herding", "Carry", "Convexity"], 0,
+           "Selling winners / keeping losers = disposition effect."),
+          ("Following the consensus and amplifying a bubble is…",
+           ["Herding", "Anchoring", "Best execution", "Risk aversion"], 0,
+           "Following the crowd = herding."),
+          ("Fixating on your purchase price to decide to sell is…",
+           ["Anchoring bias", "Disposition effect", "Slippage", "Carry"], 0,
+           "Referring to a reference price = anchoring bias.")])
     q = rng.choice(qs)
     return _mcq(q[0], list(q[1]), q[2], q[3], rng)
 
 
 def g_factor(rng):
-    qs = [("Un fonds surpondère les sociétés décotées (faible P/B). Style ?",
+    qs = _L([("Un fonds surpondère les sociétés décotées (faible P/B). Style ?",
            ["Value", "Growth", "Momentum", "Quality"], 0,
            "Décoté sur ses fondamentaux = biais value."),
           ("Acheter les titres récemment les plus performants exploite le facteur…",
            ["Momentum", "Value", "Size", "Carry"], 0,
-           "Continuation des performances récentes = momentum.")]
+           "Continuation des performances récentes = momentum.")],
+         [("A fund overweights cheap stocks (low P/B). Which style?",
+           ["Value", "Growth", "Momentum", "Quality"], 0,
+           "Cheap on fundamentals = value bias."),
+          ("Buying recent top performers exploits the factor…",
+           ["Momentum", "Value", "Size", "Carry"], 0,
+           "Continuation of recent performance = momentum.")])
     q = rng.choice(qs)
     return _mcq(q[0], list(q[1]), q[2], q[3], rng)
 
@@ -593,12 +655,19 @@ def g_factor(rng):
 def g_glossary(rng):
     """Pioche un terme du glossaire et demande de l'identifier d'après sa définition.
     Rend les 160+ termes du glossaire examinables."""
-    term, (cat, definition) = rng.choice(_GLOSS_ITEMS)
-    others = [t for t, _ in _GLOSS_ITEMS if t != term]
+    from core.i18n import get_lang
+    from data import glossary_data
+    lang = get_lang()
+    gloss, _ = glossary_data.localized(lang)
+    items = list(gloss.items())
+    term, (cat, definition) = rng.choice(items)
+    correct = glossary_data.display_name(term, lang)
+    others = [glossary_data.display_name(t, lang) for t, _ in items if t != term]
     rng.shuffle(others)
     d = definition if len(definition) < 170 else definition[:167] + "…"
-    return _mcq(f"Quel terme correspond à : « {d} »", [term] + others[:3], 0,
-                f"Réponse : {term} — catégorie {cat}.", rng)
+    prompt = _L(f"Quel terme correspond à : « {d} »", f"Which term matches: “{d}”")
+    expl = _L(f"Réponse : {correct} — catégorie {cat}.", f"Answer: {correct} — category {cat}.")
+    return _mcq(prompt, [correct] + others[:3], 0, expl, rng)
 
 
 # ---------------------------------------------------------------------------

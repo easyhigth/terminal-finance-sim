@@ -99,8 +99,9 @@ CATALOG = [
         ("PITCH", "Démarcher un client pour un mandat"),
     ]),
     ("Classes d'actifs", [
-        ("BONDS", "Marché obligataire : YTM, duration, prix"),
+        ("BONDS", "Obligations souveraines & corporate : YTM, duration, prix"),
         ("BUYBOND / SELLBOND <id> <qté>", "Acheter / vendre des obligations"),
+        ("GOV / PAYS", "Pays : note souveraine, dette, stabilité, histoire, bonds"),
         ("CMDTY", "Matières premières : futures, contango/backwardation"),
         ("BUYCMDTY / SELLCMDTY <id> <qté>", "Trader des commodities"),
         ("CRYPTO", "Crypto-actifs & stablecoin (volatil, depeg)"),

@@ -20,6 +20,7 @@ from core import portfolio as pf_mod
 from core import inbox as inbox_mod
 from core import rivals as rivals_mod
 from core import scenarios as scenarios_mod
+from core import politics as politics_mod
 from core import dilemmas as dilemmas_mod
 from core import badges as badges_mod
 from core import mandates as mandates_mod
@@ -42,7 +43,8 @@ CMD_NAMES = [
     "COMPANY", "FA", "SEARCH", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS",
     "PORTFOLIO", "BOOK", "BUY", "SELL", "LONG", "SHORT", "COVER", "MARGIN",
-    "BONDS", "BUYBOND", "SELLBOND", "CMDTY", "BUYCMDTY", "SELLCMDTY",
+    "BONDS", "BUYBOND", "SELLBOND", "GOV", "GOVERNMENTS", "PAYS",
+    "CMDTY", "BUYCMDTY", "SELLCMDTY",
     "CRYPTO", "BUYCRYPTO", "SELLCRYPTO", "STRUCT", "CREDIT", "ALM",
     "ALLOCATE", "HEDGE", "REBALANCE",
     "PITCH", "FRONTIER", "RISK", "QUANT", "MA", "SHEET", "GLOSSARY",
@@ -388,6 +390,9 @@ class TerminalScene(Scene):
             self.app.scenes.go("academy", return_to="terminal")
         elif cmd in ("TUTO", "TUTORIAL", "TUTORIELS", "HOWTO", "GUIDE"):
             self.app.scenes.go("tutorials", return_to="terminal")
+        elif cmd in ("GOV", "GOVERNMENTS", "GOVT", "PAYS", "SOUVERAINS", "POLITICS", "POLITIQUE"):
+            self.app.scenes.go("governments", return_to="terminal",
+                               focus=(arg.upper() if arg else None))
         elif cmd in ("CERT", "CERTS", "CERTIFICATIONS", "CFA", "FRM"):
             self.app.scenes.go("cert", return_to="terminal")
         elif cmd in ("DEFINE", "DEF", "GLO"):
@@ -1455,6 +1460,25 @@ class TerminalScene(Scene):
             career_mod.log(p, "crisis", hname)
             self.app.notify(hname, hist["kind"])
             if hist["kind"] == "bad":
+                p.flags["crises"] = p.flags.get("crises", 0) + 1
+        # événement POLITIQUE régional (impacte actions ET spreads obligataires de la zone)
+        pol = politics_mod.maybe_trigger(p, m, random)
+        if pol:
+            from core.i18n import get_lang
+            en = get_lang() == "en"
+            pname = pol["name_en"] if en else pol["name"]
+            pstory = pol["story_en"] if en else pol["story"]
+            self.worldmap.push_news([{"region": pol["region"], "kind": pol["kind"],
+                                      "text": pname}])
+            tag = {"good": "▲", "bad": "▼", "info": "◆"}.get(pol["kind"], "◆")
+            self.recent_events.insert(0, {"title": f"{tag} {pname}", "kind": pol["kind"],
+                                          "cash": 0, "rep": 0})
+            self._log(_L(f"  ⚑ POLITIQUE — {pname} : {pstory[:64]}…",
+                         f"  ⚑ POLITICS — {pname}: {pstory[:64]}…"))
+            inbox_mod.on_crisis(p, pname, pol["kind"])
+            career_mod.log(p, "crisis", pname)
+            self.app.notify(pname, pol["kind"])
+            if pol["kind"] == "bad":
                 p.flags["crises"] = p.flags.get("crises", 0) + 1
         if summary.get("quarter_changed"):
             self._log(_L(f"  ── Nouveau trimestre : T{p.quarter} ──", f"  ── New quarter: Q{p.quarter} ──"))

@@ -144,6 +144,11 @@ class Market:
         self.last_ret = None        # rendements log du dernier pas (par société)
         self.crises = []
         self._last_news = []
+        # bump de crédit RÉGIONAL transitoire (en décimal de rendement) injecté
+        # par les événements politiques (core/politics.py) et lu par core/bonds.py :
+        # un choc politique élargit les spreads de la zone puis se résorbe. État
+        # de gameplay ÉPHÉMÈRE (comme les crises) : non sérialisé, décroît à chaque pas.
+        self.region_credit_bump = {r: 0.0 for r in self.regions}
 
         # ---- macro-économie (déterministe, évolue à chaque pas) ----
         # chaque indicateur : valeur courante, moyenne de long terme, vitesse de
@@ -237,6 +242,12 @@ class Market:
         for cr in self.crises:
             cr.steps_left -= 1
         self.crises = [cr for cr in self.crises if cr.steps_left > 0]
+
+        # résorption progressive des bumps de crédit régionaux (politique) :
+        # décroissance déterministe (aucun tirage RNG → prix inchangés).
+        for r in self.region_credit_bump:
+            v = self.region_credit_bump[r] * 0.72
+            self.region_credit_bump[r] = v if v > 1e-5 else 0.0
 
         self._last_news = self._generate_news(F_world, F_sector, F_region)
         self._last_news += self._earnings_news()
@@ -343,6 +354,15 @@ class Market:
 
     def add_crisis(self, crisis):
         self.crises.append(crisis)
+
+    def bump_region_credit(self, region, amount):
+        """Élargit (amount>0) ou resserre (amount<0) le spread de crédit d'une
+        région. Utilisé par les événements politiques pour faire réagir le marché
+        obligataire (souverains ET corporates de la zone)."""
+        if region in self.region_credit_bump:
+            self.region_credit_bump[region] += amount
+        else:
+            self.region_credit_bump[region] = amount
 
     # -------------------------------------------------------------- requêtes
     def index_value(self, name):

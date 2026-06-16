@@ -22,7 +22,7 @@ def test_holdings_table_aggregates_classes():
     p, m = _mk()
     for c in m.companies[:3]:
         p.portfolio[c["ticker"]] = {"shares": 100, "avg": m.price_of(c["ticker"])}
-    bonds.buy_bond(p, m, bonds.BONDS[0][0], 10)
+    bonds.buy_bond(p, m, bonds.BONDS[0]["id"], 10)
     rows = analytics.holdings_table(p, m)
     classes = {r["cls"] for r in rows}
     assert "Actions" in classes and "Obligations" in classes

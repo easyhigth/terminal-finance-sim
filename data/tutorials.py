@@ -28,19 +28,57 @@ TUTORIALS = [
     },
     {
         "id": "bonds",
-        "title": "Obligations : revenu fixe & taux",
+        "title": "Obligations : souverains & corporates",
         "image": "bonds.png",
-        "intro": "Les obligations versent un coupon régulier et remboursent le nominal "
-                 "à l'échéance. Ouvrez le marché avec BONDS.",
+        "intro": "Une obligation est un PRÊT : vous touchez un coupon régulier et le "
+                 "nominal est remboursé à l'échéance. Il en existe deux familles — "
+                 "SOUVERAINES (émises par un État/pays) et CORPORATE (émises par une "
+                 "entreprise). Ouvrez le marché avec BONDS.",
         "steps": [
-            "Affichez le marché obligataire : BONDS (ou le rail).",
-            "Repérez l'identifiant (id), le YTM (rendement) et la duration de chaque ligne.",
-            "Achetez : BUYBOND <id> <quantité>   ·   Vendez : SELLBOND <id> <qté>.",
-            "Encaissez les coupons automatiquement à chaque pas de temps (ADV).",
+            "Affichez le marché : BONDS — la liste sépare SOUVERAINS et CORPORATE.",
+            "SOUVERAIN = dette d'un PAYS (ex. Trésor US, Bund allemand). Son rendement "
+            "dépend du rating du pays, de sa dette/PIB et de sa stabilité. Tapez GOV "
+            "pour voir les pays, leur note et leur historique.",
+            "CORPORATE = dette d'une ENTREPRISE (ex. Pomme, Toyota). Plus l'émetteur est "
+            "risqué (rating bas), plus le coupon/le rendement exigé est élevé.",
+            "Lisez chaque ligne : RATING, COUPON, MAT. (maturité), YTM (rendement), PRIX, "
+            "DUR (sensibilité au taux).",
+            "Achetez : BUYBOND <id> <qté>   ·   Vendez : SELLBOND <id> <qté>. Les coupons "
+            "tombent automatiquement à chaque pas (ADV).",
         ],
         "concept": "Prix et taux varient en SENS INVERSE : si les taux montent, le prix "
-                   "des obligations baisse — d'autant plus que la DURATION est longue. "
-                   "Un rendement élevé (high yield) rémunère un risque de crédit plus fort.",
+                   "baisse — d'autant plus que la DURATION est longue. Le RENDEMENT se "
+                   "décompose en : courbe (taux directeur) + prime de terme + spread de "
+                   "CRÉDIT (rating) + prime de risque PAYS (souverains). Un événement "
+                   "politique régional (cf. tutoriel Pays) élargit les spreads de la zone : "
+                   "les prix des souverains ET des corporates de la région baissent, puis "
+                   "se résorbent — une occasion d'acheter du rendement sur repli.",
+    },
+    {
+        "id": "governments",
+        "title": "Pays, gouvernements & politique",
+        "image": "governments.png",
+        "intro": "Le monde est peuplé de vrais pays, regroupés par région. Chaque "
+                 "gouvernement a une note souveraine, une dette/PIB, une stabilité "
+                 "politique et un historique sur ~5 ans. Ouvrez l'écran avec GOV.",
+        "steps": [
+            "Tapez GOV : à gauche les pays par région, à droite la fiche détaillée.",
+            "Lisez la fiche : NOTE souveraine, DETTE/PIB, STABILITÉ, régime, devise, et "
+            "l'HISTORIQUE des 5 dernières années (inspiré du réel).",
+            "En bas de la fiche : les OBLIGATIONS du pays, avec leur rendement en direct.",
+            "Au fil du jeu, des ÉVÉNEMENTS POLITIQUES surviennent dans un pays et frappent "
+            "sa RÉGION : crise budgétaire, élections, tensions géopolitiques, relance…",
+            "Surveillez le flux d'actualités (⚑) et la carte : l'événement s'affiche sur "
+            "la région concernée.",
+        ],
+        "concept": "Un événement politique a deux effets RÉELS et exploitables : (1) il "
+                   "choque les ACTIONS de la région (les sociétés de la zone montent ou "
+                   "baissent via le facteur régional) ; (2) il fait varier le SPREAD de "
+                   "crédit de la zone, donc le prix des OBLIGATIONS souveraines et "
+                   "corporates de la région. Une mauvaise nouvelle (instabilité, défaut) "
+                   "élargit les spreads (prix en baisse) ; une bonne nouvelle (réformes, "
+                   "relance) les resserre. Anticiper la région touchée = anticiper qui "
+                   "gagne et qui perd.",
     },
     {
         "id": "futures",

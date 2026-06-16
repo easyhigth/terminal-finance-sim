@@ -87,7 +87,7 @@ CATALOG = [
     ("Portefeuille & trading", [
         ("PORTFOLIO / BOOK / PRT", "Livre de positions (valeur nette, P&L)"),
         ("PA / ANALYSE", "Analyse détaillée : poids, risque, corrél., frontière"),
-        ("BUY <tk> <qté>", "Acheter des actions. Ex : BUY MVC 100"),
+        ("BUY / LONG <tk> <qté>", "Acheter des actions (position longue)"),
         ("SELL <tk> <qté|ALL>", "Vendre des actions"),
         ("SHORT <tk> <qté>", "Vente à découvert (parier à la baisse)"),
         ("COVER <tk> <qté|ALL>", "Racheter une position courte"),

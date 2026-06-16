@@ -41,7 +41,7 @@ CMD_NAMES = [
     "RIVALS", "MANDATES", "MANDATE", "DECIDE", "MARKET", "TOP", "MOVERS",
     "COMPANY", "FA", "SEARCH", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS",
-    "PORTFOLIO", "BOOK", "BUY", "SELL", "SHORT", "COVER", "MARGIN",
+    "PORTFOLIO", "BOOK", "BUY", "SELL", "LONG", "SHORT", "COVER", "MARGIN",
     "BONDS", "BUYBOND", "SELLBOND", "CMDTY", "BUYCMDTY", "SELLCMDTY",
     "CRYPTO", "BUYCRYPTO", "SELLCRYPTO", "STRUCT", "CREDIT", "ALM",
     "ALLOCATE", "HEDGE", "REBALANCE",
@@ -107,14 +107,17 @@ class TerminalScene(Scene):
         self._index_rects = {}    # indices cliquables (panneau indices → graphe)
         self.rail_w = 150         # largeur du rail latéral
         self._map_rect = None     # rect de la carte (pour le clic)
-        # rail latéral : (libellé, commande)
+        # rail latéral : (libellé, commande), regroupé par usage
         self.rail = [
-            ("ADV ▸", "ADV"), ("MISSION", "MISSION"), ("EVAL", "EVAL"),
-            ("DEALS", "DEALS"), ("MARCHÉ", "MARKET"), ("TOP", "TOP"),
-            ("MOVERS", "MOVERS"), ("PORTEF.", "PORTFOLIO"), ("MANDATS", "MANDATES"),
-            ("TABLEUR", "SHEET"), ("ÉCO", "ECO"), ("ACADÉMIE", "LEARN"),
-            ("CERTIF.", "CERT"), ("INBOX", "INBOX"), ("DÉCIDE", "DECIDE"),
+            ("ADV ▸", "ADV"),
+            ("PORTEF.", "PORTFOLIO"), ("MARCHÉ", "MARKET"),
+            ("TOP", "TOP"), ("MOVERS", "MOVERS"),
+            ("MISSION", "MISSION"), ("EVAL", "EVAL"),
+            ("MANDATS", "MANDATES"), ("DEALS", "DEALS"),
+            ("INBOX", "INBOX"), ("DÉCIDE", "DECIDE"),
             ("CARRIÈRE", "CAREER"), ("RIVAUX", "RIVALS"),
+            ("TABLEUR", "SHEET"), ("ÉCO", "ECO"),
+            ("ACADÉMIE", "LEARN"), ("CERTIF.", "CERT"),
             ("SAUVER", "SAVE"), ("AIDE", "COMMANDS"),
         ]
         self.networth_spark = widgets.Sparkline(80)
@@ -405,7 +408,7 @@ class TerminalScene(Scene):
             self.app.scenes.go("analytics", return_to="terminal")
         elif cmd in ("FRONTIER", "MARKOWITZ", "FRONTIERE"):
             self.app.scenes.go("portfolio")
-        elif cmd in ("BUY", "ACHETER"):
+        elif cmd in ("BUY", "ACHETER", "LONG"):
             self._cmd_buy(parts[1:])
         elif cmd in ("SELL", "VENDRE"):
             self._cmd_sell(parts[1:])
@@ -1636,11 +1639,13 @@ class TerminalScene(Scene):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if (hover and not locked) else config.COL_PANEL,
                              br, border_radius=4)
             pygame.draw.rect(surf, acc, br, 1, border_radius=4)
+            ty = br.y + (bh - fonts.small().get_height()) // 2
             if locked:
                 g = unlocks_mod.required_grade(unlocks_mod.CMD_FEATURE[cmd])
-                widgets.draw_text(surf, f"⊘ {label}", (br.x + 8, br.y + 7),
+                widgets.draw_text(surf, widgets.fit_text(f"⊘ {label}", fonts.small(), br.w - 36),
+                                  (br.x + 8, ty),
                                   fonts.small(), config.COL_TEXT_DIM)
-                widgets.draw_text(surf, f"G{g}", (br.right - 8, br.y + 7),
+                widgets.draw_text(surf, f"G{g}", (br.right - 8, ty),
                                   fonts.tiny(), config.COL_TEXT_DIM, align="right")
             else:
                 txt = _t("rail." + cmd)
@@ -1650,22 +1655,40 @@ class TerminalScene(Scene):
                         txt = f"{txt} ({u})"
                 elif cmd == "DECIDE" and p.pending_dilemmas:
                     txt = f"{txt} !"
-                widgets.draw_text(surf, txt, (br.x + 10, br.y + 7),
+                widgets.draw_text(surf, widgets.fit_text(txt, fonts.small(bold=hover), br.w - 16),
+                                  (br.x + 10, ty),
                                   fonts.small(bold=hover), acc if hover else config.COL_TEXT)
             y += bh + gap
 
     def _draw_topbar(self, surf, p, info, accent):
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, (0, 0, config.SCREEN_WIDTH, config.TOPBAR_H))
         pygame.draw.line(surf, accent, (0, config.TOPBAR_H), (config.SCREEN_WIDTH, config.TOPBAR_H), 1)
-        widgets.draw_text(surf, "TERMINAL", (12, 8), fonts.head(bold=True), config.COL_AMBER)
-        widgets.draw_ticker_value(surf, "GRADE", p.grade, (190, 12))
+        y = 12
+        r = widgets.draw_text(surf, "TERMINAL", (12, 8), fonts.head(bold=True), config.COL_AMBER)
+        x = r.right + 16
+        # grade (tronqué si trop long pour ne jamais cacher les éléments suivants)
+        max_grade_w = 200
+        r = widgets.draw_text(surf, "GRADE  ", (x, y), fonts.small(), config.COL_TEXT_DIM)
+        r = widgets.draw_text_fit(surf, p.grade, (r.right, y), fonts.small(bold=True),
+                                  config.COL_WHITE, max_width=max_grade_w)
+        x = r.right + 18
+        # cash
         cash_col = config.COL_UP if p.cash >= 0 else config.COL_DOWN
-        widgets.draw_text(surf, "CASH ", (400, 12), fonts.small(), config.COL_TEXT_DIM)
-        widgets.draw_text(surf, widgets.format_money(p.cash, info["currency"]),
-                          (448, 12), fonts.small(bold=True), cash_col)
-        widgets.draw_ticker_value(surf, "REP", f"{p.reputation}/100", (640, 12))
-        widgets.draw_ticker_value(surf, "DAY", f"{p.day} (T{p.quarter})", (800, 12))
-        # badge messagerie (non-lus)
+        r = widgets.draw_text(surf, "CASH ", (x, y), fonts.small(), config.COL_TEXT_DIM)
+        r = widgets.draw_text(surf, widgets.format_money(p.cash, info["currency"]),
+                              (r.right, y), fonts.small(bold=True), cash_col)
+        x = r.right + 18
+        # reputation
+        r = widgets.draw_text(surf, "REP  ", (x, y), fonts.small(), config.COL_TEXT_DIM)
+        r = widgets.draw_text(surf, f"{p.reputation}/100", (r.right, y), fonts.small(bold=True),
+                              config.COL_WHITE)
+        x = r.right + 18
+        # day
+        widgets.draw_text(surf, "DAY  ", (x, y), fonts.small(), config.COL_TEXT_DIM)
+        r = widgets.draw_text(surf, f"{p.day} (T{p.quarter})",
+                              (x + fonts.small().size("DAY  ")[0], y), fonts.small(bold=True),
+                              config.COL_WHITE)
+        # badge messagerie (non-lus) — aligné à droite
         unread = inbox_mod.unread_count(p)
         if unread:
             widgets.draw_badge(surf, f"@ {unread}", (config.SCREEN_WIDTH - 70, 9),

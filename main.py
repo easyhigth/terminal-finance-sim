@@ -46,12 +46,15 @@ from scenes.scene_graph import GraphScene
 from scenes.scene_rivals import RivalsScene
 from scenes.scene_analytics import AnalyticsScene
 from scenes.scene_tutorials import TutorialsScene
+from scenes.scene_splash import SplashScene
+from ui.logo import make_icon_surface
 
 
 class App:
     def __init__(self):
         pygame.init()
         pygame.display.set_caption(config.TITLE)
+        pygame.display.set_icon(make_icon_surface(64))
         self.screen = pygame.display.set_mode(
             (config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
         self.clock = pygame.time.Clock()
@@ -102,7 +105,8 @@ class App:
         self.scenes.register("rivals", RivalsScene(self))
         self.scenes.register("analytics", AnalyticsScene(self))
         self.scenes.register("tutorials", TutorialsScene(self))
-        self.scenes.go("menu")
+        self.scenes.register("splash", SplashScene(self))
+        self.scenes.go("splash")
 
     def notify(self, text, kind="info"):
         """Pousse une notification (toast) affichée en overlay."""

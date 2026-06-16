@@ -9,6 +9,7 @@ from core.i18n import t, toggle_lang, get_lang
 from core.scene_manager import Scene
 from core.game_state import GameState
 from ui import fonts, widgets
+from ui.logo import draw_ta_logo
 
 # Ticker décoratif — tickers fictifs cohérents avec l'univers du jeu
 _TICKER = ("MVC +1.2%   LWNH -0.4%   C&D500 +0.7%   KAK40 +0.3%   MIRC +0.9%   "
@@ -19,7 +20,7 @@ class MenuScene(Scene):
     def on_enter(self, **kwargs):
         cx = config.SCREEN_WIDTH // 2
         bw, bh, gap = 320, 50, 14
-        y0 = 392
+        y0 = 422
         self.auto = GameState.slot_meta(config.AUTOSAVE_SLOT)
         self.buttons = {
             "continue": widgets.Button((cx-bw//2, y0,              bw, bh), t("menu.continue"), config.COL_UP),
@@ -98,14 +99,15 @@ class MenuScene(Scene):
                           (10, 7), fonts.small(), config.COL_AMBER_DIM)
 
         # logo / titre
-        widgets.draw_text(surf, "TERMINAL", (cx, 132), fonts.huge(bold=True),
+        draw_ta_logo(surf, cx, 104, size=108)
+        widgets.draw_text(surf, "TERMINAL", (cx, 185), fonts.huge(bold=True),
                           config.COL_AMBER, align="center")
-        widgets.draw_text(surf, t("menu.subtitle"), (cx, 212),
-                          fonts.head(), config.COL_TEXT, align="center")
+        widgets.draw_text(surf, "ALPHA", (cx, 257), fonts.title(bold=True),
+                          config.COL_CYAN, align="center")
         pulse = 120 + int(60 * (math.sin(self.t * 2) * 0.5 + 0.5))
-        pygame.draw.line(surf, (pulse, pulse//2, 0), (cx-220, 267), (cx+220, 267), 1)
+        pygame.draw.line(surf, (pulse, pulse//2, 0), (cx-220, 310), (cx+220, 310), 1)
         widgets.draw_text(surf, t("menu.tagline"),
-                          (cx, 287), fonts.small(), config.COL_TEXT_DIM, align="center")
+                          (cx, 328), fonts.small(), config.COL_TEXT_DIM, align="center")
 
         # résumé de la dernière partie (autosave)
         if self.auto:
@@ -123,7 +125,7 @@ class MenuScene(Scene):
     def _draw_last_run(self, surf, cx):
         m = self.auto
         cur = config.CONTINENTS.get(m["continent"], {}).get("currency", "$")
-        panel = pygame.Rect(cx - 250, 320, 500, 58)
+        panel = pygame.Rect(cx - 250, 352, 500, 58)
         pygame.draw.rect(surf, config.COL_PANEL, panel)
         pygame.draw.rect(surf, config.COL_BORDER, panel, 1)
         widgets.draw_text(surf, t("menu.last_run"), (panel.x + 12, panel.y + 8),

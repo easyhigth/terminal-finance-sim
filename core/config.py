@@ -12,7 +12,7 @@ import sys
 SCREEN_WIDTH = 1280        # format 16:9
 SCREEN_HEIGHT = 720        # 1280x720 — tient sur la plupart des écrans
 FPS = 60
-TITLE = "TERMINAL — Finance Career Simulator"
+TITLE = "Terminal Alpha"
 
 # ---------------------------------------------------------------------------
 # PALETTE BLOOMBERG-STYLE

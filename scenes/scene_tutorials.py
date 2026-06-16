@@ -22,6 +22,9 @@ class TutorialsScene(Scene):
         self.sel = kwargs.get("tid", T.TUTORIALS[0]["id"])
         self._img_cache = {}
         self._rows = {}
+        self.scroll = 0
+        self._max_scroll = 0
+        self._content_rect = None
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
@@ -43,6 +46,13 @@ class TutorialsScene(Scene):
             for tid, rect in self._rows.items():
                 if rect.collidepoint(event.pos):
                     self.sel = tid
+                    self.scroll = 0
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if self._content_rect and self._content_rect.collidepoint(event.pos):
+                if event.button == 4:
+                    self.scroll = max(0, self.scroll - 30)
+                elif event.button == 5:
+                    self.scroll = min(self._max_scroll, self.scroll + 30)
 
     def update(self, dt):
         self.back_btn.update(pygame.mouse.get_pos(), dt)
@@ -72,53 +82,75 @@ class TutorialsScene(Scene):
                               config.COL_WHITE if sel else config.COL_TEXT)
             y += 38
 
-        # contenu à droite
+        # contenu à droite (panneau scrollable)
         readp = pygame.Rect(380, 100, config.SCREEN_WIDTH - 420, ph)
         rinner = widgets.draw_panel(surf, readp, "Tutoriel", config.COL_AMBER)
-        t = T.get(self.sel)
-        if not t:
+        self._content_rect = readp
+        tut = T.get(self.sel)
+        if not tut:
             return self.back_btn.draw(surf)
 
-        widgets.draw_text(surf, t["title"], (rinner.x, rinner.y), fonts.head(bold=True),
+        prev_clip = surf.get_clip()
+        surf.set_clip(rinner)
+
+        oy = -self.scroll
+        cy = rinner.y + oy
+
+        widgets.draw_text(surf, tut["title"], (rinner.x, cy), fonts.head(bold=True),
                           config.COL_WHITE)
-        y = rinner.y + 34
-        y += widgets.draw_text_wrapped(surf, t["intro"], (rinner.x, y), fonts.small(),
+        cy += 34
+        cy += widgets.draw_text_wrapped(surf, tut["intro"], (rinner.x, cy), fonts.small(),
                                        config.COL_TEXT_DIM, rinner.w) + 8
 
-        # capture d'écran (mise à l'échelle pour tenir dans la colonne)
-        img = self._image(t["image"])
+        img = self._image(tut["image"])
         if img:
             iw = min(560, rinner.w)
             ih = int(iw * img.get_height() / img.get_width())
             scaled = pygame.transform.smoothscale(img, (iw, ih))
             ix = rinner.x
-            surf.blit(scaled, (ix, y))
-            pygame.draw.rect(surf, config.COL_BORDER, (ix, y, iw, ih), 1)
-            # étapes à droite de l'image si la place le permet, sinon dessous
+            if cy + ih > rinner.y and cy < rinner.bottom:
+                surf.blit(scaled, (ix, cy))
+                pygame.draw.rect(surf, config.COL_BORDER, (ix, cy, iw, ih), 1)
             steps_x = ix + iw + 20
             steps_w = rinner.right - steps_x
             if steps_w >= 240:
-                self._draw_steps(surf, t, steps_x, y, steps_w)
-                y += ih + 12
+                cy = self._draw_steps(surf, tut, steps_x, cy, steps_w, rinner)
+                cy = max(cy, rinner.y + oy + 34 + ih + 12)
             else:
-                y += ih + 12
-                y = self._draw_steps(surf, t, rinner.x, y, rinner.w)
+                cy += ih + 12
+                cy = self._draw_steps(surf, tut, rinner.x, cy, rinner.w, rinner)
         else:
-            y = self._draw_steps(surf, t, rinner.x, y, rinner.w)
+            cy = self._draw_steps(surf, tut, rinner.x, cy, rinner.w, rinner)
 
+        cy += 4
         # encart « à comprendre »
-        box = pygame.Rect(rinner.x, y, rinner.w, rinner.bottom - y)
-        if box.h > 40:
-            pygame.draw.rect(surf, config.COL_PANEL, box, border_radius=4)
-            pygame.draw.rect(surf, config.COL_CYAN, (box.x, box.y, 3, box.h))
-            widgets.draw_text(surf, "À COMPRENDRE", (box.x + 12, box.y + 8),
-                              fonts.tiny(bold=True), config.COL_CYAN)
-            widgets.draw_text_wrapped(surf, t["concept"], (box.x + 12, box.y + 26),
-                                      fonts.small(), config.COL_TEXT, box.w - 24)
+        box_h = max(80, rinner.bottom - (cy - oy) - rinner.y + 200)
+        box = pygame.Rect(rinner.x, cy, rinner.w, box_h)
+        pygame.draw.rect(surf, config.COL_PANEL, box, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN, (box.x, box.y, 3, box.h))
+        widgets.draw_text(surf, "À COMPRENDRE", (box.x + 12, box.y + 8),
+                          fonts.tiny(bold=True), config.COL_CYAN)
+        concept_h = widgets.draw_text_wrapped(surf, tut["concept"], (box.x + 12, box.y + 26),
+                                  fonts.small(), config.COL_TEXT, box.w - 24)
+        cy += concept_h + 40
+
+        surf.set_clip(prev_clip)
+
+        total_content = cy - (rinner.y + oy)
+        self._max_scroll = max(0, total_content - rinner.h)
+        self.scroll = min(self.scroll, self._max_scroll)
+
+        if self._max_scroll > 0:
+            track = pygame.Rect(readp.right - 8, rinner.y, 6, rinner.h)
+            pygame.draw.rect(surf, config.COL_PANEL, track, border_radius=3)
+            frac = rinner.h / (total_content or 1)
+            bar_h = max(24, int(rinner.h * frac))
+            bar_y = rinner.y + int((rinner.h - bar_h) * (self.scroll / self._max_scroll)) if self._max_scroll else rinner.y
+            pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 6, bar_h), border_radius=3)
 
         self.back_btn.draw(surf)
 
-    def _draw_steps(self, surf, t, x, y, w):
+    def _draw_steps(self, surf, t, x, y, w, clip_rect=None):
         widgets.draw_text(surf, "ÉTAPES", (x, y), fonts.tiny(bold=True), config.COL_AMBER)
         y += 20
         for i, step in enumerate(t["steps"], 1):

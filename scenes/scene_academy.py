@@ -35,7 +35,7 @@ class AcademyScene(Scene):
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button(
-            (260, config.SCREEN_HEIGHT - 50, 230, 42), "TUTORIELS « COMMENT FAIRE »", config.COL_CYAN)
+            (260, config.SCREEN_HEIGHT - 50, 180, 42), "TUTORIELS", config.COL_CYAN)
 
     def _mark_read(self, lesson_id):
         p = self.app.gs.player

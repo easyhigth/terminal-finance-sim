@@ -25,6 +25,9 @@ class StructuredScene(Scene):
         self.invest_rects = {}
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
+        self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
+                                        config.back_button_rect(160)[1], 150, 42),
+                                       "📘 TUTO", config.COL_CYAN)
 
     def _can_trade(self):
         return unlocks.unlocked(self.app.gs.player, "trade")
@@ -49,6 +52,9 @@ class StructuredScene(Scene):
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
             return
+        if self.tuto_btn.handle(event):
+            self.app.scenes.go("tutorials", tid="structured", return_to="structured")
+            return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
                 self.search = ""
@@ -68,6 +74,7 @@ class StructuredScene(Scene):
     def update(self, dt):
         self._t += dt
         self.back_btn.update(pygame.mouse.get_pos(), dt)
+        self.tuto_btn.update(pygame.mouse.get_pos(), dt)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -138,3 +145,4 @@ class StructuredScene(Scene):
                                   (pinner.x, y + 18), fonts.tiny(), pcol)
                 y += 44
         self.back_btn.draw(surf)
+        self.tuto_btn.draw(surf)

@@ -51,21 +51,48 @@ class TrackScene(Scene):
             "CONFIRMER LA VOIE", config.COL_UP, enabled=False)
         self.back = widgets.Button(
             (40, config.SCREEN_HEIGHT-80, 160, 50), "← TERMINAL", config.COL_TEXT_DIM)
+        self._cards = {}
+        self._names = list(TRACK_INFO.keys())
+        self.focus = 0   # index de la carte ayant le focus clavier
+
+    def _select(self, name):
+        self.selected = name
+        self.confirm.enabled = True
+
+    def _confirm_track(self):
+        if not self.selected:
+            return
+        p = self.app.gs.player
+        p.track = self.selected
+        p.flags["can_choose_track"] = False
+        self.app.gs.save(config.AUTOSAVE_SLOT)
+        self.app.scenes.go("terminal")
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            for name, rect in getattr(self, "_cards", {}).items():
+            for name, rect in self._cards.items():
                 if rect.collidepoint(event.pos):
-                    self.selected = name
-                    self.confirm.enabled = True
+                    self._select(name)
+        if event.type == pygame.KEYDOWN:
+            cols = 3
+            if event.key in (pygame.K_TAB, pygame.K_RIGHT, pygame.K_LEFT,
+                             pygame.K_UP, pygame.K_DOWN):
+                n = len(self._names)
+                if event.key in (pygame.K_LEFT,):
+                    step = -1
+                elif event.key in (pygame.K_RIGHT, pygame.K_TAB):
+                    step = 1
+                elif event.key == pygame.K_UP:
+                    step = -cols
+                else:
+                    step = cols
+                self.focus = (self.focus + step) % n
+            elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                self._select(self._names[self.focus])
         if self.back.handle(event):
             self.app.scenes.go("terminal")
-        if self.confirm.handle(event) and self.selected:
-            p = self.app.gs.player
-            p.track = self.selected
-            p.flags["can_choose_track"] = False
-            self.app.gs.save(config.AUTOSAVE_SLOT)
-            self.app.scenes.go("terminal")
+        if self.confirm.handle(event):
+            self._confirm_track()
 
     def update(self, dt):
         mp = pygame.mouse.get_pos()
@@ -82,7 +109,7 @@ class TrackScene(Scene):
 
         self._cards = {}
         cols = 3
-        cw, ch, gap = 380, 250, 20
+        cw, ch, gap = 380, 290, 20
         x0 = 40
         y0 = 112
         for i, (name, info) in enumerate(TRACK_INFO.items()):
@@ -93,9 +120,11 @@ class TrackScene(Scene):
             rect = pygame.Rect(x, y, cw, ch)
             self._cards[name] = rect
             sel = (self.selected == name)
+            focused = (self.focus == i)
             accent = info["color"]
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect)
-            pygame.draw.rect(surf, accent if sel else config.COL_BORDER, rect, 2 if sel else 1)
+            border_col = config.COL_CYAN if focused else (accent if sel else config.COL_BORDER)
+            pygame.draw.rect(surf, border_col, rect, 2 if (sel or focused) else 1)
             widgets.draw_text(surf, name.upper(), (x+16, y+14),
                               fonts.head(bold=True), accent)
             widgets.draw_text_wrapped(surf, info["desc"], (x+16, y+50),
@@ -105,10 +134,13 @@ class TrackScene(Scene):
                               fonts.tiny(bold=True), accent)
             widgets.draw_text_wrapped(surf, tracks.label(name), (x+16, y+148),
                                       fonts.tiny(), config.COL_WHITE, cw-32, line_gap=2)
-            widgets.draw_text(surf, "Concepts clés :", (x+16, y+ch-46),
+            widgets.draw_text(surf, "Concepts clés :", (x+16, y+184),
                               fonts.tiny(bold=True), config.COL_TEXT_DIM)
-            widgets.draw_text_wrapped(surf, info["concepts"], (x+16, y+ch-30),
+            widgets.draw_text_wrapped(surf, info["concepts"], (x+16, y+200),
                                       fonts.tiny(), config.COL_NEUTRAL, cw-32, line_gap=2)
+            footer_label = "VOIE SÉLECTIONNÉE ✓" if sel else "SÉLECTIONNER CETTE VOIE"
+            widgets.draw_card_footer(surf, rect, footer_label, accent,
+                                     hover=rect.collidepoint(pygame.mouse.get_pos()))
 
         self.confirm.draw(surf)
         self.back.draw(surf)

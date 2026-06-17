@@ -55,9 +55,11 @@ class RivalsScene(Scene):
         # cartes : une par acteur, triées par score (déjà fait par leaderboard)
         top = 110
         ch, gap = 92, 10
-        avail = config.footer_y() - 12 - top
+        log_h = 150  # réserve l'espace du journal d'activité en bas d'écran
+        avail = config.footer_y() - 12 - top - log_h
         per_col = max(1, avail // (ch + gap))
-        colw = (config.SCREEN_WIDTH - 3 * config.MARGIN) // 2
+        n_cols = max(1, -(-len(board) // per_col))  # ceil
+        colw = (config.SCREEN_WIDTH - (n_cols + 1) * config.MARGIN) // n_cols
         for i, row in enumerate(board):
             col = i // per_col
             r_in_col = i % per_col
@@ -65,7 +67,33 @@ class RivalsScene(Scene):
             y = top + r_in_col * (ch + gap)
             self._draw_card(surf, pygame.Rect(x, y, colw, ch), row, p, pscore, nem, cur)
 
+        cards_bottom = top + min(per_col, len(board)) * (ch + gap)
+        log_top = max(cards_bottom + 6, config.footer_y() - 12 - log_h)
+        log_rect = pygame.Rect(config.MARGIN, log_top,
+                               config.SCREEN_WIDTH - 2 * config.MARGIN,
+                               config.footer_y() - 8 - log_top)
+        self._draw_activity_log(surf, log_rect, p)
+
         self.back_btn.draw(surf)
+
+    def _draw_activity_log(self, surf, rect, player):
+        """Journal d'activité des rivaux : dernières actions visibles (percées,
+        sniping de deals, débauchage de mandats) tirées du journal de carrière."""
+        inner = widgets.draw_panel(surf, rect, "Journal d'activité des rivaux", config.COL_DOWN)
+        events = R.recent_activity(player, limit=6)
+        if not events:
+            widgets.draw_text(surf, "Aucune activité rivale récente. Avancez le temps (ADV) pour en générer.",
+                              (inner.x, inner.y + 2), fonts.tiny(), config.COL_TEXT_DIM)
+            return
+        y = inner.y
+        row_h = max(16, inner.h // len(events))
+        for entry in events:
+            kind = entry.get("kind", "info")
+            col = config.COL_WARN if kind in ("deal", "crisis") else config.COL_TEXT_DIM
+            label = f"T{entry.get('quarter', '?')} j{entry.get('day', '?')} — {entry.get('text', '')}"
+            widgets.draw_text(surf, widgets.fit_text(label, fonts.tiny(), inner.w),
+                              (inner.x, y), fonts.tiny(), col)
+            y += row_h
 
     def _draw_card(self, surf, rect, row, player, pscore, nem, cur):
         is_player = row["is_player"]

@@ -1,7 +1,7 @@
 """Tests des rivaux actifs (core/rivals.py)."""
 import random
 
-from core import rivals, market
+from core import career, rivals, market
 from core.game_state import PlayerState
 
 
@@ -87,3 +87,30 @@ def test_act_surge_increases_a_rival_score():
             fired = True
             break
     assert fired
+
+
+def test_recent_activity_empty_when_no_rivals_named_in_journal():
+    p, _ = _mk()
+    career.log(p, "info", "Un événement sans rapport avec les rivaux.")
+    assert rivals.recent_activity(p) == []
+
+
+def test_recent_activity_returns_matching_entries_most_recent_first():
+    p, _ = _mk()
+    name = p.rivals[0]["name"]
+    career.log(p, "info", "Premier événement sans rapport.")
+    career.log(p, "deal", f"{name} rafle un deal.")
+    career.log(p, "info", "Deuxième événement sans rapport.")
+    career.log(p, "crisis", f"{name} débauche un mandat.")
+    out = rivals.recent_activity(p)
+    assert [e["text"] for e in out] == [f"{name} débauche un mandat.", f"{name} rafle un deal."]
+
+
+def test_recent_activity_respects_limit():
+    p, _ = _mk()
+    name = p.rivals[0]["name"]
+    for i in range(10):
+        career.log(p, "info", f"{name} agit ({i}).")
+    out = rivals.recent_activity(p, limit=3)
+    assert len(out) == 3
+    assert out[0]["text"] == f"{name} agit (9)."

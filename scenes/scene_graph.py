@@ -24,6 +24,10 @@ from core import etfs as ETF
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
+
+def _asset_exists(market, tk):
+    return tk in market.ticker_idx or ETF.exists(tk)
+
 # (code, libellé court, kind, multi-actifs ?)
 TYPES = [
     ("GP", "Ligne", "line", False),
@@ -53,9 +57,19 @@ class GraphScene(Scene):
         self.kind = kwargs.get("kind", "line")
         self.market = self.app.ensure_market()
         tickers = kwargs.get("tickers")
+        self.error = None
         if not tickers:
             top = self.market.top_companies(n=1)
             tickers = [top[0]["ticker"]] if top else []
+        else:
+            # actifs demandés explicitement (ex. bouton GRAPHE d'une fiche) :
+            # un ticker invalide/périmé (société radiée, faute de frappe) ne doit
+            # pas planter — on filtre et on signale si rien n'est exploitable.
+            requested = [t.upper() for t in tickers]
+            valid = [t for t in requested if _asset_exists(self.market, t)]
+            if not valid and self.kind not in _NO_ASSET:
+                self.error = f"Actif introuvable : {', '.join(requested)}"
+            tickers = valid
         self.tickers = [t.upper() for t in tickers][:6]
         self.period = kwargs.get("period", 365)
         self.spread_mode = "ratio"
@@ -133,6 +147,11 @@ class GraphScene(Scene):
     # -------------------------------------------------------------- draw
     def draw(self, surf):
         surf.fill(config.COL_BG)
+        if self.error:
+            widgets.draw_error_panel(surf, self.error,
+                                     "Utilisez SEARCH <texte> depuis le terminal.")
+            self.back_btn.draw(surf)
+            return
         code = next((c for c, _, k, _ in TYPES if k == self.kind), "GP")
         label = next((l for c, l, k, _ in TYPES if k == self.kind), "")
         widgets.draw_text(surf, f"GRAPHE — {code}  {label}", (40, 18),

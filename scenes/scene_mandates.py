@@ -16,6 +16,15 @@ ROW_H = 26
 
 
 class MandatesScene(Scene):
+    def __init__(self, app):
+        super().__init__(app)
+        # compteur d'historique de mandats déjà vus par le joueur. 0 au départ :
+        # un historique non vide à la première visite est donc bien considéré
+        # comme « nouveau » et déclenche le postmortem (mandat résolu pendant
+        # que le joueur était sur un autre écran, ex. via ADV au terminal).
+        self._seen_history = 0
+        self.postmortem = None
+
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
         self.scroll = 0
@@ -26,12 +35,35 @@ class MandatesScene(Scene):
         self._t = 0.0
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
+        # postmortem : popup affichant le dernier mandat résolu non encore vu
+        # (y compris résolu pendant que le joueur était sur un autre écran).
+        p = self.app.gs.player
+        self._postmortem_close_rect = None
+        self._check_new_postmortem(p)
+
+    def _check_new_postmortem(self, p):
+        """Détecte un nouveau mandat résolu (succès/échec) depuis la dernière
+        visite de l'écran et ouvre le postmortem correspondant."""
+        hist = p.mandate_history
+        if len(hist) > self._seen_history:
+            self.postmortem = hist[-1]
+            self._seen_history = len(hist)
 
     def _can(self):
         return unlocks.unlocked(self.app.gs.player, "mandates")
 
     # ------------------------------------------------------------- events
     def handle_event(self, event):
+        if self.postmortem is not None:
+            # tant que le postmortem est ouvert, il capte les clics/échap
+            if event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
+                self.postmortem = None
+                return
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if self._postmortem_close_rect and self._postmortem_close_rect.collidepoint(event.pos):
+                    self.postmortem = None
+                return
+            return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.go(self.return_to)
             return
@@ -61,6 +93,7 @@ class MandatesScene(Scene):
     def update(self, dt):
         self._t += dt
         self.back_btn.update(pygame.mouse.get_pos(), dt)
+        self._check_new_postmortem(self.app.gs.player)
 
     # ------------------------------------------------------------- draw
     def draw(self, surf):
@@ -72,6 +105,7 @@ class MandatesScene(Scene):
             widgets.draw_text(surf, f"⊘ Mandats débloqués au grade {config.GRADES[g]}.",
                               (42, 56), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
+            self._draw_postmortem(surf)
             return
         widgets.draw_text(surf, "Gérez l'argent de clients sous objectif de rendement et limite de risque (bêta).",
                           (42, 56), fonts.small(), config.COL_TEXT_DIM)
@@ -129,6 +163,7 @@ class MandatesScene(Scene):
             widgets.draw_text(surf, "Aucun mandat actif. Acceptez une offre ci-dessus.",
                               (ainner.x, list_top + 4), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
+            self._draw_postmortem(surf)
             return
 
         prev_clip = surf.get_clip()
@@ -193,3 +228,50 @@ class MandatesScene(Scene):
             pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 6, bar_h), border_radius=3)
 
         self.back_btn.draw(surf)
+        self._draw_postmortem(surf)
+
+    # ------------------------------------------------------------- postmortem
+    def _draw_postmortem(self, surf):
+        """Popup « postmortem » : montre pourquoi un mandat a réussi/échoué,
+        avec les chiffres réels vs cibles (rendement, bêta)."""
+        res = self.postmortem
+        if res is None:
+            return
+        # voile semi-transparent
+        veil = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT), pygame.SRCALPHA)
+        veil.fill((0, 0, 0, 150))
+        surf.blit(veil, (0, 0))
+
+        w, h = 560, 280
+        rect = pygame.Rect((config.SCREEN_WIDTH - w) // 2, (config.SCREEN_HEIGHT - h) // 2, w, h)
+        accent = config.COL_UP if res["ok"] else config.COL_DOWN
+        inner = widgets.draw_panel(surf, rect,
+                                   "MANDAT RÉUSSI" if res["ok"] else "MANDAT ÉCHOUÉ", accent)
+
+        widgets.draw_text(surf, res["client"], (inner.x, inner.y), fonts.body(bold=True), config.COL_AMBER)
+        y = inner.y + 30
+        widgets.draw_text(surf, f"Rendement obtenu : {res['growth']:+.1f}%   ·   "
+                                f"objectif : +{res['target_pct']:.1f}%",
+                          (inner.x, y), fonts.small(), config.COL_TEXT)
+        y += 24
+        widgets.draw_text(surf, f"Bêta atteint : {res['beta']:.2f}   ·   limite autorisée : {res['max_beta']:.2f}",
+                          (inner.x, y), fonts.small(), config.COL_TEXT)
+        y += 34
+        widgets.draw_text(surf, "Diagnostic :", (inner.x, y), fonts.small(bold=True), config.COL_TEXT_DIM)
+        y += 22
+        widgets.draw_text_wrapped(surf, res["reason"], (inner.x, y), fonts.small(),
+                                  accent, inner.w)
+        y += 46
+        if res["ok"]:
+            widgets.draw_text(surf, f"Commission perçue : +{res['reward_cash']:,.0f}   ·   "
+                                    f"réputation +{res['reward_rep']}",
+                              (inner.x, y), fonts.small(), config.COL_UP)
+        else:
+            widgets.draw_text(surf, f"Réputation -{res['penalty_rep']} (client perdu).",
+                              (inner.x, y), fonts.small(), config.COL_DOWN)
+
+        close = pygame.Rect(rect.right - 110, rect.bottom - 40, 90, 28)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, close, border_radius=4)
+        pygame.draw.rect(surf, accent, close, 1, border_radius=4)
+        widgets.draw_text(surf, "FERMER", close.center, fonts.tiny(bold=True), accent, align="center")
+        self._postmortem_close_rect = close

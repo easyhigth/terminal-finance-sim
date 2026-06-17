@@ -25,6 +25,7 @@ import math
 import numpy as np
 
 from data import companies as comp_data
+from core.applog import logger
 
 HIST_LEN = 400          # ~5.4 ans d'historique conservé (pour les graphes)
 
@@ -166,6 +167,7 @@ class Market:
                             "label": "Confiance"},
         }
         self.macro_hist = {k: [self.macro[k]["v"]] for k in self.macro}
+        logger.info("Market.__init__: seed=%s n_companies=%s", self.seed, self.n)
 
     # ------------------------------------------------------------------ pas
     def step(self):
@@ -257,6 +259,9 @@ class Market:
                 "region": None, "kind": "good" if good else "bad",
                 "text": f"Bascule de régime : {self.regime_label()}"})
         self._last_news = self._last_news[:4]
+        logger.debug(
+            "market.step: step_count=%s regime=%s world=%.5f news=%d",
+            self.step_count, self.regime, self.last_world, len(self._last_news))
         return self._last_news
 
     def _step_macro(self):

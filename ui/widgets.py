@@ -184,6 +184,34 @@ class Button:
 
 
 # ---------------------------------------------------------------------------
+# PIED DE CARTE — rangée de bouton(s) d'action alignée en bas d'une carte
+# ---------------------------------------------------------------------------
+def draw_card_footer(surf, card_rect, label, accent=config.COL_AMBER,
+                      enabled=True, hover=False, height=36, pad=16):
+    """Dessine un bouton d'action ancré en bas d'une carte, avec un padding et
+    une hauteur constants : unifie le placement des CTA de carte entre les
+    écrans (examcert / track / cert), qui variaient (bas-centré, bas-droite,
+    en ligne). Retourne le Rect du bouton (pour la détection de clic/focus).
+
+    `card_rect` : rect de la carte parente.
+    `label`     : texte du bouton.
+    `accent`    : couleur de bordure/texte du bouton.
+    `enabled`   : si False, bouton grisé (non actionnable).
+    `hover`     : si True, applique le fond "survolé".
+    """
+    card_rect = pygame.Rect(card_rect)
+    rect = pygame.Rect(card_rect.x + pad, card_rect.bottom - pad - height,
+                        card_rect.w - 2 * pad, height)
+    col = accent if enabled else config.COL_TEXT_DIM
+    bg = config.COL_PANEL_HEAD if (hover and enabled) else config.COL_PANEL
+    pygame.draw.rect(surf, bg, rect, border_radius=5)
+    pygame.draw.rect(surf, col, rect, 1, border_radius=5)
+    img = fonts.small(bold=True).render(label, True, col)
+    surf.blit(img, img.get_rect(center=rect.center))
+    return rect
+
+
+# ---------------------------------------------------------------------------
 # DIVERS
 # ---------------------------------------------------------------------------
 def draw_ticker_value(surf, label, value, pos, change=None):
@@ -359,6 +387,17 @@ def draw_tile(surf, rect, label, value, accent=config.COL_AMBER,
               config.COL_TEXT_DIM)
     draw_text(surf, str(value), (rect.x + 8, rect.y + 20), fonts.body(bold=True),
               value_color)
+
+
+def draw_error_panel(surf, message, hint=None, top=40, title_color=config.COL_DOWN):
+    """Écran de repli standard quand des données attendues (ticker, dataset…)
+    sont manquantes/invalides. Affiche un message d'erreur + une indication
+    optionnelle. N'affiche PAS de bouton retour : la scène appelante garde
+    son propre `back_btn` (déjà créé dans on_enter) et le dessine après cet
+    appel, pour rester cohérente avec le reste de l'écran."""
+    draw_text(surf, message, (40, top), fonts.title(bold=True), title_color)
+    if hint:
+        draw_text(surf, hint, (40, top + 60), fonts.body(), config.COL_TEXT_DIM)
 
 
 def draw_badge(surf, text, pos, accent=config.COL_AMBER, align="left"):

@@ -34,6 +34,8 @@ class SpreadsheetScene(Scene):
         self.clear_btn = widgets.Button(
             (config.SCREEN_WIDTH-220, config.SCREEN_HEIGHT-50, 180, 42),
             "TOUT EFFACER", config.COL_DOWN)
+        self.tuto_btn = widgets.Button(
+            (230, config.SCREEN_HEIGHT-50, 150, 42), "📘 TUTO", config.COL_CYAN)
 
     def _seed_demo(self, s):
         """Mini-modèle DCF pour montrer l'outil."""
@@ -100,6 +102,9 @@ class SpreadsheetScene(Scene):
             self.app.sheet = Spreadsheet(N_ROWS, N_COLS)
             self.sheet = self.app.sheet
             self.editing = False
+        if self.tuto_btn.handle(event):
+            self.app.scenes.go("tutorials", tid="spreadsheet", return_to="spreadsheet")
+            return
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             ref = self._cell_at(event.pos)
@@ -132,6 +137,7 @@ class SpreadsheetScene(Scene):
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp)
         self.clear_btn.update(mp)
+        self.tuto_btn.update(mp)
 
     # ------------------------------------------------------------------- draw
     def draw(self, surf):
@@ -147,6 +153,7 @@ class SpreadsheetScene(Scene):
         self._draw_help(surf)
         self.back_btn.draw(surf)
         self.clear_btn.draw(surf)
+        self.tuto_btn.draw(surf)
 
     def _draw_formula_bar(self, surf):
         bar = pygame.Rect(40, 110, config.SCREEN_WIDTH-80, 56)

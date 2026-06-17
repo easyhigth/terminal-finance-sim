@@ -12,6 +12,9 @@ from core.scene_manager import Scene
 from ui import fonts, widgets
 
 
+CARD_KEYS = ["exam", "cert"]
+
+
 class ExamCertScene(Scene):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
@@ -19,19 +22,31 @@ class ExamCertScene(Scene):
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self._card_rects = {}
+        self.focus = 0   # index de la carte ayant le focus clavier
+
+    def _activate(self, key):
+        if key == "exam":
+            self._go_exam()
+        else:
+            self.app.scenes.go("cert", return_to="terminal")
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.go(self.return_to)
+            return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+            return
+        if event.type == pygame.KEYDOWN:
+            if event.key in (pygame.K_TAB, pygame.K_RIGHT, pygame.K_LEFT):
+                step = -1 if event.key == pygame.K_LEFT else 1
+                self.focus = (self.focus + step) % len(CARD_KEYS)
+            elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                self._activate(CARD_KEYS[self.focus])
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for key, rect in self._card_rects.items():
                 if rect.collidepoint(event.pos):
-                    if key == "exam":
-                        self._go_exam()
-                    else:
-                        self.app.scenes.go("cert", return_to="terminal")
+                    self._activate(key)
                     return
 
     def _go_exam(self):
@@ -66,19 +81,20 @@ class ExamCertScene(Scene):
         top = config.content_top()
         colw = (config.SCREEN_WIDTH - 3 * M) // 2
         h = 280
-        self._draw_exam_card(surf, pygame.Rect(M, top, colw, h), p, mp)
-        self._draw_cert_card(surf, pygame.Rect(M * 2 + colw, top, colw, h), p, mp)
+        self._draw_exam_card(surf, pygame.Rect(M, top, colw, h), p, mp, self.focus == 0)
+        self._draw_cert_card(surf, pygame.Rect(M * 2 + colw, top, colw, h), p, mp, self.focus == 1)
 
         if self.msg:
             widgets.draw_text(surf, self.msg, (40, top + h + 24), fonts.small(), config.COL_WARN)
         self.back_btn.draw(surf)
 
-    def _draw_exam_card(self, surf, rect, p, mp):
+    def _draw_exam_card(self, surf, rect, p, mp, focused):
         ready = p.can_promote() and career_mod.promotion_ready(p)
         accent = config.COL_UP if ready else config.COL_WARN
         hover = rect.collidepoint(mp)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL, rect, border_radius=6)
-        pygame.draw.rect(surf, accent, rect, 2, border_radius=6)
+        pygame.draw.rect(surf, config.COL_CYAN if focused else accent, rect, 3 if focused else 2,
+                         border_radius=6)
         self._card_rects["exam"] = rect
         widgets.draw_text(surf, "EXAMEN DE PROMOTION", (rect.x + 20, rect.y + 18),
                           fonts.head(bold=True), config.COL_AMBER)
@@ -97,13 +113,13 @@ class ExamCertScene(Scene):
                                   (rect.right - 20, y), fonts.small(bold=True), col, align="right")
                 y += 26
         label = "PASSER L'EXAMEN" if ready else "VOIR LA ROADMAP (CAREER)"
-        widgets.draw_text(surf, label, (rect.x + 20, rect.bottom - 32),
-                          fonts.small(bold=True), accent)
+        widgets.draw_card_footer(surf, rect, label, accent, hover=hover)
 
-    def _draw_cert_card(self, surf, rect, p, mp):
+    def _draw_cert_card(self, surf, rect, p, mp, focused):
         hover = rect.collidepoint(mp)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL, rect, border_radius=6)
-        pygame.draw.rect(surf, config.COL_PRESTIGE, rect, 2, border_radius=6)
+        pygame.draw.rect(surf, config.COL_CYAN if focused else config.COL_PRESTIGE, rect,
+                         3 if focused else 2, border_radius=6)
         self._card_rects["cert"] = rect
         widgets.draw_text(surf, "CERTIFICATIONS", (rect.x + 20, rect.y + 18),
                           fonts.head(bold=True), config.COL_AMBER)
@@ -111,5 +127,4 @@ class ExamCertScene(Scene):
                           (rect.x + 20, rect.y + 54), fonts.small(), config.COL_TEXT)
         widgets.draw_text(surf, f"Voie actuelle : {p.track}", (rect.x + 20, rect.y + 84),
                           fonts.small(), config.COL_TEXT_DIM)
-        widgets.draw_text(surf, "VOIR LES CERTIFICATIONS", (rect.x + 20, rect.bottom - 32),
-                          fonts.small(bold=True), config.COL_PRESTIGE)
+        widgets.draw_card_footer(surf, rect, "VOIR LES CERTIFICATIONS", config.COL_PRESTIGE, hover=hover)

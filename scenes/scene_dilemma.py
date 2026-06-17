@@ -25,6 +25,7 @@ class DilemmaScene(Scene):
         self.state = "decide"
         self.chosen = None
         self.option_rects = {}
+        self.focus = 0   # index de l'option ayant le focus clavier
         self.continue_btn = widgets.Button(
             (config.SCREEN_WIDTH // 2 - 130, config.SCREEN_HEIGHT - 78, 260, 48),
             "RETOUR AU TERMINAL", config.COL_UP)
@@ -41,9 +42,19 @@ class DilemmaScene(Scene):
                         self._choose(i)
             elif self.state == "outcome" and self.continue_btn.rect.collidepoint(event.pos):
                 self._leave()
-        if event.type == pygame.KEYDOWN and self.state == "outcome" \
-                and event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
-            self._leave()
+        if event.type == pygame.KEYDOWN:
+            if self.state == "outcome" and event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
+                self._leave()
+            elif self.state == "decide":
+                n = len(self.dilemma["options"])
+                if event.key in (pygame.K_DOWN, pygame.K_TAB):
+                    self.focus = (self.focus + 1) % n
+                elif event.key == pygame.K_UP:
+                    self.focus = (self.focus - 1) % n
+                elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                    self._choose(self.focus)
+                elif event.key == pygame.K_ESCAPE:
+                    self.app.scenes.go(self.return_to)
 
     def _choose(self, i):
         p = self.app.gs.player
@@ -99,8 +110,10 @@ class DilemmaScene(Scene):
             rect = pygame.Rect(120, y, config.SCREEN_WIDTH - 240, 72)
             self.option_rects[i] = rect
             hover = rect.collidepoint(mp)
-            pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL, rect)
-            pygame.draw.rect(surf, config.COL_CYAN if hover else config.COL_BORDER, rect, 2 if hover else 1)
+            focused = (i == self.focus)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if (hover or focused) else config.COL_PANEL, rect)
+            pygame.draw.rect(surf, config.COL_CYAN if (hover or focused) else config.COL_BORDER, rect,
+                             3 if focused else (2 if hover else 1))
             widgets.draw_text(surf, f"{chr(65+i)}. {o['label']}", (rect.x + 16, rect.y + 12),
                               fonts.body(bold=True), config.COL_WHITE)
             # effets visibles

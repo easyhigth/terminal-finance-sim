@@ -7,6 +7,7 @@ import os
 import time
 from dataclasses import dataclass, field, asdict
 from core import config
+from core.applog import logger
 
 
 @dataclass
@@ -72,6 +73,7 @@ class PlayerState:
     mandates: list = field(default_factory=list)       # mandats clients actifs
     mandate_offers: list = field(default_factory=list)  # offres de mandats en attente
     next_mandate_id: int = 1
+    mandate_history: list = field(default_factory=list)  # postmortems résolus (succès/échec, capé)
     research: dict = field(default_factory=dict)        # ticker -> {fair, rating, day}
     alerts: list = field(default_factory=list)          # [{ticker, price, above}]
     learned: list = field(default_factory=list)         # ids des leçons lues (Académie)
@@ -159,20 +161,34 @@ class GameState:
 
     # ----- Fichiers ------------------------------------------------------
     def save(self, slot="manual"):
+        logger.info("save: début (slot=%s)", slot)
         os.makedirs(config.SAVE_DIR, exist_ok=True)
         self.last_saved = time.time()
         path = os.path.join(config.SAVE_DIR, f"{slot}.json")
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(self.to_dict(), f, indent=2)
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(self.to_dict(), f, indent=2)
+        except Exception:
+            logger.warning("save: échec (slot=%s, path=%s)", slot, path, exc_info=True)
+            raise
+        logger.info("save: succès (slot=%s, path=%s)", slot, path)
         return path
 
     @classmethod
     def load(cls, slot="manual"):
+        logger.info("load: début (slot=%s)", slot)
         path = os.path.join(config.SAVE_DIR, f"{slot}.json")
         if not os.path.exists(path):
+            logger.info("load: aucune sauvegarde trouvée (slot=%s, path=%s)", slot, path)
             return None
-        with open(path, "r", encoding="utf-8") as f:
-            return cls.from_dict(json.load(f))
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                gs = cls.from_dict(json.load(f))
+        except Exception:
+            logger.warning("load: échec (slot=%s, path=%s)", slot, path, exc_info=True)
+            raise
+        logger.info("load: succès (slot=%s, path=%s)", slot, path)
+        return gs
 
     @staticmethod
     def delete(slot):
@@ -337,6 +353,10 @@ class GameState:
         p.event_log = p.event_log[-12:]
 
         p.check_game_over(net_worth=nw)
+
+        logger.debug(
+            "advance_step: day=%s quarter=%s cash=%.2f net_worth=%.2f game_over=%s",
+            p.day, p.quarter, p.cash, nw, p.game_over)
 
         return {
             "events": evts,

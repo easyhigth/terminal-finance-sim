@@ -90,9 +90,29 @@ def progress(player, market, m):
     return growth, portfolio.portfolio_beta(player, market)
 
 
+MAX_HISTORY = 12   # nb de postmortems conservés pour affichage (scene_mandates)
+
+
+def failure_reason(m, growth, beta):
+    """Construit un message d'échec SPÉCIFIQUE (chiffré) plutôt qu'un « Échoué » générique.
+    Un mandat peut échouer sur l'un des deux critères, ou les deux à la fois."""
+    miss_target = growth < m["target_pct"]
+    miss_risk = beta > m["max_beta"] + 0.01
+    parts = []
+    if miss_target:
+        parts.append(f"Rendement cible non atteint : {growth:+.1f}% vs objectif "
+                      f"+{m['target_pct']:.1f}%")
+    if miss_risk:
+        parts.append(f"Risque dépassé : bêta {beta:.2f} vs limite {m['max_beta']:.2f}")
+    if not parts:
+        parts.append("Échoué")
+    return " · ".join(parts)
+
+
 def evaluate_due(player, market):
     """Évalue les mandats arrivés à échéance (au changement de trimestre).
-    Applique récompenses/pénalités. Retourne la liste des résultats."""
+    Applique récompenses/pénalités. Retourne la liste des résultats (chacun
+    augmenté d'un champ `reason` pour le postmortem affiché dans l'UI)."""
     from core import career
     results = []
     still = []
@@ -106,11 +126,20 @@ def evaluate_due(player, market):
             player.adjust_cash(m["reward_cash"])
             player.adjust_reputation(m["reward_rep"])
             player.flags["mandates_won"] = player.flags.get("mandates_won", 0) + 1
+            reason = f"Objectif atteint : {growth:+.1f}% (cible +{m['target_pct']:.1f}%), " \
+                     f"bêta {beta:.2f} sous la limite {m['max_beta']:.2f}."
             career.log(player, "deal", f"Mandat {m['client']} réussi (+{growth:.1f}%)")
         else:
             player.adjust_reputation(-m["penalty_rep"])
-            reason = "objectif manqué" if growth < m["target_pct"] else "risque excessif"
+            reason = failure_reason(m, growth, beta)
             career.log(player, "crisis", f"Mandat {m['client']} échoué ({reason})")
-        results.append({"mandate": m, "ok": ok, "growth": growth, "beta": beta})
+        result = {"mandate": m, "ok": ok, "growth": growth, "beta": beta, "reason": reason,
+                  "client": m["client"], "target_pct": m["target_pct"], "max_beta": m["max_beta"],
+                  "reward_cash": m["reward_cash"], "reward_rep": m["reward_rep"],
+                  "penalty_rep": m["penalty_rep"], "day": player.day, "quarter": player.quarter}
+        results.append(result)
+        player.mandate_history.append(result)
+        if len(player.mandate_history) > MAX_HISTORY:
+            player.mandate_history.pop(0)
     player.mandates = still
     return results

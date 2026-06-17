@@ -49,10 +49,8 @@ class CompanyScene(Scene):
         m = self.app.market
         mt = m.metrics(self.ticker) if m else None
         if not mt:
-            widgets.draw_text(surf, f"Société introuvable : {self.ticker}",
-                              (40, 40), fonts.title(bold=True), config.COL_DOWN)
-            widgets.draw_text(surf, "Utilisez SEARCH <texte> depuis le terminal.",
-                              (40, 100), fonts.body(), config.COL_TEXT_DIM)
+            widgets.draw_error_panel(surf, f"Société introuvable : {self.ticker}",
+                                     "Utilisez SEARCH <texte> depuis le terminal.")
             self.back_btn.draw(surf)
             return
 

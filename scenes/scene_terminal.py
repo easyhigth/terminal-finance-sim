@@ -48,7 +48,7 @@ CMD_NAMES = [
     "BONDS", "BUYBOND", "SELLBOND", "GOV", "GOVERNMENTS", "PAYS",
     "CMDTY", "BUYCMDTY", "SELLCMDTY",
     "CRYPTO", "BUYCRYPTO", "SELLCRYPTO", "ETF", "ETFS", "BUYETF", "SELLETF",
-    "STRUCT", "CREDIT", "ALM",
+    "STRUCT", "CREDIT", "ALM", "SWAP", "SWAPS",
     "ALLOCATE", "HEDGE", "REBALANCE",
     "PITCH", "FRONTIER", "RISK", "QUANT", "MA", "SHEET", "GLOSSARY",
     "SAVE", "SAVES", "NEWS", "MORE", "REG", "STATUS", "MENU",
@@ -452,6 +452,8 @@ class TerminalScene(Scene):
             self._cmd_alt_trade("etfs", cmd, parts[1:])
         elif cmd in ("STRUCT", "STRUCTURED", "STRUCTURES"):
             self.app.scenes.go("structured", return_to="terminal")
+        elif cmd in ("SWAP", "SWAPS"):
+            self.app.scenes.go("swaps", return_to="terminal")
         elif cmd in ("CREDIT", "TITRISATION", "ABS", "CLO"):
             self.app.scenes.go("credit", return_to="terminal")
         elif cmd in ("ALM", "BANKING"):

@@ -21,6 +21,7 @@ SECTIONS = [
         ("Crypto", "crypto", {}),
         ("Produits structurés", "structured", {}),
         ("Titrisation / ABS", "credit", {}),
+        ("Swaps de devises", "swaps", {}),
         ("Gouvernements", "governments", {}),
     ]),
     ("Analyse & outils", [

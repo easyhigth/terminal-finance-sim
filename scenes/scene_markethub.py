@@ -3,8 +3,9 @@ scene_markethub.py — Vue MARCHÉ regroupée.
 
 Rassemble en un seul écran ce qui était dispersé en plusieurs fenêtres
 flottantes du terminal : indices mondiaux, top sociétés (par région),
-plus forts mouvements (variations) et indicateurs macro (éco).
-Ouvert via MARKETHUB / le rail latéral « MARCHÉ ».
+plus forts mouvements (variations), indicateurs macro (éco), performance
+sectorielle et watchlist du joueur. Ouvert via MARKETHUB / le rail
+latéral « MARCHÉ ».
 """
 import pygame
 from core import config
@@ -20,19 +21,25 @@ _ECO_NOTES = {
     "confidence": "moral des marchés",
 }
 
+_TABS = [("overview", "Vue d'ensemble"), ("sectors", "Secteurs"), ("watchlist", "Watchlist")]
+_SECTOR_BAR_MAX = 1.5    # % de variation correspondant à une jauge pleine
+
 
 class MarketHubScene(Scene, PopupMixin):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
         self.market = self.app.ensure_market()
         self.top_region = self.app.gs.player.continent
+        self.tab = "overview"
         self.init_popups()
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
+        self._tab_rects = {}
         self._ticker_rects = {}
         self._region_rects = {}
         self._index_row_rects = {}
         self._eco_row_rects = {}
+        self._sector_row_rects = {}
         self._regime_rect = None
 
     def handle_event(self, event):
@@ -45,6 +52,10 @@ class MarketHubScene(Scene, PopupMixin):
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for tab_id, rect in self._tab_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.tab = tab_id
+                    return
             for region, rect in self._region_rects.items():
                 if rect.collidepoint(event.pos):
                     self.top_region = region
@@ -72,6 +83,10 @@ class MarketHubScene(Scene, PopupMixin):
                     label = self.market.macro[key]["label"]
                     self._open_series_popup(f"ÉCO — {label}", self.market.macro_hist.get(key, []), col)
                     return
+            for sector, rect in self._sector_row_rects.items():
+                if rect.collidepoint(event.pos):
+                    self._open_sector_popup(sector)
+                    return
 
     def _open_series_popup(self, title, series, color):
         def render(surf, rect):
@@ -84,6 +99,28 @@ class MarketHubScene(Scene, PopupMixin):
                               fonts.tiny(), config.COL_TEXT_DIM)
         self.open_custom_chart(title, render, accent=color)
 
+    def _open_sector_popup(self, sector):
+        comps = self.market.top_companies(sector=sector, n=10)
+        cur = self._cur()
+        def render(surf, rect):
+            y = rect.y
+            widgets.draw_text(surf, f"Top capitalisations — {sector}", (rect.x, y),
+                              fonts.small(bold=True), config.COL_TEXT)
+            y += 24
+            for c in comps:
+                ccol = config.COL_UP if c["change_pct"] >= 0 else config.COL_DOWN
+                widgets.draw_text(surf, c["ticker"], (rect.x, y), fonts.small(bold=True), config.COL_AMBER)
+                widgets.draw_text(surf, c["name"][:22], (rect.x + 64, y), fonts.small(), config.COL_TEXT)
+                widgets.draw_text(surf, widgets.format_money(c["mktcap"] * 1e6, cur),
+                                  (rect.x + rect.w - 90, y), fonts.tiny(), config.COL_TEXT_DIM, align="right")
+                widgets.draw_text(surf, f"{'+' if c['change_pct']>=0 else ''}{c['change_pct']:.2f}%",
+                                  (rect.right, y), fonts.tiny(bold=True), ccol, align="right")
+                y += 24
+            if y == rect.y + 24:
+                widgets.draw_text(surf, "Aucune société dans ce secteur.", (rect.x, y),
+                                  fonts.small(), config.COL_TEXT_DIM)
+        self.open_custom_chart(f"SECTEUR — {sector}", render, accent=config.COL_PRESTIGE, size=(460, 360))
+
     def update(self, dt):
         self.back_btn.update(pygame.mouse.get_pos(), dt)
 
@@ -93,26 +130,48 @@ class MarketHubScene(Scene, PopupMixin):
     def draw(self, surf):
         surf.fill(config.COL_BG)
         widgets.draw_text(surf, "MARCHÉ", (40, 22), fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Indices, top sociétés, variations et macro-économie — réunis ici.",
+        widgets.draw_text(surf, "Indices, top sociétés, variations, macro-économie, secteurs et watchlist.",
                           (42, 72), fonts.small(), config.COL_TEXT_DIM)
 
-        M = config.MARGIN
-        top = config.content_top()
-        bottom = config.footer_y() - 8
-        colw = (config.SCREEN_WIDTH - 3 * M) // 2
-        row_h = (bottom - top - M) // 2
-        x1, x2 = M, M * 2 + colw
-        y1, y2 = top, top + row_h + M
+        self._draw_tabs(surf)
 
+        M = config.MARGIN
+        top = config.content_top() + 30
+        bottom = config.footer_y() - 8
         self._ticker_rects = {}
         self._region_rects = {}
-        self._draw_indices(surf, pygame.Rect(x1, y1, colw, row_h))
-        self._draw_top(surf, pygame.Rect(x2, y1, colw, row_h))
-        self._draw_movers(surf, pygame.Rect(x1, y2, colw, row_h))
-        self._draw_eco(surf, pygame.Rect(x2, y2, colw, row_h))
+
+        if self.tab == "overview":
+            colw = (config.SCREEN_WIDTH - 3 * M) // 2
+            row_h = (bottom - top - M) // 2
+            x1, x2 = M, M * 2 + colw
+            y1, y2 = top, top + row_h + M
+            self._draw_indices(surf, pygame.Rect(x1, y1, colw, row_h))
+            self._draw_top(surf, pygame.Rect(x2, y1, colw, row_h))
+            self._draw_movers(surf, pygame.Rect(x1, y2, colw, row_h))
+            self._draw_eco(surf, pygame.Rect(x2, y2, colw, row_h))
+        elif self.tab == "sectors":
+            self._draw_sectors(surf, pygame.Rect(M, top, config.SCREEN_WIDTH - 2 * M, bottom - top))
+        else:
+            self._draw_watchlist(surf, pygame.Rect(M, top, config.SCREEN_WIDTH - 2 * M, bottom - top))
 
         self.back_btn.draw(surf)
         self.popups_draw(surf)
+
+    def _draw_tabs(self, surf):
+        self._tab_rects = {}
+        x = 40
+        y = config.content_top()
+        for tab_id, label in _TABS:
+            w = fonts.small(bold=True).size(label)[0] + 22
+            rect = pygame.Rect(x, y, w, 24)
+            active = (tab_id == self.tab)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if active else config.COL_PANEL, rect, border_radius=4)
+            pygame.draw.rect(surf, config.COL_AMBER if active else config.COL_BORDER, rect, 1, border_radius=4)
+            widgets.draw_text(surf, label, rect.center, fonts.small(bold=active),
+                              config.COL_AMBER if active else config.COL_TEXT_DIM, align="center")
+            self._tab_rects[tab_id] = rect
+            x = rect.right + 8
 
     def _draw_indices(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Indices mondiaux", config.COL_AMBER)
@@ -228,3 +287,64 @@ class MarketHubScene(Scene, PopupMixin):
             widgets.draw_text(surf, _ECO_NOTES.get(key, ""), (inner.x, y),
                               fonts.tiny(), config.COL_TEXT_DIM)
             y += 18
+
+    def _draw_sectors(self, surf, rect):
+        inner = widgets.draw_panel(surf, rect, "Performance sectorielle (dernier pas, pondérée par capitalisation)",
+                                   config.COL_PRESTIGE)
+        widgets.draw_text(surf, "Cliquez un secteur pour voir ses plus fortes capitalisations.",
+                          (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
+        cur = self._cur()
+        mp = pygame.mouse.get_pos()
+        self._sector_row_rects = {}
+        y = inner.y + 22
+        row_h = 28
+        bar_w = 160
+        for s in self.market.sector_performance():
+            row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, row_h - 2)
+            self._sector_row_rects[s["sector"]] = row
+            if row.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+            ccol = config.COL_UP if s["change_pct"] >= 0 else config.COL_DOWN
+            widgets.draw_text(surf, s["sector"], (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
+            bar_rect = pygame.Rect(inner.x + 160, y + 2, bar_w, 14)
+            ratio = min(1.0, abs(s["change_pct"]) / _SECTOR_BAR_MAX)
+            widgets.draw_progress(surf, bar_rect, ratio, accent=ccol)
+            widgets.draw_text(surf, f"{'+' if s['change_pct']>=0 else ''}{s['change_pct']:.2f}%",
+                              (bar_rect.right + 12, y), fonts.small(bold=True), ccol)
+            widgets.draw_text(surf, f"{s['n']} sociétés", (inner.x + inner.w - 200, y),
+                              fonts.tiny(), config.COL_TEXT_DIM, align="right")
+            widgets.draw_text(surf, widgets.format_money(s["mktcap"] * 1e6, cur), (inner.right, y),
+                              fonts.tiny(bold=True), config.COL_WHITE, align="right")
+            y += row_h
+
+    def _draw_watchlist(self, surf, rect):
+        p = self.app.gs.player
+        inner = widgets.draw_panel(surf, rect, f"Votre watchlist ({len(p.watchlist)}/10)", config.COL_CYAN)
+        if not p.watchlist:
+            widgets.draw_text(surf, "Aucune valeur suivie. Utilisez WATCHLIST ADD <ticker> au terminal,",
+                              (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, "ou ouvrez une société puis ajoutez-la à vos favoris.",
+                              (inner.x, inner.y + 20), fonts.small(), config.COL_TEXT_DIM)
+            return
+        mp = pygame.mouse.get_pos()
+        cur = self._cur()
+        y = inner.y
+        row_h = 30
+        for tk in p.watchlist:
+            mt = self.market.metrics(tk)
+            if mt is None:
+                continue
+            row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, row_h - 2)
+            self._ticker_rects[tk] = row
+            if row.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+            ccol = config.COL_UP if mt["change_pct"] >= 0 else config.COL_DOWN
+            widgets.draw_text(surf, tk, (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
+            widgets.draw_text(surf, mt["name"][:24], (inner.x + 64, y), fonts.small(), config.COL_TEXT)
+            widgets.draw_text(surf, mt["sector"], (inner.x + inner.w // 2, y),
+                              fonts.tiny(), config.COL_TEXT_DIM, align="right")
+            widgets.draw_text(surf, widgets.format_money(mt["price"], cur), (inner.right - 90, y),
+                              fonts.small(bold=True), config.COL_WHITE, align="right")
+            widgets.draw_text(surf, f"{'+' if mt['change_pct']>=0 else ''}{mt['change_pct']:.2f}% (1an)",
+                              (inner.right, y), fonts.small(bold=True), ccol, align="right")
+            y += row_h

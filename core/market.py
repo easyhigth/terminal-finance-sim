@@ -455,17 +455,18 @@ class Market:
         med = lambda xs: statistics.median(xs) if xs else None
         return {"pe": med(pes), "ev_ebitda": med(evs), "ps": med(pss), "n": len(pes)}
 
-    def top_companies(self, region=None, n=8, by="mktcap"):
+    def top_companies(self, region=None, sector=None, n=8, by="mktcap"):
         """Top sociétés (par capi par défaut, ou 'gain'/'loss' du dernier pas)."""
         idx = [i for i in range(self.n)
-               if region is None or self.companies[i]["region"] == region]
+               if (region is None or self.companies[i]["region"] == region)
+               and (sector is None or self.companies[i]["sector"] == sector)]
+        ret = (self.beta * self.last_world
+               + self.b_sector * self.last_sector[self.sec_id]
+               + self.b_region * self.last_region[self.reg_id])
         if by == "mktcap":
             idx.sort(key=lambda i: self.price[i] * self.shares[i], reverse=True)
         else:
             # mouvement du dernier pas approché par le rendement implicite
-            ret = (self.beta * self.last_world
-                   + self.b_sector * self.last_sector[self.sec_id]
-                   + self.b_region * self.last_region[self.reg_id])
             order = list(idx)
             order.sort(key=lambda i: ret[i], reverse=(by == "gain"))
             idx = order
@@ -475,7 +476,29 @@ class Market:
             out.append({"ticker": c["ticker"], "name": c["name"],
                         "sector": c["sector"], "region": c["region"],
                         "price": float(self.price[i]),
-                        "mktcap": float(self.price[i] * self.shares[i])})
+                        "mktcap": float(self.price[i] * self.shares[i]),
+                        "change_pct": float(ret[i]) * 100.0})
+        return out
+
+    def sector_performance(self):
+        """Performance moyenne (du dernier pas, pondérée par capi) de chaque
+        secteur, triée du plus fort au plus faible. Réutilise l'approximation
+        de rendement de top_companies(by='gain'/'loss')."""
+        ret = (self.beta * self.last_world
+               + self.b_sector * self.last_sector[self.sec_id]
+               + self.b_region * self.last_region[self.reg_id])
+        cap = self.price * self.shares
+        out = []
+        for sector in self.sectors:
+            mask = (self.sec_id == self._sector_idx[sector])
+            w = cap[mask]
+            if w.sum() <= 0:
+                avg = 0.0
+            else:
+                avg = float((ret[mask] * w).sum() / w.sum())
+            out.append({"sector": sector, "change_pct": avg * 100.0,
+                        "mktcap": float(w.sum()), "n": int(mask.sum())})
+        out.sort(key=lambda s: s["change_pct"], reverse=True)
         return out
 
     def search(self, query, limit=12):

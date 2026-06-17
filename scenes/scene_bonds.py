@@ -14,17 +14,20 @@ from core import bonds as B
 from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
+from ui.popups import PopupMixin
 
 LOT = 10   # taille d'un paquet d'achat/vente
 ROW_H = 28
 
 
-class BondsScene(Scene):
+class BondsScene(Scene, PopupMixin):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
+        self.init_popups()
         self.msg = ""
         self.buy_rects = {}
         self.sell_rects = {}
+        self.name_rects = {}
         self.scroll = 0
         self._max_scroll = 0
         self._list_rect = None
@@ -37,8 +40,12 @@ class BondsScene(Scene):
         return unlocks.unlocked(self.app.gs.player, "trade")
 
     def handle_event(self, event):
+        if self.popups_handle_event(event):
+            return
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
+                if self.popups_close_top():
+                    return
                 self.app.scenes.go(self.return_to)
             elif event.key == pygame.K_PAGEUP:
                 self.scroll = max(0, self.scroll - 200)
@@ -53,6 +60,10 @@ class BondsScene(Scene):
                 self.scroll = max(0, min(self._max_scroll,
                                          self.scroll + (-48 if event.button == 4 else 48)))
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for bid, rect in self.name_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.open_bond(bid)
+                    return
             p, m = self.app.gs.player, self.app.market
             if not self._can_trade():
                 return
@@ -112,7 +123,7 @@ class BondsScene(Scene):
         list_top = inner.y + 22
         list_area = pygame.Rect(inner.x - 6, list_top, inner.w + 12, inner.bottom - list_top - 26)
         self._list_rect = list_area
-        self.buy_rects, self.sell_rects = {}, {}
+        self.buy_rects, self.sell_rects, self.name_rects = {}, {}, {}
         prev_clip = surf.get_clip()
         surf.set_clip(list_area)
 
@@ -143,6 +154,7 @@ class BondsScene(Scene):
                           config.COL_UP if hv else config.COL_TEXT_DIM)
         self.back_btn.draw(surf)
         self.gov_btn.draw(surf)
+        self.popups_draw(surf)
 
     def _draw_group(self, surf, title, quotes, y, p, list_area):
         cols = self.cols
@@ -152,6 +164,8 @@ class BondsScene(Scene):
         for q in quotes:
             visible = (list_area.top - ROW_H) < y < list_area.bottom
             if visible:
+                name_w = min(260, fonts.small(bold=True).size(q["name"])[0])
+                self.name_rects[q["id"]] = pygame.Rect(cols["name"] - 2, y - 2, name_w + 4, ROW_H - 4)
                 widgets.draw_text(surf, widgets.fit_text(q["name"], fonts.small(bold=True), 260),
                                   (cols["name"], y), fonts.small(bold=True), config.COL_TEXT)
                 tcol = config.COL_CYAN if q["kind"] == "Souverain" else config.COL_PRESTIGE

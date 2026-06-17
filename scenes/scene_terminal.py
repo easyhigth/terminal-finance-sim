@@ -27,6 +27,7 @@ from core import mandates as mandates_mod
 from core import unlocks as unlocks_mod
 from core import history as history_mod
 from core import etfs as etfs_mod
+from core import news as news_mod
 from core.i18n import t as _t, get_lang
 from core.scene_manager import Scene
 
@@ -103,6 +104,8 @@ class TerminalScene(Scene):
         rivals_mod.ensure(p)              # concurrents
         self._check_badges()              # badges éventuellement franchis ailleurs
         self.worldmap = WorldMap()
+        # restaure les marqueurs persistants des news du jour courant (reprise de save)
+        self.worldmap.set_day_markers(news_mod.for_day(p, p.day))
         self.news = list(SAMPLE_NEWS.get(p.continent, SAMPLE_NEWS["USA"]))
         self.recent_events = []
         self.datawins = []        # fenêtres de données déplaçables (overlay)
@@ -126,7 +129,7 @@ class TerminalScene(Scene):
             ("PORTEF.", "PORTFOLIO"), ("MARCHÉ", "MARKETHUB"), ("ETF", "ETF"),
             ("MISSION", "MISSION"), ("EXAM/CERTIF", "EXAMCERT"),
             ("MANDATS", "MANDATES"), ("DEALS", "DEALS"),
-            ("INBOX", "INBOX"), ("DÉCIDE", "DECIDE"),
+            ("INBOX", "INBOX"), ("NEWS", "NEWS"), ("DÉCIDE", "DECIDE"),
             ("TABLEUR", "SHEET"), ("ACADÉMIE", "LEARN"),
             ("GLOSSAIRE", "GLOSSARY"),
             ("SAUVER", "SAVE"), ("AIDE", "COMMANDS"),
@@ -197,6 +200,9 @@ class TerminalScene(Scene):
                 return
             if self._career_panel_rect and self._career_panel_rect.collidepoint(event.pos):
                 self.app.scenes.go("career", return_to="terminal")
+                return
+            if getattr(self, "_health_rect", None) and self._health_rect.collidepoint(event.pos):
+                self.app.scenes.go("book", return_to="terminal")
                 return
             for tk, rect in self._topco_rects.items():
                 if rect.collidepoint(event.pos):
@@ -589,10 +595,8 @@ class TerminalScene(Scene):
         elif getattr(self.app, "cheats", False) and cmd in (
                 "GRADE", "CASH", "REP", "REPUTATION", "CHEAT", "CHEATS", "MAXUNLOCK"):
             self._cmd_cheat(cmd, parts[1:])
-        elif cmd == "NEWS":
-            import random
-            random.shuffle(self.news)
-            self._log(_L("  Flux d'actualités rafraîchi.","  News feed refreshed."))
+        elif cmd in ("NEWS", "ACTUS", "ACTUALITES", "EVENTS"):
+            self.app.scenes.go("news", return_to="terminal")
         elif cmd == "REG":
             info = config.CONTINENTS[p.continent]
             self._log(_L(f"  Régulateur : {info['regulator']}", f"  Regulator  : {info['regulator']}"),
@@ -1408,6 +1412,10 @@ class TerminalScene(Scene):
         market_news = m.step()
         p.market_step = m.step_count
         self.worldmap.push_news(market_news)
+        # fil d'actualités persistant du jour (carte + scène NEWS + historique 3 ans)
+        today_news = [news_mod.make(news_mod.categorize_market(n), n.get("kind", "info"),
+                                    n.get("text", ""), n.get("region"), "market")
+                      for n in market_news]
         # logique carrière existante (salaire/coûts, deals, événements) +
         # valorisation du portefeuille via le marché
         summary = gs.advance_step(m)
@@ -1513,6 +1521,7 @@ class TerminalScene(Scene):
             self.recent_events.insert(0, {"title": "⚠ " + scenario["name"],
                                           "kind": scenario["kind"], "cash": 0, "rep": 0})
             self._log(_L(f"  ⚠ ÉVÉNEMENT : {scenario['name']} — {scenario['story'][:50]}…", f"  ⚠ EVENT: {scenario['name']} — {scenario['story'][:50]}…"))
+            today_news.append(news_mod.make("event", scenario["kind"], scenario["name"], None, "scenario"))
             inbox_mod.on_crisis(p, scenario["name"], scenario["kind"])
             career_mod.log(p, "crisis", scenario["name"])
             self.app.notify(scenario["name"], scenario["kind"])
@@ -1527,6 +1536,7 @@ class TerminalScene(Scene):
             self.recent_events.insert(0, {"title": "✶ " + hname, "kind": hist["kind"],
                                           "cash": 0, "rep": 0})
             self._log(f"  ✶ {hname} — {hstory[:64]}…")
+            today_news.append(news_mod.make("event", hist["kind"], hname, None, "history"))
             inbox_mod.on_crisis(p, hname, hist["kind"])
             career_mod.log(p, "crisis", hname)
             self.app.notify(hname, hist["kind"])
@@ -1546,11 +1556,34 @@ class TerminalScene(Scene):
                                           "cash": 0, "rep": 0})
             self._log(_L(f"  ⚑ POLITIQUE — {pname} : {pstory[:64]}…",
                          f"  ⚑ POLITICS — {pname}: {pstory[:64]}…"))
-            inbox_mod.on_crisis(p, pname, pol["kind"])
+            today_news.append(news_mod.make("political", pol["kind"], pname, pol["region"], "politics"))
+            # une news de PAYS atterrit aussi dans l'inbox
+            inbox_mod.push(p, "country", pol["country"],
+                           _L(f"Actualité — {pol['country']}", f"Country brief — {pol['country_en']}"),
+                           pstory)
             career_mod.log(p, "crisis", pname)
             self.app.notify(pname, pol["kind"])
             if pol["kind"] == "bad":
                 p.flags["crises"] = p.flags.get("crises", 0) + 1
+            # deal/mandat avec un gouvernement, si cohérent avec la situation
+            gdeal = deals_mod.maybe_government_deal(p, pol, random)
+            if gdeal:
+                self._log(_L(f"  ✶ MANDAT SOUVERAIN : {gdeal['title']} — {pol['country']} "
+                             f"({gdeal['days_left']}j, DEALS).",
+                             f"  ✶ SOVEREIGN MANDATE: {gdeal['title']} — {pol['country_en']} "
+                             f"({gdeal['days_left']}d, DEALS)."))
+                today_news.append(news_mod.make("political", "info",
+                                  _L(f"{pol['country']} mandate un conseil financier",
+                                     f"{pol['country_en']} seeks a financial advisor"),
+                                  pol["region"], "gov_deal"))
+                inbox_mod.push(p, "country", pol["country"],
+                               _L("Proposition de mandat souverain", "Sovereign mandate proposal"),
+                               _L(f"{gdeal['desc']} Récompense {gdeal['reward_cash']:,.0f}. "
+                                  "Ouvrez DEALS pour traiter ce mandat.",
+                                  f"{gdeal['desc']} Reward {gdeal['reward_cash']:,.0f}. "
+                                  "Open DEALS to handle this mandate."))
+                self.app.notify(_L(f"Mandat souverain : {pol['country']}",
+                                   f"Sovereign mandate: {pol['country_en']}"), "info")
         if summary.get("quarter_changed"):
             self._log(_L(f"  ── Nouveau trimestre : T{p.quarter} ──", f"  ── New quarter: Q{p.quarter} ──"))
             qr = summary.get("quarter_report")
@@ -1608,6 +1641,9 @@ class TerminalScene(Scene):
                       f"  ⚠ REGULATORY INVESTIGATION: fine "
                       f"{widgets.format_money(inv['fine'], cur)}, reputation -{inv['rep_loss']}."))
             self.app.notify(_L("Enquête réglementaire : sanction","Regulatory investigation: penalty"), "bad")
+            today_news.append(news_mod.make("regulatory", "bad",
+                              _L("Enquête réglementaire ouverte à votre encontre",
+                                 "Regulatory investigation opened against you"), p.continent, "regulator"))
         # dilemme éventuel à trancher
         dil = dilemmas_mod.maybe_trigger(p, random)
         if dil:
@@ -1618,6 +1654,9 @@ class TerminalScene(Scene):
                 and summary["quarter_report"]["total"]:
             qr = summary["quarter_report"]
             self.app.notify(_L(f"Bilan T{p.quarter-1} : {qr['done']}/{qr['total']} objectifs", f"Q{p.quarter-1} review: {qr['done']}/{qr['total']} objectives"), "info")
+        # enregistre le fil d'actualités du jour (persistant 3 ans) + marqueurs carte
+        news_mod.record(p, today_news, p.day)
+        self.worldmap.set_day_markers(today_news)
         # badges éventuels
         self._check_badges()
         unread = inbox_mod.unread_count(p)
@@ -1848,10 +1887,12 @@ class TerminalScene(Scene):
             pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 4, bar_h), border_radius=2)
 
     def _draw_health(self, surf, rect, p, info):
-        inner = widgets.draw_panel(surf, rect, _t("term.health"), config.COL_AMBER)
+        self._health_rect = pygame.Rect(rect)     # cliquable → analyse détaillée (BOOK)
+        title = _t("term.health") + (" ▸" if rect.collidepoint(pygame.mouse.get_pos()) else "")
+        inner = widgets.draw_panel(surf, rect, title, config.COL_AMBER)
         cur = info["currency"]
         pos_val = pf_mod.positions_value(p, self.market)
-        nw = p.cash + pos_val
+        nw = pf_mod.net_worth(p, self.market)
         upnl = pf_mod.unrealized_pnl(p, self.market)
         nw_col = config.COL_UP if nw >= 0 else config.COL_DOWN
         widgets.draw_text(surf, _t("term.networth"), (inner.x, inner.y), fonts.small(bold=True), config.COL_TEXT_DIM)

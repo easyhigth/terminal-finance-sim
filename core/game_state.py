@@ -57,6 +57,7 @@ class PlayerState:
     # ----- monde vivant -----
     inbox: list = field(default_factory=list)          # messages reçus (manager/client/conformité/desk)
     next_msg_id: int = 1                               # compteur d'identifiants de messages
+    news_history: list = field(default_factory=list)   # fil d'actualités persistant (jusqu'à 3 ans)
     rivals: list = field(default_factory=list)         # concurrents : [{name, firm, track, score}]
     # ----- décisions & éthique -----
     heat: int = 0                                      # scrutin réglementaire 0-100 (risque d'enquête)

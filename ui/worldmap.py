@@ -66,6 +66,7 @@ class WorldMap:
     def __init__(self):
         self.t = 0.0
         self.pings = []
+        self.day_markers = []        # news PERSISTANTES du jour (remplacées chaque tour)
         self.hub_pulse = {r: 0.0 for r in REGION_HUBS}
         self.zoom = None             # None = vue monde ; sinon nom de région
         self._hub_rects = {}         # region -> (cx, cy) en pixels (dernier rendu)
@@ -92,6 +93,21 @@ class WorldMap:
             self.pings.append({"nx": nx, "ny": ny, "color": color,
                                "life": 3.0, "max_life": 3.0, "text": n.get("text", "")})
         self.pings = self.pings[-8:]
+
+    def set_day_markers(self, news_list):
+        """Fixe les news PERSISTANTES du jour : elles restent affichées sur la
+        carte (là où elles se produisent) jusqu'au tour suivant. Plusieurs
+        incidents peuvent coexister, y compris dans la même région (empilés)."""
+        self.day_markers = []
+        for n in news_list or []:
+            region = n.get("region")
+            kind = n.get("kind", "info")
+            if region and region in REGION_HUBS:
+                nx, ny = REGION_HUBS[region]["pos"]
+            else:
+                nx, ny = 0.5, 0.46     # incident mondial : centre de la carte
+            self.day_markers.append({"nx": nx, "ny": ny, "kind": kind,
+                                     "region": region, "text": n.get("text", "")})
 
     def update(self, dt):
         self.t += dt
@@ -163,6 +179,9 @@ class WorldMap:
             pygame.draw.circle(surf, p["color"], (cx, cy), int(6 + frac * 26), 1)
             pygame.draw.circle(surf, p["color"], (cx, cy), 3)
 
+        # marqueurs PERSISTANTS des news du jour (restent jusqu'au tour suivant)
+        self._draw_day_markers(surf, rect)
+
         # 7 hubs : point + label court toujours ; la fiche détaillée de l'indice
         # ne s'affiche qu'au SURVOL (sinon trop chargé). Clic = zoom région.
         self._hub_rects = {}
@@ -189,6 +208,33 @@ class WorldMap:
             last = self.pings[-1]
             widgets.draw_text(surf, "● " + last["text"], (rect.x + 10, rect.bottom - 20),
                               fonts.small(), last["color"])
+
+    def _draw_day_markers(self, surf, rect):
+        """Dessine les news persistantes du jour, empilées par localisation, avec
+        un petit losange coloré (▲ bonne / ▼ mauvaise / ◆ info) et un libellé."""
+        if not self.day_markers:
+            return
+        groups = {}
+        for mk in self.day_markers:
+            groups.setdefault((mk["nx"], mk["ny"]), []).append(mk)
+        for (nx, ny), mks in groups.items():
+            cx, cy = self._to_screen(rect, nx, ny)
+            for i, mk in enumerate(mks[:4]):
+                color = (config.COL_EVENT_GOOD if mk["kind"] == "good"
+                         else config.COL_EVENT_BAD if mk["kind"] == "bad"
+                         else config.COL_EVENT_INFO)
+                my = cy - 12 - i * 13
+                pts = [(cx, my - 5), (cx - 5, my + 4), (cx + 5, my + 4)]
+                pygame.draw.polygon(surf, color, pts)
+                pygame.draw.polygon(surf, config.COL_BG, pts, 1)
+                # libellé court de la 1re news (les suivantes : pastilles seules)
+                if i == 0:
+                    label = widgets.fit_text(mk["text"], fonts.tiny(), 120)
+                    tx = cx + 8 if nx < 0.8 else cx - 8 - fonts.tiny().size(label)[0]
+                    widgets.draw_text(surf, label, (tx, my - 4), fonts.tiny(), color)
+            if len(mks) > 4:
+                widgets.draw_text(surf, f"+{len(mks) - 4}", (cx + 8, cy - 12 - 4 * 13),
+                                  fonts.tiny(bold=True), config.COL_TEXT_DIM)
 
     def _draw_hub_box(self, surf, rect, region, market):
         """Petite fiche de l'indice phare d'une région (affichée au survol)."""

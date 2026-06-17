@@ -358,6 +358,69 @@ TUTORIALS = [
                    "la VaR suppose un monde plus calme que la réalité ne l'est lors "
                    "des crises.",
     },
+    {
+        "id": "structured",
+        "title": "Produits structurés : capital garanti, reverse convertible, autocall",
+        "image": "structured.png",
+        "intro": "Le DESK STRUCTURÉS vend des produits dont le gain final n'est pas "
+                 "linéaire avec l'indice sous-jacent : il dépend de seuils, de "
+                 "barrières et de l'échéance. Ouvrez-le avec STRUCT.",
+        "steps": [
+            "Ouvrez le catalogue : STRUCT — chaque produit a un nom, une "
+            "description du payoff et une maturité fixe (en années).",
+            "Le CAPITAL GARANTI rend le notionnel investi quoi qu'il arrive, "
+            "plus une fraction de la hausse de l'indice : sécurité d'abord, "
+            "performance ensuite.",
+            "Le REVERSE CONVERTIBLE paie un coupon élevé fixe, mais si l'indice "
+            "chute sous une barrière, le capital n'est PAS protégé : le coupon "
+            "rémunère ce risque de baisse.",
+            "L'AUTOCALLABLE peut être remboursé par anticipation (avant "
+            "l'échéance) si l'indice dépasse un certain niveau à une date "
+            "d'observation — sinon il continue jusqu'à l'échéance suivante.",
+            "Souscrivez avec SOUSCRIRE (bouton dans le catalogue) ; le payoff "
+            "n'est calculé qu'À L'ÉCHÉANCE, en fonction du niveau final de "
+            "l'indice régional sous-jacent.",
+        ],
+        "concept": "Un produit structuré combine une obligation (ou un dépôt) "
+                   "avec une ou plusieurs options pour façonner un profil de "
+                   "gain non linéaire : capital protégé en échange d'un "
+                   "potentiel de hausse plafonné, ou coupon élevé en échange "
+                   "d'un risque de baisse non protégé. Il y a toujours un "
+                   "ÉMETTEUR (la banque qui structure le produit) : son risque "
+                   "de crédit s'ajoute au risque de marché — si l'émetteur "
+                   "fait défaut, le produit ne vaut plus rien, indépendamment "
+                   "de la performance de l'indice.",
+    },
+    {
+        "id": "spreadsheet",
+        "title": "Le tableur intégré : formules et modèle DCF",
+        "image": "spreadsheet.png",
+        "intro": "Le TABLEUR (type Excel) permet de construire vos propres "
+                 "modèles financiers avec des formules. Un mini-DCF est "
+                 "préchargé pour exemple. Ouvrez-le avec SHEET.",
+        "steps": [
+            "Ouvrez l'outil : SHEET — naviguez avec les flèches ou en cliquant "
+            "une cellule ; la barre de formule affiche la référence (ex. B12).",
+            "Appuyez sur ENTRÉE ou F2 pour éditer une cellule, ou tapez "
+            "directement un caractère pour commencer à écrire.",
+            "Une formule commence par = (ex. =B3/POWER(1+B5,2)) et peut "
+            "référencer d'autres cellules ; SUM, NPV, IRR, POWER, IF sont "
+            "disponibles.",
+            "Le modèle préchargé calcule une Enterprise Value par DCF : B5 "
+            "est le WACC, B6 la croissance terminale, B12 le résultat final.",
+            "Modifiez B5 ou B6 et observez B12 se recalculer aussitôt — "
+            "c'est l'intérêt d'un modèle : tester des hypothèses sans tout "
+            "refaire à la main.",
+        ],
+        "concept": "Un modèle DCF (Discounted Cash Flow) valorise une "
+                   "entreprise en actualisant ses flux de trésorerie futurs "
+                   "au WACC (coût moyen pondéré du capital), puis en ajoutant "
+                   "une VALEUR TERMINALE qui représente tous les flux après "
+                   "l'horizon explicite (souvent via la formule de Gordon-"
+                   "Growth : FCF×(1+g)/(WACC-g)). La valeur terminale domine "
+                   "presque toujours le total — d'où la sensibilité extrême "
+                   "du résultat au couple (WACC, croissance terminale).",
+    },
 ]
 
 _BY_ID = {t["id"]: t for t in TUTORIALS}

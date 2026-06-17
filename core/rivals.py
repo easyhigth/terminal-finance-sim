@@ -117,6 +117,23 @@ def nemesis(player, market):
     return None
 
 
+def recent_activity(player, limit=8):
+    """Retourne les dernières entrées du journal de carrière qui concernent un
+    rival nommé (percées, sniping, débauchage de mandats…), les plus récentes
+    en premier. Dérivé de `player.journal`, déjà alimenté par `act()`/`snipe()`
+    via `career.log()` — aucune donnée supplémentaire à persister."""
+    names = {r["name"] for r in player.rivals}
+    if not names:
+        return []
+    out = []
+    for entry in reversed(player.journal):
+        if any(name in entry.get("text", "") for name in names):
+            out.append(entry)
+            if len(out) >= limit:
+                break
+    return out
+
+
 def act(player, market, rng=None):
     """Actions VISIBLES des rivaux ce tour. Modifie l'état (retire deals/mandats
     raflés, fait grimper les scores) et retourne une liste d'événements :

@@ -30,6 +30,7 @@ class MissionScene(Scene):
         self.input = ""        # saisie pour les items "fill"
         self.input_ok = None   # résultat de la dernière validation fill
         self.answer_rects = {}
+        self.mcq_focus = 0     # index focusé au clavier parmi les choix MCQ
         self.continue_btn = widgets.Button(
             (config.SCREEN_WIDTH // 2 - 130, config.SCREEN_HEIGHT - 56, 260, 44),
             "COMMENCER", config.COL_UP)
@@ -70,7 +71,15 @@ class MissionScene(Scene):
                     ch = event.unicode
                     if ch and (ch.isdigit() or ch in ".,-"):
                         self.input += ("." if ch == "," else ch)
-            elif event.key == pygame.K_RETURN:
+            elif self.state == "question" and item and item["kind"] == "mcq":
+                n = len(item["choices"])
+                if event.key in (pygame.K_DOWN, pygame.K_TAB):
+                    self.mcq_focus = (self.mcq_focus + 1) % n
+                elif event.key == pygame.K_UP:
+                    self.mcq_focus = (self.mcq_focus - 1) % n
+                elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                    self._answer_mcq(self.mcq_focus)
+            elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                 self._advance_state_via_key()
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -122,6 +131,7 @@ class MissionScene(Scene):
         self.chosen = None
         self.input = ""
         self.input_ok = None
+        self.mcq_focus = 0
         if self.idx >= len(self.mission["items"]):
             self._finish()
         else:
@@ -260,11 +270,12 @@ class MissionScene(Scene):
                     bg, border, txt = config.COL_PANEL, config.COL_BORDER, config.COL_TEXT_DIM
             else:
                 hover = rect.collidepoint(pygame.mouse.get_pos())
-                bg = config.COL_PANEL_HEAD if hover else config.COL_PANEL
-                border = config.COL_CYAN if hover else config.COL_BORDER
-                txt = config.COL_WHITE if hover else config.COL_TEXT
+                focused = (i == self.mcq_focus)
+                bg = config.COL_PANEL_HEAD if (hover or focused) else config.COL_PANEL
+                border = config.COL_CYAN if (hover or focused) else config.COL_BORDER
+                txt = config.COL_WHITE if (hover or focused) else config.COL_TEXT
             pygame.draw.rect(surf, bg, rect)
-            pygame.draw.rect(surf, border, rect, 1)
+            pygame.draw.rect(surf, border, rect, 3 if (self.state == "question" and i == self.mcq_focus) else 1)
             widgets.draw_text(surf, f"{chr(65 + i)}.", (rect.x + 12, rect.y + 15),
                               fonts.body(bold=True), border)
             widgets.draw_text(surf, choice, (rect.x + 48, rect.y + 15), fonts.small(), txt)

@@ -85,9 +85,7 @@ class CertScene(Scene):
             widgets.draw_text(surf, f"Statut : {C.status_label(p, pid)}  ·  "
                                     f"niveaux {prog['levels']}  ·  voie {prog['track']}",
                               (rect.x+16, rect.y+94), fonts.small(), config.COL_TEXT_DIM)
-            # bouton d'inscription
-            br = pygame.Rect(rect.right-260, rect.y+40, 244, 44)
-            self.btn_rects[pid] = br
+            # bouton d'inscription, ancré en bas-droite de la carte (largeur fixe)
             code, fee, _ = C.can_attempt(p, pid)
             if code == "done":
                 label, bcol = "OBTENU ✓", config.COL_UP
@@ -95,11 +93,11 @@ class CertScene(Scene):
                 label, bcol = f"Grade min. {prog['min_grade']+1}*", config.COL_TEXT_DIM
             else:
                 label, bcol = f"PASSER NIV. {lvl+1} — {widgets.format_money(prog['fee'][lvl], cur)}", config.COL_UP
-            hover = br.collidepoint(mp)
-            pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL, br, border_radius=5)
-            pygame.draw.rect(surf, bcol, br, 1, border_radius=5)
-            img = fonts.small(bold=True).render(label, True, bcol)
-            surf.blit(img, img.get_rect(center=br.center))
+            footer_rect = pygame.Rect(rect.right - 260, rect.y, 244, rect.h)
+            hover = pygame.Rect(rect.right - 260, rect.bottom - 16 - 36,
+                                244, 36).collidepoint(mp)
+            br = widgets.draw_card_footer(surf, footer_rect, label, bcol, hover=hover)
+            self.btn_rects[pid] = br
             y += 132
 
         if self.msg:

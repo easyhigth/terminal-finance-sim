@@ -40,6 +40,7 @@ class FinancialsScene(Scene):
         m = self.app.market
         self.block = F.statements(m, self.ticker, self.fy, n_years=N_YEARS) if m else []
         self.metrics = m.metrics(self.ticker) if m else None
+        self.error = None if self.block else f"Société introuvable : {self.ticker}"
         self.name = ""
         self.cur = "$"
         self.accent = config.COL_AMBER
@@ -106,9 +107,9 @@ class FinancialsScene(Scene):
         surf.fill(config.COL_BG)
         widgets.draw_text(surf, f"SANTÉ FINANCIÈRE — {self.ticker}", (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
-        if not self.block:
-            widgets.draw_text(surf, "Société introuvable.", (42, 90),
-                              fonts.body(), config.COL_DOWN)
+        if self.error:
+            widgets.draw_error_panel(surf, self.error,
+                                     "Utilisez SEARCH <texte> depuis le terminal.", top=90)
             self.back_btn.draw(surf)
             return
         widgets.draw_text(surf, f"{self.name} · montants en M {self.cur} · analyse complète "

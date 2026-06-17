@@ -24,23 +24,38 @@ class NewsScene(Scene):
         self.return_to = kwargs.get("return_to", "terminal")
         self.cat_filter = None
         self.region_filter = None
+        self.search = ""
         self.scroll = 0
         self._max_scroll = 0
         self._list_rect = None
         self._cat_rects = {}
         self._region_rects = {}
+        self._search_clear_rect = None
+        self._t = 0.0
         self.back_btn = widgets.Button(config.back_button_rect(180),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
+                if self.search:
+                    self.search = ""
+                    return
                 self.app.scenes.go(self.return_to)
+                return
+            elif event.key == pygame.K_BACKSPACE:
+                self.search = self.search[:-1]
                 return
             elif event.key == pygame.K_PAGEUP:
                 self.scroll = max(0, self.scroll - 200)
+                return
             elif event.key == pygame.K_PAGEDOWN:
                 self.scroll = min(self._max_scroll, self.scroll + 200)
+                return
+            elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
+                self.search += event.unicode
+                self.scroll = 0
+                return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
             return
@@ -50,6 +65,9 @@ class NewsScene(Scene):
                                          self.scroll + (-48 if event.button == 4 else 48)))
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
+                self.search = ""
+                return
             for val, rect in self._cat_rects.items():
                 if rect.collidepoint(event.pos):
                     self.cat_filter = None if self.cat_filter == val else val
@@ -62,12 +80,16 @@ class NewsScene(Scene):
                     return
 
     def update(self, dt):
+        self._t += dt
         self.back_btn.update(pygame.mouse.get_pos(), dt)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
         p = self.app.gs.player
         items = N.query(p, cat=self.cat_filter, region=self.region_filter)
+        q = self.search.strip().lower()
+        if q:
+            items = [e for e in items if q in f"{e['text']} {e['region'] or ''}".lower()]
         widgets.draw_text(surf, "NEWS", (40, 22), fonts.title(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, "Tout ce qui agite la partie — filtrez par type ou région. "
                                 "Historique conservé jusqu'à 3 ans.",
@@ -75,10 +97,26 @@ class NewsScene(Scene):
 
         x0 = 40
         top = config.content_top()
+
+        # ---- recherche ----
+        search_rect = pygame.Rect(x0, top, 300, 24)
+        pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN if self.search else config.COL_BORDER, search_rect, 1, border_radius=4)
+        cursor = "_" if int(self._t * 2) % 2 == 0 else " "
+        label = (self.search + cursor) if self.search else "Tapez pour rechercher dans le texte…"
+        col = config.COL_TEXT if self.search else config.COL_TEXT_DIM
+        widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
+                          (search_rect.x + 8, search_rect.y + 4), fonts.small(), col)
+        self._search_clear_rect = None
+        if self.search:
+            self._search_clear_rect = pygame.Rect(search_rect.right - 22, search_rect.y, 22, search_rect.h)
+            widgets.draw_text(surf, "✕", self._search_clear_rect.center, fonts.small(bold=True),
+                              config.COL_TEXT_DIM, align="center")
+
         counts = N.counts_by_category(p)
         cat_chips = [(None, f"TOUTES ({len(getattr(p, 'news_history', []) or [])})")]
         cat_chips += [(k, f"{lbl} ({counts.get(k, 0)})") for k, lbl in N.CATEGORIES]
-        self._cat_rects, ybot = self._chip_row(surf, x0, top, config.SCREEN_WIDTH - 40,
+        self._cat_rects, ybot = self._chip_row(surf, x0, top + 30, config.SCREEN_WIDTH - 40,
                                                cat_chips, self.cat_filter, config.COL_AMBER)
         regions = sorted({e["region"] for e in (getattr(p, "news_history", []) or []) if e["region"]})
         region_chips = [(None, "TOUTES RÉGIONS")] + [(r, r) for r in regions]

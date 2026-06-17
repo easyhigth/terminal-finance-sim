@@ -67,6 +67,7 @@ class WorldMap:
         self.t = 0.0
         self.pings = []
         self.day_markers = []        # news PERSISTANTES du jour (remplacées chaque tour)
+        self._marker_rects = []      # [(Rect, region)] cliquables (vue monde)
         self.hub_pulse = {r: 0.0 for r in REGION_HUBS}
         self.zoom = None             # None = vue monde ; sinon nom de région
         self._hub_rects = {}         # region -> (cx, cy) en pixels (dernier rendu)
@@ -123,6 +124,10 @@ class WorldMap:
         if not rect.collidepoint(pos):
             return None
         if self.zoom is None:
+            # 1) clic sur un marqueur de news du jour → fiche détaillée des news
+            for mrect, region in self._marker_rects:
+                if mrect.collidepoint(pos):
+                    return ("news", region)
             best = None
             for region, (cx, cy) in self._hub_rects.items():
                 d2 = (pos[0] - cx) ** 2 + (pos[1] - cy) ** 2
@@ -212,6 +217,7 @@ class WorldMap:
     def _draw_day_markers(self, surf, rect):
         """Dessine les news persistantes du jour, empilées par localisation, avec
         un petit losange coloré (▲ bonne / ▼ mauvaise / ◆ info) et un libellé."""
+        self._marker_rects = []
         if not self.day_markers:
             return
         groups = {}
@@ -219,6 +225,11 @@ class WorldMap:
             groups.setdefault((mk["nx"], mk["ny"]), []).append(mk)
         for (nx, ny), mks in groups.items():
             cx, cy = self._to_screen(rect, nx, ny)
+            n_shown = min(len(mks), 4)
+            # zone cliquable couvrant toute la pile de marqueurs (+ libellé)
+            top_y = cy - 12 - (n_shown - 1) * 13 - 6
+            self._marker_rects.append(
+                (pygame.Rect(cx - 8, top_y, 132, (cy - top_y) + 6), mks[0]["region"]))
             for i, mk in enumerate(mks[:4]):
                 color = (config.COL_EVENT_GOOD if mk["kind"] == "good"
                          else config.COL_EVENT_BAD if mk["kind"] == "bad"

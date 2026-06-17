@@ -68,7 +68,7 @@ class NewsScene(Scene):
         surf.fill(config.COL_BG)
         p = self.app.gs.player
         items = N.query(p, cat=self.cat_filter, region=self.region_filter)
-        widgets.draw_text(surf, "NEWS & ÉVÉNEMENTS", (40, 22), fonts.title(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, "NEWS", (40, 22), fonts.title(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, "Tout ce qui agite la partie — filtrez par type ou région. "
                                 "Historique conservé jusqu'à 3 ans.",
                           (42, 72), fonts.small(), config.COL_TEXT_DIM)

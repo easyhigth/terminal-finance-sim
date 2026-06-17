@@ -291,6 +291,7 @@ python main.py
 | `BONDS` · `CMDTY` · `CRYPTO` | Marchés obligataire / commodities / crypto |
 | `SAVE`     | Sauvegarde manuelle (hors hardcore)     |
 | `NEWS`     | Scène News & événements (filtres par type/région, historique 3 ans) |
+| `MORE` / `PLUS` | Toutes les pages (raccourcis vers chaque scène) |
 | `REG`      | Rappel réglementaire de la région       |
 | `MENU`     | Retour au menu (ou ESC)                 |
 

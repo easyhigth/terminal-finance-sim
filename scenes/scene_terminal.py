@@ -51,7 +51,7 @@ CMD_NAMES = [
     "STRUCT", "CREDIT", "ALM",
     "ALLOCATE", "HEDGE", "REBALANCE",
     "PITCH", "FRONTIER", "RISK", "QUANT", "MA", "SHEET", "GLOSSARY",
-    "SAVE", "SAVES", "NEWS", "REG", "STATUS", "MENU",
+    "SAVE", "SAVES", "NEWS", "MORE", "REG", "STATUS", "MENU",
 ]
 
 SAMPLE_NEWS = {
@@ -131,7 +131,7 @@ class TerminalScene(Scene):
             ("MANDATS", "MANDATES"), ("DEALS", "DEALS"),
             ("INBOX", "INBOX"), ("NEWS", "NEWS"), ("DÉCIDE", "DECIDE"),
             ("TABLEUR", "SHEET"), ("ACADÉMIE", "LEARN"),
-            ("GLOSSAIRE", "GLOSSARY"),
+            ("GLOSSAIRE", "GLOSSARY"), ("PLUS", "MORE"),
             ("SAUVER", "SAVE"), ("AIDE", "COMMANDS"),
         ]
         self.networth_spark = widgets.Sparkline(80)
@@ -224,6 +224,9 @@ class TerminalScene(Scene):
                 if action and action[0] == "company":
                     self._open_company_popup(action[1])
                     return
+                if action and action[0] == "news":
+                    self._open_news_window(action[1])
+                    return
                 if action:
                     return
         # 3) clavier : ligne de commande
@@ -272,6 +275,22 @@ class TerminalScene(Scene):
         self.datawins.append(DataWindow(title, columns, rows, pos=pos, accent=accent))
         if len(self.datawins) > 5:
             self.datawins.pop(0)
+
+    def _open_news_window(self, region):
+        """Détaille les news du jour à un emplacement de la carte (clic marqueur)."""
+        p = self.app.gs.player
+        items = [e for e in news_mod.for_day(p, p.day) if e["region"] == region]
+        kcol = {"good": config.COL_UP, "bad": config.COL_DOWN, "info": config.COL_CYAN}
+        rows = []
+        for e in items:
+            cat = news_mod.CATEGORY_LABEL.get(e["cat"], e["cat"])
+            rows.append(((cat, kcol.get(e["kind"], config.COL_TEXT)), e["text"]))
+        if not rows:
+            rows = [("—", _L("Aucune actualité détaillée.", "No detailed news."))]
+        loc = region or _L("Mondial", "Global")
+        self._open_window(_L(f"NEWS — {loc} (jour {p.day})", f"NEWS — {loc} (day {p.day})"),
+                          [(_L("Type", "Type"), 110), (_L("Actualité", "Headline"), 360)],
+                          rows, accent=config.COL_PRESTIGE)
 
     def _open_company_popup(self, ticker):
         """Ouvre la fiche flottante d'une société (en cascade), sans changer de scène."""
@@ -597,6 +616,8 @@ class TerminalScene(Scene):
             self._cmd_cheat(cmd, parts[1:])
         elif cmd in ("NEWS", "ACTUS", "ACTUALITES", "EVENTS"):
             self.app.scenes.go("news", return_to="terminal")
+        elif cmd in ("MORE", "PLUS", "RACCOURCIS", "SHORTCUTS", "PAGES"):
+            self.app.scenes.go("more", return_to="terminal")
         elif cmd == "REG":
             info = config.CONTINENTS[p.continent]
             self._log(_L(f"  Régulateur : {info['regulator']}", f"  Regulator  : {info['regulator']}"),
@@ -1768,7 +1789,8 @@ class TerminalScene(Scene):
         self._rail_rects = {}
         gap = 4
         n = max(1, len(self.rail))
-        bh = max(18, min(26, (inner.h - gap * (n - 1)) // n))   # pas adaptatif
+        # pas adaptatif borné à la hauteur du panneau (jamais de débordement vers le bas)
+        bh = max(14, min(26, (inner.h - gap * (n - 1)) // n))
         y = inner.y
         mp = pygame.mouse.get_pos()
         for label, cmd in self.rail:

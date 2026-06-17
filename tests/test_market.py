@@ -266,3 +266,21 @@ def test_suggest_ranks_exact_first():
     sug = m.suggest(tk)
     assert sug and sug[0][0] == tk
     assert len(sug) <= 8
+
+
+# --------------------------------------------------------------- secteurs / top
+def test_sector_performance_covers_all_sectors_and_sums_companies():
+    m = Market(seed=3); m.fast_forward(5)
+    perf = m.sector_performance()
+    assert {p["sector"] for p in perf} == set(m.sectors)
+    assert sum(p["n"] for p in perf) == m.n
+    # trié du plus fort au plus faible
+    assert all(perf[i]["change_pct"] >= perf[i + 1]["change_pct"] for i in range(len(perf) - 1))
+
+
+def test_top_companies_filters_by_sector():
+    m = Market(seed=3)
+    sector = m.companies[0]["sector"]
+    out = m.top_companies(sector=sector, n=50)
+    assert out
+    assert all(c["sector"] == sector for c in out)

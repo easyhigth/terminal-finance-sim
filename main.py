@@ -18,6 +18,9 @@ from scenes.scene_glossary import GlossaryScene
 from scenes.scene_evaluation import EvaluationScene
 from scenes.scene_portfolio import PortfolioScene
 from scenes.scene_ma import MAScene
+from scenes.scene_ma_target import MATargetScene
+from scenes.scene_mandates import MandatesScene
+from scenes.scene_deals import DealsScene
 from scenes.scene_track import TrackScene
 from scenes.scene_risk import RiskScene
 from scenes.scene_quant import QuantScene
@@ -85,6 +88,9 @@ class App:
         self.scenes.register("evaluation", EvaluationScene(self))
         self.scenes.register("portfolio", PortfolioScene(self))
         self.scenes.register("ma", MAScene(self))
+        self.scenes.register("ma_target", MATargetScene(self))
+        self.scenes.register("mandates", MandatesScene(self))
+        self.scenes.register("deals", DealsScene(self))
         self.scenes.register("track", TrackScene(self))
         self.scenes.register("risk", RiskScene(self))
         self.scenes.register("quant", QuantScene(self))

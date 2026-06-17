@@ -28,7 +28,7 @@ SECTIONS = [
         ("Analyse portefeuille", "analytics", {}),
         ("Risque (VaR)", "risk", {}),
         ("Quant (options)", "quant", {}),
-        ("M&A / LBO", "ma", {}),
+        ("M&A (cibles & LBO)", "ma", {}),
         ("Frontière efficiente", "portfolio", {}),
         ("ALM bancaire", "alm", {}),
         ("Tableur", "spreadsheet", {}),
@@ -42,6 +42,8 @@ SECTIONS = [
         ("Rivaux", "rivals", {}),
         ("Inbox", "inbox", {}),
         ("News & événements", "news", {}),
+        ("Mandats clients", "mandates", {}),
+        ("Deals", "deals", {}),
     ]),
     ("Apprendre", [
         ("Académie", "academy", {}),

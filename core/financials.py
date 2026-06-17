@@ -78,19 +78,16 @@ def _row(label, value):
     return {"label": label, "value": value}
 
 
-def income_statement(market, ticker, year_offset=0):
-    """Compte de résultat (en M de devise locale) pour l'exercice N-`year_offset`."""
-    i = market.ticker_idx[ticker]
-    c = market.companies[i]
-    p = params(c["sector"], ticker)
-    g = p["growth"]
+def income_statement_for(rev_n, net_margin, ebitda_margin, net_debt0, sector, ticker,
+                          year_offset=0, shares=1.0, growth=None):
+    """Compte de résultat à partir de fondamentaux bruts (pas besoin d'un Market
+    vivant) : réutilisé par `income_statement()` (sociétés cotées) et par le
+    module M&A (cibles privées, hors marché)."""
+    p = params(sector, ticker)
+    g = p["growth"] if growth is None else growth
 
-    rev_n = float(market.revenue[i])
     revenue = rev_n / ((1 + g) ** year_offset)
-    net_margin = float(market.net_margin[i])
-    ebitda_margin = float(market.ebitda_margin[i])
-    shares = c["shares"]
-    net_debt = c["net_debt"] * (revenue / rev_n if rev_n else 1.0)
+    net_debt = net_debt0 * (revenue / rev_n if rev_n else 1.0)
 
     # marge brute = EBITDA margin + SG&A + R&D  ->  COGS = CA × (1 − marge brute)
     gross_margin = min(0.92, ebitda_margin + p["sga_pct"] + p["rnd_pct"])
@@ -131,17 +128,17 @@ def income_statement(market, ticker, year_offset=0):
     }
 
 
-def balance_sheet(market, ticker, year_offset=0):
-    """Bilan (en M) pour l'exercice N-`year_offset`. Équilibré par construction."""
-    i = market.ticker_idx[ticker]
-    c = market.companies[i]
-    p = params(c["sector"], ticker)
-    g = p["growth"]
+def balance_sheet_for(rev_n, net_margin, ebitda_margin, net_debt0, sector, ticker,
+                       year_offset=0, shares=1.0, growth=None):
+    """Bilan à partir de fondamentaux bruts. Équilibré par construction.
+    Voir `income_statement_for` pour le pourquoi de cette extraction."""
+    p = params(sector, ticker)
+    g = p["growth"] if growth is None else growth
 
-    rev_n = float(market.revenue[i])
     revenue = rev_n / ((1 + g) ** year_offset)
-    net_debt = c["net_debt"] * (revenue / rev_n if rev_n else 1.0)
-    inc = income_statement(market, ticker, year_offset)
+    net_debt = net_debt0 * (revenue / rev_n if rev_n else 1.0)
+    inc = income_statement_for(rev_n, net_margin, ebitda_margin, net_debt0, sector, ticker,
+                               year_offset, shares, growth)
     cogs = inc["cogs"]
 
     cash_base = revenue * p["cash_pct"]
@@ -196,6 +193,24 @@ def balance_sheet(market, ticker, year_offset=0):
             _row("TOTAL PASSIF + CP", total_liab + equity),
         ],
     }
+
+
+def income_statement(market, ticker, year_offset=0):
+    """Compte de résultat (en M de devise locale) pour l'exercice N-`year_offset`."""
+    i = market.ticker_idx[ticker]
+    c = market.companies[i]
+    return income_statement_for(
+        float(market.revenue[i]), float(market.net_margin[i]), float(market.ebitda_margin[i]),
+        c["net_debt"], c["sector"], ticker, year_offset, c["shares"])
+
+
+def balance_sheet(market, ticker, year_offset=0):
+    """Bilan (en M) pour l'exercice N-`year_offset`. Équilibré par construction."""
+    i = market.ticker_idx[ticker]
+    c = market.companies[i]
+    return balance_sheet_for(
+        float(market.revenue[i]), float(market.net_margin[i]), float(market.ebitda_margin[i]),
+        c["net_debt"], c["sector"], ticker, year_offset, c["shares"])
 
 
 def statements(market, ticker, base_year, n_years=3):

@@ -46,6 +46,7 @@ from scenes.scene_alm import AlmScene
 from scenes.scene_graph import GraphScene
 from scenes.scene_rivals import RivalsScene
 from scenes.scene_analytics import AnalyticsScene
+from scenes.scene_explorer import MarketExplorerScene
 from scenes.scene_tutorials import TutorialsScene
 from scenes.scene_splash import SplashScene
 from ui.logo import make_icon_surface
@@ -106,6 +107,7 @@ class App:
         self.scenes.register("graph", GraphScene(self))
         self.scenes.register("rivals", RivalsScene(self))
         self.scenes.register("analytics", AnalyticsScene(self))
+        self.scenes.register("explorer", MarketExplorerScene(self))
         self.scenes.register("tutorials", TutorialsScene(self))
         self.scenes.register("splash", SplashScene(self))
         self.scenes.go("splash")

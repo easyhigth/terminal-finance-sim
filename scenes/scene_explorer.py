@@ -57,6 +57,7 @@ class MarketExplorerScene(Scene, PopupMixin):
         self.init_popups()
         self.rows = self._build_dataset()
         self.search = ""
+        self._t = 0.0
         self.type_filter = None
         self.region_filter = None
         self.sub_filter = None
@@ -345,6 +346,7 @@ class MarketExplorerScene(Scene, PopupMixin):
             self.app.scenes.go("governments", return_to="explorer", focus=key)
 
     def update(self, dt):
+        self._t += dt
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp, dt)
         self.add_btn.label = f"+ AJOUTER ({len(self.selected)})" if self.selected else "+ AJOUTER"
@@ -369,7 +371,8 @@ class MarketExplorerScene(Scene, PopupMixin):
         search_rect = pygame.Rect(x0, top, 300, 24)
         pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN if self.search else config.COL_BORDER, search_rect, 1, border_radius=4)
-        label = self.search if self.search else "Rechercher (nom, ticker, secteur, région)…"
+        cursor = "_" if int(self._t * 2) % 2 == 0 else " "
+        label = (self.search + cursor) if self.search else "Tapez pour rechercher (nom, ticker, secteur)…"
         col = config.COL_TEXT if self.search else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
                           (search_rect.x + 8, search_rect.y + 4), fonts.small(), col)

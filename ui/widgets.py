@@ -18,7 +18,7 @@ def draw_text(surf, text, pos, font, color=config.COL_TEXT, align="left"):
     if align == "left":
         rect.topleft = pos
     elif align == "center":
-        rect.midtop = pos
+        rect.center = pos
     elif align == "right":
         rect.topright = pos
     surf.blit(img, rect)
@@ -53,7 +53,7 @@ def draw_text_scaled(surf, text, pos, font, color, max_width, align="left"):
     if align == "left":
         rect.topleft = pos
     elif align == "center":
-        rect.midtop = pos
+        rect.center = pos
     elif align == "right":
         rect.topright = pos
     surf.blit(img, rect)

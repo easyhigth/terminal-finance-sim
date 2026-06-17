@@ -37,6 +37,9 @@ class CommoditiesScene(Scene, PopupMixin):
         self._list_rect = None
         self.cat_filter = None     # None = toutes catégories
         self._cat_rects = {}
+        self.search = ""
+        self._search_clear_rect = None
+        self._t = 0.0
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
@@ -50,11 +53,24 @@ class CommoditiesScene(Scene, PopupMixin):
             if event.key == pygame.K_ESCAPE:
                 if self.popups_close_top():
                     return
+                if self.search:
+                    self.search = ""
+                    return
                 self.app.scenes.go(self.return_to)
+                return
+            elif event.key == pygame.K_BACKSPACE:
+                self.search = self.search[:-1]
+                return
             elif event.key == pygame.K_PAGEUP:
                 self.scroll = max(0, self.scroll - 200)
+                return
             elif event.key == pygame.K_PAGEDOWN:
                 self.scroll = min(self._max_scroll, self.scroll + 200)
+                return
+            elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
+                self.search += event.unicode
+                self.scroll = 0
+                return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
@@ -62,6 +78,9 @@ class CommoditiesScene(Scene, PopupMixin):
                 self.scroll = max(0, min(self._max_scroll,
                                          self.scroll + (-48 if event.button == 4 else 48)))
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
+                self.search = ""
+                return
             for cat, rect in self._cat_rects.items():
                 if rect.collidepoint(event.pos):
                     if cat == "__ALL__":
@@ -93,6 +112,7 @@ class CommoditiesScene(Scene, PopupMixin):
                         self.app.gs.save(config.AUTOSAVE_SLOT)
 
     def update(self, dt):
+        self._t += dt
         self.back_btn.update(pygame.mouse.get_pos(), dt)
 
     def draw(self, surf):
@@ -105,9 +125,24 @@ class CommoditiesScene(Scene, PopupMixin):
                                 "backwardation = futures < spot (roll positif). " + self.msg,
                           (42, 50), fonts.small(), config.COL_TEXT_DIM)
 
+        # ---- recherche ----
+        search_rect = pygame.Rect(40, 74, 260, 24)
+        pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN if self.search else config.COL_BORDER, search_rect, 1, border_radius=4)
+        cursor = "_" if int(self._t * 2) % 2 == 0 else " "
+        label = (self.search + cursor) if self.search else "Tapez pour rechercher…"
+        col = config.COL_TEXT if self.search else config.COL_TEXT_DIM
+        widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
+                          (search_rect.x + 8, search_rect.y + 4), fonts.small(), col)
+        self._search_clear_rect = None
+        if self.search:
+            self._search_clear_rect = pygame.Rect(search_rect.right - 22, search_rect.y, 22, search_rect.h)
+            widgets.draw_text(surf, "✕", self._search_clear_rect.center, fonts.small(bold=True),
+                              config.COL_TEXT_DIM, align="center")
+
         # chips de catégorie
         self._cat_rects = {}
-        cx = 42
+        cx = 42 + search_rect.w + 16
         cy = 74
         all_rect = pygame.Rect(cx, cy, 70, 20)
         self._cat_rects["__ALL__"] = all_rect
@@ -150,6 +185,9 @@ class CommoditiesScene(Scene, PopupMixin):
         surf.set_clip(list_area)
 
         all_q = C.all_quotes(m)
+        q = self.search.strip().lower()
+        if q:
+            all_q = [r for r in all_q if q in f"{r['name']} {r['id']} {r['category']}".lower()]
         cats = [self.cat_filter] if self.cat_filter else CATEGORY_ORDER
         y = list_top - self.scroll
         for cat in cats:

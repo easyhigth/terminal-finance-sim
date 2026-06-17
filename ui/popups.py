@@ -28,6 +28,7 @@ from core import config
 from core import charts as _charts
 from core import commodities as commodities_mod
 from core import bonds as bonds_mod
+from core import etfs as etfs_mod
 from ui import fonts, widgets
 from ui.datawindow import DataWindow
 
@@ -363,6 +364,87 @@ class BondPopup(DataWindow):
                               fonts.tiny(), config.COL_TEXT_DIM)
 
 
+_RISK_LABEL = {1: "Très faible", 2: "Faible", 3: "Modéré", 4: "Élevé", 5: "Très élevé"}
+
+
+class ETFPopup(DataWindow):
+    """Fiche ETF compacte : NAV, catégorie, exposition, frais, rendement et
+    mini-graphe de NAV à onglets (équivalent de CompanyPopup pour les fonds)."""
+
+    def __init__(self, eid, market, pos=(160, 120), accent=None):
+        self.eid = eid.upper()
+        self.market = market
+        self.kind = "line"
+        self.expand_requested = False
+        self.open_ticker = None
+        self._kind_rects = {}
+        q = etfs_mod.quote(market, self.eid) if market else None
+        accent = accent or (config.COL_DOWN if (q and q["leveraged"]) else config.COL_PRESTIGE)
+        title = f"{self.eid} — {q['name']}" if q else self.eid
+        super().__init__(title, [], [], pos=pos, accent=accent,
+                         size=(380, 320), resizable=True, min_size=(320, 240))
+
+    def _handle_body(self, pos):
+        for k, rr in self._kind_rects.items():
+            if rr.collidepoint(pos):
+                self.kind = k
+                return True
+        return False
+
+    def draw(self, surf):
+        content = self._draw_chrome(surf)
+        if content is None:
+            return
+        q = etfs_mod.quote(self.market, self.eid) if self.market else None
+        if not q:
+            widgets.draw_text(surf, f"ETF introuvable : {self.eid}",
+                              (content.x, content.y), fonts.small(), config.COL_DOWN)
+            return
+        y = content.y
+        widgets.draw_text(surf, self.eid, (content.x, y), fonts.body(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, f"{q['price']:,.2f}", (content.right, y),
+                          fonts.body(bold=True), config.COL_WHITE, align="right")
+        y += 22
+        chg = q["change_pct"]
+        chg_col = config.COL_UP if chg >= 0 else config.COL_DOWN
+        widgets.draw_text(surf, widgets.fit_text(q["name"], fonts.small(), content.w - 90),
+                          (content.x, y), fonts.small(), config.COL_TEXT)
+        widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.2f}%", (content.right, y),
+                          fonts.small(bold=True), chg_col, align="right")
+        y += 22
+        widgets.draw_badge(surf, q["category_label"], (content.x, y), self.accent)
+        if q["leveraged"]:
+            widgets.draw_badge(surf, "RISQUE ÉLEVÉ", (content.x + 130, y), config.COL_DOWN)
+        y += 26
+        widgets.draw_text(surf, "Exposition : " + widgets.fit_text(q["exposure"], fonts.tiny(), content.w - 80),
+                          (content.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+        y += 18
+        col_a = [("Var. 1 an", f"{q['change_1y']:+.1f}%"), ("Rendement", f"{q['yield']*100:.1f}%")]
+        col_b = [("Frais", f"{q['expense']*100:.2f}%"), ("Bêta monde", f"{q['beta']:+.2f}")]
+        cw = content.w // 2
+        for ci, col in enumerate((col_a, col_b)):
+            fx = content.x + ci * cw
+            fy = y
+            for label, val in col:
+                widgets.draw_text(surf, label, (fx, fy), fonts.tiny(), config.COL_TEXT_DIM)
+                widgets.draw_text(surf, val, (fx + cw - 16, fy), fonts.tiny(bold=True),
+                                  config.COL_WHITE, align="right")
+                fy += 15
+        y += 15 * 2 + 6
+        widgets.draw_text(surf, f"Risque : {_RISK_LABEL.get(q['risk'], '?')}", (content.x, y),
+                          fonts.tiny(), config.COL_WARN if q["risk"] >= 4 else config.COL_TEXT_DIM)
+        y += 18
+        tabs_rect = pygame.Rect(content.x, y, content.w, 20)
+        self._kind_rects = _draw_kind_tabs(surf, tabs_rect, self.kind, self.accent)
+        y += 24
+        plot_rect = pygame.Rect(content.x, y, content.w, max(20, content.bottom - y - 16 - 4))
+        series = etfs_mod.nav_history(self.market, self.eid, 365) if self.market else []
+        legend = _draw_series_plot(surf, plot_rect, series, self.kind)
+        if legend:
+            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+
+
 class QuickAccessWindow(DataWindow):
     """« Accès rapide » : gère les actions favorites (watchlist, max 10) —
     clic sur le ticker → fiche, ▲/▼ réordonnent, ✕ retire. Lit/modifie
@@ -525,6 +607,17 @@ class PopupMixin:
         if not market or bonds_mod.quote(market, bond_id) is None:
             return None
         w = BondPopup(bond_id, market, pos=self._popup_pos(), accent=accent)
+        self.popups.append(w)
+        if len(self.popups) > self._MAX_POPUPS:
+            self.popups.pop(0)
+        return w
+
+    def open_etf(self, eid, accent=None):
+        """Ouvre (ou met au premier plan) la fiche flottante d'un ETF."""
+        market = self._popup_market()
+        if not market or etfs_mod.quote(market, eid.upper()) is None:
+            return None
+        w = ETFPopup(eid, market, pos=self._popup_pos(), accent=accent)
         self.popups.append(w)
         if len(self.popups) > self._MAX_POPUPS:
             self.popups.pop(0)

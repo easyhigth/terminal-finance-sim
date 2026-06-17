@@ -14,6 +14,7 @@ _KIND = {
     "compliance": ("CONFORMITÉ", config.COL_DOWN),
     "desk": ("DESK", config.COL_TEXT),
     "hr": ("RH", config.COL_UP),
+    "country": ("PAYS", config.COL_PRESTIGE),
 }
 
 

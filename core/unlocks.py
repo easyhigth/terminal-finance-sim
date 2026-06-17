@@ -40,6 +40,7 @@ CMD_FEATURE = {
     "TRACK": "track", "VOIE": "track",
     "DEALS": "deals", "DEAL": "deals",
     "BUY": "trade", "ACHETER": "trade", "SELL": "trade", "VENDRE": "trade",
+    "BUYETF": "trade", "SELLETF": "trade",
     "ALLOCATE": "trade", "ALLOC": "trade", "REBALANCE": "trade", "REBAL": "trade",
     "MARGIN": "trade", "MARGE": "trade",
     "SHORT": "leverage", "VAD": "leverage", "COVER": "leverage", "RACHETER": "leverage",

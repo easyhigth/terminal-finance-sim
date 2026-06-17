@@ -20,6 +20,7 @@ Ouvrable depuis la console (GP/GPC/COMP/...), ou via le bouton GRAPHE des fiches
 """
 import pygame
 from core import config, charts
+from core import etfs as ETF
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
@@ -102,7 +103,12 @@ class GraphScene(Scene):
         self.input = ""
         if not q:
             return
-        tk = q if ticker is not None else self.market.resolve(q)
+        if ticker is not None:
+            tk = q
+        else:
+            tk = self.market.resolve(q)
+            if not tk and ETF.exists(q.upper()):   # un ticker d'ETF est aussi graphable
+                tk = q.upper()
         if not tk:
             self.app.notify(f"Aucun résultat : {q}", "bad")
             return
@@ -120,6 +126,8 @@ class GraphScene(Scene):
 
     # -------------------------------------------------------------- data
     def _series(self, tk):
+        if ETF.exists(tk):
+            return ETF.nav_history(self.market, tk, self.period)
         return self.market.history_of(tk, self.period)
 
     # -------------------------------------------------------------- draw

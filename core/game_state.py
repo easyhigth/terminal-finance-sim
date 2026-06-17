@@ -34,6 +34,7 @@ class PlayerState:
     bonds: dict = field(default_factory=dict)          # obligations : bond_id -> {"qty","avg"}
     commodities: dict = field(default_factory=dict)    # matières premières : id -> {"qty","avg"}
     crypto: dict = field(default_factory=dict)         # crypto-actifs : id -> {"qty","avg"}
+    etfs: dict = field(default_factory=dict)           # ETF (fonds indiciels) : id -> {"qty","avg"}
     structured: list = field(default_factory=list)     # produits structurés souscrits
     securitised: list = field(default_factory=list)    # tranches de titrisation détenues
     eval_state: dict = field(default_factory=dict)     # examen en pause (reprise possible)
@@ -56,6 +57,7 @@ class PlayerState:
     # ----- monde vivant -----
     inbox: list = field(default_factory=list)          # messages reçus (manager/client/conformité/desk)
     next_msg_id: int = 1                               # compteur d'identifiants de messages
+    news_history: list = field(default_factory=list)   # fil d'actualités persistant (jusqu'à 3 ans)
     rivals: list = field(default_factory=list)         # concurrents : [{name, firm, track, score}]
     # ----- décisions & éthique -----
     heat: int = 0                                      # scrutin réglementaire 0-100 (risque d'enquête)

@@ -72,6 +72,65 @@ DEAL_TEMPLATES = [
 ]
 
 
+# --------------------------------------------------------------------------
+# Deals SOUVERAINS : mandats avec des gouvernements, déclenchés par l'actualité
+# politique (core/politics.py) quand c'est COHÉRENT avec la situation du pays.
+# --------------------------------------------------------------------------
+GOV_DEAL_PROBABILITY = 0.45     # proba quand un événement éligible survient
+MAX_GOV_DEALS = 2               # plafond de deals souverains actifs simultanés
+
+# Selon la tonalité de l'événement politique, un type de mandat différent :
+#   good  → financement d'infrastructure / privatisation (mandat lucratif) ;
+#   bad   → restructuration de dette / stabilisation (mission de crise) ;
+#   info  → conseil stratégique (plus modeste).
+_GOV_TEMPLATES = {
+    "good": {"kind": "Advisory", "title": "Mandat souverain — financement d'infrastructure",
+             "desc": "Structurer et placer l'emprunt d'infrastructure de {country}.",
+             "base_cash": 140_000, "rep": 8, "difficulty": 4, "days": 26},
+    "bad": {"kind": "Risk", "title": "Mandat souverain — restructuration de dette",
+            "desc": "Conseiller {country} sur la restructuration et la stabilisation de sa dette.",
+            "base_cash": 160_000, "rep": 9, "difficulty": 5, "days": 22},
+    "info": {"kind": "Advisory", "title": "Mandat souverain — conseil stratégique",
+             "desc": "Accompagner {country} dans l'arbitrage de sa politique économique.",
+             "base_cash": 90_000, "rep": 6, "difficulty": 3, "days": 20},
+}
+
+
+def maybe_government_deal(player, event, rng=None):
+    """Génère éventuellement un DEAL avec un gouvernement, en cohérence avec un
+    événement politique (event = dict de core/politics.maybe_trigger). Retourne
+    le deal créé ou None. Réservé aux grades qui peuvent traiter des deals."""
+    rng = rng or random
+    if not event or player.grade_index < 3:        # deals souverains : Associate+
+        return None
+    n_gov = sum(1 for d in player.deals if d.get("gov"))
+    if n_gov >= MAX_GOV_DEALS:
+        return None
+    if rng.random() > GOV_DEAL_PROBABILITY:
+        return None
+    tmpl = _GOV_TEMPLATES.get(event.get("kind"), _GOV_TEMPLATES["info"])
+    country = event.get("country", "un État")
+    scale = _scale(player)
+    reward_cash = round(tmpl["base_cash"] * scale * rng.uniform(0.9, 1.25), 2)
+    deal = {
+        "id": player.next_deal_id,
+        "title": tmpl["title"],
+        "kind": tmpl["kind"],
+        "desc": tmpl["desc"].format(country=country),
+        "reward_cash": reward_cash,
+        "reward_rep": tmpl["rep"],
+        "penalty_cash": round(reward_cash * MISS_PENALTY_FRAC, 2),
+        "penalty_rep": max(2, tmpl["difficulty"] - 1),
+        "difficulty": tmpl["difficulty"],
+        "days_left": tmpl["days"],
+        "gov": country,                     # marqueur de contrepartie souveraine
+        "region": event.get("region"),
+    }
+    player.next_deal_id += 1
+    player.deals.append(deal)
+    return deal
+
+
 def _scale(player):
     """Facteur d'échelle des montants selon le grade."""
     return 1.0 + 0.7 * player.grade_index

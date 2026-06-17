@@ -1082,30 +1082,7 @@ class TerminalScene(Scene):
 
     # ------------------------------------------------------------- mandats
     def _cmd_mandates(self):
-        p = self.app.gs.player
-        cur = self._cur()
-        rows = []
-        for m in p.mandates:
-            g, beta = mandates_mod.progress(p, self.market, m)
-            gcol = config.COL_UP if g >= m["target_pct"] else config.COL_WARN
-            rows.append(((f"#{m['id']} {m['client'][:16]}", config.COL_AMBER),
-                         f"{g:+.1f}/{m['target_pct']:.0f}%",
-                         (f"β{beta:.2f}/{m['max_beta']:.2f}",
-                          config.COL_DOWN if beta > m["max_beta"] else config.COL_TEXT),
-                         f"T{m['deadline_q']}"))
-        for o in p.mandate_offers:
-            rows.append(((f"#{o['id']} {o['client'][:16]}", config.COL_CYAN),
-                         f"obj {o['target_pct']:.0f}%", f"β≤{o['max_beta']:.2f}",
-                         (f"OFFRE {o['horizon']}T", config.COL_CYAN)))
-        if not rows:
-            if p.grade_index < mandates_mod.MIN_GRADE:
-                rows = [("Mandats dès le grade Associate.", "", "", "")]
-            else:
-                rows = [("Aucun mandat. ADV pour en recevoir.", "", "", "")]
-        self._open_window("MANDATS CLIENTS",
-                          [("Mandat", 170), ("Perf/Obj", 90), ("Risque", 90),
-                           ("Échéance", 80)], rows, accent=config.COL_PRESTIGE)
-        self._log(_L("  MANDATE ACCEPT <id> / MANDATE DECLINE <id> pour gérer.","  MANDATE ACCEPT <id> / MANDATE DECLINE <id> to manage."))
+        self.app.scenes.go("mandates", return_to="terminal")
 
     def _cmd_mandate(self, args):
         p = self.app.gs.player
@@ -1707,16 +1684,7 @@ class TerminalScene(Scene):
             self.app.scenes.go("dilemma", return_to="terminal")
 
     def _cmd_deals(self):
-        p = self.app.gs.player
-        if not p.deals:
-            self._log(_L("  Aucun deal en cours. Avancez le temps (ADV) pour en générer.","  No active deals. Advance time (ADV) to generate some."))
-            return
-        cur = config.CONTINENTS[p.continent]["currency"]
-        self._log(_L("  Deals en cours :","  Active deals:"))
-        for d in p.deals:
-            prob = deals_mod.success_probability(p, d)
-            self._log(f"   #{d['id']} {d['title']} [{d['kind']}] {d['days_left']}j  "
-                      f"gain {widgets.format_money(d['reward_cash'], cur)} p={int(prob*100)}%")
+        self.app.scenes.go("deals", return_to="terminal")
 
     def _cmd_deal(self, arg):
         p = self.app.gs.player

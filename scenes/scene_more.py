@@ -42,6 +42,8 @@ SECTIONS = [
         ("Rivaux", "rivals", {}),
         ("Inbox", "inbox", {}),
         ("News & événements", "news", {}),
+        ("Mandats clients", "mandates", {}),
+        ("Deals", "deals", {}),
     ]),
     ("Apprendre", [
         ("Académie", "academy", {}),

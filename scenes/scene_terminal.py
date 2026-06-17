@@ -38,8 +38,8 @@ from ui.worldmap import WorldMap
 
 # Noms de commandes pour l'autocomplétion (Tab) et la suggestion fantôme
 CMD_NAMES = [
-    "HELP", "COMMANDS", "ADV", "MISSION", "EVAL", "TRACK", "CAREER", "INBOX",
-    "RIVALS", "MANDATES", "MANDATE", "DECIDE", "MARKET", "TOP", "MOVERS",
+    "HELP", "COMMANDS", "ADV", "MISSION", "EVAL", "EXAMCERT", "TRACK", "CAREER", "INBOX",
+    "RIVALS", "MANDATES", "MANDATE", "DECIDE", "MARKET", "MARKETHUB", "TOP", "MOVERS",
     "COMPANY", "FA", "SEARCH", "EXPLORE", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS",
     "PORTFOLIO", "BOOK", "BUY", "SELL", "LONG", "SHORT", "COVER", "MARGIN",
@@ -108,19 +108,18 @@ class TerminalScene(Scene):
         self._topco_rects = {}    # sociétés cliquables (panneau top sociétés)
         self._topco_header_rect = None   # titre du panneau (clic → explorateur)
         self._index_rects = {}    # indices cliquables (panneau indices → graphe)
+        self._career_panel_rect = None   # panneau CARRIÈRE (ex-priorités) → scène carrière
         self.rail_w = 150         # largeur du rail latéral
         self._map_rect = None     # rect de la carte (pour le clic)
         # rail latéral : (libellé, commande), regroupé par usage
         self.rail = [
             ("ADV ▸", "ADV"),
-            ("PORTEF.", "PORTFOLIO"), ("MARCHÉ", "MARKET"),
-            ("TOP", "TOP"), ("MOVERS", "MOVERS"), ("EXPLORER", "EXPLORE"),
-            ("MISSION", "MISSION"), ("EVAL", "EVAL"),
+            ("PORTEF.", "PORTFOLIO"), ("MARCHÉ", "MARKETHUB"),
+            ("MISSION", "MISSION"), ("EXAM/CERTIF", "EXAMCERT"),
             ("MANDATS", "MANDATES"), ("DEALS", "DEALS"),
             ("INBOX", "INBOX"), ("DÉCIDE", "DECIDE"),
-            ("CARRIÈRE", "CAREER"), ("RIVAUX", "RIVALS"),
-            ("TABLEUR", "SHEET"), ("ÉCO", "ECO"),
-            ("ACADÉMIE", "LEARN"), ("CERTIF.", "CERT"),
+            ("TABLEUR", "SHEET"), ("ACADÉMIE", "LEARN"),
+            ("GLOSSAIRE", "GLOSSARY"),
             ("SAUVER", "SAVE"), ("AIDE", "COMMANDS"),
         ]
         self.networth_spark = widgets.Sparkline(80)
@@ -174,6 +173,9 @@ class TerminalScene(Scene):
                     return
             if self._topco_header_rect and self._topco_header_rect.collidepoint(event.pos):
                 self.app.scenes.go("explorer", return_to="terminal")
+                return
+            if self._career_panel_rect and self._career_panel_rect.collidepoint(event.pos):
+                self.app.scenes.go("career", return_to="terminal")
                 return
             for tk, rect in self._topco_rects.items():
                 if rect.collidepoint(event.pos):
@@ -366,6 +368,8 @@ class TerminalScene(Scene):
             self._advance_time()
         elif cmd in ("MARKET", "INDEX", "INDICES", "WEI"):
             self._cmd_market()
+        elif cmd == "MARKETHUB":
+            self.app.scenes.go("markethub", return_to="terminal")
         elif cmd == "TOP":
             self._cmd_top(arg)
         elif cmd in ("EXPLORE", "EXPLORER", "EXPLO"):
@@ -439,6 +443,8 @@ class TerminalScene(Scene):
             self._cmd_deal(arg)
         elif cmd in ("EVAL", "EVALUATION"):
             self._cmd_eval()
+        elif cmd == "EXAMCERT":
+            self.app.scenes.go("examcert", return_to="terminal")
         elif cmd in ("GLOSSARY", "GLOSSAIRE"):
             self.app.scenes.go("glossary", return_to="terminal")
         elif cmd in ("PORTFOLIO", "PORTEFEUILLE", "BOOK", "POSITIONS", "PRT"):
@@ -1878,7 +1884,8 @@ class TerminalScene(Scene):
                           (inner.x, inner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_career(self, surf, rect, p):
-        """Panneau PRIORITÉS : prochain objectif, promotion, risque, opportunité."""
+        """Panneau CARRIÈRE (ex-PRIORITÉS) : prochain objectif, promotion, risque,
+        opportunité. Cliquable : ouvre la scène carrière."""
         # couleur de priorité du panneau selon le danger le plus pressant
         marge0 = p.cash - config.BANKRUPTCY_CASH
         prio = None
@@ -1886,7 +1893,10 @@ class TerminalScene(Scene):
             prio = config.COL_PRIO_CRITICAL
         elif p.pending_dilemmas or any(d["days_left"] <= config.DAYS_PER_STEP * 2 for d in p.deals):
             prio = config.COL_PRIO_URGENT
-        inner = widgets.draw_panel(surf, rect, _t("term.priorities"), config.COL_AMBER, prio=prio)
+        self._career_panel_rect = pygame.Rect(rect.x, rect.y, rect.w, 26)
+        hover = self._career_panel_rect.collidepoint(pygame.mouse.get_pos())
+        inner = widgets.draw_panel(surf, rect, _t("term.career"),
+                                   config.COL_CYAN if hover else config.COL_AMBER, prio=prio)
         y = inner.y
         # 1) prochain objectif non atteint
         widgets.draw_text(surf, "OBJECTIF", (inner.x, y), fonts.tiny(bold=True), config.COL_CYAN)

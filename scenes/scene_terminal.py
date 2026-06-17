@@ -40,7 +40,7 @@ from ui.worldmap import WorldMap
 CMD_NAMES = [
     "HELP", "COMMANDS", "ADV", "MISSION", "EVAL", "EXAMCERT", "TRACK", "CAREER", "INBOX",
     "RIVALS", "MANDATES", "MANDATE", "DECIDE", "MARKET", "MARKETHUB", "TOP", "MOVERS",
-    "COMPANY", "FA", "SEARCH", "EXPLORE", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
+    "COMPANY", "FA", "SEARCH", "ACCESS", "EXPLORE", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS",
     "PORTFOLIO", "BOOK", "BUY", "SELL", "LONG", "SHORT", "COVER", "MARGIN",
     "BONDS", "BUYBOND", "SELLBOND", "GOV", "GOVERNMENTS", "PAYS",
@@ -107,7 +107,14 @@ class TerminalScene(Scene):
         self._rail_rects = {}     # boutons du rail latéral (label -> Rect)
         self._topco_rects = {}    # sociétés cliquables (panneau top sociétés)
         self._topco_header_rect = None   # titre du panneau (clic → explorateur)
+        self._topco_panel_rect = None    # zone défilable (molette)
+        self._topco_scroll = 0
+        self._topco_max_scroll = 0
         self._index_rects = {}    # indices cliquables (panneau indices → graphe)
+        self._indices_header_rect = None  # titre du panneau (clic → MARKETHUB)
+        self._indices_panel_rect = None   # zone défilable (molette)
+        self._indices_scroll = 0
+        self._indices_max_scroll = 0
         self._career_panel_rect = None   # panneau CARRIÈRE (ex-priorités) → scène carrière
         self.rail_w = 150         # largeur du rail latéral
         self._map_rect = None     # rect de la carte (pour le clic)
@@ -150,10 +157,19 @@ class TerminalScene(Scene):
                     self._open_company_popup(tk)
                 self.datawins = [x for x in self.datawins if not x.closed]
                 return
-        # 1bis) molette sur la console : défile l'historique
+        # 1bis) molette : console, panneau indices, panneau top sociétés
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
-            if self._console_rect().collidepoint(pygame.mouse.get_pos()):
+            mp = pygame.mouse.get_pos()
+            if self._console_rect().collidepoint(mp):
                 self._scroll_console(3 if event.button == 4 else -3)
+                return
+            if self._indices_panel_rect and self._indices_panel_rect.collidepoint(mp):
+                self._indices_scroll = max(0, min(self._indices_max_scroll,
+                    self._indices_scroll + (-32 if event.button == 4 else 32)))
+                return
+            if self._topco_panel_rect and self._topco_panel_rect.collidepoint(mp):
+                self._topco_scroll = max(0, min(self._topco_max_scroll,
+                    self._topco_scroll + (-28 if event.button == 4 else 28)))
                 return
         # 2) souris : boutons console + rail latéral + carte
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -173,6 +189,9 @@ class TerminalScene(Scene):
                     return
             if self._topco_header_rect and self._topco_header_rect.collidepoint(event.pos):
                 self.app.scenes.go("explorer", return_to="terminal")
+                return
+            if self._indices_header_rect and self._indices_header_rect.collidepoint(event.pos):
+                self.app.scenes.go("markethub", return_to="terminal")
                 return
             if self._career_panel_rect and self._career_panel_rect.collidepoint(event.pos):
                 self.app.scenes.go("career", return_to="terminal")
@@ -254,6 +273,16 @@ class TerminalScene(Scene):
         offset = 16 * (len(self.datawins) % 6)
         pos = (self.rail_w + 30 + offset, 90 + offset)
         self.datawins.append(CompanyPopup(ticker, self.market, pos=pos))
+        if len(self.datawins) > 5:
+            self.datawins.pop(0)
+
+    def _open_quick_access(self):
+        """Ouvre le gestionnaire « accès rapide » des favoris (watchlist)."""
+        from ui.popups import QuickAccessWindow
+        offset = 16 * (len(self.datawins) % 6)
+        pos = (self.rail_w + 30 + offset, 90 + offset)
+        p = self.app.gs.player
+        self.datawins.append(QuickAccessWindow(p, self.market, self._open_company_popup, pos=pos))
         if len(self.datawins) > 5:
             self.datawins.pop(0)
 
@@ -437,6 +466,8 @@ class TerminalScene(Scene):
             self._cmd_define(parts[1:])
         elif cmd in ("SEARCH", "FIND"):
             self._cmd_search(parts[1:])
+        elif cmd in ("ACCESS", "FAVORIS", "FAVORITES", "QUICKACCESS"):
+            self._open_quick_access()
         elif cmd == "DEALS":
             self._cmd_deals()
         elif cmd == "DEAL":
@@ -703,7 +734,7 @@ class TerminalScene(Scene):
     def _cmd_search(self, terms):
         q = " ".join(terms) if terms else ""
         if not q:
-            self._log(_L("  Usage : SEARCH <nom ou ticker>.","  Usage: SEARCH <name or ticker>."))
+            self._open_quick_access()
             return
         res = self.market.search(q)
         if not res:
@@ -882,18 +913,7 @@ class TerminalScene(Scene):
     def _cmd_watchlist(self, args):
         p = self.app.gs.player
         if not args:
-            if not p.watchlist:
-                self._log(_L("  Watchlist vide. WATCHLIST ADD <ticker> pour suivre une valeur.","  Watchlist empty. WATCHLIST ADD <ticker> to follow a stock."))
-                return
-            rows = []
-            for tk in p.watchlist:
-                mt = self.market.metrics(tk)
-                if mt:
-                    ccol = config.COL_UP if mt["change_pct"] >= 0 else config.COL_DOWN
-                    rows.append(((tk, config.COL_AMBER), f"{mt['price']:.2f}",
-                                 (f"{mt['change_pct']:+.1f}%", ccol), mt["sector"]))
-            self._open_window("WATCHLIST", [("Tk", 60), ("Cours", 70),
-                                            ("Var.", 70), ("Secteur", 90)], rows)
+            self._open_quick_access()
             return
         op = args[0].upper()
         tk = args[1].upper() if len(args) > 1 else None
@@ -902,6 +922,9 @@ class TerminalScene(Scene):
                 self._log(_L(f"  Ticker inconnu : {tk}.", f"  Unknown ticker: {tk}."))
             elif tk in p.watchlist:
                 self._log(_L(f"  {tk} est déjà dans la watchlist.", f"  {tk} is already in the watchlist."))
+            elif len(p.watchlist) >= 10:
+                self._log(_L("  Limite de 10 favoris atteinte. Retirez-en un avant d'en ajouter un autre.",
+                             "  Limit of 10 favorites reached. Remove one before adding another."))
             else:
                 p.watchlist.append(tk)
                 self.market.track_company(tk)
@@ -1777,28 +1800,44 @@ class TerminalScene(Scene):
     def _draw_indices(self, surf, rect):
         inner = widgets.draw_panel(surf, rect,
                                    f'{_t("term.indices")} · {self.market.regime_label()}', config.COL_AMBER)
+        self._indices_header_rect = pygame.Rect(rect.x, rect.y, rect.w, 26)
+        self._indices_panel_rect = rect
         self._index_rects = {}
         defs = self.market.index_defs
-        n = max(1, len(defs))
-        step = max(26, min(50, inner.h // n))
+        step = 50
         spark_h = max(8, step - 20)
         mp = pygame.mouse.get_pos()
-        y = inner.y
+        prev_clip = surf.get_clip()
+        surf.set_clip(inner)
+        y = inner.y - self._indices_scroll
         for name, *_ in defs:
-            v = self.market.index_value(name)
-            chg = self.market.index_change_pct(name)
-            col = config.COL_UP if chg >= 0 else config.COL_DOWN
-            row = pygame.Rect(inner.x - 4, y - 1, inner.w + 8, step - 2)
-            self._index_rects[name] = row
-            if row.collidepoint(mp):
-                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
-            widgets.draw_text(surf, name, (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
-            widgets.draw_text(surf, f"{v:,.0f}", (inner.x + 96, y), fonts.small(), config.COL_WHITE)
-            widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.2f}%", (inner.right, y),
-                              fonts.small(bold=True), col, align="right")
-            widgets.draw_series(surf, pygame.Rect(inner.x, y + 16, inner.w, spark_h),
-                                self.market.index_history(name), col, baseline=False)
+            visible = (inner.top - step) < y < inner.bottom
+            if visible:
+                v = self.market.index_value(name)
+                chg = self.market.index_change_pct(name)
+                col = config.COL_UP if chg >= 0 else config.COL_DOWN
+                row = pygame.Rect(inner.x - 4, y - 1, inner.w + 8, step - 2)
+                self._index_rects[name] = row
+                if row.collidepoint(mp):
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+                widgets.draw_text(surf, name, (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
+                widgets.draw_text(surf, f"{v:,.0f}", (inner.x + 96, y), fonts.small(), config.COL_WHITE)
+                widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.2f}%", (inner.right, y),
+                                  fonts.small(bold=True), col, align="right")
+                widgets.draw_series(surf, pygame.Rect(inner.x, y + 16, inner.w, spark_h),
+                                    self.market.index_history(name), col, baseline=False)
             y += step
+        surf.set_clip(prev_clip)
+        content_h = (y + self._indices_scroll) - inner.y
+        self._indices_max_scroll = max(0, content_h - inner.h)
+        self._indices_scroll = min(self._indices_scroll, self._indices_max_scroll)
+        if self._indices_max_scroll > 0:
+            track = pygame.Rect(rect.right - 6, inner.y, 4, inner.h)
+            pygame.draw.rect(surf, config.COL_PANEL, track, border_radius=2)
+            frac = inner.h / (content_h or 1)
+            bar_h = max(16, int(inner.h * frac))
+            bar_y = inner.y + int((inner.h - bar_h) * (self._indices_scroll / self._indices_max_scroll))
+            pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 4, bar_h), border_radius=2)
 
     def _draw_health(self, surf, rect, p, info):
         inner = widgets.draw_panel(surf, rect, _t("term.health"), config.COL_AMBER)
@@ -1857,11 +1896,13 @@ class TerminalScene(Scene):
         title = f'{_t("term.topco")} ({len(watch)} suivies)' if watch else f'{_t("term.topco")} — {p.continent}'
         inner = widgets.draw_panel(surf, rect, title, config.COL_CYAN)
         self._topco_header_rect = pygame.Rect(rect.x, rect.y, rect.w, 26)
+        self._topco_panel_rect = rect
         cur = config.CONTINENTS[p.continent]["currency"]
         self._topco_rects = {}
         mp = pygame.mouse.get_pos()
-        y = inner.y
-        n = max(6, (inner.h - 20) // 28)
+        list_area = pygame.Rect(inner.x, inner.y, inner.w, inner.h - 16)
+        row_h = 28
+        n = max(len(watch), 20) if watch else 20
         if watch:
             companies = []
             for tk in watch[:n]:
@@ -1870,16 +1911,32 @@ class TerminalScene(Scene):
                     companies.append({"ticker": tk, "name": mt["name"], "mktcap": mt["mktcap"]})
         else:
             companies = self.market.top_companies(region=p.continent, n=n)
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        y = inner.y - self._topco_scroll
         for c in companies:
-            row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 26)
-            self._topco_rects[c["ticker"]] = row
-            if row.collidepoint(mp):
-                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
-            widgets.draw_text(surf, c["ticker"], (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
-            widgets.draw_text(surf, c["name"][:16], (inner.x + 58, y), fonts.small(), config.COL_TEXT)
-            widgets.draw_text(surf, widgets.format_money(c["mktcap"] * 1e6, cur), (inner.right, y),
-                              fonts.tiny(bold=True), config.COL_WHITE, align="right")
-            y += 28
+            visible = (list_area.top - row_h) < y < list_area.bottom
+            if visible:
+                row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 26)
+                self._topco_rects[c["ticker"]] = row
+                if row.collidepoint(mp):
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+                widgets.draw_text(surf, c["ticker"], (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
+                widgets.draw_text(surf, c["name"][:16], (inner.x + 58, y), fonts.small(), config.COL_TEXT)
+                widgets.draw_text(surf, widgets.format_money(c["mktcap"] * 1e6, cur), (inner.right, y),
+                                  fonts.tiny(bold=True), config.COL_WHITE, align="right")
+            y += row_h
+        surf.set_clip(prev_clip)
+        content_h = (y + self._topco_scroll) - inner.y
+        self._topco_max_scroll = max(0, content_h - list_area.h)
+        self._topco_scroll = min(self._topco_scroll, self._topco_max_scroll)
+        if self._topco_max_scroll > 0:
+            track = pygame.Rect(rect.right - 6, list_area.y, 4, list_area.h)
+            pygame.draw.rect(surf, config.COL_PANEL, track, border_radius=2)
+            frac = list_area.h / (content_h or 1)
+            bar_h = max(16, int(list_area.h * frac))
+            bar_y = list_area.y + int((list_area.h - bar_h) * (self._topco_scroll / self._topco_max_scroll))
+            pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 4, bar_h), border_radius=2)
         widgets.draw_text(surf, "clic titre → explorateur · clic ligne → fiche",
                           (inner.x, inner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
 

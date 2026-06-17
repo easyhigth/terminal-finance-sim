@@ -47,7 +47,10 @@ class PlayerState:
     objectives: list = field(default_factory=list)     # objectifs du trimestre en cours
     objectives_quarter: int = 0                        # trimestre auquel se rapportent les objectifs
     journal: list = field(default_factory=list)        # journal de carrière (événements marquants)
-    watchlist: list = field(default_factory=list)      # tickers suivis
+    watchlist: list = field(default_factory=list)      # tickers suivis (max 10, accès rapide)
+    bond_watchlist: list = field(default_factory=list)       # bond_id suivis
+    commodity_watchlist: list = field(default_factory=list)  # id matières premières suivies
+    gov_watchlist: list = field(default_factory=list)        # codes pays suivis
     titles: list = field(default_factory=list)         # titres de prestige obtenus
     best_cash: float = 0.0                             # meilleure trésorerie atteinte
     # ----- monde vivant -----

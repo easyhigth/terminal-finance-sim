@@ -177,6 +177,25 @@ def quote(market, bond_id):
             "mod_duration": dur, "convexity": conv}
 
 
+def price_history(market, bond_id, n=None):
+    """Historique approximatif du prix, reconstruit depuis l'historique du taux
+    directeur (les autres composantes du spread sont supposées constantes sur
+    la période, faute d'historique stocké pour elles)."""
+    b = _BY_ID.get(bond_id)
+    if not b or market is None:
+        return []
+    rates = getattr(market, "macro_hist", {}).get("rate", [])
+    if not rates:
+        return []
+    spread = TERM_PREMIUM * b["years"] + _RATING_SPREAD.get(b["rating"], 0.02) \
+        + _region_bump(market, b["region"])
+    if b["kind"] == "Souverain" and b["gov"]:
+        spread += gov_mod.country_premium(gov_mod.get(b["gov"]))
+    prices = [finmath.bond_price(FACE, b["coupon"], r / 100.0 + spread, b["years"])
+              for r in rates]
+    return prices[-n:] if n else prices
+
+
 def all_quotes(market):
     return [quote(market, b["id"]) for b in BONDS]
 

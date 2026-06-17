@@ -13,6 +13,7 @@ from core import commodities as C
 from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
+from ui.popups import PopupMixin
 
 LOT = 5
 ROW_H = 26
@@ -24,11 +25,13 @@ CATEGORY_ORDER = [
 ]
 
 
-class CommoditiesScene(Scene):
+class CommoditiesScene(Scene, PopupMixin):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
+        self.init_popups()
         self.msg = ""
         self.buy_rects, self.sell_rects = {}, {}
+        self.name_rects = {}
         self.scroll = 0
         self._max_scroll = 0
         self._list_rect = None
@@ -41,8 +44,12 @@ class CommoditiesScene(Scene):
         return unlocks.unlocked(self.app.gs.player, "trade")
 
     def handle_event(self, event):
+        if self.popups_handle_event(event):
+            return
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
+                if self.popups_close_top():
+                    return
                 self.app.scenes.go(self.return_to)
             elif event.key == pygame.K_PAGEUP:
                 self.scroll = max(0, self.scroll - 200)
@@ -62,6 +69,10 @@ class CommoditiesScene(Scene):
                     else:
                         self.cat_filter = None if self.cat_filter == cat else cat
                     self.scroll = 0
+                    return
+            for cid, rect in self.name_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.open_commodity(cid)
                     return
             p, m = self.app.gs.player, self.app.market
             if not self._can_trade():
@@ -134,7 +145,7 @@ class CommoditiesScene(Scene):
         list_top = inner.y + 22
         list_area = pygame.Rect(inner.x - 6, list_top, inner.w + 12, inner.bottom - list_top - 26)
         self._list_rect = list_area
-        self.buy_rects, self.sell_rects = {}, {}
+        self.buy_rects, self.sell_rects, self.name_rects = {}, {}, {}
         prev_clip = surf.get_clip()
         surf.set_clip(list_area)
 
@@ -165,6 +176,7 @@ class CommoditiesScene(Scene):
                           (inner.x, inner.bottom - 22), fonts.small(bold=True),
                           config.COL_UP if hv else config.COL_TEXT_DIM)
         self.back_btn.draw(surf)
+        self.popups_draw(surf)
 
     def _draw_group(self, surf, title, quotes, y, p, list_area, cols, cur):
         widgets.draw_text(surf, f"— {title} ({len(quotes)})", (cols[0][1], y),
@@ -175,6 +187,8 @@ class CommoditiesScene(Scene):
             if visible:
                 pos = p.commodities.get(q["id"])
                 held = pos["qty"] if pos else 0
+                name_w = min(260, fonts.small(bold=True).size(q["name"])[0])
+                self.name_rects[q["id"]] = pygame.Rect(cols[0][1] - 2, y - 2, name_w + 4, ROW_H - 4)
                 widgets.draw_text(surf, widgets.fit_text(q["name"], fonts.small(bold=True), 260),
                                   (cols[0][1], y), fonts.small(bold=True), config.COL_TEXT)
                 widgets.draw_text(surf, f"{q['spot']:,.2f}".replace(",", " "), (cols[1][1], y), fonts.small(), config.COL_WHITE)

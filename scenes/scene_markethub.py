@@ -10,6 +10,7 @@ import pygame
 from core import config
 from core.scene_manager import Scene
 from ui import fonts, widgets
+from ui.popups import PopupMixin
 
 _ECO_NOTES = {
     "rate": "coût de l'argent ; ↑ pèse sur actions/immo",
@@ -20,18 +21,26 @@ _ECO_NOTES = {
 }
 
 
-class MarketHubScene(Scene):
+class MarketHubScene(Scene, PopupMixin):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
         self.market = self.app.ensure_market()
         self.top_region = self.app.gs.player.continent
+        self.init_popups()
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self._ticker_rects = {}
         self._region_rects = {}
+        self._index_row_rects = {}
+        self._eco_row_rects = {}
+        self._regime_rect = None
 
     def handle_event(self, event):
+        if self.popups_handle_event(event):
+            return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            if self.popups_close_top():
+                return
             self.app.scenes.go(self.return_to)
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
@@ -44,6 +53,36 @@ class MarketHubScene(Scene):
                 if rect.collidepoint(event.pos):
                     self.app.scenes.go("company", ticker=tk, return_to="markethub")
                     return
+            for name, rect in self._index_row_rects.items():
+                if rect.collidepoint(event.pos):
+                    chg = self.market.index_change_pct(name)
+                    col = config.COL_UP if chg >= 0 else config.COL_DOWN
+                    self._open_series_popup(f"INDICE — {name}", self.market.index_history(name), col)
+                    return
+            if self._regime_rect and self._regime_rect.collidepoint(event.pos):
+                reg_good = self.market.regime in ("Expansion", "Calme")
+                self._open_series_popup("RÉGIME — taux directeur",
+                                        self.market.macro_hist.get("rate", []),
+                                        config.COL_UP if reg_good else config.COL_DOWN)
+                return
+            for key, rect in self._eco_row_rects.items():
+                if rect.collidepoint(event.pos):
+                    ch = self.market.macro_change(key)
+                    col = config.COL_UP if ch >= 0 else config.COL_DOWN
+                    label = self.market.macro[key]["label"]
+                    self._open_series_popup(f"ÉCO — {label}", self.market.macro_hist.get(key, []), col)
+                    return
+
+    def _open_series_popup(self, title, series, color):
+        def render(surf, rect):
+            if len(series) < 2:
+                widgets.draw_text(surf, "Historique insuffisant (avancez le temps).",
+                                  (rect.x, rect.y), fonts.small(), config.COL_TEXT_DIM)
+                return
+            widgets.draw_series(surf, rect, series, color, baseline=False)
+            widgets.draw_text(surf, f"Dernier : {series[-1]:,.2f}", (rect.x, rect.bottom - 16),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+        self.open_custom_chart(title, render, accent=color)
 
     def update(self, dt):
         self.back_btn.update(pygame.mouse.get_pos(), dt)
@@ -73,14 +112,21 @@ class MarketHubScene(Scene):
         self._draw_eco(surf, pygame.Rect(x2, y2, colw, row_h))
 
         self.back_btn.draw(surf)
+        self.popups_draw(surf)
 
     def _draw_indices(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Indices mondiaux", config.COL_AMBER)
+        mp = pygame.mouse.get_pos()
+        self._index_row_rects = {}
         y = inner.y
         for name, *_ in self.market.index_defs:
             v = self.market.index_value(name)
             chg = self.market.index_change_pct(name)
             ccol = config.COL_UP if chg >= 0 else config.COL_DOWN
+            row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 22)
+            self._index_row_rects[name] = row
+            if row.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
             widgets.draw_text(surf, name, (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
             widgets.draw_text(surf, f"{v:,.0f}", (inner.x + inner.w // 2, y),
                               fonts.small(), config.COL_TEXT, align="right")
@@ -152,18 +198,27 @@ class MarketHubScene(Scene):
 
     def _draw_eco(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Éco — macro-économie", config.COL_PRESTIGE)
+        mp = pygame.mouse.get_pos()
         m = self.market.macro
         reg_good = self.market.regime in ("Expansion", "Calme")
         y = inner.y
+        self._regime_rect = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 22)
+        if self._regime_rect.collidepoint(mp):
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._regime_rect, border_radius=3)
         widgets.draw_text(surf, "Régime de marché", (inner.x, y), fonts.small(), config.COL_TEXT)
         widgets.draw_text(surf, self.market.regime_label(), (inner.right, y),
                           fonts.small(bold=True), config.COL_UP if reg_good else config.COL_DOWN,
                           align="right")
         y += 26
+        self._eco_row_rects = {}
         for key in ["rate", "inflation", "growth", "unemployment", "confidence"]:
             d = m[key]
             ch = self.market.macro_change(key)
             ccol = config.COL_UP if ch >= 0 else config.COL_DOWN
+            row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 40)
+            self._eco_row_rects[key] = row
+            if row.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
             widgets.draw_text(surf, d["label"], (inner.x, y), fonts.small(), config.COL_TEXT)
             widgets.draw_text(surf, f"{d['v']:.2f}{d['unit']}", (inner.x + inner.w - 90, y),
                               fonts.small(bold=True), config.COL_WHITE, align="right")

@@ -26,6 +26,8 @@ Usage dans une scène :
 import pygame
 from core import config
 from core import charts as _charts
+from core import commodities as commodities_mod
+from core import bonds as bonds_mod
 from ui import fonts, widgets
 from ui.datawindow import DataWindow
 
@@ -54,6 +56,13 @@ def _draw_kind_plot(surf, rect, market, ticker, kind):
     """Dessine le graphe sélectionné pour `ticker`. Retourne un libellé de
     légende (ou None s'il n'y a rien à afficher)."""
     s = market.history_of(ticker, 365) if market else []
+    return _draw_series_plot(surf, rect, s, kind)
+
+
+def _draw_series_plot(surf, rect, s, kind):
+    """Dessine le graphe sélectionné pour une série de valeurs déjà extraite
+    (utilisé pour les actifs sans ticker boursier : obligations, commodities).
+    Retourne un libellé de légende (ou None s'il n'y a rien à afficher)."""
     if len(s) < 2:
         widgets.draw_text(surf, "Historique insuffisant (avancez le temps).",
                           (rect.x, rect.y), fonts.tiny(), config.COL_TEXT_DIM)
@@ -214,6 +223,224 @@ class ChartPopup(DataWindow):
                               fonts.tiny(bold=True), config.COL_TEXT)
 
 
+class CommodityPopup(DataWindow):
+    """Fiche commodity compacte : spot, structure de courbe, roll yield et
+    mini-graphe de spot à onglets (équivalent de CompanyPopup pour les futures)."""
+
+    def __init__(self, cid, market, pos=(160, 120), accent=None):
+        self.cid = cid.upper()
+        self.market = market
+        self.kind = "line"
+        self.expand_requested = False
+        self.open_ticker = None
+        self._kind_rects = {}
+        q = commodities_mod.quote(market, self.cid) if market else None
+        accent = accent or config.COL_WARN
+        title = f"{self.cid} — {q['name']}" if q else self.cid
+        super().__init__(title, [], [], pos=pos, accent=accent,
+                         size=(360, 300), resizable=True, min_size=(300, 220))
+
+    def _handle_body(self, pos):
+        for k, rr in self._kind_rects.items():
+            if rr.collidepoint(pos):
+                self.kind = k
+                return True
+        return False
+
+    def draw(self, surf):
+        content = self._draw_chrome(surf)
+        if content is None:
+            return
+        q = commodities_mod.quote(self.market, self.cid) if self.market else None
+        if not q:
+            widgets.draw_text(surf, f"Commodity introuvable : {self.cid}",
+                              (content.x, content.y), fonts.small(), config.COL_DOWN)
+            return
+        y = content.y
+        widgets.draw_text(surf, self.cid, (content.x, y), fonts.body(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, f"{q['spot']:,.2f}", (content.right, y),
+                          fonts.body(bold=True), config.COL_WHITE, align="right")
+        y += 22
+        widgets.draw_text(surf, widgets.fit_text(q["name"], fonts.small(), content.w - 90),
+                          (content.x, y), fonts.small(), config.COL_TEXT)
+        widgets.draw_text(surf, q["category"], (content.right, y),
+                          fonts.tiny(), config.COL_TEXT_DIM, align="right")
+        y += 26
+        widgets.draw_badge(surf, q["structure"], (content.x, y), self.accent)
+        y += 28
+        col_a = [("Future 1M", f"{q['front']:,.2f}"), ("Roll yield", f"{q['roll_yield']*100:+.1f}%")]
+        col_b = [("Vol. annualisée", f"{q['vol']*100:.0f}%"), ("Pente courbe", f"{q['slope']*100:+.1f}%/an")]
+        cw = content.w // 2
+        for ci, col in enumerate((col_a, col_b)):
+            fx = content.x + ci * cw
+            fy = y
+            for label, val in col:
+                widgets.draw_text(surf, label, (fx, fy), fonts.tiny(), config.COL_TEXT_DIM)
+                widgets.draw_text(surf, val, (fx + cw - 16, fy), fonts.tiny(bold=True),
+                                  config.COL_WHITE, align="right")
+                fy += 15
+        y += 15 * 2 + 14
+        tabs_rect = pygame.Rect(content.x, y, content.w, 20)
+        self._kind_rects = _draw_kind_tabs(surf, tabs_rect, self.kind, self.accent)
+        y += 24
+        legend_h = 16
+        plot_rect = pygame.Rect(content.x, y, content.w, max(20, content.bottom - y - legend_h - 4))
+        series = commodities_mod.history(self.market, self.cid, 365) if self.market else []
+        legend = _draw_series_plot(surf, plot_rect, series, self.kind)
+        if legend:
+            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+
+
+class BondPopup(DataWindow):
+    """Fiche obligation compacte : YTM, prix, duration et mini-graphe de prix
+    (reconstruit depuis l'historique du taux directeur, cf. core.bonds.price_history)."""
+
+    def __init__(self, bond_id, market, pos=(160, 120), accent=None):
+        self.bond_id = bond_id
+        self.market = market
+        self.kind = "line"
+        self.expand_requested = False
+        self.open_ticker = None
+        self._kind_rects = {}
+        q = bonds_mod.quote(market, bond_id) if market else None
+        accent = accent or config.COL_CYAN
+        title = q["name"] if q else bond_id
+        super().__init__(title, [], [], pos=pos, accent=accent,
+                         size=(360, 300), resizable=True, min_size=(300, 220))
+
+    def _handle_body(self, pos):
+        for k, rr in self._kind_rects.items():
+            if rr.collidepoint(pos):
+                self.kind = k
+                return True
+        return False
+
+    def draw(self, surf):
+        content = self._draw_chrome(surf)
+        if content is None:
+            return
+        q = bonds_mod.quote(self.market, self.bond_id) if self.market else None
+        if not q:
+            widgets.draw_text(surf, f"Obligation introuvable : {self.bond_id}",
+                              (content.x, content.y), fonts.small(), config.COL_DOWN)
+            return
+        y = content.y
+        widgets.draw_text(surf, widgets.fit_text(q["name"], fonts.body(bold=True), content.w - 90),
+                          (content.x, y), fonts.body(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, f"{q['price']:.1f}", (content.right, y),
+                          fonts.body(bold=True), config.COL_WHITE, align="right")
+        y += 22
+        widgets.draw_text(surf, widgets.fit_text(q["issuer"], fonts.small(), content.w - 90),
+                          (content.x, y), fonts.small(), config.COL_TEXT)
+        widgets.draw_text(surf, q["rating"], (content.right, y),
+                          fonts.small(bold=True), self.accent, align="right")
+        y += 26
+        widgets.draw_badge(surf, q["kind"], (content.x, y), self.accent)
+        widgets.draw_badge(surf, q["region"], (content.x + 100, y), self.accent)
+        y += 28
+        col_a = [("YTM", f"{q['ytm']*100:.2f}%"), ("Coupon", f"{q['coupon']*100:.1f}%")]
+        col_b = [("Duration mod.", f"{q['mod_duration']:.2f}"), ("Maturité", f"{q['years']} ans")]
+        cw = content.w // 2
+        for ci, col in enumerate((col_a, col_b)):
+            fx = content.x + ci * cw
+            fy = y
+            for label, val in col:
+                widgets.draw_text(surf, label, (fx, fy), fonts.tiny(), config.COL_TEXT_DIM)
+                widgets.draw_text(surf, val, (fx + cw - 16, fy), fonts.tiny(bold=True),
+                                  config.COL_WHITE, align="right")
+                fy += 15
+        y += 15 * 2 + 14
+        tabs_rect = pygame.Rect(content.x, y, content.w, 20)
+        self._kind_rects = _draw_kind_tabs(surf, tabs_rect, self.kind, self.accent)
+        y += 24
+        legend_h = 16
+        plot_rect = pygame.Rect(content.x, y, content.w, max(20, content.bottom - y - legend_h - 4))
+        series = bonds_mod.price_history(self.market, self.bond_id, 365) if self.market else []
+        legend = _draw_series_plot(surf, plot_rect, series, self.kind)
+        if legend:
+            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+
+
+class QuickAccessWindow(DataWindow):
+    """« Accès rapide » : gère les actions favorites (watchlist, max 10) —
+    clic sur le ticker → fiche, ▲/▼ réordonnent, ✕ retire. Lit/modifie
+    directement `player.watchlist` (pas de copie), donc reste à jour même si
+    la liste change ailleurs pendant que la fenêtre est ouverte."""
+
+    ROW_H = 26
+    CAP = 10
+
+    def __init__(self, player, market, open_company, pos=(160, 110), accent=config.COL_AMBER):
+        self.player = player
+        self.market = market
+        self.open_company = open_company
+        self._zones = []
+        size = (380, 56 + self.CAP * self.ROW_H + 30)
+        super().__init__("ACCÈS RAPIDE — favoris", [], [], pos=pos, accent=accent,
+                         size=size, resizable=False, min_size=(320, 140))
+
+    def _handle_body(self, pos):
+        wl = self.player.watchlist
+        for rect, kind, tk in self._zones:
+            if not rect.collidepoint(pos):
+                continue
+            if kind == "remove" and tk in wl:
+                wl.remove(tk)
+            elif kind in ("up", "down") and tk in wl:
+                i = wl.index(tk)
+                j = i - 1 if kind == "up" else i + 1
+                if 0 <= j < len(wl):
+                    wl[i], wl[j] = wl[j], wl[i]
+            elif kind == "open":
+                self.open_company(tk)
+            return True
+        return False
+
+    def draw(self, surf):
+        content = self._draw_chrome(surf)
+        if content is None:
+            return
+        self._zones = []
+        wl = self.player.watchlist
+        widgets.draw_text(surf, f"{len(wl)}/{self.CAP} favoris — clic ticker → fiche · "
+                                "▲▼ réordonner · ✕ retirer",
+                          (content.x, content.y), fonts.tiny(), config.COL_TEXT_DIM)
+        y = content.y + 20
+        if not wl:
+            widgets.draw_text(surf, "Aucun favori. WATCHLIST ADD <ticker>, ou clic droit "
+                                    "dans EXPLORER.", (content.x, y), fonts.small(), config.COL_TEXT_DIM)
+            return
+        mp = pygame.mouse.get_pos()
+        for i, tk in enumerate(wl):
+            row = pygame.Rect(content.x - 2, y - 2, content.w + 4, self.ROW_H - 2)
+            if row.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+            mt = self.market.metrics(tk) if self.market else None
+            name_rect = pygame.Rect(content.x, y, content.w - 96, self.ROW_H - 4)
+            self._zones.append((name_rect, "open", tk))
+            label = f"{tk}  {mt['name'][:16]}" if mt else tk
+            widgets.draw_text(surf, label, (content.x, y), fonts.small(bold=True), config.COL_AMBER)
+            if mt:
+                ccol = config.COL_UP if mt["change_pct"] >= 0 else config.COL_DOWN
+                widgets.draw_text(surf, f"{mt['change_pct']:+.1f}%", (content.x + content.w - 96, y),
+                                  fonts.tiny(bold=True), ccol)
+            bx = content.right - 64
+            up_r = pygame.Rect(bx, y - 1, 20, 18)
+            dn_r = pygame.Rect(bx + 22, y - 1, 20, 18)
+            rm_r = pygame.Rect(bx + 44, y - 1, 20, 18)
+            self._zones.append((up_r, "up", tk))
+            self._zones.append((dn_r, "down", tk))
+            self._zones.append((rm_r, "remove", tk))
+            widgets.draw_text(surf, "▲", up_r.center, fonts.tiny(bold=True),
+                              config.COL_TEXT_DIM if i == 0 else config.COL_TEXT, align="center")
+            widgets.draw_text(surf, "▼", dn_r.center, fonts.tiny(bold=True),
+                              config.COL_TEXT_DIM if i == len(wl) - 1 else config.COL_TEXT, align="center")
+            widgets.draw_text(surf, "✕", rm_r.center, fonts.tiny(bold=True), config.COL_DOWN, align="center")
+            y += self.ROW_H
+
+
 class PopupMixin:
     """À inclure dans une Scene pour ouvrir des fenêtres flottantes (fiches
     société, graphes) qui coexistent avec la scène elle-même."""
@@ -281,11 +508,43 @@ class PopupMixin:
             self.popups.pop(0)
         return w
 
+    def open_commodity(self, cid, accent=None):
+        """Ouvre (ou met au premier plan) la fiche flottante d'une commodity."""
+        market = self._popup_market()
+        if not market or commodities_mod.quote(market, cid.upper()) is None:
+            return None
+        w = CommodityPopup(cid, market, pos=self._popup_pos(), accent=accent)
+        self.popups.append(w)
+        if len(self.popups) > self._MAX_POPUPS:
+            self.popups.pop(0)
+        return w
+
+    def open_bond(self, bond_id, accent=None):
+        """Ouvre (ou met au premier plan) la fiche flottante d'une obligation."""
+        market = self._popup_market()
+        if not market or bonds_mod.quote(market, bond_id) is None:
+            return None
+        w = BondPopup(bond_id, market, pos=self._popup_pos(), accent=accent)
+        self.popups.append(w)
+        if len(self.popups) > self._MAX_POPUPS:
+            self.popups.pop(0)
+        return w
+
     def open_custom_chart(self, title, render_fn, accent=config.COL_AMBER, size=(520, 380)):
         """Agrandit un visuel existant (callback `render_fn(surf, rect)`) dans
         une fenêtre flottante déplaçable/redimensionnable."""
         w = ChartPopup(title, render_fn=render_fn, pos=self._popup_pos(),
                        accent=accent, size=size)
+        self.popups.append(w)
+        if len(self.popups) > self._MAX_POPUPS:
+            self.popups.pop(0)
+        return w
+
+    def open_quick_access(self, player, accent=None):
+        """Ouvre le gestionnaire « accès rapide » des favoris (watchlist)."""
+        market = self._popup_market()
+        w = QuickAccessWindow(player, market, self.open_company,
+                              pos=self._popup_pos(), accent=accent or config.COL_AMBER)
         self.popups.append(w)
         if len(self.popups) > self._MAX_POPUPS:
             self.popups.pop(0)

@@ -7,15 +7,18 @@ gouvernements. Recherche libre, filtres (type / continent / secteur ou
 catégorie selon le type) et tri (nom / cours / valeur / rendement / variation,
 croissant ou décroissant).
 
-Interactions sur une ligne « Action » :
-  - clic gauche  : ouvre la fiche flottante de la société (PopupMixin) ;
+Interactions sur n'importe quelle ligne (Action / Obligation / Commodity /
+Gouvernement) :
+  - clic gauche  : ouvre la fiche flottante de l'actif (PopupMixin) — pour un
+                   gouvernement, ouvre directement l'écran GOV (fiche pays déjà
+                   riche, pas besoin de popup) ;
   - Ctrl+clic     : ajoute/retire la ligne de la sélection multiple ;
   - Shift+clic    : sélectionne toute la plage entre le dernier clic et celui-ci ;
-  - clic droit    : ajoute directement le ticker à la watchlist (écran principal).
-Le bouton « + AJOUTER » envoie toute la sélection courante vers la watchlist.
-
-Lignes Obligation / Commodity / Gouvernement : un clic navigue vers l'écran
-dédié déjà existant (BONDS / CMDTY / GOV), pour consulter le détail complet.
+  - clic droit    : ajoute directement l'actif à la liste de suivi correspondante
+                   (watchlist actions/obligations/commodities/pays).
+Le bouton « + AJOUTER » envoie toute la sélection courante vers ces listes.
+La watchlist actions est plafonnée à 10 lignes (accès rapide, cf. WATCHLIST
+dans le terminal) ; les autres listes ne sont pas plafonnées.
 
 Ouvert via EXPLORE, ou en cliquant le titre du panneau « Entreprises » du
 terminal.
@@ -39,6 +42,9 @@ KIND_COLOR = {"Action": config.COL_AMBER, "Obligation": config.COL_CYAN,
               "Commodity": config.COL_WARN, "Gouvernement": config.COL_PRESTIGE}
 KIND_LABEL = {"Action": "Action", "Obligation": "Oblig.", "Commodity": "Cmdty",
               "Gouvernement": "Gouv."}
+WATCHLIST_ATTR = {"Action": "watchlist", "Obligation": "bond_watchlist",
+                   "Commodity": "commodity_watchlist", "Gouvernement": "gov_watchlist"}
+WATCHLIST_CAP = {"Action": 10}
 
 
 class MarketExplorerScene(Scene, PopupMixin):
@@ -160,37 +166,58 @@ class MarketExplorerScene(Scene, PopupMixin):
             have.sort(key=lambda r: r[key], reverse=(self.sort_dir < 0))
         return have + none_rows
 
-    def _quick_add(self, ticker):
+    def _quick_add(self, kind, key):
         p = self.app.gs.player
         if not self._can_watch():
             self.app.notify("Watchlist verrouillée (débloqué au grade Analyst).", "warn")
             return
-        if ticker in p.watchlist:
-            self.app.notify(f"{ticker} est déjà dans la watchlist.", "info")
+        attr = WATCHLIST_ATTR[kind]
+        lst = getattr(p, attr)
+        if key in lst:
+            self.app.notify(f"{key} est déjà dans la liste de suivi.", "info")
             return
-        p.watchlist.append(ticker)
-        self.market.track_company(ticker)
-        self.app.notify(f"{ticker} ajouté à l'écran principal.", "good")
+        cap = WATCHLIST_CAP.get(kind)
+        if cap and len(lst) >= cap:
+            self.app.notify(f"Limite de {cap} atteinte — retirez-en un avant d'en ajouter un autre.", "warn")
+            return
+        lst.append(key)
+        if kind == "Action":
+            self.market.track_company(key)
+        self.app.notify(f"{key} ajouté à la liste de suivi.", "good")
 
     def _bulk_add(self):
         p = self.app.gs.player
         if not self._can_watch():
             self.app.notify("Watchlist verrouillée (débloqué au grade Analyst).", "warn")
             return
-        added, dup = 0, 0
-        for tk in sorted(self.selected):
-            if tk in p.watchlist:
+        added, dup, capped = 0, 0, 0
+        for kind, key in sorted(self.selected):
+            attr = WATCHLIST_ATTR[kind]
+            lst = getattr(p, attr)
+            if key in lst:
                 dup += 1
                 continue
-            p.watchlist.append(tk)
-            self.market.track_company(tk)
+            cap = WATCHLIST_CAP.get(kind)
+            if cap and len(lst) >= cap:
+                capped += 1
+                continue
+            lst.append(key)
+            if kind == "Action":
+                self.market.track_company(key)
             added += 1
         self.selected.clear()
         if added:
-            extra = f" ({dup} déjà présente(s))" if dup else ""
-            self.app.notify(f"{added} société(s) ajoutée(s) à l'écran principal.{extra}", "good")
+            extra = []
+            if dup:
+                extra.append(f"{dup} déjà présente(s)")
+            if capped:
+                extra.append(f"{capped} refusée(s) (limite atteinte)")
+            suffix = f" ({', '.join(extra)})" if extra else ""
+            self.app.notify(f"{added} actif(s) ajouté(s) à la liste de suivi.{suffix}", "good")
+        elif capped:
+            self.app.notify("Limite de watchlist atteinte pour la sélection.", "warn")
         elif dup:
-            self.app.notify("Sélection déjà entièrement dans la watchlist.", "info")
+            self.app.notify("Sélection déjà entièrement suivie.", "info")
 
     # --------------------------------------------------------------- events
     def handle_event(self, event):
@@ -272,30 +299,29 @@ class MarketExplorerScene(Scene, PopupMixin):
         kind, key = ident
         idx = self._row_index.get(ident)
         if button == 3:
-            if kind == "Action":
-                self._quick_add(key)
+            self._quick_add(kind, key)
             return
         mods = pygame.key.get_mods()
-        if kind == "Action":
-            if mods & pygame.KMOD_CTRL:
-                if key in self.selected:
-                    self.selected.discard(key)
-                else:
-                    self.selected.add(key)
-                self.last_idx = idx
-            elif mods & pygame.KMOD_SHIFT and self.last_idx is not None and idx is not None:
-                lo, hi = sorted((self.last_idx, idx))
-                for r in self._row_list[lo:hi + 1]:
-                    if r["kind"] == "Action":
-                        self.selected.add(r["ticker"])
-                self.last_idx = idx
+        if mods & pygame.KMOD_CTRL:
+            if ident in self.selected:
+                self.selected.discard(ident)
             else:
-                self.last_idx = idx
-                self.open_company(key)
+                self.selected.add(ident)
+            self.last_idx = idx
+            return
+        if mods & pygame.KMOD_SHIFT and self.last_idx is not None and idx is not None:
+            lo, hi = sorted((self.last_idx, idx))
+            for r in self._row_list[lo:hi + 1]:
+                self.selected.add((r["kind"], r["key"]))
+            self.last_idx = idx
+            return
+        self.last_idx = idx
+        if kind == "Action":
+            self.open_company(key)
         elif kind == "Obligation":
-            self.app.scenes.go("bonds", return_to="explorer")
+            self.open_bond(key)
         elif kind == "Commodity":
-            self.app.scenes.go("commodities", return_to="explorer")
+            self.open_commodity(key)
         elif kind == "Gouvernement":
             self.app.scenes.go("governments", return_to="explorer", focus=key)
 
@@ -314,13 +340,14 @@ class MarketExplorerScene(Scene, PopupMixin):
         widgets.draw_text(surf, "EXPLORATEUR DE MARCHÉ", (40, 22), fonts.title(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, "Actions · obligations · commodities · gouvernements — clic = détail · "
                                 "Ctrl+clic / Shift+clic = sélection · clic droit = ajout rapide",
-                          (42, 50), fonts.tiny(), config.COL_TEXT_DIM)
+                          (42, 72), fonts.tiny(), config.COL_TEXT_DIM)
 
         mp = pygame.mouse.get_pos()
         x0 = 40
+        top = config.content_top()
 
         # ---- recherche ----
-        search_rect = pygame.Rect(x0, 70, 300, 24)
+        search_rect = pygame.Rect(x0, top, 300, 24)
         pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN if self.search else config.COL_BORDER, search_rect, 1, border_radius=4)
         label = self.search if self.search else "Rechercher (nom, ticker, secteur, région)…"
@@ -334,12 +361,12 @@ class MarketExplorerScene(Scene, PopupMixin):
                               config.COL_TEXT_DIM, align="center")
 
         # ---- chips TYPE ----
-        self._type_rects, _ = self._draw_chip_row(surf, x0 + 310, 70, config.SCREEN_WIDTH - 40,
+        self._type_rects, _ = self._draw_chip_row(surf, x0 + 310, top, config.SCREEN_WIDTH - 40,
                                                    TYPE_CHIPS, self.type_filter, config.COL_AMBER)
 
         # ---- chips RÉGION ----
         region_chips = [(None, "TOUTES")] + [(r, r) for r in self.market.regions]
-        self._region_rects, y = self._draw_chip_row(surf, x0, 100, config.SCREEN_WIDTH - 40,
+        self._region_rects, y = self._draw_chip_row(surf, x0, top + 30, config.SCREEN_WIDTH - 40,
                                                      region_chips, self.region_filter, config.COL_CYAN)
 
         # ---- chips SECTEUR / CATÉGORIE (dynamiques selon le TYPE) ----
@@ -354,21 +381,26 @@ class MarketExplorerScene(Scene, PopupMixin):
         # ---- boutons de tri ----
         y += 8
         self._sort_rects = {}
+        x_max = config.SCREEN_WIDTH - 40
         widgets.draw_text(surf, "TRIER :", (x0, y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
-        sx = x0 + 56
+        sx0 = x0 + 56
+        sx, sy = sx0, y
         for key, label in SORT_FIELDS:
             active = (self.sort_key == key)
             arrow = (" ▲" if self.sort_dir > 0 else " ▼") if active else ""
             full = label + arrow
             w = fonts.tiny(bold=True).size(full)[0] + 16
-            rect = pygame.Rect(sx, y, w, 20)
+            if sx + w > x_max and sx > sx0:
+                sx = sx0
+                sy += 24
+            rect = pygame.Rect(sx, sy, w, 20)
             self._sort_rects[key] = rect
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if active else config.COL_PANEL, rect, border_radius=3)
             pygame.draw.rect(surf, config.COL_AMBER if active else config.COL_BORDER, rect, 1, border_radius=3)
             widgets.draw_text(surf, full, rect.center, fonts.tiny(bold=active),
                               config.COL_AMBER if active else config.COL_TEXT_DIM, align="center")
             sx += w + 6
-        y += 28
+        y = sy + 28
 
         # ---- panneau résultats ----
         filtered = self._filtered_sorted()
@@ -419,7 +451,7 @@ class MarketExplorerScene(Scene, PopupMixin):
         kind, key = r["kind"], r["key"]
         row_rect = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, ROW_H)
         self._row_rects[(kind, key)] = row_rect
-        selected = (kind == "Action" and key in self.selected)
+        selected = (kind, key) in self.selected
         if selected:
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect, border_radius=3)
             pygame.draw.rect(surf, config.COL_UP, row_rect, 1, border_radius=3)

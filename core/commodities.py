@@ -200,6 +200,16 @@ def roll_yield(market, cid):
     return -_BY_ID[cid][5]
 
 
+def history(market, cid, n=None):
+    """Historique de spot complet (depuis l'origine) d'une commodity.
+    `n` borne au dernier n points si fourni. Retourne une liste de floats."""
+    if cid not in _BY_ID:
+        return []
+    step = int(getattr(market, "step_count", 0))
+    path = _path(market, cid, step)[:step + 1]
+    return path[-n:] if n else path
+
+
 def quote(market, cid):
     c = _BY_ID.get(cid)
     if not c:

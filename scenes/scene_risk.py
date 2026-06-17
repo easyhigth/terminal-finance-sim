@@ -53,6 +53,8 @@ class RiskScene(Scene):
             (40, config.SCREEN_HEIGHT-66, 160, 44), "← TERMINAL", config.COL_TEXT_DIM)
         self.mode_btn = widgets.Button(
             (210, config.SCREEN_HEIGHT-66, 240, 44), "MODE : —", config.COL_CYAN)
+        self.tuto_btn = widgets.Button(
+            (460, config.SCREEN_HEIGHT-66, 150, 44), "📘 TUTO", config.COL_WARN)
         self._exp_btns = {}
         self._scenario_btns = {}
         self._conf_btns = {}
@@ -123,6 +125,9 @@ class RiskScene(Scene):
             self.scenario = None
             self.stress_real = None
             self._simulate()
+        if self.tuto_btn.handle(event):
+            self.app.scenes.go("tutorials", tid="risk", return_to="risk")
+            return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for i, (minus, plus) in self._exp_btns.items():
                 if minus.collidepoint(event.pos):
@@ -142,6 +147,7 @@ class RiskScene(Scene):
         self.back_btn.update(mp)
         self.mode_btn.label = "MODE : PORTEFEUILLE RÉEL" if self.real else "MODE : DÉMO"
         self.mode_btn.update(mp)
+        self.tuto_btn.update(mp)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -159,6 +165,7 @@ class RiskScene(Scene):
         self._draw_stress(surf)
         self.back_btn.draw(surf)
         self.mode_btn.draw(surf)
+        self.tuto_btn.draw(surf)
 
     def _draw_exposures(self, surf):
         panel = pygame.Rect(40, 110, 360, 280)

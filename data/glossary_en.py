@@ -28,6 +28,7 @@ NAME_EN = {
     "Taxonomie verte": "Green taxonomy", "Risque de transition": "Transition risk",
     "Facteurs (Fama-French)": "Factors (Fama-French)", "Rendement log": "Log return",
     "Attribution de performance": "Performance attribution",
+    "Vente à découvert": "Short selling", "Appel de marge": "Margin call",
 }
 
 
@@ -135,6 +136,16 @@ GLOSSARY_EN = {
         "assess a portfolio's or institution's resilience."),
     "Hedge": ("Risk", "A position taken to offset the risk of another (e.g. buying "
         "puts to protect a stock portfolio)."),
+    "Vente à découvert": ("Risk", "Short selling. Borrowing a security to sell it "
+        "immediately, hoping to buy it back cheaper later (COVER) and pocket the "
+        "difference. Potentially unlimited loss if the price rises, unlike a long "
+        "position."),
+    "Appel de marge": ("Risk", "Margin call. A demand for extra capital when a "
+        "leveraged (or short) portfolio's value drops too much: the borrower must "
+        "top up margin, or positions get force-liquidated."),
+    "Short squeeze": ("Risk", "A sharp price rally forcing many short sellers to "
+        "buy back (COVER) in a hurry to limit losses; their forced buying pushes "
+        "the price even higher, creating a self-reinforcing loop."),
     # --- M&A -------------------------------------------------------------
     "M&A": ("M&A", "Mergers & Acquisitions: combining two firms (merger) or buying a "
         "target (acquisition)."),

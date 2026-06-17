@@ -200,6 +200,164 @@ TUTORIALS = [
                    "dette, elle, doit être remboursée quoi qu'il arrive. Voir les leçons "
                    "Académie « LBO » et « Accretion/Dilution » pour la mécanique chiffrée.",
     },
+    {
+        "id": "crypto",
+        "title": "Crypto-actifs & stablecoins",
+        "image": "crypto.png",
+        "intro": "Une classe d'actifs à part : pas de coupon ni de dividende, "
+                 "uniquement une variation de prix — souvent très volatile. Ouvrez "
+                 "le marché avec CRYPTO.",
+        "steps": [
+            "Affichez le marché : CRYPTO — chaque ligne montre le spot, la "
+            "volatilité annualisée et le TYPE (Crypto, Stablecoin, CBDC).",
+            "Une CRYPTO classique (type « Crypto ») n'a pas d'ancre : son prix peut "
+            "doubler ou être divisé par deux sur l'année — lisez bien VOL/AN avant "
+            "d'investir.",
+            "Un STABLECOIN vise un prix fixe (souvent 1.0). S'il DÉCROCHE (depeg, "
+            "marqué ⚠), son prix s'écarte de son ancre — un signal d'alerte, pas "
+            "une opportunité de hausse.",
+            "Une CBDC (monnaie numérique de banque centrale) verse un rendement "
+            "régulier (+%/an affiché), proche d'un cash rémunéré : le profil le "
+            "moins risqué de la classe.",
+            "Achetez/vendez en cliquant +1/-1 sur chaque ligne, ou au clavier : "
+            "BUYCRYPTO <id> <qté>   ·   SELLCRYPTO <id> <qté>.",
+        ],
+        "concept": "La volatilité (VOL/AN) est l'indicateur clé : une crypto à "
+                   "80-150% de vol annuelle peut perdre la moitié de sa valeur en "
+                   "quelques semaines, sans aucun flux (coupon/dividende) pour "
+                   "compenser l'attente. Un DEPEG de stablecoin est un signal de "
+                   "stress (perte de confiance, problème de réserve) : ne pas le "
+                   "confondre avec une simple fluctuation — c'est souvent le signe "
+                   "qu'il faut sortir, pas qu'il faut moyenner à la baisse.",
+    },
+    {
+        "id": "credit",
+        "title": "Titrisation : tranches & waterfall",
+        "image": "credit.png",
+        "intro": "Le desk crédit (CREDIT) titrise un pool de prêts en plusieurs "
+                 "TRANCHES — equity, mezzanine, senior — qui absorbent les pertes "
+                 "du pool dans un ordre précis : la « waterfall ».",
+        "steps": [
+            "Ouvrez le desk : CREDIT — chaque ligne est une tranche avec son "
+            "ATTACHE-DÉTACHE, son COUPON et son RATING.",
+            "ATTACHE-DÉTACHE définit la plage de pertes du pool que la tranche "
+            "absorbe : ex. une tranche « 0%-5% » encaisse les 5 premiers points de "
+            "pertes du pool, une tranche « 20%-100% » n'est touchée qu'au-delà de "
+            "20% de pertes.",
+            "La tranche EQUITY (attache 0%) paie le coupon le plus élevé car elle "
+            "saute en PREMIER en cas de défauts — c'est la plus risquée.",
+            "La tranche SENIOR (détache à 100%) paie le coupon le plus faible mais "
+            "n'est touchée qu'en tout dernier — c'est la plus protégée (souvent "
+            "notée AAA).",
+            "Investissez : cliquez INVESTIR sur la tranche choisie. Le rendement "
+            "réalisé dépend du taux de défaut du pool sur sa durée de vie.",
+        ],
+        "concept": "C'est le principe de la SUBORDINATION : les pertes du pool "
+                   "remontent de bas en haut, des tranches les plus junior (equity) "
+                   "vers les plus senior. Une PERTE ATTENDUE de 6% sur le pool ne "
+                   "touche quasiment pas une tranche senior qui détache à 20%, mais "
+                   "peut consommer l'intégralité d'une tranche equity de 5% "
+                   "d'épaisseur. Choisir sa tranche, c'est choisir où se situer dans "
+                   "la file d'attente des pertes — du rendement élevé et risqué "
+                   "(equity) au rendement faible et protégé (senior).",
+    },
+    {
+        "id": "alm",
+        "title": "ALM : gestion actif-passif bancaire",
+        "image": "alm.png",
+        "intro": "Le desk ALM (ALM) simule le bilan d'une banque : masses et "
+                 "durations de l'actif et du passif, puis l'impact d'un choc de "
+                 "taux sur la marge d'intérêt (NII) et la valeur économique des "
+                 "fonds propres (ΔEVE).",
+        "steps": [
+            "Ouvrez l'outil : ALM — ajustez les masses (Actifs/Passifs totaux) et "
+            "les durations avec les boutons +/-.",
+            "Le REPRICING GAP (1 an) = actifs sensibles au taux moins passifs "
+            "sensibles au taux sur l'horizon d'un an. Un gap positif = la banque "
+            "« asset-sensitive », elle gagne quand les taux montent.",
+            "Le DURATION GAP compare la sensibilité-prix de l'actif à celle du "
+            "passif, pondérées par leurs masses respectives.",
+            "Appliquez un CHOC DE TAUX (boutons -200/-100/+100/+200 bps) et lisez "
+            "Δ NII (impact sur la marge d'intérêt à 1 an) et Δ EVE (impact sur la "
+            "valeur économique des fonds propres).",
+            "Surveillez Δ EVE / fonds propres : au-delà d'environ 15-20%, le "
+            "risque de taux du bilan est jugé excessif par les régulateurs "
+            "(cf. Bâle III).",
+        ],
+        "concept": "Un GAP DE REPRICING positif et un DURATION GAP positif "
+                   "racontent deux histoires complémentaires : à court terme (NII), "
+                   "une hausse des taux profite à la banque si plus d'actifs que de "
+                   "passifs se repricent vite. Mais à long terme (EVE), un duration "
+                   "gap positif (actifs plus longs que les passifs) signifie que la "
+                   "VALEUR de l'actif chute plus que celle du passif quand les taux "
+                   "montent — c'est l'inverse du raisonnement NII. Une banque bien "
+                   "gérée surveille les DEUX mesures : NII pour le court terme, EVE "
+                   "pour la valeur économique long terme.",
+    },
+    {
+        "id": "quant",
+        "title": "Pricing d'options (Black-Scholes & Greeks)",
+        "image": "quant.png",
+        "intro": "Le module QUANT calcule en direct le prix Black-Scholes d'une "
+                 "option call/put et ses Greeks (delta, gamma, vega, theta, rho) "
+                 "à partir de 5 paramètres.",
+        "steps": [
+            "Ouvrez l'outil : QUANT — réglez Spot (S), Strike (K), Maturité (T), "
+            "Taux (r) et Volatilité (σ) avec les boutons +/-.",
+            "Basculez CALL/PUT avec le bouton TYPE pour comparer les deux profils.",
+            "Lisez le PRIX affiché en gros : c'est la prime théorique de l'option "
+            "selon Black-Scholes, comparée à la VALEUR INTRINSÈQUE sur le graphe "
+            "« Prix vs Spot ».",
+            "Les GREEKS mesurent la sensibilité du prix : Delta (variation du "
+            "sous-jacent), Gamma (variation du delta), Vega (variation de la vol), "
+            "Theta (érosion temporelle), Rho (variation du taux).",
+            "Le diagramme de PAYOFF (en bas) montre le P&L net de prime à "
+            "l'échéance : il révèle la perte maximale (la prime payée) pour un "
+            "acheteur d'option.",
+        ],
+        "concept": "Augmenter la VOLATILITÉ (σ) augmente TOUJOURS le prix d'une "
+                   "option (call ou put) : plus le sous-jacent peut bouger, plus "
+                   "l'optionnalité a de la valeur — c'est ce que mesure Vega. À "
+                   "l'inverse, le THETA est presque toujours négatif pour un "
+                   "acheteur d'option : chaque jour qui passe sans mouvement du "
+                   "sous-jacent érode la prime, surtout proche de l'échéance. Une "
+                   "option proche de la monnaie (S ≈ K) a le GAMMA le plus élevé : "
+                   "son delta change vite, donc son risque est le plus difficile à "
+                   "couvrir dynamiquement.",
+    },
+    {
+        "id": "risk",
+        "title": "VaR, CVaR & stress tests",
+        "image": "risk.png",
+        "intro": "Le module RISK mesure le risque de votre portefeuille (ou d'un "
+                 "book de démo) via la VaR, la CVaR et des scénarios de stress. "
+                 "Ouvrez-le avec RISK.",
+        "steps": [
+            "Ouvrez l'outil : RISK — en MODE PORTEFEUILLE RÉEL, l'exposition vient "
+            "de vos positions ; en MODE DÉMO, ajustez vous-même l'exposition par "
+            "facteur (Equities, Rates, Credit, FX, Commodities).",
+            "Choisissez un NIVEAU DE CONFIANCE (90/95/99%) : plus il est élevé, "
+            "plus la VaR affichée est grande (on couvre une queue de distribution "
+            "plus large).",
+            "Lisez l'HISTOGRAMME : la zone rouge à gauche de la ligne VaR "
+            "représente les pires scénarios simulés.",
+            "Comparez VaR HISTORIQUE, VaR PARAMÉTRIQUE et CVaR : la CVaR (perte "
+            "moyenne au-delà de la VaR) est toujours ≥ la VaR — elle capture la "
+            "sévérité de la queue, pas seulement son seuil.",
+            "Cliquez un SCÉNARIO DE STRESS (crise actions, choc de taux…) pour "
+            "voir l'impact instantané sur votre book, décomposé par facteur.",
+        ],
+        "concept": "La VaR répond à « quelle perte ne devrait pas être dépassée "
+                   "X% du temps ? » mais reste MUETTE sur l'ampleur au-delà de ce "
+                   "seuil — deux portefeuilles peuvent avoir la même VaR 95% et des "
+                   "pertes extrêmes radicalement différentes. La CVaR (Expected "
+                   "Shortfall) comble ce trou en moyennant les pertes DANS la queue. "
+                   "Les STRESS TESTS complètent l'approche statistique avec des "
+                   "scénarios historiques ou hypothétiques extrêmes (krachs, chocs "
+                   "de taux) que la distribution \"normale\" sous-estime souvent — "
+                   "la VaR suppose un monde plus calme que la réalité ne l'est lors "
+                   "des crises.",
+    },
 ]
 
 _BY_ID = {t["id"]: t for t in TUTORIALS}

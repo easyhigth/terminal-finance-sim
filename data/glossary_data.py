@@ -110,6 +110,20 @@ GLOSSARY = {
     "Hedge": ("Risque",
         "Couverture : prise de position destinée à compenser le risque d'une "
         "autre position (ex : acheter des puts pour protéger un portefeuille actions)."),
+    "Vente à découvert": ("Risque",
+        "Short selling. Emprunter un titre pour le vendre immédiatement, dans "
+        "l'espoir de le racheter moins cher plus tard (COVER) et d'empocher la "
+        "différence. Perte potentiellement illimitée si le cours monte, à "
+        "l'inverse d'une position longue."),
+    "Appel de marge": ("Risque",
+        "Margin call. Exigence de fonds propres supplémentaires quand la valeur "
+        "d'un portefeuille à effet de levier (ou à découvert) chute trop : "
+        "l'emprunteur doit reconstituer sa marge, sinon des positions sont "
+        "liquidées de force."),
+    "Short squeeze": ("Risque",
+        "Hausse brutale d'un cours forçant de nombreux vendeurs à découvert à "
+        "racheter en urgence (COVER) pour limiter leurs pertes ; ces achats "
+        "forcés amplifient encore la hausse, créant une boucle auto-entretenue."),
 
     # --- M&A / Corporate --------------------------------------------------
     "M&A": ("M&A",

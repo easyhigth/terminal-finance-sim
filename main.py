@@ -49,6 +49,7 @@ from scenes.scene_more import MoreScene
 from scenes.scene_structured import StructuredScene
 from scenes.scene_credit import CreditScene
 from scenes.scene_alm import AlmScene
+from scenes.scene_swaps import SwapsScene
 from scenes.scene_graph import GraphScene
 from scenes.scene_rivals import RivalsScene
 from scenes.scene_analytics import AnalyticsScene
@@ -119,6 +120,7 @@ class App:
         self.scenes.register("structured", StructuredScene(self))
         self.scenes.register("credit", CreditScene(self))
         self.scenes.register("alm", AlmScene(self))
+        self.scenes.register("swaps", SwapsScene(self))
         self.scenes.register("graph", GraphScene(self))
         self.scenes.register("rivals", RivalsScene(self))
         self.scenes.register("analytics", AnalyticsScene(self))

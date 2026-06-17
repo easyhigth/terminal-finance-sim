@@ -50,6 +50,7 @@ CMD_FEATURE = {
     "HEDGE": "hedge",
     "MANDATES": "mandates", "MANDATS": "mandates", "MANDATE": "mandates", "MANDAT": "mandates",
     "MA": "ma", "M&A": "ma",
+    "SWAP": "trade", "SWAPS": "trade",
 }
 
 

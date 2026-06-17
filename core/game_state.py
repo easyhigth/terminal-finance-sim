@@ -37,6 +37,8 @@ class PlayerState:
     etfs: dict = field(default_factory=dict)           # ETF (fonds indiciels) : id -> {"qty","avg"}
     structured: list = field(default_factory=list)     # produits structurés souscrits
     securitised: list = field(default_factory=list)    # tranches de titrisation détenues
+    ma_owned: dict = field(default_factory=dict)        # sociétés M&A détenues : ticker -> instance
+    ma_history: list = field(default_factory=list)      # historique M&A (cessions, défauts)
     eval_state: dict = field(default_factory=dict)     # examen en pause (reprise possible)
     realized_pnl: float = 0.0                          # P&L réalisé cumulé (ventes)
     # ----- progression de carrière -----
@@ -297,6 +299,7 @@ class GameState:
 
         # bascule de trimestre : clôture des objectifs + génération des suivants
         quarter_report = None
+        ma_events = []
         if p.quarter != prev_quarter:
             quarter_report = career.close_quarter(p)
             career.ensure_objectives(p)
@@ -304,6 +307,9 @@ class GameState:
             import random as _r
             from data.companies import SECTORS as _SEC
             p.flags["hot_sector"] = _r.choice(list(_SEC.keys()))
+            if getattr(p, "ma_owned", None):
+                from core import ma as ma_mod
+                ma_events = ma_mod.evolve_quarter(p)
         p.best_cash = max(p.best_cash, nw)
 
         # mémorise la valeur nette pour la sparkline du terminal
@@ -315,6 +321,8 @@ class GameState:
         for e in evts + [{"title": x["title"], "kind": "bad",
                           "desc": "Deal expiré non traité."} for x in expired]:
             p.event_log.append(e["title"])
+        for title in ma_events:
+            p.event_log.append(title)
         p.event_log = p.event_log[-12:]
 
         p.check_game_over(net_worth=nw)
@@ -331,5 +339,6 @@ class GameState:
             "securitised_due": securitised_due,
             "quarter_changed": p.quarter != prev_quarter,
             "quarter_report": quarter_report,
+            "ma_events": ma_events,
             "game_over": p.game_over,
         }

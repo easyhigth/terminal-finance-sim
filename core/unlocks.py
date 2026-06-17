@@ -17,6 +17,7 @@ UNLOCKS = {
     "hedge": 6,      # couverture du portefeuille (réduction d'exposition)
     "leverage": 6,   # levier & vente à découvert (short)
     "mandates": 6,   # mandats clients
+    "ma": 4,         # M&A : acquisition de cibles privées (LBO réel)
 }
 
 LABELS = {
@@ -28,6 +29,7 @@ LABELS = {
     "hedge": "Couverture du portefeuille (HEDGE)",
     "leverage": "Levier & vente à découvert (SHORT/COVER)",
     "mandates": "Mandats clients",
+    "ma": "M&A : acquisition de cibles privées",
 }
 
 # commande (token majuscule) -> fonctionnalité gated
@@ -47,6 +49,7 @@ CMD_FEATURE = {
     "PITCH": "pitch",
     "HEDGE": "hedge",
     "MANDATES": "mandates", "MANDATS": "mandates", "MANDATE": "mandates", "MANDAT": "mandates",
+    "MA": "ma", "M&A": "ma",
 }
 
 

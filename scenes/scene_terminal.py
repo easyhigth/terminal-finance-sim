@@ -128,7 +128,7 @@ class TerminalScene(Scene):
             ("ADV ▸", "ADV"),
             ("PORTEF.", "PORTFOLIO"), ("MARCHÉ", "MARKETHUB"), ("ETF", "ETF"),
             ("MISSION", "MISSION"), ("EXAM/CERTIF", "EXAMCERT"),
-            ("MANDATS", "MANDATES"), ("DEALS", "DEALS"),
+            ("MANDATS", "MANDATES"), ("DEALS", "DEALS"), ("M&A", "MA"),
             ("INBOX", "INBOX"), ("NEWS", "NEWS"), ("DÉCIDE", "DECIDE"),
             ("TABLEUR", "SHEET"), ("ACADÉMIE", "LEARN"),
             ("GLOSSAIRE", "GLOSSARY"), ("PLUS", "MORE"),

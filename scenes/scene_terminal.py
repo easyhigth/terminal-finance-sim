@@ -2052,12 +2052,13 @@ class TerminalScene(Scene):
                 nxt = o
                 break
         if nxt:
-            widgets.draw_text_wrapped(surf, career_mod.objective_label(p, nxt), (inner.x, y),
-                                      fonts.small(), config.COL_TEXT, inner.w)
+            wrapped_h = widgets.draw_text_wrapped(surf, career_mod.objective_label(p, nxt), (inner.x, y),
+                                                  fonts.small(), config.COL_TEXT, inner.w)
         else:
             widgets.draw_text(surf, "Tous les objectifs atteints ✓", (inner.x, y),
                               fonts.small(), config.COL_UP)
-        y += 44
+            wrapped_h = fonts.small().get_height()
+        y += max(44, wrapped_h + 10)
         # 2) promotion
         widgets.draw_text(surf, "PROMOTION", (inner.x, y), fonts.tiny(bold=True), config.COL_CYAN)
         y += 18

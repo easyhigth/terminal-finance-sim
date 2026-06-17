@@ -62,6 +62,7 @@ class App:
         pygame.init()
         pygame.display.set_caption(config.TITLE)
         pygame.display.set_icon(make_icon_surface(64))
+        self.fullscreen = False
         self.screen = pygame.display.set_mode(
             (config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
         self.clock = pygame.time.Clock()
@@ -126,6 +127,13 @@ class App:
         """Pousse une notification (toast) affichée en overlay."""
         self.notes.push(text, kind)
 
+    def toggle_fullscreen(self):
+        """Bascule entre mode fenêtré et plein écran (résolution logique inchangée)."""
+        self.fullscreen = not self.fullscreen
+        flags = pygame.FULLSCREEN if self.fullscreen else 0
+        self.screen = pygame.display.set_mode(
+            (config.SCREEN_WIDTH, config.SCREEN_HEIGHT), flags)
+
     def ensure_market(self):
         """Crée/synchronise le moteur de marché avec l'état du joueur.
         Le marché est déterministe : (graine, nb de pas) reconstruit l'état exact.
@@ -145,6 +153,9 @@ class App:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
+                    self.toggle_fullscreen()
+                    continue
                 self.scenes.handle_event(event)
             self.scenes.update(dt)
             self.scenes.draw(self.screen)

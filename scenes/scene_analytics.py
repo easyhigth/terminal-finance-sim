@@ -11,23 +11,54 @@ import pygame
 from core import config, analytics
 from core.scene_manager import Scene
 from ui import fonts, widgets
+from ui.popups import PopupMixin
 
 _CLASS_COL = {"Actions": config.COL_AMBER, "Obligations": config.COL_CYAN,
               "Matières": config.COL_WARN, "Crypto": config.COL_PRESTIGE}
 
 
-class AnalyticsScene(Scene):
+class AnalyticsScene(Scene, PopupMixin):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
         self.market = self.app.ensure_market()
+        self.init_popups()
         self.back_btn = widgets.Button(
             config.back_button_rect(180), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
+        self._holding_rects = {}    # ticker -> Rect (clic → fiche flottante)
+        self._chart_rects = {}      # ticker -> Rect (clic → graphe flottant, rendement)
+        self._frontier_rect = None
+        self._corr_rect = None
 
     def handle_event(self, event):
+        if self.popups_handle_event(event):
+            return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
+            if not self.popups_close_top():
+                self.app.scenes.go(self.return_to)
+            return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for tk, rect in self._holding_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.open_company(tk)
+                    return
+            for tk, rect in self._chart_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.open_chart(tk, kind="change")
+                    return
+            if self._frontier_rect and self._frontier_rect.collidepoint(event.pos):
+                p, m = self.app.gs.player, self.market
+                self.open_custom_chart("FRONTIÈRE EFFICIENTE — actions",
+                                       lambda surf, rect: self._draw_frontier(surf, rect, p, m),
+                                       accent=config.COL_UP, size=(560, 420))
+                return
+            if self._corr_rect and self._corr_rect.collidepoint(event.pos):
+                p, m = self.app.gs.player, self.market
+                self.open_custom_chart("CORRÉLATIONS — actions",
+                                       lambda surf, rect: self._draw_corr(surf, rect, p, m),
+                                       accent=config.COL_DOWN, size=(560, 420))
+                return
 
     def update(self, dt):
         self.back_btn.update(pygame.mouse.get_pos(), dt)
@@ -51,6 +82,7 @@ class AnalyticsScene(Scene):
                               "BUYCMDTY…) pour voir l'analyse détaillée.",
                               (40, 120), fonts.body(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
+            self.popups_draw(surf)
             return
 
         self._draw_tiles(surf, s, cur)
@@ -69,6 +101,7 @@ class AnalyticsScene(Scene):
         self._draw_allocations(surf, pygame.Rect(x2, top, mw, h), s, cur)
         self._draw_risk_charts(surf, pygame.Rect(x3, top, rw, h), p, m, s)
         self.back_btn.draw(surf)
+        self.popups_draw(surf)
 
     def _draw_tiles(self, surf, s, cur):
         fm = lambda v: widgets.format_money(v, cur)
@@ -108,8 +141,20 @@ class AnalyticsScene(Scene):
         y = inner.y + 20
         row_h = 26
         maxrows = (inner.h - 28) // row_h
+        mp = pygame.mouse.get_pos()
+        self._holding_rects = {}
+        self._chart_rects = {}
         for h in s["rows"][:maxrows]:
             ccol = _CLASS_COL.get(h["cls"], config.COL_TEXT)
+            clickable = h["cls"] == "Actions"     # tickers d'actions = sociétés du marché
+            if clickable:
+                tk = h["label"]
+                name_rect = pygame.Rect(inner.x, y - 2, 300, row_h - 2)
+                value_rect = pygame.Rect(inner.x + 300, y - 2, inner.w - 300, row_h - 2)
+                self._holding_rects[tk] = name_rect
+                self._chart_rects[tk] = value_rect
+                if name_rect.collidepoint(mp) or value_rect.collidepoint(mp):
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, (inner.x, y - 2, inner.w, row_h - 2))
             pygame.draw.rect(surf, ccol, (inner.x, y + 2, 6, 14))
             tag = "S" if h["short"] else " "
             widgets.draw_text(surf, tag, (inner.x + 10, y), fonts.tiny(bold=True), config.COL_DOWN)
@@ -134,6 +179,8 @@ class AnalyticsScene(Scene):
         if len(s["rows"]) > maxrows:
             widgets.draw_text(surf, f"… +{len(s['rows'])-maxrows} autres",
                               (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, "clic action → fiche · clic cours/valeur/P&L → graphe",
+                          (inner.x, inner.bottom - 12), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_allocations(self, surf, rect, s, cur):
         inner = widgets.draw_panel(surf, rect, "Répartition & diversification", config.COL_AMBER)
@@ -178,8 +225,16 @@ class AnalyticsScene(Scene):
 
     def _draw_risk_charts(self, surf, rect, p, m, s):
         half = (rect.h - config.MARGIN) // 2
-        self._draw_frontier(surf, pygame.Rect(rect.x, rect.y, rect.w, half), p, m)
-        self._draw_corr(surf, pygame.Rect(rect.x, rect.y + half + config.MARGIN, rect.w, half), p, m)
+        self._frontier_rect = pygame.Rect(rect.x, rect.y, rect.w, half)
+        self._corr_rect = pygame.Rect(rect.x, rect.y + half + config.MARGIN, rect.w, half)
+        self._draw_frontier(surf, self._frontier_rect, p, m)
+        self._draw_corr(surf, self._corr_rect, p, m)
+        mp = pygame.mouse.get_pos()
+        for r in (self._frontier_rect, self._corr_rect):
+            if r.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_WHITE, r, 1)
+                widgets.draw_text(surf, "clic → agrandir ⤢", (r.right - 6, r.bottom - 14),
+                                  fonts.tiny(bold=True), config.COL_WHITE, align="right")
 
     def _draw_frontier(self, surf, rect, p, m):
         inner = widgets.draw_panel(surf, rect, "Frontière efficiente (actions)", config.COL_UP)

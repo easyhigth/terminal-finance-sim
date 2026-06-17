@@ -98,6 +98,32 @@ le seuil du grade (`MISSION` pour la faire monter). Commande : `MISSION`.
 - **Terminal** : historique de commandes (↑/↓), **autocomplétion** (Tab + suggestion fantôme),
   **indices cliquables** ouvrant un graphe d'historique en fenêtre déplaçable.
 
+### ETF — fonds indiciels (core/etfs.py + scene_etfs.py)
+- **~80 ETF** couvrant toutes les grandes familles : *broad/monde, régions, pays,
+  secteurs, styles factoriels* (value, growth, dividend, quality, momentum, min-vol),
+  *thématiques* (IA, semis, robotique, cybersécurité, énergie propre, défense,
+  infrastructure, fintech, biotech…), *ESG*, *REIT*, *obligataire* (souverain,
+  corporate, high yield, indexé inflation, court/long terme), *commodities*, *devises*,
+  et quelques **levier/inverse** clairement signalés « risque élevé ».
+- **NAV émergente** : comme les indices, la valeur d'un ETF découle de son **exposition**
+  (panier d'actions, taux, commodities…), donc il réagit de façon **cohérente** aux
+  facteurs monde/secteur/région/taux/inflation — déterministe, reconstruit depuis les
+  historiques du marché (5 ans d'historique dès le départ).
+- Pleinement intégrés : recherche/filtres/tri (`ETF`), explorateur unifié, fiche
+  flottante, **graphes** (`GP`/`COMP`), **comparaison** (`COMPARE`), portefeuille
+  (valeur nette), trading (`BUYETF`/`SELLETF`).
+
+### News & événements (core/news.py + scene_news.py)
+- Scène **`NEWS`** : fil d'actualités centralisé, **filtrable par type** (marché, macro,
+  entreprises, politique, réglementaire, événements) **et par région**, regroupé par jour.
+- **Persistance jusqu'à 3 ans** : on peut revoir tout ce qui s'est passé depuis le début.
+- **Carte du monde** : les news du jour s'affichent en **marqueurs persistants** là où
+  elles se produisent (plusieurs incidents simultanés), remplacés au tour suivant.
+- Les **news de pays** atterrissent dans l'inbox ; des **deals/mandats souverains**
+  apparaissent quand c'est cohérent avec l'actualité politique (`DEALS`).
+- **Santé financière** (`FA`) : analyse complète d'une société — stats clés, graphe de
+  cours 5 ans, et **5 exercices** de compte de résultat & bilan.
+
 ### Contenu additionnel
 - **Mandats clients** (`MANDATES`) : un client confie un capital avec un **objectif de
   rendement** sur N trimestres et une **limite de bêta** ; réussite → grosse commission +
@@ -261,8 +287,10 @@ python main.py
 | `GLOSSARY` | Ouvrir le glossaire                     |
 | `TRACK`    | Choisir une voie de spécialisation      |
 | `SAVES`    | Gestion des sauvegardes                  |
+| `ETF` / `ETFS` | Marché des ETF (filtres/tri/trading), `BUYETF`/`SELLETF` |
+| `BONDS` · `CMDTY` · `CRYPTO` | Marchés obligataire / commodities / crypto |
 | `SAVE`     | Sauvegarde manuelle (hors hardcore)     |
-| `NEWS`     | Rafraîchir le flux régional             |
+| `NEWS`     | Scène News & événements (filtres par type/région, historique 3 ans) |
 | `REG`      | Rappel réglementaire de la région       |
 | `MENU`     | Retour au menu (ou ESC)                 |
 

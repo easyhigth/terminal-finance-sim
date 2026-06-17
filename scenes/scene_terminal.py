@@ -954,6 +954,22 @@ class TerminalScene(Scene):
         if len(args) < 2:
             self._log(_L("  Usage : COMPARE <ticker1> <ticker2>","  Usage: COMPARE <ticker1> <ticker2>"))
             return
+        # comparaison d'ETF (panier vs panier) si les deux termes sont des ETF
+        ea, eb = args[0].upper(), args[1].upper()
+        if etfs_mod.exists(ea) and etfs_mod.exists(eb):
+            qa, qb = etfs_mod.quote(self.market, ea), etfs_mod.quote(self.market, eb)
+            rows = [
+                ("NAV", f"{qa['price']:.2f}", f"{qb['price']:.2f}"),
+                ("Catégorie", qa["category_label"], qb["category_label"]),
+                ("Var 1 an", f"{qa['change_1y']:+.1f}%", f"{qb['change_1y']:+.1f}%"),
+                ("Rendement", f"{qa['yield']*100:.1f}%", f"{qb['yield']*100:.1f}%"),
+                ("Frais", f"{qa['expense']*100:.2f}%", f"{qb['expense']*100:.2f}%"),
+                ("Bêta monde", f"{qa['beta']:+.2f}", f"{qb['beta']:+.2f}"),
+                ("Risque", "●" * qa["risk"], "●" * qb["risk"]),
+            ]
+            self._open_window(f"COMPARER {ea} / {eb}",
+                              [("Métrique", 110), (ea, 100), (eb, 100)], rows)
+            return
         a, b = self.market.resolve(args[0]), self.market.resolve(args[1])
         ma = self.market.metrics(a) if a else None
         mb = self.market.metrics(b) if b else None

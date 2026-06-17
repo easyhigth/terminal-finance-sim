@@ -27,6 +27,7 @@ import pygame
 from core import config
 from core import bonds as B
 from core import commodities as C
+from core import etfs as ETF
 from core import governments as GOV
 from core import unlocks as unlocks_mod
 from core.scene_manager import Scene
@@ -36,12 +37,14 @@ from ui.popups import PopupMixin
 ROW_H = 24
 SORT_FIELDS = [("name", "NOM"), ("price", "COURS"), ("value", "VALEUR"),
                ("yield_pct", "RENDEMENT"), ("change_pct", "VAR %")]
-TYPE_CHIPS = [(None, "TOUTES"), ("Action", "ACTIONS"), ("Obligation", "OBLIGATIONS"),
-              ("Commodity", "COMMODITIES"), ("Gouvernement", "GOUVERNEMENTS")]
-KIND_COLOR = {"Action": config.COL_AMBER, "Obligation": config.COL_CYAN,
+TYPE_CHIPS = [(None, "TOUTES"), ("Action", "ACTIONS"), ("ETF", "ETF"),
+              ("Obligation", "OBLIGATIONS"), ("Commodity", "COMMODITIES"),
+              ("Gouvernement", "GOUVERNEMENTS")]
+KIND_COLOR = {"Action": config.COL_AMBER, "ETF": config.COL_PRESTIGE,
+              "Obligation": config.COL_CYAN,
               "Commodity": config.COL_WARN, "Gouvernement": config.COL_PRESTIGE}
-KIND_LABEL = {"Action": "Action", "Obligation": "Oblig.", "Commodity": "Cmdty",
-              "Gouvernement": "Gouv."}
+KIND_LABEL = {"Action": "Action", "ETF": "ETF", "Obligation": "Oblig.",
+              "Commodity": "Cmdty", "Gouvernement": "Gouv."}
 WATCHLIST_ATTR = {"Action": "watchlist", "Obligation": "bond_watchlist",
                    "Commodity": "commodity_watchlist", "Gouvernement": "gov_watchlist"}
 WATCHLIST_CAP = {"Action": 10}
@@ -106,6 +109,13 @@ class MarketExplorerScene(Scene, PopupMixin):
                 "price": q["front"], "value": q["front"] * C.MULTIPLIER,
                 "yield_pct": q["roll_yield"] * 100.0, "change_pct": None,
             })
+        for q in ETF.all_quotes(m):
+            rows.append({
+                "kind": "ETF", "key": q["id"], "ticker": q["id"], "name": q["name"],
+                "sub": q["category_label"], "region": None,
+                "price": q["price"], "value": q["price"],
+                "yield_pct": q["yield"] * 100.0, "change_pct": q["change_pct"],
+            })
         best_by_gov = {}
         for q in B.all_quotes(m):
             if q["kind"] != "Souverain" or not q["gov"]:
@@ -139,6 +149,8 @@ class MarketExplorerScene(Scene, PopupMixin):
             return seen
         if self.type_filter == "Obligation":
             return ["Souverain", "Corporate"]
+        if self.type_filter == "ETF":
+            return [lbl for _, lbl in ETF.CATEGORIES]
         return []
 
     def _filtered_sorted(self):
@@ -171,7 +183,10 @@ class MarketExplorerScene(Scene, PopupMixin):
         if not self._can_watch():
             self.app.notify("Watchlist verrouillée (débloqué au grade Analyst).", "warn")
             return
-        attr = WATCHLIST_ATTR[kind]
+        attr = WATCHLIST_ATTR.get(kind)
+        if attr is None:
+            self.app.notify("Les ETF se consultent via leur fiche (clic), pas de watchlist dédiée.", "info")
+            return
         lst = getattr(p, attr)
         if key in lst:
             self.app.notify(f"{key} est déjà dans la liste de suivi.", "info")
@@ -192,7 +207,9 @@ class MarketExplorerScene(Scene, PopupMixin):
             return
         added, dup, capped = 0, 0, 0
         for kind, key in sorted(self.selected):
-            attr = WATCHLIST_ATTR[kind]
+            attr = WATCHLIST_ATTR.get(kind)
+            if attr is None:
+                continue
             lst = getattr(p, attr)
             if key in lst:
                 dup += 1
@@ -318,6 +335,8 @@ class MarketExplorerScene(Scene, PopupMixin):
         self.last_idx = idx
         if kind == "Action":
             self.open_company(key)
+        elif kind == "ETF":
+            self.open_etf(key)
         elif kind == "Obligation":
             self.open_bond(key)
         elif kind == "Commodity":

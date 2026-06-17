@@ -26,6 +26,7 @@ from core import badges as badges_mod
 from core import mandates as mandates_mod
 from core import unlocks as unlocks_mod
 from core import history as history_mod
+from core import etfs as etfs_mod
 from core.i18n import t as _t, get_lang
 from core.scene_manager import Scene
 
@@ -45,7 +46,8 @@ CMD_NAMES = [
     "PORTFOLIO", "BOOK", "BUY", "SELL", "LONG", "SHORT", "COVER", "MARGIN",
     "BONDS", "BUYBOND", "SELLBOND", "GOV", "GOVERNMENTS", "PAYS",
     "CMDTY", "BUYCMDTY", "SELLCMDTY",
-    "CRYPTO", "BUYCRYPTO", "SELLCRYPTO", "STRUCT", "CREDIT", "ALM",
+    "CRYPTO", "BUYCRYPTO", "SELLCRYPTO", "ETF", "ETFS", "BUYETF", "SELLETF",
+    "STRUCT", "CREDIT", "ALM",
     "ALLOCATE", "HEDGE", "REBALANCE",
     "PITCH", "FRONTIER", "RISK", "QUANT", "MA", "SHEET", "GLOSSARY",
     "SAVE", "SAVES", "NEWS", "REG", "STATUS", "MENU",
@@ -121,7 +123,7 @@ class TerminalScene(Scene):
         # rail latéral : (libellé, commande), regroupé par usage
         self.rail = [
             ("ADV ▸", "ADV"),
-            ("PORTEF.", "PORTFOLIO"), ("MARCHÉ", "MARKETHUB"),
+            ("PORTEF.", "PORTFOLIO"), ("MARCHÉ", "MARKETHUB"), ("ETF", "ETF"),
             ("MISSION", "MISSION"), ("EXAM/CERTIF", "EXAMCERT"),
             ("MANDATS", "MANDATES"), ("DEALS", "DEALS"),
             ("INBOX", "INBOX"), ("DÉCIDE", "DECIDE"),
@@ -419,6 +421,10 @@ class TerminalScene(Scene):
             self._cmd_alt_trade("commodities", cmd, parts[1:])
         elif cmd in ("CRYPTO", "COIN"):
             self.app.scenes.go("crypto", return_to="terminal")
+        elif cmd in ("ETF", "ETFS", "FUNDS", "FONDS"):
+            self.app.scenes.go("etfs", return_to="terminal")
+        elif cmd in ("BUYETF", "SELLETF"):
+            self._cmd_alt_trade("etfs", cmd, parts[1:])
         elif cmd in ("STRUCT", "STRUCTURED", "STRUCTURES"):
             self.app.scenes.go("structured", return_to="terminal")
         elif cmd in ("CREDIT", "TITRISATION", "ABS", "CLO"):
@@ -750,6 +756,8 @@ class TerminalScene(Scene):
         if kind not in ("macro", "curve"):
             for a in args:
                 tk = self.market.resolve(a)
+                if not tk and etfs_mod.exists(a.upper()):   # ETF graphable aussi
+                    tk = a.upper()
                 if tk:
                     tickers.append(tk)
                 else:

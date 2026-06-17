@@ -104,6 +104,9 @@ def net_worth(player, market):
     if getattr(player, "crypto", None):
         from core import crypto as crypto_mod
         nw += crypto_mod.holdings_value(player, market)
+    if getattr(player, "etfs", None):
+        from core import etfs as etfs_mod
+        nw += etfs_mod.holdings_value(player, market)
     if getattr(player, "structured", None):
         from core import structured
         nw += structured.holdings_value(player, market)

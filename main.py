@@ -40,6 +40,7 @@ from scenes.scene_bonds import BondsScene
 from scenes.scene_governments import GovernmentsScene
 from scenes.scene_commodities import CommoditiesScene
 from scenes.scene_crypto import CryptoScene
+from scenes.scene_etfs import ETFScene
 from scenes.scene_structured import StructuredScene
 from scenes.scene_credit import CreditScene
 from scenes.scene_alm import AlmScene
@@ -103,6 +104,7 @@ class App:
         self.scenes.register("governments", GovernmentsScene(self))
         self.scenes.register("commodities", CommoditiesScene(self))
         self.scenes.register("crypto", CryptoScene(self))
+        self.scenes.register("etfs", ETFScene(self))
         self.scenes.register("structured", StructuredScene(self))
         self.scenes.register("credit", CreditScene(self))
         self.scenes.register("alm", AlmScene(self))

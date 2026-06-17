@@ -59,7 +59,7 @@ class BookScene(Scene, PopupMixin):
         widgets.draw_text(surf, "PORTEFEUILLE", (40, 22), fonts.title(bold=True), config.COL_AMBER)
 
         pos_val = pf.positions_value(p, m)
-        nw = p.cash + pos_val
+        nw = pf.net_worth(p, m)        # valeur nette TOTALE (toutes classes d'actifs)
         upnl = pf.unrealized_pnl(p, m)
         beta = pf.portfolio_beta(p, m)
         # bandeau de synthèse
@@ -70,6 +70,19 @@ class BookScene(Scene, PopupMixin):
                f"bêta {beta:.2f} · P&L réalisé {widgets.format_money(p.realized_pnl, cur)}")
         widgets.draw_text(surf, sub, (config.SCREEN_WIDTH - 40, 70), fonts.small(),
                           config.COL_TEXT_DIM, align="right")
+        # ventilation des autres classes d'actifs (obligataire / cmdty / crypto / ETF)
+        from core import bonds as _b, commodities as _c, crypto as _cr, etfs as _e
+        alt_bits = []
+        for label, val in (("Oblig.", _b.holdings_value(p, m) if p.bonds else 0.0),
+                           ("Cmdty", _c.holdings_value(p, m) if p.commodities else 0.0),
+                           ("Crypto", _cr.holdings_value(p, m) if getattr(p, "crypto", None) else 0.0),
+                           ("ETF", _e.holdings_value(p, m) if getattr(p, "etfs", None) else 0.0)):
+            if val:
+                alt_bits.append(f"{label} {widgets.format_money(val, cur)}")
+        if alt_bits:
+            widgets.draw_text(surf, "Autres actifs : " + " · ".join(alt_bits),
+                              (config.SCREEN_WIDTH - 40, 104), fonts.tiny(),
+                              config.COL_TEXT_DIM, align="right")
         # ligne de marge / levier
         st = pf.margin_status(p, m)
         lev = "∞" if st["leverage"] == float("inf") else f"{st['leverage']:.2f}x"

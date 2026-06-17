@@ -32,6 +32,9 @@ class AlmScene(Scene):
         self._shock_btns = {}
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
+        self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
+                                        config.back_button_rect(160)[1], 150, 42),
+                                       "📘 TUTO", config.COL_CYAN)
 
     def _adj(self, key, delta):
         lo = 0.0
@@ -42,6 +45,9 @@ class AlmScene(Scene):
             self.app.scenes.go(self.return_to)
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+        if self.tuto_btn.handle(event):
+            self.app.scenes.go("tutorials", tid="alm", return_to="alm")
+            return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for key, (minus, plus, step) in self._field_btns.items():
                 if minus.collidepoint(event.pos):
@@ -54,6 +60,7 @@ class AlmScene(Scene):
 
     def update(self, dt):
         self.back_btn.update(pygame.mouse.get_pos(), dt)
+        self.tuto_btn.update(pygame.mouse.get_pos(), dt)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -131,3 +138,4 @@ class AlmScene(Scene):
             "économique des fonds propres quand les taux montent.",
             (rinner.x, y + 6), fonts.tiny(), config.COL_TEXT_DIM, rinner.w)
         self.back_btn.draw(surf)
+        self.tuto_btn.draw(surf)

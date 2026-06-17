@@ -28,6 +28,8 @@ class QuantScene(Scene):
             (40, config.SCREEN_HEIGHT-66, 160, 44), "← TERMINAL", config.COL_TEXT_DIM)
         self.toggle_btn = widgets.Button(
             (220, config.SCREEN_HEIGHT-66, 200, 44), "TYPE : CALL", config.COL_UP)
+        self.tuto_btn = widgets.Button(
+            (440, config.SCREEN_HEIGHT-66, 150, 44), "📘 TUTO", config.COL_CYAN)
         self._params = {}
 
     def _adj(self, key, delta):
@@ -44,6 +46,9 @@ class QuantScene(Scene):
             self.app.scenes.go("terminal")
         if self.toggle_btn.handle(event):
             self.option = "put" if self.option == "call" else "call"
+        if self.tuto_btn.handle(event):
+            self.app.scenes.go("tutorials", tid="quant", return_to="quant")
+            return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for key, (minus, plus, step) in self._params.items():
                 if minus.collidepoint(event.pos):
@@ -57,6 +62,7 @@ class QuantScene(Scene):
         self.toggle_btn.label = f"TYPE : {self.option.upper()}"
         self.toggle_btn.accent = config.COL_UP if self.option == "call" else config.COL_DOWN
         self.toggle_btn.update(mp)
+        self.tuto_btn.update(mp)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -69,6 +75,7 @@ class QuantScene(Scene):
         self._draw_payoff(surf)
         self.back_btn.draw(surf)
         self.toggle_btn.draw(surf)
+        self.tuto_btn.draw(surf)
 
     def _slider(self, surf, x, y, label, value, key, step, fmt="{:.2f}"):
         widgets.draw_text(surf, label, (x, y), fonts.small(), config.COL_TEXT)

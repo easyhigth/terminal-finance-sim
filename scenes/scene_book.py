@@ -10,24 +10,41 @@ from core import config
 from core import portfolio as pf
 from core.scene_manager import Scene
 from ui import fonts, widgets
+from ui.popups import PopupMixin
 
 
-class BookScene(Scene):
+class BookScene(Scene, PopupMixin):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
         self.market = self.app.ensure_market()
+        self.init_popups()
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.analytics_btn = widgets.Button(
             (250, config.SCREEN_HEIGHT - 50, 230, 42), "ANALYSE DÉTAILLÉE (PA)", config.COL_CYAN)
+        self._name_rects = {}     # ticker -> Rect (clic → fiche flottante)
+        self._chart_rects = {}    # ticker -> Rect (clic → graphe flottant)
 
     def handle_event(self, event):
+        if self.popups_handle_event(event):
+            return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
+            if not self.popups_close_top():
+                self.app.scenes.go(self.return_to)
+            return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
         if self.analytics_btn.handle(event):
-            self.app.scenes.go("analytics", return_to="terminal")
+            self.app.scenes.go("analytics", return_to="book")
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for tk, rect in self._name_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.open_company(tk)
+                    return
+            for tk, rect in self._chart_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.open_chart(tk, kind="change")
+                    return
 
     def update(self, dt):
         mp = pygame.mouse.get_pos()
@@ -83,9 +100,19 @@ class BookScene(Scene):
             for label, x in cols:
                 widgets.draw_text(surf, label, (x, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
             y = inner.y + 22
+            mp = pygame.mouse.get_pos()
+            self._name_rects = {}
+            self._chart_rects = {}
             for h in holds:
+                tk = h["ticker"]
                 pcol = config.COL_UP if h["pnl"] >= 0 else config.COL_DOWN
-                tk_label = h["ticker"] + (" (S)" if h["short"] else "")
+                name_rect = pygame.Rect(inner.x - 4, y - 2, cols[1][1] - inner.x + 80, 22)
+                chart_rect = pygame.Rect(cols[4][1] - 60, y - 2, inner.right - cols[4][1] + 60 + 4, 22)
+                self._name_rects[tk] = name_rect
+                self._chart_rects[tk] = chart_rect
+                if name_rect.collidepoint(mp) or chart_rect.collidepoint(mp):
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, (inner.x - 4, y - 2, inner.w + 8, 22))
+                tk_label = tk + (" (S)" if h["short"] else "")
                 tk_col = config.COL_DOWN if h["short"] else config.COL_AMBER
                 widgets.draw_text(surf, tk_label, (cols[0][1], y), fonts.small(bold=True), tk_col)
                 widgets.draw_text(surf, f"{h['shares']:.0f}", (cols[1][1], y), fonts.small(), config.COL_TEXT)
@@ -98,6 +125,8 @@ class BookScene(Scene):
                 y += 26
                 if y > inner.bottom - 20:
                     break
+            widgets.draw_text(surf, "clic société → fiche · clic valeur/P&L → graphe",
+                              (inner.x, inner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
 
         # répartition par secteur
         alloc = pygame.Rect(960, 100, config.SCREEN_WIDTH - 1000, ph)
@@ -123,3 +152,4 @@ class BookScene(Scene):
 
         self.back_btn.draw(surf)
         self.analytics_btn.draw(surf)
+        self.popups_draw(surf)

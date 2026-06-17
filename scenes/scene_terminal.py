@@ -141,6 +141,13 @@ class TerminalScene(Scene):
                 if w.clicked_row is not None:
                     self._datawin_row_click(w, w.clicked_row)
                     w.clicked_row = None
+                if getattr(w, "expand_requested", False):
+                    w.expand_requested = False
+                    self._open_chart_popup(w.ticker, kind=w.kind)
+                tk = getattr(w, "open_ticker", None)
+                if tk:
+                    w.open_ticker = None
+                    self._open_company_popup(tk)
                 self.datawins = [x for x in self.datawins if not x.closed]
                 return
         # 1bis) molette sur la console : défile l'historique
@@ -166,7 +173,7 @@ class TerminalScene(Scene):
                     return
             for tk, rect in self._topco_rects.items():
                 if rect.collidepoint(event.pos):
-                    self.app.scenes.go("company", ticker=tk, return_to="terminal")
+                    self._open_company_popup(tk)
                     return
             for name, rect in self._index_rects.items():
                 if rect.collidepoint(event.pos):
@@ -182,7 +189,7 @@ class TerminalScene(Scene):
             if getattr(self, "_map_rect", None):
                 action = self.worldmap.handle_click(event.pos, self._map_rect, self.market)
                 if action and action[0] == "company":
-                    self.app.scenes.go("company", ticker=action[1], return_to="terminal")
+                    self._open_company_popup(action[1])
                     return
                 if action:
                     return
@@ -222,7 +229,7 @@ class TerminalScene(Scene):
         text = cell[0] if isinstance(cell, tuple) else cell
         ticker = str(text).replace("↑", "").replace("↓", "").strip().split()[0:1]
         if ticker and self.market.price_of(ticker[0].upper()) is not None:
-            self.app.scenes.go("company", ticker=ticker[0].upper(), return_to="terminal")
+            self._open_company_popup(ticker[0].upper())
 
     def _open_window(self, title, columns, rows, accent=config.COL_CYAN):
         """Ouvre une fenêtre de données déplaçable (en cascade)."""
@@ -230,6 +237,27 @@ class TerminalScene(Scene):
         offset = 16 * (len(self.datawins) % 6)
         pos = (self.rail_w + 30 + offset, 90 + offset)
         self.datawins.append(DataWindow(title, columns, rows, pos=pos, accent=accent))
+        if len(self.datawins) > 5:
+            self.datawins.pop(0)
+
+    def _open_company_popup(self, ticker):
+        """Ouvre la fiche flottante d'une société (en cascade), sans changer de scène."""
+        from ui.popups import CompanyPopup
+        if not ticker or not self.market or self.market.metrics(ticker.upper()) is None:
+            return
+        offset = 16 * (len(self.datawins) % 6)
+        pos = (self.rail_w + 30 + offset, 90 + offset)
+        self.datawins.append(CompanyPopup(ticker, self.market, pos=pos))
+        if len(self.datawins) > 5:
+            self.datawins.pop(0)
+
+    def _open_chart_popup(self, ticker, kind="line"):
+        """Ouvre un graphe flottant agrandi (en cascade) pour un ticker donné."""
+        from ui.popups import ChartPopup
+        offset = 16 * (len(self.datawins) % 6)
+        pos = (self.rail_w + 30 + offset, 90 + offset)
+        self.datawins.append(ChartPopup(f"GRAPHE — {ticker.upper()}", market=self.market,
+                                        ticker=ticker, kind=kind, pos=pos))
         if len(self.datawins) > 5:
             self.datawins.pop(0)
 

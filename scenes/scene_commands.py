@@ -7,6 +7,7 @@ dans le terminal (et placée dans le presse-papiers si disponible), prête à la
 """
 import pygame
 from core import config
+from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
@@ -128,6 +129,22 @@ def _copy_text(label):
     return (cut + " ") if has_arg else cut
 
 
+def _label_lock_grade(label, player):
+    """Grade minimal requis pour utiliser cette commande, ou None si déjà débloquée.
+    Compare chaque alias du libellé (avant les placeholders) aux features de unlocks.py."""
+    base = label.split("<")[0].strip()
+    best = None
+    for alias in base.split("/"):
+        words = alias.strip().split()
+        if not words:
+            continue
+        feat = unlocks.CMD_FEATURE.get(words[0].upper())
+        if feat and not unlocks.unlocked(player, feat):
+            g = unlocks.required_grade(feat)
+            best = g if best is None else max(best, g)
+    return best
+
+
 def _try_clipboard(text):
     """Copie best-effort dans le presse-papiers système (silencieux si indispo)."""
     try:
@@ -148,21 +165,40 @@ class CommandsScene(Scene):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
         self.scroll = 0
+        self.search = ""
+        self._search_clear_rect = None
+        self._t = 0.0
         self._hit = []                 # [(rect, label)] pour le clic (coord. écran)
         self.back_btn = widgets.Button(
             config.back_button_rect(220), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self._layout()
 
     # ------------------------------------------------------------- layout
+    def _search_rect(self):
+        return pygame.Rect(40, 100, 320, 24)
+
     def _viewport(self):
-        return pygame.Rect(40, 110, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - 110)
+        top = 138
+        return pygame.Rect(40, top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - top)
+
+    def _filtered_catalog(self):
+        q = self.search.strip().lower()
+        if not q:
+            return CATALOG
+        out = []
+        for cat, items in CATALOG:
+            kept = [(label, desc) for label, desc in items
+                    if q in label.lower() or q in desc.lower()]
+            if kept:
+                out.append((cat, kept))
+        return out
 
     def _layout(self):
-        """Répartit les catégories en COLS colonnes équilibrées (greedy)."""
+        """Répartit les catégories (filtrées par recherche) en COLS colonnes équilibrées (greedy)."""
         self._col_w = (self._viewport().w - 24 * (self.COLS - 1)) // self.COLS
         col_blocks = [[] for _ in range(self.COLS)]
         col_h = [0] * self.COLS
-        for cat, items in CATALOG:
+        for cat, items in self._filtered_catalog():
             h = self.HEAD_H + len(items) * self.ITEM_H + self.CAT_GAP
             ci = min(range(self.COLS), key=lambda i: col_h[i])
             col_blocks[ci].append((cat, items))
@@ -177,7 +213,15 @@ class CommandsScene(Scene):
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
+                if self.search:
+                    self.search = ""
+                    self._layout()
+                    return
                 self.app.scenes.go(self.return_to)
+            elif event.key == pygame.K_BACKSPACE:
+                self.search = self.search[:-1]
+                self.scroll = 0
+                self._layout()
             elif event.key == pygame.K_PAGEUP:
                 self.scroll = max(0, self.scroll - 240)
             elif event.key == pygame.K_PAGEDOWN:
@@ -186,12 +230,21 @@ class CommandsScene(Scene):
                 self.scroll = 0
             elif event.key == pygame.K_END:
                 self.scroll = self._max_scroll()
+            elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
+                self.search += event.unicode
+                self.scroll = 0
+                self._layout()
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 4:
                 self.scroll = max(0, self.scroll - 60)
             elif event.button == 5:
                 self.scroll = min(self._max_scroll(), self.scroll + 60)
             elif event.button == 1:
+                if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
+                    self.search = ""
+                    self.scroll = 0
+                    self._layout()
+                    return
                 for rect, label in self._hit:
                     if rect.collidepoint(event.pos):
                         self._copy(label)
@@ -206,6 +259,7 @@ class CommandsScene(Scene):
         self.app.notify(f"Copié : {text.strip()} — collé dans le terminal", "good")
 
     def update(self, dt):
+        self._t += dt
         self.back_btn.update(pygame.mouse.get_pos(), dt)
 
     # -------------------------------------------------------------- draw
@@ -214,14 +268,35 @@ class CommandsScene(Scene):
         widgets.draw_text(surf, "CATALOGUE DES COMMANDES", (40, 24),
                           fonts.title(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, "Cliquez une commande pour la copier dans le terminal · "
-                                "molette / ▲▼ PgUp-PgDn pour défiler · insensible à la casse.",
+                                "molette / ▲▼ PgUp-PgDn pour défiler · 🔒 = verrouillée à votre grade.",
                           (42, 76), fonts.small(), config.COL_TEXT_DIM)
 
+        # ---- recherche ----
+        search_rect = self._search_rect()
+        pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN if self.search else config.COL_BORDER,
+                          search_rect, 1, border_radius=4)
+        cursor = "_" if int(self._t * 2) % 2 == 0 else " "
+        label = (self.search + cursor) if self.search else "Rechercher une commande…"
+        col = config.COL_TEXT if self.search else config.COL_TEXT_DIM
+        widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
+                          (search_rect.x + 8, search_rect.y + 4), fonts.small(), col)
+        self._search_clear_rect = None
+        if self.search:
+            self._search_clear_rect = pygame.Rect(search_rect.right - 22, search_rect.y,
+                                                   22, search_rect.h)
+            widgets.draw_text(surf, "✕", self._search_clear_rect.center, fonts.small(bold=True),
+                              config.COL_TEXT_DIM, align="center")
+
+        p = self.app.gs.player
         vp = self._viewport()
         self._hit = []
         prev_clip = surf.get_clip()
         surf.set_clip(vp)
         mouse = pygame.mouse.get_pos()
+        if not any(blocks for blocks in self._col_blocks):
+            widgets.draw_text(surf, "Aucune commande ne correspond à cette recherche.",
+                              (vp.x, vp.y), fonts.small(), config.COL_TEXT_DIM)
         for ci, blocks in enumerate(self._col_blocks):
             x = vp.x + ci * (self._col_w + 24)
             y = vp.y - self.scroll
@@ -232,16 +307,24 @@ class CommandsScene(Scene):
                 pygame.draw.line(surf, config.COL_BORDER, (x, y + 19), (x + self._col_w, y + 19), 1)
                 y += self.HEAD_H
                 for label, desc in items:
+                    lock_g = _label_lock_grade(label, p)
                     row = pygame.Rect(x - 4, y - 2, self._col_w + 8, self.ITEM_H - 2)
                     hovered = row.collidepoint(mouse) and vp.collidepoint(mouse)
                     if hovered:
                         pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=4)
                     if vp.top - self.ITEM_H < y < vp.bottom:
                         self._hit.append((row.copy(), label))
+                        label_col = config.COL_TEXT_DIM if lock_g is not None else (
+                            config.COL_WHITE if hovered else config.COL_AMBER)
+                        badge = f"🔒 {config.GRADES[lock_g]}" if lock_g is not None else ""
+                        avail_w = self._col_w - 8 - (fonts.tiny().size(badge)[0] + 6 if badge else 0)
                         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(bold=True),
-                                                                 self._col_w - 8),
-                                          (x, y), fonts.small(bold=True),
-                                          config.COL_WHITE if hovered else config.COL_AMBER)
+                                                                 avail_w),
+                                          (x, y), fonts.small(bold=True), label_col)
+                        if badge:
+                            widgets.draw_text(surf, badge, (x + self._col_w - 4, y + 2),
+                                              fonts.tiny(bold=True), config.COL_AMBER_DIM,
+                                              align="right")
                         widgets.draw_text(surf, widgets.fit_text(desc, fonts.tiny(),
                                                                  self._col_w - 12),
                                           (x + 12, y + 17), fonts.tiny(), config.COL_TEXT_DIM)

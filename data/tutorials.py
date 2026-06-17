@@ -45,14 +45,24 @@ TUTORIALS = [
             "DUR (sensibilité au taux).",
             "Achetez : BUYBOND <id> <qté>   ·   Vendez : SELLBOND <id> <qté>. Les coupons "
             "tombent automatiquement à chaque pas (ADV).",
+            "Exemple de ligne lue sur BONDS : « FR-2034  AA  COUPON 3.2%  MAT 8a  YTM 3.6%  "
+            "PRIX 97.4  DUR 6.9 ». Le YTM (3.6%) > coupon (3.2%) car le prix (97.4) est sous "
+            "le pair (100) — le marché exige un rendement plus élevé que le coupon affiché.",
+            "Le SPREAD DE CRÉDIT, c'est l'écart de YTM entre une obligation risquée et une "
+            "obligation « sans risque » de même maturité (souvent le souverain le mieux noté "
+            "de la région). Ex. : un corporate BBB à 5.1% de YTM contre un souverain AAA à "
+            "3.0% sur la même maturité = spread de 2.1 points (210 pb). Plus le rating "
+            "baisse, plus le spread s'élargit — c'est la prime exigée pour le risque de défaut.",
         ],
         "concept": "Prix et taux varient en SENS INVERSE : si les taux montent, le prix "
                    "baisse — d'autant plus que la DURATION est longue. Le RENDEMENT se "
                    "décompose en : courbe (taux directeur) + prime de terme + spread de "
-                   "CRÉDIT (rating) + prime de risque PAYS (souverains). Un événement "
-                   "politique régional (cf. tutoriel Pays) élargit les spreads de la zone : "
-                   "les prix des souverains ET des corporates de la région baissent, puis "
-                   "se résorbent — une occasion d'acheter du rendement sur repli.",
+                   "CRÉDIT (rating) + prime de risque PAYS (souverains). Un souverain bien "
+                   "noté (AAA/AA) a un spread quasi nul ; un corporate spéculatif (BB et "
+                   "moins) peut afficher plusieurs points de spread. Un événement politique "
+                   "régional (cf. tutoriel Pays) élargit les spreads de la zone : les prix "
+                   "des souverains ET des corporates de la région baissent, puis se "
+                   "résorbent — une occasion d'acheter du rendement sur repli.",
     },
     {
         "id": "governments",
@@ -129,6 +139,66 @@ TUTORIALS = [
         "concept": "Les moyennes mobiles (MM20/MM50) lissent la tendance ; un croisement "
                    "à la hausse est souvent vu comme un signal positif. Les chandeliers "
                    "montrent ouverture/haut/bas/clôture de chaque période.",
+    },
+    {
+        "id": "short",
+        "title": "Vendre à découvert (short / cover)",
+        "image": "short.png",
+        "intro": "Aller LONG (BUY), c'est parier que le prix MONTE. Aller SHORT, c'est "
+                 "parier que le prix BAISSE : vous empruntez des actions, les vendez "
+                 "tout de suite, puis devez les RACHETER plus tard pour les rendre. "
+                 "Débloqué au grade Levier (cf. badge 🔒 dans COMMANDS).",
+        "steps": [
+            "Ouvrez la fiche de la société visée : DES <ticker> ou COMPANY <ticker>.",
+            "Vendez à découvert : SHORT <ticker> <quantité>   →   ex. SHORT MVC 100. "
+            "Le produit de la vente crédite votre cash, mais la position apparaît en "
+            "négatif dans PRT.",
+            "Surveillez votre marge avec MARGIN : une position courte consomme de la "
+            "marge, comme un emprunt sur effet de levier.",
+            "Si le prix BAISSE comme prévu, rachetez moins cher : COVER <ticker> <qté|ALL> "
+            "→   ex. COVER MVC ALL. La différence (vendu haut − racheté bas) est votre gain.",
+            "Si le prix MONTE au contraire, COVER coûte plus cher que ce que vous avez "
+            "touché à la vente : c'est une PERTE — clôturez tôt si la thèse échoue.",
+        ],
+        "concept": "Asymétrie clé : à l'achat (LONG), la perte maximale est limitée à votre "
+                   "mise (le prix ne descend jamais sous 0) alors que le gain est, en théorie, "
+                   "illimité. Au SHORT, c'est l'INVERSE : le gain maximal est limité (le prix "
+                   "ne peut pas descendre sous 0) alors que la PERTE est illimitée — le prix "
+                   "peut monter sans plafond. C'est pourquoi le SHORT consomme de la marge et "
+                   "peut déclencher un appel de marge si la position part contre vous. Un "
+                   "SHORT SQUEEZE survient quand un prix qui monte force de nombreux vendeurs "
+                   "à découvert à COVER en urgence pour limiter leurs pertes — leurs achats "
+                   "forcés poussent le prix encore plus haut, amplifiant la hausse en boucle.",
+    },
+    {
+        "id": "ma",
+        "title": "M&A : cibles, LBO & sortie",
+        "image": "ma.png",
+        "intro": "Le module M&A (commande MA) permet d'ACQUÉRIR des sociétés privées en "
+                 "tout ou partie à crédit (effet de levier), de les détenir, puis de les "
+                 "CÉDER (exit) plus tard avec une plus-value. Débloqué au grade M&A.",
+        "steps": [
+            "Ouvrez le hub : MA — onglet CIBLES liste les sociétés privées disponibles "
+            "(filtrables par secteur ou recherche).",
+            "Cliquez une cible pour ouvrir sa fiche : prix, EBITDA, multiple d'entrée, "
+            "profil de risque.",
+            "Réglez le LEVIER : le curseur « dette / EV » fixe la part de la transaction "
+            "financée par dette plutôt que par votre cash (jusqu'à un plafond).",
+            "Cliquez ACQUÉRIR : votre cash finance la part en fonds propres (equity), le "
+            "reste est de la dette portée par la société acquise.",
+            "Suivez vos acquisitions dans l'onglet PORTEFEUILLE : valeur courante, dette "
+            "restante, dividendes perçus.",
+            "Quand le moment est bon, cliquez CÉDER (EXIT) sur la fiche de la cible pour "
+            "revendre la société et encaisser la plus-value (ou la perte).",
+        ],
+        "concept": "C'est le principe du LBO (Leveraged Buy-Out) : plus la part financée par "
+                   "DETTE est grande, plus votre mise en fonds propres (equity) est petite — "
+                   "et donc plus le MOIC (Multiple On Invested Capital, gain ÷ mise initiale) "
+                   "est AMPLIFIÉ si la sortie se fait à un multiple supérieur à l'entrée. "
+                   "Mais le levier amplifie aussi les PERTES si l'EBITDA de la cible se "
+                   "dégrade ou si le multiple de sortie est inférieur à celui d'entrée — la "
+                   "dette, elle, doit être remboursée quoi qu'il arrive. Voir les leçons "
+                   "Académie « LBO » et « Accretion/Dilution » pour la mécanique chiffrée.",
     },
 ]
 

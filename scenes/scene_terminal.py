@@ -40,7 +40,7 @@ from ui.worldmap import WorldMap
 CMD_NAMES = [
     "HELP", "COMMANDS", "ADV", "MISSION", "EVAL", "TRACK", "CAREER", "INBOX",
     "RIVALS", "MANDATES", "MANDATE", "DECIDE", "MARKET", "TOP", "MOVERS",
-    "COMPANY", "FA", "SEARCH", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
+    "COMPANY", "FA", "SEARCH", "EXPLORE", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS",
     "PORTFOLIO", "BOOK", "BUY", "SELL", "LONG", "SHORT", "COVER", "MARGIN",
     "BONDS", "BUYBOND", "SELLBOND", "GOV", "GOVERNMENTS", "PAYS",
@@ -106,6 +106,7 @@ class TerminalScene(Scene):
         self.datawins = []        # fenêtres de données déplaçables (overlay)
         self._rail_rects = {}     # boutons du rail latéral (label -> Rect)
         self._topco_rects = {}    # sociétés cliquables (panneau top sociétés)
+        self._topco_header_rect = None   # titre du panneau (clic → explorateur)
         self._index_rects = {}    # indices cliquables (panneau indices → graphe)
         self.rail_w = 150         # largeur du rail latéral
         self._map_rect = None     # rect de la carte (pour le clic)
@@ -113,7 +114,7 @@ class TerminalScene(Scene):
         self.rail = [
             ("ADV ▸", "ADV"),
             ("PORTEF.", "PORTFOLIO"), ("MARCHÉ", "MARKET"),
-            ("TOP", "TOP"), ("MOVERS", "MOVERS"),
+            ("TOP", "TOP"), ("MOVERS", "MOVERS"), ("EXPLORER", "EXPLORE"),
             ("MISSION", "MISSION"), ("EVAL", "EVAL"),
             ("MANDATS", "MANDATES"), ("DEALS", "DEALS"),
             ("INBOX", "INBOX"), ("DÉCIDE", "DECIDE"),
@@ -171,6 +172,9 @@ class TerminalScene(Scene):
                 if rect.collidepoint(event.pos):
                     self._run_command(dict(self.rail)[label])
                     return
+            if self._topco_header_rect and self._topco_header_rect.collidepoint(event.pos):
+                self.app.scenes.go("explorer", return_to="terminal")
+                return
             for tk, rect in self._topco_rects.items():
                 if rect.collidepoint(event.pos):
                     self._open_company_popup(tk)
@@ -323,7 +327,7 @@ class TerminalScene(Scene):
             if get_lang() == "en":
                 self._log(
                     "  ADV advance · COMMANDS full catalogue",
-                    "  MARKET indices · TOP [region] · MOVERS",
+                    "  MARKET indices · TOP [region] · MOVERS · EXPLORE explorer",
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
                     "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC charts",
                     "  SECTOR · REGION · SCREEN · RANKING · CALENDAR",
@@ -341,7 +345,7 @@ class TerminalScene(Scene):
             else:
                 self._log(
                     "  ADV avancer · COMMANDS catalogue complet",
-                    "  MARKET indices · TOP [region] · MOVERS",
+                    "  MARKET indices · TOP [region] · MOVERS · EXPLORE explorer",
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
                     "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC graphes",
                     "  SECTOR · REGION · SCREEN · RANKING · CALENDAR",
@@ -364,6 +368,8 @@ class TerminalScene(Scene):
             self._cmd_market()
         elif cmd == "TOP":
             self._cmd_top(arg)
+        elif cmd in ("EXPLORE", "EXPLORER", "EXPLO"):
+            self.app.scenes.go("explorer", return_to="terminal")
         elif cmd in ("MOVERS", "MOVER"):
             self._cmd_movers()
         elif cmd in ("COMPANY", "CO", "TICKER", "DES"):
@@ -1841,13 +1847,24 @@ class TerminalScene(Scene):
                 return
 
     def _draw_top_companies(self, surf, rect, p):
-        inner = widgets.draw_panel(surf, rect, f'{_t("term.topco")} — {p.continent}', config.COL_CYAN)
+        watch = [tk for tk in p.watchlist if self.market.price_of(tk) is not None]
+        title = f'{_t("term.topco")} ({len(watch)} suivies)' if watch else f'{_t("term.topco")} — {p.continent}'
+        inner = widgets.draw_panel(surf, rect, title, config.COL_CYAN)
+        self._topco_header_rect = pygame.Rect(rect.x, rect.y, rect.w, 26)
         cur = config.CONTINENTS[p.continent]["currency"]
         self._topco_rects = {}
         mp = pygame.mouse.get_pos()
         y = inner.y
         n = max(6, (inner.h - 20) // 28)
-        for c in self.market.top_companies(region=p.continent, n=n):
+        if watch:
+            companies = []
+            for tk in watch[:n]:
+                mt = self.market.metrics(tk)
+                if mt:
+                    companies.append({"ticker": tk, "name": mt["name"], "mktcap": mt["mktcap"]})
+        else:
+            companies = self.market.top_companies(region=p.continent, n=n)
+        for c in companies:
             row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 26)
             self._topco_rects[c["ticker"]] = row
             if row.collidepoint(mp):
@@ -1857,8 +1874,8 @@ class TerminalScene(Scene):
             widgets.draw_text(surf, widgets.format_money(c["mktcap"] * 1e6, cur), (inner.right, y),
                               fonts.tiny(bold=True), config.COL_WHITE, align="right")
             y += 28
-        widgets.draw_text(surf, "clic → fiche · COMPANY <tk>", (inner.x, inner.bottom - 14),
-                          fonts.tiny(), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, "clic titre → explorateur · clic ligne → fiche",
+                          (inner.x, inner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_career(self, surf, rect, p):
         """Panneau PRIORITÉS : prochain objectif, promotion, risque, opportunité."""

@@ -15,26 +15,42 @@ seuil de maintenance — un krach peut donc réellement ruiner.
   portfolio    : dict ticker -> {"shares": float signé, "avg": prix d'entrée moyen}
   realized_pnl : P&L réalisé cumulé
 
-Conventions :
-  equity (valeur nette) = cash + Σ shares·prix   (les shorts pèsent négativement)
-  exposition brute      = Σ |shares|·prix
-  levier                = exposition brute / equity
+Ce module exécute les ORDRES (buy/sell/short/cover) et l'appel de marge. Le
+calcul du levier/de la marge vit dans core/portfolio_margin.py, les vues de
+reporting (détail des positions, allocation, dividendes...) dans
+core/portfolio_views.py — réexportés ici pour que l'API publique (`pf.xxx`)
+reste un point d'entrée unique.
 """
 from core import tracks
+from core.portfolio_margin import (  # noqa: F401 (réexporté, API publique de pf.)
+    MAINT_MARGIN,
+    MARGIN_SPREAD,
+    SHORT_FEE_ANNUAL,
+    _gross_excluding,
+    _maint_margin,
+    _max_leverage,
+    _would_exceed_leverage,
+    accrue_financing,
+    gross_exposure,
+    leverage,
+    margin_status,
+    max_leverage,
+    net_worth,
+    positions_value,
+)
+from core.portfolio_views import (  # noqa: F401 (réexporté, API publique de pf.)
+    allocation_by,
+    dividends,
+    holdings,
+    portfolio_beta,
+    unrealized_pnl,
+)
 
 COMMISSION = 0.001        # 10 points de base par transaction
 HALF_SPREAD = 0.0008      # demi-spread bid/ask de base (8 bps)
 IMPACT_K = 0.12           # coefficient d'impact de marché (slippage selon la taille)
 MAX_SLIPPAGE = 0.05       # impact plafonné à 5 %
-MAINT_MARGIN = 0.25       # equity/exposition mini avant appel de marge
-MARGIN_SPREAD = 0.03      # surcoût annuel sur le taux directeur (emprunt sur marge)
-SHORT_FEE_ANNUAL = 0.01   # frais d'emprunt de titres annuels (notionnel short)
 LIQUIDATION_FEE = 0.005   # surcoût appliqué à la valeur liquidée lors d'un appel de marge
-
-
-def max_leverage(grade_index):
-    """Levier maximal autorisé, croissant avec le grade (1.5x → 4.0x)."""
-    return min(4.0, 1.5 + 0.25 * grade_index)
 
 
 def _commission(player):
@@ -55,109 +71,6 @@ def fill_price(market, ticker, qty, side):
     impact = min(MAX_SLIPPAGE, IMPACT_K * (order_value / liquidity)) if liquidity > 0 else 0.0
     cost_frac = HALF_SPREAD + impact
     return mid * (1 + cost_frac) if side == "buy" else mid * (1 - cost_frac)
-
-
-def _max_leverage(player):
-    """Levier maximal effectif (bonus de voie Risk inclus)."""
-    return max_leverage(player.grade_index) + tracks.perk(player, "max_leverage_add")
-
-
-def _maint_margin(player):
-    """Marge de maintenance effective (plus clémente pour la voie Risk)."""
-    m = tracks.perk(player, "maint_margin")
-    return MAINT_MARGIN if m is None else m
-
-
-# ---------------------------------------------------------------------------
-# Mesures d'état
-# ---------------------------------------------------------------------------
-def positions_value(player, market):
-    """Valeur SIGNÉE des positions (les shorts comptent négativement)."""
-    total = 0.0
-    for t, p in player.portfolio.items():
-        price = market.price_of(t)
-        if price is not None:
-            total += price * p["shares"]
-    return total
-
-
-def gross_exposure(player, market):
-    """Exposition brute = somme des valeurs absolues des positions."""
-    total = 0.0
-    for t, p in player.portfolio.items():
-        price = market.price_of(t)
-        if price is not None:
-            total += abs(price * p["shares"])
-    return total
-
-
-def net_worth(player, market):
-    """Valeur nette = trésorerie + positions actions signées + obligations."""
-    nw = player.cash + positions_value(player, market)
-    if getattr(player, "bonds", None):
-        from core import bonds
-        nw += bonds.holdings_value(player, market)
-    if getattr(player, "commodities", None):
-        from core import commodities
-        nw += commodities.holdings_value(player, market)
-    if getattr(player, "crypto", None):
-        from core import crypto as crypto_mod
-        nw += crypto_mod.holdings_value(player, market)
-    if getattr(player, "etfs", None):
-        from core import etfs as etfs_mod
-        nw += etfs_mod.holdings_value(player, market)
-    if getattr(player, "structured", None):
-        from core import structured
-        nw += structured.holdings_value(player, market)
-    if getattr(player, "securitised", None):
-        from core import securitisation
-        nw += securitisation.holdings_value(player, market)
-    if getattr(player, "ma_owned", None):
-        from core import ma
-        nw += ma.holdings_value(player)
-    return nw
-
-
-def leverage(player, market):
-    eq = net_worth(player, market)
-    if eq <= 0:
-        return float("inf") if gross_exposure(player, market) > 0 else 0.0
-    return gross_exposure(player, market) / eq
-
-
-def margin_status(player, market):
-    """Synthèse de marge : equity, exposition, levier, pouvoir d'achat, alerte."""
-    eq = net_worth(player, market)
-    gross = gross_exposure(player, market)
-    maxlev = _max_leverage(player)
-    buying_power = max(0.0, maxlev * eq - gross)
-    # appel de marge dès que l'equity passe sous la marge de maintenance
-    # (y compris equity négative : c'est le cas le plus grave)
-    call = gross > 0 and eq < _maint_margin(player) * gross
-    return {"equity": eq, "gross": gross, "leverage": (gross / eq) if eq > 0 else float("inf"),
-            "max_leverage": maxlev, "buying_power": buying_power,
-            "borrowed": max(0.0, -player.cash), "margin_call": call}
-
-
-def _would_exceed_leverage(player, market, new_gross, fee=0.0):
-    """Vrai si une exposition brute `new_gross` dépasserait le levier autorisé."""
-    eq = net_worth(player, market) - fee
-    maxlev = _max_leverage(player)
-    if eq <= 0:
-        return new_gross > 0
-    return new_gross > maxlev * eq + 1e-6
-
-
-def _gross_excluding(player, market, ticker):
-    """Exposition brute hors `ticker` (pour évaluer une nouvelle position)."""
-    g = 0.0
-    for t, p in player.portfolio.items():
-        if t == ticker:
-            continue
-        price = market.price_of(t)
-        if price is not None:
-            g += abs(price * p["shares"])
-    return g
 
 
 # ---------------------------------------------------------------------------
@@ -280,24 +193,8 @@ def cover(player, market, ticker, qty):
 
 
 # ---------------------------------------------------------------------------
-# Financement (intérêts sur marge + frais d'emprunt de titres) & appel de marge
+# Appel de marge
 # ---------------------------------------------------------------------------
-def accrue_financing(player, market, days):
-    """Prélève les frais de financement du tour : intérêts sur le capital
-    emprunté (cash négatif) + frais d'emprunt de titres sur les shorts."""
-    yr = days / 365.0
-    rate = market.macro["rate"]["v"] / 100.0 if hasattr(market, "macro") else 0.03
-    borrowed = max(0.0, -player.cash)
-    interest = borrowed * (rate + MARGIN_SPREAD * tracks.perk(player, "margin_spread_mult")) * yr
-    short_notional = sum(abs(p["shares"]) * (market.price_of(t) or 0.0)
-                         for t, p in player.portfolio.items() if p["shares"] < 0)
-    borrow_fee = short_notional * SHORT_FEE_ANNUAL * yr
-    total = interest + borrow_fee
-    if total:
-        player.cash -= total
-    return {"interest": interest, "borrow_fee": borrow_fee, "total": total}
-
-
 def check_margin_call(player, market):
     """Si l'equity passe sous la marge de maintenance, liquide d'office des
     positions (au prorata) pour ramener le levier en zone sûre. Retourne un
@@ -328,80 +225,3 @@ def check_margin_call(player, market):
     penalty = liquidated * LIQUIDATION_FEE
     player.cash -= penalty
     return {"triggered": True, "liquidated": liquidated, "penalty": penalty}
-
-
-# ---------------------------------------------------------------------------
-# Vues (détail, P&L, allocation, bêta, dividendes)
-# ---------------------------------------------------------------------------
-def holdings(player, market):
-    """Détail des positions (valeur signée, P&L latent), triées par |valeur|."""
-    out = []
-    for t, p in player.portfolio.items():
-        price = market.price_of(t)
-        if price is None:
-            continue
-        value = price * p["shares"]
-        pnl = (price - p["avg"]) * p["shares"]        # vrai pour long ET short
-        # variation en faveur de la position (positive = gain)
-        if p["avg"]:
-            pnl_pct = ((price / p["avg"] - 1) if p["shares"] > 0
-                       else (p["avg"] / price - 1)) * 100
-        else:
-            pnl_pct = 0.0
-        out.append({
-            "ticker": t, "shares": p["shares"], "avg": p["avg"], "price": price,
-            "value": value, "pnl": pnl, "pnl_pct": pnl_pct,
-            "short": p["shares"] < 0,
-        })
-    out.sort(key=lambda h: abs(h["value"]), reverse=True)
-    return out
-
-
-def unrealized_pnl(player, market):
-    total = 0.0
-    for t, p in player.portfolio.items():
-        price = market.price_of(t)
-        if price is not None:
-            total += (price - p["avg"]) * p["shares"]
-    return total
-
-
-def allocation_by(player, market, key):
-    """Répartition de l'exposition (brute) des positions par `key`."""
-    comp = {c["ticker"]: c for c in market.companies}
-    agg = {}
-    for t, p in player.portfolio.items():
-        price = market.price_of(t)
-        c = comp.get(t)
-        if price is None or not c:
-            continue
-        agg[c[key]] = agg.get(c[key], 0.0) + abs(price * p["shares"])
-    return agg
-
-
-def dividends(player, market, days):
-    """Dividendes du tour : les longs en touchent, les shorts en PAIENT."""
-    comp = {c["ticker"]: c for c in market.companies}
-    total = 0.0
-    for t, pos in player.portfolio.items():
-        price = market.price_of(t)
-        c = comp.get(t)
-        if price and c:
-            total += price * pos["shares"] * c.get("div_yield", 0.0) * (days / 365.0)
-    return total
-
-
-def portfolio_beta(player, market):
-    """Bêta NET du portefeuille (les shorts réduisent l'exposition au marché)."""
-    comp = {c["ticker"]: c for c in market.companies}
-    eq = net_worth(player, market)
-    if eq <= 0:
-        return 0.0
-    b = 0.0
-    for t, p in player.portfolio.items():
-        price = market.price_of(t)
-        c = comp.get(t)
-        if price is None or not c:
-            continue
-        b += (price * p["shares"] / eq) * c["beta"]
-    return b

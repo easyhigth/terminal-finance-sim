@@ -111,7 +111,7 @@ class HistoryScene(Scene):
 
     def _draw_timeline(self, surf, rect, p):
         inner = widgets.draw_panel(surf, rect, "Timeline des évènements", config.COL_AMBER)
-        entries = format_timeline(p.journal, limit=40)
+        entries = format_timeline(p.journal, limit=80)
         if not entries:
             widgets.draw_text(surf, "Votre histoire s'écrira ici : promotions, deals, crises…",
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
@@ -125,7 +125,7 @@ class HistoryScene(Scene):
         line_h = 22
         rows_per_col = max(1, inner.h // line_h)
         ncols = max(1, (len(entries) + rows_per_col - 1) // rows_per_col)
-        ncols = min(ncols, 3)
+        ncols = min(ncols, 4)
         colw = inner.w // ncols - 10
         for i, (label, text) in enumerate(entries):
             col = i // rows_per_col

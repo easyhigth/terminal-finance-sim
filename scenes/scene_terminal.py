@@ -127,6 +127,7 @@ class TerminalScene(Scene):
         self._indices_scroll = 0
         self._indices_max_scroll = 0
         self._career_panel_rect = None   # panneau CARRIÈRE (ex-priorités) → scène carrière
+        self._feed_header_rect = None    # panneau FLUX & ÉVÉNEMENTS → scène historique
         self.rail_w = 150         # largeur du rail latéral
         self._map_rect = None     # rect de la carte (pour le clic)
         # rail latéral : (libellé, commande), regroupé par usage
@@ -206,6 +207,9 @@ class TerminalScene(Scene):
                 return
             if self._career_panel_rect and self._career_panel_rect.collidepoint(event.pos):
                 self.app.scenes.go("career", return_to="terminal")
+                return
+            if getattr(self, "_feed_header_rect", None) and self._feed_header_rect.collidepoint(event.pos):
+                self.app.scenes.go("history", return_to="terminal")
                 return
             if getattr(self, "_health_rect", None) and self._health_rect.collidepoint(event.pos):
                 self.app.scenes.go("book", return_to="terminal")
@@ -2025,6 +2029,7 @@ class TerminalScene(Scene):
 
     def _draw_feed(self, surf, rect, info):
         inner = widgets.draw_panel(surf, rect, _t("term.feed"), config.COL_CYAN)
+        self._feed_header_rect = pygame.Rect(rect.x, rect.y, rect.w, 26)
         y = inner.y
         cur = info["currency"]
         for e in self.recent_events[:3]:
@@ -2043,6 +2048,8 @@ class TerminalScene(Scene):
             y += h + 6
             if y > inner.bottom - 20:
                 return
+        widgets.draw_text(surf, "clic titre → historique complet",
+                          (inner.x, inner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_top_companies(self, surf, rect, p):
         watch = [tk for tk in p.watchlist if self.market.price_of(tk) is not None]

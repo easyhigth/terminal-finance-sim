@@ -219,13 +219,7 @@ class MandatesScene(Scene):
         content_h = (y + self.scroll) - list_top
         self._max_scroll = max(0, content_h - list_area.h)
         self.scroll = min(self.scroll, self._max_scroll)
-        if self._max_scroll > 0:
-            track = pygame.Rect(act_panel.right - 8, list_area.y, 6, list_area.h)
-            pygame.draw.rect(surf, config.COL_PANEL, track, border_radius=3)
-            frac = list_area.h / (content_h or 1)
-            bar_h = max(24, int(list_area.h * frac))
-            bar_y = list_area.y + int((list_area.h - bar_h) * (self.scroll / self._max_scroll))
-            pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 6, bar_h), border_radius=3)
+        widgets.draw_scrollbar(surf, act_panel, list_area, self.scroll, self._max_scroll, content_h)
 
         self.back_btn.draw(surf)
         self._draw_postmortem(surf)

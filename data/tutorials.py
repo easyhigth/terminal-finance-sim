@@ -392,6 +392,41 @@ TUTORIALS = [
                    "de la performance de l'indice.",
     },
     {
+        "id": "swaps",
+        "title": "Swaps de devises : échanger un différentiel de taux",
+        "image": "swaps.png",
+        "intro": "Le DESK SWAPS échange le différentiel de taux d'intérêt entre votre "
+                 "devise domestique et une devise étrangère, sans jamais échanger le "
+                 "principal (le notionnel n'est qu'une référence de calcul). Ouvert "
+                 "avec SWAP ou SWAPS.",
+        "steps": [
+            "Ouvrez le desk : SWAP — choisissez une DEVISE ÉTRANGÈRE parmi les "
+            "régions disponibles (toutes sauf la vôtre).",
+            "Choisissez le SENS : « Reçoit taux étranger / Paie taux domestique » "
+            "si vous pensez que le taux étranger restera plus élevé, ou l'inverse "
+            "si vous pensez que c'est votre taux domestique qui rapportera plus.",
+            "Fixez la MATURITÉ (2, 3 ou 5 ans) et le NOTIONNEL (+/- par paliers de "
+            "100k) : ce notionnel sert uniquement à calculer les flux, il n'est "
+            "jamais débité de votre cash à l'entrée.",
+            "Cliquez CONCLURE LE SWAP : à chaque tour jusqu'à l'échéance, le "
+            "différentiel de taux net (jambe reçue moins jambe payée) est réglé "
+            "en cash — positif s'il joue en votre faveur, négatif sinon.",
+            "Suivez vos positions dans « Vos swaps » : carry annuel estimé et "
+            "temps restant avant expiration, où le swap s'arrête sans autre "
+            "règlement.",
+        ],
+        "concept": "Un swap de devises ne transfère jamais le principal : seul le "
+                   "différentiel de taux entre les deux jambes (domestique et "
+                   "étrangère) est réglé net, comme un vrai cross-currency swap "
+                   "simplifié. Le taux régional réutilise celui des obligations "
+                   "souveraines (taux directeur + prime de crédit du pays) : "
+                   "conclure un swap revient donc à un PARI SUR L'ÉCART DE TAUX "
+                   "entre deux zones, sans exposition directe au taux de change ni "
+                   "au marché actions. Le risque : si l'écart de taux évolue contre "
+                   "votre position pendant la durée du swap, le carry négatif "
+                   "s'accumule à chaque tour jusqu'à l'échéance.",
+    },
+    {
         "id": "spreadsheet",
         "title": "Le tableur intégré : formules et modèle DCF",
         "image": "spreadsheet.png",
@@ -420,6 +455,37 @@ TUTORIALS = [
                    "Growth : FCF×(1+g)/(WACC-g)). La valeur terminale domine "
                    "presque toujours le total — d'où la sensibilité extrême "
                    "du résultat au couple (WACC, croissance terminale).",
+    },
+    {
+        "id": "hedge",
+        "title": "Couverture : acheter un put protecteur",
+        "image": "hedge.png",
+        "intro": "Le DESK DE COUVERTURE permet d'acheter un PUT sur l'indice phare de "
+                 "votre région pour réduire le bêta net de votre portefeuille sans "
+                 "vendre vos positions. Ouvert avec PROTECT.",
+        "steps": [
+            "Ouvrez le desk : PROTECT — choisissez un STRIKE (100% = à la monnaie, "
+            "95% ou 90% = hors la monnaie, donc moins cher mais protège plus tard).",
+            "Choisissez la MATURITÉ (3, 6 ou 12 mois) : plus elle est longue, plus "
+            "la prime est élevée (plus de temps pour que l'indice baisse).",
+            "La PRIME affichée est débitée immédiatement de votre cash lors de "
+            "l'achat — c'est le coût de l'assurance, perdu si l'indice ne baisse "
+            "pas sous le strike à l'échéance.",
+            "Cliquez SOUSCRIRE : la couverture est notionnelle (un montant de "
+            "référence), pas une vente réelle de vos positions.",
+            "À l'échéance, si l'indice termine sous le strike, le put paie la "
+            "différence proportionnelle au notionnel, compensant une partie des "
+            "pertes de votre book ; sinon il expire sans valeur.",
+        ],
+        "concept": "Un put protecteur (protective put) est l'assurance la plus "
+                   "classique d'un portefeuille actions : on paie une PRIME "
+                   "(calculée par Black-Scholes, comme toute option) pour avoir le "
+                   "droit de vendre l'indice au STRIKE à l'échéance, quel que soit "
+                   "son niveau réel. Plus le strike est proche du niveau courant, "
+                   "plus la protection est large mais plus la prime est chère. "
+                   "C'est un compromis : on accepte un coût certain (la prime) pour "
+                   "limiter une perte incertaine, sans toucher à ses positions "
+                   "sous-jacentes.",
     },
 ]
 

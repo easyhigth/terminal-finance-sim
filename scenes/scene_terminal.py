@@ -49,7 +49,7 @@ CMD_NAMES = [
     "CMDTY", "BUYCMDTY", "SELLCMDTY",
     "CRYPTO", "BUYCRYPTO", "SELLCRYPTO", "ETF", "ETFS", "BUYETF", "SELLETF",
     "STRUCT", "CREDIT", "ALM", "SWAP", "SWAPS",
-    "ALLOCATE", "HEDGE", "REBALANCE",
+    "ALLOCATE", "HEDGE", "PROTECT", "REBALANCE",
     "PITCH", "FRONTIER", "RISK", "QUANT", "MA", "SHEET", "GLOSSARY",
     "SAVE", "SAVES", "NEWS", "MORE", "REG", "STATUS", "MENU",
 ]
@@ -389,7 +389,7 @@ class TerminalScene(Scene):
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
                     "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC charts",
                     "  SECTOR · REGION · SCREEN · RANKING · CALENDAR",
-                    "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE",
+                    "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE · PROTECT",
                     "  RESEARCH <tk> · ALERT <tk> <px> · MANDATES · PITCH",
                     "  LEARN academy · CERT certifications · ECO macro",
                     "  RV <tk> · DEFINE <term>",
@@ -407,7 +407,7 @@ class TerminalScene(Scene):
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
                     "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC graphes",
                     "  SECTOR · REGION · SCREEN · RANKING · CALENDAR",
-                    "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE",
+                    "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE · PROTECT",
                     "  RESEARCH <tk> · ALERT <tk> <px> · MANDATES · PITCH",
                     "  LEARN académie · CERT certifications · ECO macro",
                     "  RV <tk> · DEFINE <terme>",
@@ -454,6 +454,8 @@ class TerminalScene(Scene):
             self.app.scenes.go("structured", return_to="terminal")
         elif cmd in ("SWAP", "SWAPS"):
             self.app.scenes.go("swaps", return_to="terminal")
+        elif cmd == "PROTECT":
+            self.app.scenes.go("hedge", return_to="terminal")
         elif cmd in ("CREDIT", "TITRISATION", "ABS", "CLO"):
             self.app.scenes.go("credit", return_to="terminal")
         elif cmd in ("ALM", "BANKING"):

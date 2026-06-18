@@ -5,6 +5,12 @@ Quelques crypto-actifs fictifs TRÈS volatils + un stablecoin arrimé au dollar
 mais exposé au risque de DEPEG (décrochage). Prix déterministes (reconstruits via
 graine+pas). Pas de dividende ni de coupon : du pur spot, volatil.
 
+Contagion : quand le stablecoin DEPEG, un facteur de stress partagé ("F_contagion",
+même esprit que les chocs de facteurs du moteur de marché — cf. core/market.py)
+augmente la probabilité/magnitude de stress des autres crypto-actifs corrélés
+(actuellement le groupe "non-stable, non-CBDC" : BITC/ETHR/SOLR/DOGY). Tout passe
+par le rng seedé par (market.seed, cid) : aucun aléa non reproductible.
+
 Holdings : PlayerState.crypto = { id : {"qty","avg"} }.
 """
 import numpy as np
@@ -20,12 +26,21 @@ COINS = [
 ]
 _BY_ID = {c[0]: c for c in COINS}
 CBDC_IDS = {"CBDC"}
+STABLE_IDS = {c[0] for c in COINS if c[5]}
+# Groupe corrélé exposé à la contagion d'un depeg de stablecoin (ni stable, ni CBDC :
+# la CBDC est garantie par la banque centrale, jamais affectée).
+CONTAGION_GROUP = {c[0] for c in COINS if not c[5] and c[0] not in CBDC_IDS}
+
+CONTAGION_VOL_MULT = 1.8     # multiplicateur de vol hebdo sur un pas sous stress
+CONTAGION_DRIFT = -0.12      # choc de drift hebdo additionnel (négatif) sous stress
+CONTAGION_DECAY = 0.6        # le facteur de stress se résorbe d'un pas à l'autre
 
 
 def is_cbdc(cid):
     return cid in CBDC_IDS
 COMMISSION = 0.0015        # frais plus élevés (15 bps)
 _path_cache = {}
+_stress_cache = {}
 
 
 def _hash(cid):
@@ -33,6 +48,30 @@ def _hash(cid):
     for ch in cid:
         h = (h * 131 + ord(ch)) & 0xFFFFFFFF
     return h
+
+
+def _stress_factor(market, n_steps):
+    """Facteur de stress de contagion F_contagion[t], dérivé déterministement des
+    pas de DEPEG de chaque stablecoin (boucle de rétroaction comme les chocs de
+    facteurs du marché). Reconstruit à partir de (seed, n_steps) ; mis en cache."""
+    seed = int(getattr(market, "seed", 12345)) & 0xFFFFFFFF
+    key = (seed, n_steps)
+    cached = _stress_cache.get(key)
+    if cached is not None and len(cached) > n_steps:
+        return cached
+    n = n_steps + 1
+    stress = np.zeros(n)
+    for sid in STABLE_IDS:
+        path = _path(market, sid, n_steps)
+        lvl = np.asarray(path[:n])
+        depeg_mask = lvl < 0.95
+        for t in range(1, n):
+            # le stress décroît puis est relevé par un depeg actif à ce pas
+            stress[t] = max(stress[t] * CONTAGION_DECAY, stress[t - 1] * CONTAGION_DECAY)
+            if depeg_mask[t]:
+                stress[t] = max(stress[t], 1.0 - lvl[t])    # plus le decrochage est fort, plus le stress est haut
+    _stress_cache[key] = stress
+    return stress
 
 
 def _path(market, cid, n_steps):
@@ -54,12 +93,49 @@ def _path(market, cid, n_steps):
         else:
             mu = drift / 52.0 - 0.5 * (vol / np.sqrt(52)) ** 2
             sig = vol / np.sqrt(52)
-            rets = rng.normal(mu, sig, n_steps + 1)
+            if cid in CONTAGION_GROUP:
+                # contagion : un facteur de stress partagé (issu des depegs de
+                # stablecoin) augmente la vol et tire le drift à la baisse sur les
+                # pas concernés — toujours via le même rng seedé (déterministe).
+                stress = _stress_factor(market, n_steps)[:n_steps + 1]
+                rets = np.empty(n_steps + 1)
+                for t in range(n_steps + 1):
+                    s = stress[t] if t < len(stress) else 0.0
+                    rets[t] = rng.normal(mu + CONTAGION_DRIFT * s,
+                                          sig * (1.0 + CONTAGION_VOL_MULT * s))
+            else:
+                rets = rng.normal(mu, sig, n_steps + 1)
             spots = (base * np.exp(np.cumsum(rets))).tolist()
             spots[0] = base
         path = spots
         _path_cache[key] = path
     return path
+
+
+def contagion_risk(market, cid):
+    """Niveau de stress de contagion [0..1] affectant cid au pas courant (0 si
+    hors du groupe corrélé ou si aucun depeg n'est actif)."""
+    if cid not in CONTAGION_GROUP:
+        return 0.0
+    step = int(getattr(market, "step_count", 0))
+    stress = _stress_factor(market, step)
+    t = min(step, len(stress) - 1)
+    return float(stress[t])
+
+
+def active_depegs(market):
+    """Liste des stablecoins actuellement décrochés (spot < 0.95)."""
+    out = []
+    for sid in STABLE_IDS:
+        if spot(market, sid) < 0.95:
+            out.append(sid)
+    return out
+
+
+def name(cid):
+    """Nom affichable d'un actif (pour l'UI, sans exposer _BY_ID)."""
+    c = _BY_ID.get(cid)
+    return c[1] if c else cid
 
 
 def policy_rate(market):

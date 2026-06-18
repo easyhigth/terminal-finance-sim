@@ -28,21 +28,40 @@ class InboxScene(Scene):
         if self.sel is not None:
             msgs[self.sel]["read"] = True
         self.row_rects = {}
+        self.search = ""
+        self._search_clear_rect = None
+        self._t = 0.0
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
     def handle_event(self, event):
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                if self.search:
+                    self.search = ""
+                    return
+                self.app.scenes.go(self.return_to)
+                return
+            elif event.key == pygame.K_BACKSPACE:
+                self.search = self.search[:-1]
+                return
+            elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
+                self.search += event.unicode
+                return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+            return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
+                self.search = ""
+                return
             for idx, rect in self.row_rects.items():
                 if rect.collidepoint(event.pos):
                     self.sel = idx
                     self.app.gs.player.inbox[idx]["read"] = True
 
     def update(self, dt):
+        self._t += dt
         self.back_btn.update(pygame.mouse.get_pos(), dt)
 
     def draw(self, surf):
@@ -53,18 +72,43 @@ class InboxScene(Scene):
         widgets.draw_text(surf, f"{len(msgs)} messages · {unread} non lus",
                           (42, 72), fonts.small(), config.COL_TEXT_DIM)
 
+        # ---- recherche ----
+        search_rect = pygame.Rect(40, 100, 300, 24)
+        pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN if self.search else config.COL_BORDER, search_rect, 1, border_radius=4)
+        cursor = "_" if int(self._t * 2) % 2 == 0 else " "
+        label = (self.search + cursor) if self.search else "Tapez pour rechercher…"
+        col = config.COL_TEXT if self.search else config.COL_TEXT_DIM
+        widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
+                          (search_rect.x + 8, search_rect.y + 4), fonts.small(), col)
+        self._search_clear_rect = None
+        if self.search:
+            self._search_clear_rect = pygame.Rect(search_rect.right - 22, search_rect.y, 22, search_rect.h)
+            widgets.draw_text(surf, "✕", self._search_clear_rect.center, fonts.small(bold=True),
+                              config.COL_TEXT_DIM, align="center")
+
         # liste à gauche
-        ph = config.footer_y() - 8 - 100
-        listp = pygame.Rect(40, 100, 480, ph)
-        linner = widgets.draw_panel(surf, listp, "Reçus", config.COL_CYAN)
+        list_top = 134
+        ph = config.footer_y() - 8 - list_top
+        listp = pygame.Rect(40, list_top, 480, ph)
+        q = self.search.strip().lower()
+        order = self.order
+        if q:
+            order = [idx for idx in self.order
+                     if q in f"{_KIND.get(msgs[idx]['kind'], ('', None))[0]} {msgs[idx].get('sender', '')} "
+                              f"{msgs[idx].get('subject', '')} {msgs[idx].get('body', '')}".lower()]
+        linner = widgets.draw_panel(surf, listp, f"Reçus ({len(order)})", config.COL_CYAN)
         self.row_rects = {}
         if not msgs:
             widgets.draw_text(surf, "Aucun message pour l'instant.", (linner.x, linner.y),
                               fonts.body(), config.COL_TEXT_DIM)
+        elif not order:
+            widgets.draw_text(surf, "Aucun message ne correspond à la recherche.", (linner.x, linner.y),
+                              fonts.body(), config.COL_TEXT_DIM)
         else:
             y = linner.y
             mp = pygame.mouse.get_pos()
-            for idx in self.order:
+            for idx in order:
                 m = msgs[idx]
                 row = pygame.Rect(linner.x - 4, y - 2, linner.w + 8, 46)
                 self.row_rects[idx] = row
@@ -85,7 +129,7 @@ class InboxScene(Scene):
                     break
 
         # volet de lecture à droite
-        readp = pygame.Rect(540, 100, config.SCREEN_WIDTH - 580, ph)
+        readp = pygame.Rect(540, list_top, config.SCREEN_WIDTH - 580, ph)
         rinner = widgets.draw_panel(surf, readp, "Lecture", config.COL_AMBER)
         if self.sel is not None and 0 <= self.sel < len(msgs):
             m = msgs[self.sel]

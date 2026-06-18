@@ -243,14 +243,7 @@ class GraphScene(Scene):
     # ----------------------------------------------------- helpers de tracé
     def _plot_axes(self, surf, rect, lo, hi, y_fmt=lambda v: f"{v:.0f}", rows=5):
         """Grille horizontale + libellés d'axe Y. Retourne (lo, hi, span)."""
-        span = (hi - lo) or 1.0
-        for r in range(rows + 1):
-            v = hi - span * r / rows
-            yy = rect.y + int(rect.h * r / rows)
-            pygame.draw.line(surf, config.COL_GRID, (rect.x, yy), (rect.right, yy), 1)
-            widgets.draw_text(surf, y_fmt(v), (rect.x - 6, yy - 7), fonts.tiny(),
-                              config.COL_TEXT_DIM, align="right")
-        return lo, hi, span
+        return widgets.draw_chart_axes(surf, rect, lo, hi, y_fmt, rows)
 
     def _polyline(self, surf, rect, series, lo, span, color):
         n = len(series)
@@ -487,17 +480,7 @@ class GraphScene(Scene):
 
     # ----------------------------------------------------- petits helpers
     def _zero_line(self, surf, rect, lo, span):
-        if lo <= 0 <= lo + span:
-            zy = rect.bottom - int((0 - lo) / span * rect.h)
-            pygame.draw.line(surf, config.COL_TEXT_DIM, (rect.x, zy), (rect.right, zy), 1)
+        widgets.draw_chart_zero_line(surf, rect, lo, span)
 
     def _legend(self, surf, rect, items):
-        x = rect.x + 6
-        y = rect.y + 4
-        for text, col in items:
-            r = widgets.draw_text(surf, "■ ", (x, y), fonts.tiny(bold=True), col)
-            r2 = widgets.draw_text(surf, text, (r.right, y), fonts.tiny(), config.COL_TEXT)
-            x = r2.right + 16
-            if x > rect.right - 120:
-                x = rect.x + 6
-                y += 16
+        widgets.draw_chart_legend(surf, rect, items)

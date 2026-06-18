@@ -226,6 +226,11 @@ class EvaluationScene(Scene):
             self.app.notify(_L(f"Promotion : {p.grade}", f"Promotion: {p.grade}"), "good")
             if self.new_title:
                 self.app.notify(_L(f"Titre : {self.new_title}", f"Title: {self.new_title}"), "prestige")
+            from core import unlocks
+            for feat, grade in unlocks.UNLOCKS.items():
+                if grade == p.grade_index:
+                    self.app.notify(_L(f"⊘→✓ Débloqué : {unlocks.feature_label(feat)}",
+                                        f"⊘→✓ Unlocked: {unlocks.feature_label(feat)}"), "good")
         else:
             p.reputation = max(0, p.reputation - 5)
         self.app.gs.save(config.AUTOSAVE_SLOT)

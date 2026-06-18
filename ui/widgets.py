@@ -400,6 +400,81 @@ def draw_error_panel(surf, message, hint=None, top=40, title_color=config.COL_DO
         draw_text(surf, hint, (40, top + 60), fonts.body(), config.COL_TEXT_DIM)
 
 
+def draw_scrollbar(surf, panel_rect, list_area, scroll, max_scroll, content_h):
+    """Dessine une scrollbar verticale fine (piste + curseur) le long du bord
+    droit de `panel_rect`, sur la hauteur de `list_area`. Ne dessine rien si
+    `max_scroll` <= 0 (pas besoin de défiler). Reproduit le calcul partagé par
+    les écrans à liste défilante (deals/news/mandates/bonds...) : la piste
+    fait 6px de large, collée 8px avant le bord droit du panneau ; le curseur
+    a une hauteur proportionnelle au ratio visible/contenu (mini 24px) et sa
+    position suit `scroll`/`max_scroll`.
+
+    `panel_rect`  : rect du panneau englobant (pour ancrer la piste à droite).
+    `list_area`   : rect de la zone de liste défilante (hauteur de la piste).
+    `scroll`      : décalage de défilement courant (px).
+    `max_scroll`  : décalage maximal (0 si tout le contenu est visible).
+    `content_h`   : hauteur totale du contenu (pour le ratio du curseur).
+    """
+    if max_scroll <= 0:
+        return
+    panel_rect = pygame.Rect(panel_rect)
+    list_area = pygame.Rect(list_area)
+    track = pygame.Rect(panel_rect.right - 8, list_area.y, 6, list_area.h)
+    pygame.draw.rect(surf, config.COL_PANEL, track, border_radius=3)
+    frac = list_area.h / (content_h or 1)
+    bar_h = max(24, int(list_area.h * frac))
+    bar_y = list_area.y + int((list_area.h - bar_h) * (scroll / max_scroll))
+    pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 6, bar_h), border_radius=3)
+
+
+def draw_chart_axes(surf, rect, lo, hi, y_fmt=lambda v: f"{v:.0f}", rows=5):
+    """Dessine la grille horizontale + libellés d'axe Y d'un graphe en lignes
+    (style atelier de graphes / option / quant). Commun à plusieurs écrans à
+    panneaux de graphe (scene_graph, scene_quant...). Retourne (lo, hi, span)
+    pour que l'appelant convertisse ensuite ses valeurs en pixels via
+    `rect.bottom - (v - lo) / span * rect.h`.
+
+    `rect`  : zone de tracé (hors marges d'axe, déjà réservées par l'appelant).
+    `lo/hi` : bornes de l'axe Y.
+    `y_fmt` : formatte la valeur affichée à côté de chaque ligne de grille.
+    `rows`  : nombre d'intervalles de la grille (rows+1 lignes, haut compris).
+    """
+    rect = pygame.Rect(rect)
+    span = (hi - lo) or 1.0
+    for r in range(rows + 1):
+        v = hi - span * r / rows
+        yy = rect.y + int(rect.h * r / rows)
+        pygame.draw.line(surf, config.COL_GRID, (rect.x, yy), (rect.right, yy), 1)
+        draw_text(surf, y_fmt(v), (rect.x - 6, yy - 7), fonts.tiny(),
+                  config.COL_TEXT_DIM, align="right")
+    return lo, hi, span
+
+
+def draw_chart_zero_line(surf, rect, lo, span, color=None):
+    """Trace une ligne horizontale au niveau y=0 si elle tombe dans [lo, lo+span]
+    (utile pour les graphes de variation % / spread centrés sur zéro)."""
+    if lo <= 0 <= lo + span:
+        rect = pygame.Rect(rect)
+        zy = rect.bottom - int((0 - lo) / span * rect.h)
+        pygame.draw.line(surf, color or config.COL_TEXT_DIM, (rect.x, zy), (rect.right, zy), 1)
+
+
+def draw_chart_legend(surf, rect, items):
+    """Dessine une légende compacte (carré coloré + libellé) en haut à gauche
+    d'un panneau de graphe, avec retour à la ligne automatique. `items` est une
+    liste de tuples (texte, couleur)."""
+    rect = pygame.Rect(rect)
+    x = rect.x + 6
+    y = rect.y + 4
+    for text, col in items:
+        r = draw_text(surf, "■ ", (x, y), fonts.tiny(bold=True), col)
+        r2 = draw_text(surf, text, (r.right, y), fonts.tiny(), config.COL_TEXT)
+        x = r2.right + 16
+        if x > rect.right - 120:
+            x = rect.x + 6
+            y += 16
+
+
 def draw_badge(surf, text, pos, accent=config.COL_AMBER, align="left"):
     """Petit badge/pilule coloré avec texte. Retourne le Rect."""
     font = fonts.tiny(bold=True)

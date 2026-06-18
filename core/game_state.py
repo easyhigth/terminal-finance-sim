@@ -282,6 +282,8 @@ class GameState:
         structured_due = None
         securitised_due = None
         hedges_due = None
+        options_due = None
+        ipos_settled = None
         swaps_expired = []
         if market is not None:
             from core import portfolio
@@ -321,6 +323,12 @@ class GameState:
             if getattr(p, "hedges", None):
                 from core import hedging as _hedging
                 hedges_due = _hedging.evaluate_due(p, market)
+            if getattr(p, "options", None):
+                from core import options as _options
+                options_due = _options.evaluate_due(p, market)
+            if getattr(p, "ipos", None):
+                from core import ipo as _ipo
+                ipos_settled = _ipo.evaluate_listings(p, market)
             if getattr(p, "currency_swaps", None):
                 from core import swaps as _swaps
                 swap_flow, swaps_expired = _swaps.accrue(p, market, config.DAYS_PER_STEP)
@@ -378,6 +386,8 @@ class GameState:
             "structured_due": structured_due,
             "securitised_due": securitised_due,
             "hedges_due": hedges_due,
+            "options_due": options_due,
+            "ipos_settled": ipos_settled,
             "swaps_expired": swaps_expired,
             "quarter_changed": p.quarter != prev_quarter,
             "quarter_report": quarter_report,

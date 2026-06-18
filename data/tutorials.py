@@ -487,6 +487,67 @@ TUTORIALS = [
                    "limiter une perte incertaine, sans toucher à ses positions "
                    "sous-jacentes.",
     },
+    {
+        "id": "options",
+        "title": "Options sur actions : calls et puts",
+        "image": "options.png",
+        "intro": "Le DESK D'OPTIONS permet d'acheter des CALLS (pari à la hausse) ou "
+                 "des PUTS (pari à la baisse) sur une action individuelle de votre "
+                 "watchlist ou portefeuille. Ouvert avec OPTIONS.",
+        "steps": [
+            "Ouvrez le desk : OPTIONS — choisissez un titre (watchlist ou "
+            "portefeuille).",
+            "Choisissez CALL (vous gagnez si l'action monte au-dessus du strike) "
+            "ou PUT (vous gagnez si elle baisse sous le strike).",
+            "Choisissez le STRIKE (90%, 100% ou 110% du cours actuel) et la "
+            "MATURITÉ (3, 6 ou 12 mois).",
+            "La PRIME affichée (calculée par Black-Scholes) est débitée "
+            "immédiatement — c'est votre mise maximale, votre perte est limitée "
+            "à ce montant.",
+            "Choisissez le nombre de CONTRATS puis cliquez ACHETER. À l'échéance, "
+            "le contrat est réglé automatiquement : payoff intrinsèque crédité en "
+            "cash, ou zéro s'il termine hors la monnaie.",
+        ],
+        "concept": "Une option donne le droit (pas l'obligation) d'acheter (call) "
+                   "ou de vendre (put) un actif à un prix fixé (le strike) à une "
+                   "échéance donnée. Son prix (la prime) dépend du cours actuel, "
+                   "du strike, du temps restant et de la volatilité du titre "
+                   "(modèle de Black-Scholes). Contrairement à une position "
+                   "actions classique, la perte est plafonnée à la prime payée, "
+                   "mais le gain potentiel d'un call est illimité — c'est un "
+                   "effet de levier asymétrique.",
+    },
+    {
+        "id": "ipo",
+        "title": "IPO : souscrire à une introduction en bourse",
+        "image": "ipo.png",
+        "intro": "Le DESK D'IPO liste les sociétés qui s'apprêtent à entrer en "
+                 "bourse. Vous pouvez souscrire avant la cotation, sans connaître "
+                 "le prix final définitif. Ouvert avec IPO.",
+        "steps": [
+            "Ouvrez le desk : IPO — consultez les offres en cours (fourchette de "
+            "prix indicative, sursouscription estimée, sentiment de marché).",
+            "Choisissez un montant à investir puis cliquez SOUSCRIRE : le cash "
+            "est débité immédiatement, au prix bas de la fourchette (prix "
+            "d'introduction de référence).",
+            "Si la sursouscription estimée est élevée, votre allocation réelle "
+            "est réduite proportionnellement (le surplus non alloué vous est "
+            "remboursé tout de suite) : forte demande = moins d'actions par "
+            "euro investi.",
+            "À la date de cotation, le prix définitif est tiré (influencé par le "
+            "sentiment de marché annoncé) : vos actions sont créditées à ce "
+            "prix, le solde (gain ou perte vs votre mise) ajusté en cash.",
+            "Vous pouvez aussi DÉCLINER une offre pour récupérer votre droit de "
+            "souscrire à une autre.",
+        ],
+        "concept": "Une introduction en bourse (IPO) permet de souscrire des "
+                   "actions avant qu'elles ne soient cotées publiquement, "
+                   "généralement à un prix décoté pour attirer les investisseurs. "
+                   "Le \"pop\" (variation entre le prix de souscription et le "
+                   "premier cours coté) peut être positif ou négatif : c'est un "
+                   "pari sur l'appétit du marché au moment de la cotation, "
+                   "distinct de l'analyse fondamentale classique.",
+    },
 ]
 
 _BY_ID = {t["id"]: t for t in TUTORIALS}

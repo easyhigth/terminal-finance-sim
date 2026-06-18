@@ -24,6 +24,7 @@ from core import politics as politics_mod
 from core import dilemmas as dilemmas_mod
 from core import badges as badges_mod
 from core import mandates as mandates_mod
+from core import ipo as ipo_mod
 from core import unlocks as unlocks_mod
 from core import history as history_mod
 from core import etfs as etfs_mod
@@ -49,7 +50,7 @@ CMD_NAMES = [
     "CMDTY", "BUYCMDTY", "SELLCMDTY",
     "CRYPTO", "BUYCRYPTO", "SELLCRYPTO", "ETF", "ETFS", "BUYETF", "SELLETF",
     "STRUCT", "CREDIT", "ALM", "SWAP", "SWAPS",
-    "ALLOCATE", "HEDGE", "PROTECT", "REBALANCE",
+    "ALLOCATE", "HEDGE", "PROTECT", "OPTIONS", "IPO", "REBALANCE",
     "PITCH", "FRONTIER", "RISK", "QUANT", "MA", "SHEET", "GLOSSARY",
     "SAVE", "SAVES", "NEWS", "MORE", "REG", "STATUS", "MENU",
 ]
@@ -389,7 +390,7 @@ class TerminalScene(Scene):
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
                     "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC charts",
                     "  SECTOR · REGION · SCREEN · RANKING · CALENDAR",
-                    "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE · PROTECT",
+                    "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE · PROTECT · OPTIONS · IPO",
                     "  RESEARCH <tk> · ALERT <tk> <px> · MANDATES · PITCH",
                     "  LEARN academy · CERT certifications · ECO macro",
                     "  RV <tk> · DEFINE <term>",
@@ -407,7 +408,7 @@ class TerminalScene(Scene):
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
                     "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC graphes",
                     "  SECTOR · REGION · SCREEN · RANKING · CALENDAR",
-                    "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE · PROTECT",
+                    "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE · PROTECT · OPTIONS · IPO",
                     "  RESEARCH <tk> · ALERT <tk> <px> · MANDATES · PITCH",
                     "  LEARN académie · CERT certifications · ECO macro",
                     "  RV <tk> · DEFINE <terme>",
@@ -456,6 +457,10 @@ class TerminalScene(Scene):
             self.app.scenes.go("swaps", return_to="terminal")
         elif cmd == "PROTECT":
             self.app.scenes.go("hedge", return_to="terminal")
+        elif cmd in ("OPTIONS", "OPTION"):
+            self.app.scenes.go("options", return_to="terminal")
+        elif cmd in ("IPO", "IPOS"):
+            self.app.scenes.go("ipo", return_to="terminal")
         elif cmd in ("CREDIT", "TITRISATION", "ABS", "CLO"):
             self.app.scenes.go("credit", return_to="terminal")
         elif cmd in ("ALM", "BANKING"):
@@ -1512,6 +1517,26 @@ class TerminalScene(Scene):
                       f"{widgets.format_money(res['payoff'], cur)} "
                       f"(P&L {sign}{widgets.format_money(res['pnl'], cur)})."))
             self.app.notify(_L("Tranche de titrisation dénouée","Securitisation tranche settled"), "info")
+        for res in (summary.get("options_due") or []):
+            pos = res["position"]
+            sign = "+" if res["pnl"] >= 0 else ""
+            self._log(_L(f"  ■ Option échue : {pos['ticker']} {pos['option_type']} → "
+                      f"{widgets.format_money(res['payoff'], cur)} "
+                      f"(P&L {sign}{widgets.format_money(res['pnl'], cur)}).",
+                      f"  ■ Option matured: {pos['ticker']} {pos['option_type']} → "
+                      f"{widgets.format_money(res['payoff'], cur)} "
+                      f"(P&L {sign}{widgets.format_money(res['pnl'], cur)})."))
+            self.app.notify(_L("Option arrivée à échéance","Option matured"), "info")
+        for res in (summary.get("ipos_settled") or []):
+            pos = res["position"]
+            sign = "+" if res["pnl"] >= 0 else ""
+            self._log(_L(f"  ■ IPO cotée : {pos['ticker']} à {widgets.format_money(res['listing_price'], cur)} → "
+                      f"{widgets.format_money(res['proceeds'], cur)} "
+                      f"(P&L {sign}{widgets.format_money(res['pnl'], cur)}).",
+                      f"  ■ IPO listed: {pos['ticker']} at {widgets.format_money(res['listing_price'], cur)} → "
+                      f"{widgets.format_money(res['proceeds'], cur)} "
+                      f"(P&L {sign}{widgets.format_money(res['pnl'], cur)})."))
+            self.app.notify(_L(f"IPO cotée : {pos['ticker']}", f"IPO listed: {pos['ticker']}"), "good" if res["pnl"] >= 0 else "bad")
         mc = summary.get("margin_call")
         if mc:
             self._log(_L(f"  ⚠ APPEL DE MARGE : liquidation forcée de "
@@ -1645,6 +1670,16 @@ class TerminalScene(Scene):
                            f"Nous souhaitons vous confier {widgets.format_money(offer['capital'], cur)} : "
                            f"objectif +{offer['target_pct']:.0f}% en {offer['horizon']} trimestres, "
                            f"bêta ≤ {offer['max_beta']:.2f}. Tapez MANDATES puis MANDATE ACCEPT {offer['id']}.")
+        # nouvelle offre d'IPO éventuelle
+        ipo_offer = ipo_mod.maybe_offer(p, random, m)
+        if ipo_offer:
+            self._log(_L(f"  ✶ NOUVELLE IPO : {ipo_offer['company_name']} ({ipo_offer['ticker']}) — "
+                      f"{widgets.format_money(ipo_offer['price_min'], cur)}-"
+                      f"{widgets.format_money(ipo_offer['price_max'], cur)} (IPO pour voir).",
+                      f"  ✶ NEW IPO: {ipo_offer['company_name']} ({ipo_offer['ticker']}) — "
+                      f"{widgets.format_money(ipo_offer['price_min'], cur)}-"
+                      f"{widgets.format_money(ipo_offer['price_max'], cur)} (type IPO to view)."))
+            self.app.notify(_L(f"Nouvelle IPO : {ipo_offer['ticker']}", f"New IPO: {ipo_offer['ticker']}"), "info")
         # alertes de prix
         self._check_alerts()
         for d in summary["new_deals"]:

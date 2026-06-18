@@ -19,8 +19,7 @@ class GameOverScene(Scene):
         if p.hardcore:
             GameState.delete(config.AUTOSAVE_SLOT)
         self.menu_btn = widgets.Button(
-            (config.SCREEN_WIDTH // 2 - 150, 678 if not self.app.gs.player.hardcore else 678,
-             300, 32),
+            (config.SCREEN_WIDTH // 2 - 150, 678, 300, 32),
             "RETOUR AU MENU", config.COL_AMBER)
 
     def handle_event(self, event):
@@ -90,13 +89,13 @@ class GameOverScene(Scene):
                               (rinner.x, rinner.y), fonts.small(), config.COL_TEXT_DIM)
 
         # panneau bas : rétrospective graphique de la valeur nette
-        bottom = pygame.Rect(cx - 380, 558, 760, 110)
+        bottom = pygame.Rect(cx - 380, 558, 760, 100)
         binner = widgets.draw_panel(surf, bottom, "Rétrospective — valeur nette", config.COL_CYAN)
         self._draw_networth_retrospective(surf, binner, p, cur)
 
         if p.hardcore:
             widgets.draw_badge(surf, "HARDCORE — SAUVEGARDE EFFACÉE",
-                               (cx, 678), config.COL_DOWN, align="center")
+                               (cx, 666), config.COL_DOWN, align="center")
 
         self.menu_btn.draw(surf)
 
@@ -109,7 +108,7 @@ class GameOverScene(Scene):
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
             return
 
-        chart_rect = pygame.Rect(inner.x + 50, inner.y, inner.w - 60, inner.h - 16)
+        chart_rect = pygame.Rect(inner.x + 50, inner.y, inner.w - 60, inner.h - 20)
         lo, hi = min(hist), max(hist)
         lo, hi, span = widgets.draw_chart_axes(
             surf, chart_rect, lo, hi,

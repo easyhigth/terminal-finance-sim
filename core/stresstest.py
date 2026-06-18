@@ -66,7 +66,7 @@ def maybe_trigger(player, quarter_changed, market=None):
     net_worth = pf.net_worth(player, market)
     loss = max(0.0, -impact["total"]) * 1e6   # impact["total"] est en M, loss en valeur monétaire
     loss_ratio = (loss / net_worth) if net_worth > 0 else 1.0
-    passed = loss_ratio <= FAIL_RATIO
+    passed = bool(loss_ratio <= FAIL_RATIO)
 
     try:
         sim = risk.simulate(player, market)

@@ -93,6 +93,7 @@ class PlayerState:
     last_review_quarter: int = 0        # dernier trimestre où une revue a eu lieu
     pending_review: dict = None         # offre de revue en attente de réponse, ou None
     salary_bonus_per_step: float = 0.0  # supplément de salaire fixe négocié (revues)
+    analysts: list = field(default_factory=list)  # équipe d'analystes juniors : [{profile_id, hired_step}]
     # ----- calendrier macro (paris directionnels sur évènements programmés) -----
     macro_events: list = field(default_factory=list)    # évènements programmés (annoncés, pas encore résolus)
     macro_bets: list = field(default_factory=list)       # paris placés en attente de résolution

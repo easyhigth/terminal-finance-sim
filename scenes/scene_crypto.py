@@ -84,9 +84,17 @@ class CryptoScene(Scene):
         m, p = self.app.market, self.app.gs.player
         cur = config.CONTINENTS[p.continent]["currency"]
         widgets.draw_text(surf, "CRYPTO-ACTIFS", (40, 22), fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Classe très volatile, sans flux. Le stablecoin vise 1.0 mais "
-                                "peut DÉCROCHER (depeg). " + self.msg,
-                          (42, 74), fonts.small(), config.COL_TEXT_DIM)
+        depegs = K.active_depegs(m)
+        if depegs:
+            names = ", ".join(K.name(d) for d in depegs)
+            warn = (f"⚠ DEPEG en cours sur {names} — risque de CONTAGION sur les "
+                    "crypto-actifs corrélés. " + self.msg)
+            wcol = config.COL_DOWN
+        else:
+            warn = ("Classe très volatile, sans flux. Le stablecoin vise 1.0 mais "
+                    "peut DÉCROCHER (depeg). " + self.msg)
+            wcol = config.COL_TEXT_DIM
+        widgets.draw_text(surf, warn, (42, 74), fonts.small(), wcol)
 
         # ---- recherche ----
         search_rect = self._search_rect()
@@ -128,12 +136,16 @@ class CryptoScene(Scene):
             widgets.draw_text(surf, f"{q['vol']*100:.0f}%", (cols[2][1], y), fonts.small(),
                               config.COL_DOWN if q["vol"] > 1.0 else config.COL_WARN)
             depeg = q["stable"] and q["spot"] < 0.95
+            risk = K.contagion_risk(m, q["id"])
             if q.get("cbdc"):
                 label = f"CBDC +{q['yield']*100:.1f}%/an"
                 lcol = config.COL_UP
             elif q["stable"]:
                 label = "Stablecoin" + (" ⚠ DEPEG" if depeg else "")
                 lcol = config.COL_DOWN if depeg else config.COL_CYAN
+            elif risk > 0.02:
+                label = f"Crypto ⚡ contagion {risk*100:.0f}%"
+                lcol = config.COL_DOWN if risk > 0.15 else config.COL_WARN
             else:
                 label, lcol = "Crypto", config.COL_TEXT_DIM
             widgets.draw_text(surf, label, (cols[3][1], y), fonts.small(bold=True), lcol)

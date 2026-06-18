@@ -35,6 +35,9 @@ class SwapsScene(Scene):
         self._enter_rect = None
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
+        self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
+                                        config.back_button_rect(160)[1], 150, 42),
+                                       "📘 TUTO", config.COL_CYAN)
 
     def _can_trade(self):
         return unlocks.unlocked(self.app.gs.player, "trade")
@@ -50,6 +53,9 @@ class SwapsScene(Scene):
             return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+            return
+        if self.tuto_btn.handle(event):
+            self.app.scenes.go("tutorials", tid="swaps", return_to="swaps")
             return
         if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
             return
@@ -85,6 +91,7 @@ class SwapsScene(Scene):
 
     def update(self, dt):
         self.back_btn.update(pygame.mouse.get_pos(), dt)
+        self.tuto_btn.update(pygame.mouse.get_pos(), dt)
 
     # ------------------------------------------------------------- draw
     def draw(self, surf):
@@ -96,6 +103,7 @@ class SwapsScene(Scene):
             widgets.draw_text(surf, f"⊘ Swaps débloqués au grade {config.GRADES[g]}.",
                               (42, 56), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
+            self.tuto_btn.draw(surf)
             return
         widgets.draw_text(surf, "Échange le différentiel de taux entre votre devise et une devise "
                                 f"étrangère, sans échange de principal. {self.msg}",
@@ -112,6 +120,7 @@ class SwapsScene(Scene):
         self._draw_holdings(surf, pinner, p, m)
 
         self.back_btn.draw(surf)
+        self.tuto_btn.draw(surf)
 
     def _draw_builder(self, surf, inner, p, m):
         cur_home = self._cur()

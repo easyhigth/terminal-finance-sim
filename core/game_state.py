@@ -38,6 +38,7 @@ class PlayerState:
     etfs: dict = field(default_factory=dict)           # ETF (fonds indiciels) : id -> {"qty","avg"}
     structured: list = field(default_factory=list)     # produits structurés souscrits
     securitised: list = field(default_factory=list)    # tranches de titrisation détenues
+    hedges: list = field(default_factory=list)         # puts protecteurs (couverture) en cours
     currency_swaps: list = field(default_factory=list)  # swaps de devises actifs
     next_swap_id: int = 1                                # compteur d'identifiants de swaps
     ma_owned: dict = field(default_factory=dict)        # sociétés M&A détenues : ticker -> instance
@@ -276,6 +277,7 @@ class GameState:
         margin_call = None
         structured_due = None
         securitised_due = None
+        hedges_due = None
         swaps_expired = []
         if market is not None:
             from core import portfolio
@@ -312,6 +314,9 @@ class GameState:
             if getattr(p, "securitised", None):
                 from core import securitisation as _sec
                 securitised_due = _sec.evaluate_due(p, market)
+            if getattr(p, "hedges", None):
+                from core import hedging as _hedging
+                hedges_due = _hedging.evaluate_due(p, market)
             if getattr(p, "currency_swaps", None):
                 from core import swaps as _swaps
                 swap_flow, swaps_expired = _swaps.accrue(p, market, config.DAYS_PER_STEP)
@@ -368,6 +373,7 @@ class GameState:
             "margin_call": margin_call,
             "structured_due": structured_due,
             "securitised_due": securitised_due,
+            "hedges_due": hedges_due,
             "swaps_expired": swaps_expired,
             "quarter_changed": p.quarter != prev_quarter,
             "quarter_report": quarter_report,

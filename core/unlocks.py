@@ -48,6 +48,7 @@ CMD_FEATURE = {
     "SHORT": "leverage", "VAD": "leverage", "COVER": "leverage", "RACHETER": "leverage",
     "PITCH": "pitch",
     "HEDGE": "hedge",
+    "PROTECT": "hedge",
     "MANDATES": "mandates", "MANDATS": "mandates", "MANDATE": "mandates", "MANDAT": "mandates",
     "MA": "ma", "M&A": "ma",
     "SWAP": "trade", "SWAPS": "trade",

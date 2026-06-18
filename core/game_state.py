@@ -42,6 +42,8 @@ class PlayerState:
     options: list = field(default_factory=list)        # options sur actions (calls/puts) en cours
     currency_swaps: list = field(default_factory=list)  # swaps de devises actifs
     next_swap_id: int = 1                                # compteur d'identifiants de swaps
+    fx_positions: list = field(default_factory=list)   # desk FX : spots ouverts (mark-to-market)
+    fx_forwards: list = field(default_factory=list)    # desk FX : forwards en cours (règlement à échéance)
     ma_owned: dict = field(default_factory=dict)        # sociétés M&A détenues : ticker -> instance
     ma_history: list = field(default_factory=list)      # historique M&A (cessions, défauts)
     eval_state: dict = field(default_factory=dict)     # examen en pause (reprise possible)
@@ -85,6 +87,15 @@ class PlayerState:
     certs: dict = field(default_factory=dict)           # programme -> niveau obtenu (CFA/FRM/CQF)
     game_over: bool = False
     game_over_reason: str = ""
+    # ----- revue de performance annuelle (négociation de bonus) -----
+    last_review_quarter: int = 0        # dernier trimestre où une revue a eu lieu
+    pending_review: dict = None         # offre de revue en attente de réponse, ou None
+    salary_bonus_per_step: float = 0.0  # supplément de salaire fixe négocié (revues)
+    # ----- calendrier macro (paris directionnels sur évènements programmés) -----
+    macro_events: list = field(default_factory=list)    # évènements programmés (annoncés, pas encore résolus)
+    macro_bets: list = field(default_factory=list)       # paris placés en attente de résolution
+    next_macro_event_id: int = 1                         # compteur d'identifiants d'évènements macro
+    macro_bet_history: list = field(default_factory=list)  # historique des derniers paris résolus (UI)
 
     @property
     def grade(self):

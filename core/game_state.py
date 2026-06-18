@@ -39,6 +39,7 @@ class PlayerState:
     structured: list = field(default_factory=list)     # produits structurés souscrits
     securitised: list = field(default_factory=list)    # tranches de titrisation détenues
     hedges: list = field(default_factory=list)         # puts protecteurs (couverture) en cours
+    options: list = field(default_factory=list)        # options sur actions (calls/puts) en cours
     currency_swaps: list = field(default_factory=list)  # swaps de devises actifs
     next_swap_id: int = 1                                # compteur d'identifiants de swaps
     ma_owned: dict = field(default_factory=dict)        # sociétés M&A détenues : ticker -> instance
@@ -75,6 +76,9 @@ class PlayerState:
     mandate_offers: list = field(default_factory=list)  # offres de mandats en attente
     next_mandate_id: int = 1
     mandate_history: list = field(default_factory=list)  # postmortems résolus (succès/échec, capé)
+    ipos: list = field(default_factory=list)            # positions IPO souscrites (en attente de cotation)
+    ipo_offers: list = field(default_factory=list)       # offres d'IPO en attente de souscription/refus
+    next_ipo_id: int = 1                                 # compteur d'identifiants d'offres d'IPO
     research: dict = field(default_factory=dict)        # ticker -> {fair, rating, day}
     alerts: list = field(default_factory=list)          # [{ticker, price, above}]
     learned: list = field(default_factory=list)         # ids des leçons lues (Académie)
@@ -278,6 +282,8 @@ class GameState:
         structured_due = None
         securitised_due = None
         hedges_due = None
+        options_due = None
+        ipos_settled = None
         swaps_expired = []
         if market is not None:
             from core import portfolio
@@ -317,6 +323,12 @@ class GameState:
             if getattr(p, "hedges", None):
                 from core import hedging as _hedging
                 hedges_due = _hedging.evaluate_due(p, market)
+            if getattr(p, "options", None):
+                from core import options as _options
+                options_due = _options.evaluate_due(p, market)
+            if getattr(p, "ipos", None):
+                from core import ipo as _ipo
+                ipos_settled = _ipo.evaluate_listings(p, market)
             if getattr(p, "currency_swaps", None):
                 from core import swaps as _swaps
                 swap_flow, swaps_expired = _swaps.accrue(p, market, config.DAYS_PER_STEP)
@@ -374,6 +386,8 @@ class GameState:
             "structured_due": structured_due,
             "securitised_due": securitised_due,
             "hedges_due": hedges_due,
+            "options_due": options_due,
+            "ipos_settled": ipos_settled,
             "swaps_expired": swaps_expired,
             "quarter_changed": p.quarter != prev_quarter,
             "quarter_report": quarter_report,

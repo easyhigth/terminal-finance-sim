@@ -51,6 +51,8 @@ from scenes.scene_credit import CreditScene
 from scenes.scene_alm import AlmScene
 from scenes.scene_swaps import SwapsScene
 from scenes.scene_hedge import HedgeScene
+from scenes.scene_options import OptionsScene
+from scenes.scene_ipo import IPOScene
 from scenes.scene_graph import GraphScene
 from scenes.scene_rivals import RivalsScene
 from scenes.scene_analytics import AnalyticsScene
@@ -123,6 +125,8 @@ class App:
         self.scenes.register("alm", AlmScene(self))
         self.scenes.register("swaps", SwapsScene(self))
         self.scenes.register("hedge", HedgeScene(self))
+        self.scenes.register("options", OptionsScene(self))
+        self.scenes.register("ipo", IPOScene(self))
         self.scenes.register("graph", GraphScene(self))
         self.scenes.register("rivals", RivalsScene(self))
         self.scenes.register("analytics", AnalyticsScene(self))

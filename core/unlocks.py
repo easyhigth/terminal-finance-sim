@@ -18,6 +18,8 @@ UNLOCKS = {
     "leverage": 6,   # levier & vente à découvert (short)
     "mandates": 6,   # mandats clients
     "ma": 4,         # M&A : acquisition de cibles privées (LBO réel)
+    "options": 6,    # options sur actions individuelles (calls/puts)
+    "ipo": 4,        # souscription aux introductions en bourse
 }
 
 LABELS = {
@@ -30,6 +32,8 @@ LABELS = {
     "leverage": "Levier & vente à découvert (SHORT/COVER)",
     "mandates": "Mandats clients",
     "ma": "M&A : acquisition de cibles privées",
+    "options": "Options sur actions (OPTIONS)",
+    "ipo": "Souscription aux IPO (IPO)",
 }
 
 # commande (token majuscule) -> fonctionnalité gated
@@ -52,6 +56,8 @@ CMD_FEATURE = {
     "MANDATES": "mandates", "MANDATS": "mandates", "MANDATE": "mandates", "MANDAT": "mandates",
     "MA": "ma", "M&A": "ma",
     "SWAP": "trade", "SWAPS": "trade",
+    "OPTIONS": "options", "OPTION": "options",
+    "IPO": "ipo", "IPOS": "ipo",
 }
 
 

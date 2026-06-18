@@ -128,37 +128,8 @@ TRIGGER_PROBABILITY = 0.06   # par tour
 _DEFAULT_REGION_POOL = ["USA", "Europe", "Asia", "Am.Nord", "Am.Sud", "Afrique", "Océanie"]
 
 
-# ---- accès localisé (FR / EN) ----------------------------------------------
-from data.scenarios_en import SCENARIOS_EN
-
-
-def _localize_scenario(s):
-    e = SCENARIOS_EN.get(s["id"])
-    if not e:
-        return s
-    out = dict(s)
-    out["name"] = e.get("name", s["name"])
-    out["story"] = e.get("story", s["story"])
-    return out
-
-
-def localized(lang):
-    """Renvoie la liste de scénarios dans la langue demandée."""
-    if lang == "en":
-        return [_localize_scenario(s) for s in SCENARIOS]
-    return SCENARIOS
-
-
-def _severity_label(sev, lang="fr"):
-    """Qualificatif de la sévérité tirée, pour la narration."""
-    if lang == "en":
-        if sev < 0.7:
-            return "light"
-        if sev < 1.0:
-            return "moderate"
-        if sev < 1.35:
-            return "marked"
-        return "severe"
+def _severity_label(sev):
+    """Qualificatif FR de la sévérité tirée, pour la narration."""
     if sev < 0.7:
         return "légère"
     if sev < 1.0:
@@ -179,13 +150,10 @@ def maybe_trigger(market, rng=None):
     tiré) et `region` (région ciblée si le scénario est régional, sinon None),
     en plus des champs historiques {id, name, kind, story}.
     """
-    from core.i18n import get_lang
-    lang = get_lang()
     rng = rng or random
     if rng.random() > TRIGGER_PROBABILITY:
         return None
-    pool = localized(lang)
-    s = rng.choices(pool, weights=[x["weight"] for x in pool], k=1)[0]
+    s = rng.choices(SCENARIOS, weights=[x["weight"] for x in SCENARIOS], k=1)[0]
 
     sev_min = s.get("sev_min", 1.0)
     sev_max = s.get("sev_max", 1.0)
@@ -211,18 +179,12 @@ def maybe_trigger(market, rng=None):
         s["name"], steps=s["steps"], world=world,
         regions=regions, sectors=sectors, vol_mult=vol))
 
-    sev_word = _severity_label(severity, lang)
+    sev_word = _severity_label(severity)
     story = s["story"]
-    if lang == "en":
-        if region:
-            story = f"{story} (region affected: {region}, severity {sev_word})"
-        else:
-            story = f"{story} (severity {sev_word})"
+    if region:
+        story = f"{story} (région touchée : {region}, sévérité {sev_word})"
     else:
-        if region:
-            story = f"{story} (région touchée : {region}, sévérité {sev_word})"
-        else:
-            story = f"{story} (sévérité {sev_word})"
+        story = f"{story} (sévérité {sev_word})"
 
     return {"id": s["id"], "name": s["name"], "kind": s["kind"], "story": story,
             "severity": severity, "region": region}

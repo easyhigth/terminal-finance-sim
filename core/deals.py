@@ -154,7 +154,13 @@ def maybe_generate(player, rng=None):
     rng = rng or random
     if len(player.deals) >= MAX_ACTIVE_DEALS:
         return []
-    if rng.random() > GEN_PROBABILITY:
+    prob_bonus = 0.0
+    try:
+        from core import team
+        prob_bonus = team.team_deal_prob_bonus(player)
+    except Exception:
+        pass
+    if rng.random() > GEN_PROBABILITY + prob_bonus:
         return []
     t = rng.choice(_eligible_templates(player))
     scale = _scale(player)

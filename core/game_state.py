@@ -94,6 +94,7 @@ class PlayerState:
     pending_review: dict = None         # offre de revue en attente de réponse, ou None
     salary_bonus_per_step: float = 0.0  # supplément de salaire fixe négocié (revues)
     analysts: list = field(default_factory=list)  # équipe d'analystes juniors : [{profile_id, hired_step}]
+    team_rep_accum: float = 0.0  # accumulateur fractionnaire du bonus de réputation de l'équipe
     # ----- calendrier macro (paris directionnels sur évènements programmés) -----
     macro_events: list = field(default_factory=list)    # évènements programmés (annoncés, pas encore résolus)
     macro_bets: list = field(default_factory=list)       # paris placés en attente de résolution
@@ -279,8 +280,19 @@ class GameState:
         p.day += config.DAYS_PER_STEP
         p.quarter = p.quarter_of_day()
 
-        # salaire net du tour (salaire - coûts + supplément négocié en revue de performance)
-        net = p.salary_per_step() - p.costs_per_step() + getattr(p, "salary_bonus_per_step", 0.0)
+        # salaire net du tour (salaire - coûts + supplément négocié en revue de performance
+        # - coût récurrent de l'équipe d'analystes)
+        team_cost = 0.0
+        if getattr(p, "analysts", None):
+            from core import team as _team
+            team_cost = _team.team_cost_per_step(p)
+            p.team_rep_accum = getattr(p, "team_rep_accum", 0.0) + _team.team_bonus_rep_per_step(p)
+            whole = int(p.team_rep_accum)
+            if whole:
+                p.adjust_reputation(whole)
+                p.team_rep_accum -= whole
+        net = (p.salary_per_step() - p.costs_per_step()
+               + getattr(p, "salary_bonus_per_step", 0.0) - team_cost)
         p.adjust_cash(net)
 
         # vieillissement des deals : ceux arrivés à échéance non traités pénalisent

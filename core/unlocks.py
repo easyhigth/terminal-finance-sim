@@ -22,6 +22,7 @@ UNLOCKS = {
     "ipo": 4,        # souscription aux introductions en bourse
     "fx": 5,         # desk FX (spot + forward sur devises)
     "calendar": 2,   # calendrier macro (paris sur évènements programmés)
+    "team": 6,       # recrutement d'analystes juniors (équipe)
 }
 
 LABELS = {
@@ -38,6 +39,7 @@ LABELS = {
     "ipo": "Souscription aux IPO (IPO)",
     "fx": "Desk FX (spot & forward) (FX)",
     "calendar": "Calendrier macro (MACRO)",
+    "team": "Équipe d'analystes juniors (TEAM)",
 }
 
 # commande (token majuscule) -> fonctionnalité gated
@@ -64,6 +66,7 @@ CMD_FEATURE = {
     "IPO": "ipo", "IPOS": "ipo",
     "FX": "fx",
     "AGENDA": "calendar", "PRONOS": "calendar",
+    "TEAM": "team", "EQUIPE": "team",
 }
 
 

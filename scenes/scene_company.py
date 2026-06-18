@@ -118,6 +118,7 @@ class CompanyScene(Scene):
             ("FCF yield", _fmt(mt["fcf_yield"], "%", 1)),
             ("Dette nette", widgets.format_money(mt["net_debt"] * 1e6, cur)),
             ("Dette / EBITDA", _fmt(mt["nd_ebitda"], "x", 1)),
+            ("Notation crédit", mt["credit_rating"]),
             ("Rendement div.", _fmt(mt["div_yield"] * 100, "%", 2)),
             ("Payout", _fmt(mt["payout"], "%", 0)),
             ("Bêta", _fmt(mt["beta"], "", 2)),

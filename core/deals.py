@@ -62,6 +62,16 @@ DEAL_TEMPLATES = [
      "desc": "Préparer un pitch de financement pour un client corporate.",
      "base_cash": 65_000, "rep": 6, "difficulty": 3, "days": 18},
 
+    {"kind": "DCM", "title": "Émission obligataire corporate",
+     "desc": "Originer et placer une émission de dette pour un client corporate.",
+     "base_cash": 95_000, "rep": 6, "difficulty": 3, "days": 20},
+    {"kind": "DCM", "title": "Refinancement à l'échéance",
+     "desc": "Structurer le refinancement d'une dette qui arrive à échéance.",
+     "base_cash": 70_000, "rep": 5, "difficulty": 2, "days": 16},
+    {"kind": "DCM", "title": "Émission high-yield",
+     "desc": "Placer une émission spéculative auprès d'investisseurs high-yield.",
+     "base_cash": 110_000, "rep": 7, "difficulty": 4, "days": 18},
+
     {"kind": "General", "title": "Note de marché urgente",
      "desc": "Produire une note de conjoncture pour le comité d'investissement.",
      "base_cash": 30_000, "rep": 4, "difficulty": 2, "days": 12},
@@ -136,11 +146,14 @@ def _scale(player):
 
 
 def _eligible_templates(player):
-    """Deals proposés : ceux de la voie du joueur + les 'General'."""
+    """Deals proposés : ceux de la voie du joueur + les 'General'/'DCM'.
+
+    DCM n'a pas de voie dédiée : ses deals restent ouverts à tous, comme
+    'General', plutôt que de réserver l'origination obligataire à une voie."""
     track = player.track
     out = []
     for t in DEAL_TEMPLATES:
-        if t["kind"] == "General" or t["kind"] == track:
+        if t["kind"] in ("General", "DCM") or t["kind"] == track:
             out.append(t)
     # avant de choisir une voie, on ne propose que du General + un peu de tout
     if track in ("General", "", None):

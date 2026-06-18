@@ -23,6 +23,7 @@ reconstruit donc exactement via (seed, nombre de pas) — pratique pour le save.
 """
 import numpy as np
 
+from core import credit
 from core.applog import logger
 from data import companies as comp_data
 
@@ -430,6 +431,7 @@ class Market:
         div_per_share = price * c["div_yield"]
         payout = (div_per_share / eps * 100) if eps > 0 else None
         last_earn = self.earnings_log.get(ticker)
+        credit_rating = credit.rating_for(nd_ebitda, float(self.sigma[i]))
         return {
             "ticker": ticker, "name": c["name"], "region": c["region"],
             "sector": c["sector"], "price": price, "shares": shares,
@@ -440,6 +442,7 @@ class Market:
             "net_margin": net_margin, "ebitda_margin": ebitda_margin,
             "ps": ps, "fcf_yield": fcf_yield, "nd_ebitda": nd_ebitda,
             "payout": payout, "change_pct": chg, "last_earnings": last_earn,
+            "credit_rating": credit_rating,
         }
 
     def sector_medians(self, sector):

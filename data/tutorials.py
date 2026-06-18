@@ -607,6 +607,78 @@ TUTORIALS = [
                    "logique d'une cote de bookmaker : plus l'issue est "
                    "surprenante, plus elle paie — mais plus elle est rare.",
     },
+    {
+        "id": "team",
+        "title": "Équipe : recruter des analystes juniors",
+        "image": "team.png",
+        "intro": "À partir d'un grade avancé, vous pouvez monter une petite "
+                 "équipe d'analystes juniors : un coût récurrent par tour en "
+                 "échange d'un bonus passif (réputation, probabilité d'offre "
+                 "de deal). Ouvert avec TEAM.",
+        "steps": [
+            "Ouvrez l'écran : TEAM — consultez le catalogue de profils "
+            "(actions, crédit, quant, macro), chacun avec un coût "
+            "d'embauche ponctuel et un coût récurrent par tour.",
+            "Embauchez un profil qui vous intéresse : le coût ponctuel est "
+            "débité immédiatement, le coût récurrent s'ajoute ensuite à vos "
+            "charges à chaque tour.",
+            "Chaque analyste apporte un effet passif simple selon son "
+            "profil : un peu de réputation par tour, et/ou une probabilité "
+            "légèrement accrue de nouvelles offres de deal.",
+            "Licenciez un analyste à tout moment si son coût récurrent "
+            "devient trop lourd pour le bénéfice qu'il apporte.",
+        ],
+        "concept": "Une équipe transforme une partie de votre trésorerie "
+                   "récurrente en effets passifs cumulés — un calcul "
+                   "classique de gestion : le coût fixe doit être justifié "
+                   "par un gain marginal (réputation, deal-flow) qui dépasse "
+                   "sa charge dans la durée.",
+    },
+    {
+        "id": "stresstest",
+        "title": "Stress test réglementaire",
+        "image": "stresstest.png",
+        "intro": "Périodiquement (environ tous les deux trimestres), un "
+                 "superviseur fictif teste la résistance de votre "
+                 "portefeuille réel à un scénario de choc tiré au hasard. "
+                 "Ouvert avec STRESS quand un test est en attente.",
+        "steps": [
+            "Le scénario imposé (krach actions, choc de taux, choc de "
+            "volatilité, récession) est appliqué instantanément à votre "
+            "book pour estimer une perte simulée.",
+            "Le verdict dépend du ratio perte/valeur nette : au-delà du "
+            "seuil de tolérance, le test est jugé échoué.",
+            "Répondez : « Prendre acte » (aucun coût immédiat, mais "
+            "sanction de réputation en cas d'échec) ou « Renforcer la "
+            "couverture immédiatement » (coût symbolique de couverture, "
+            "mais sanction atténuée).",
+        ],
+        "concept": "Ce stress test reprend le calcul de choc instantané du "
+                   "module RISK (VaR/CVaR, exposition) appliqué à votre "
+                   "portefeuille réel — une mise en situation du contrôle "
+                   "réglementaire qui encadre toute salle de marché : la "
+                   "résistance aux scénarios extrêmes compte autant que la "
+                   "performance courante.",
+    },
+    {
+        "id": "history",
+        "title": "Historique de carrière",
+        "image": "history.png",
+        "intro": "Un écran consultable à tout moment (pas seulement en fin "
+                 "de partie) retraçant l'évolution de votre valeur nette et "
+                 "les jalons clés de votre carrière. Ouvert avec TIMELINE.",
+        "steps": [
+            "Le graphique trace votre valeur nette (cash + positions) au "
+            "fil des derniers tours.",
+            "La timeline liste vos jalons de carrière (promotions, "
+            "certifications, deals marquants...) du plus récent au plus "
+            "ancien.",
+        ],
+        "concept": "Revoir sa trajectoire aide à juger ses décisions a "
+                   "posteriori — un réflexe utile pour distinguer la chance "
+                   "(un marché porteur) de la compétence (une vraie gestion "
+                   "du risque) dans la performance affichée.",
+    },
 ]
 
 _BY_ID = {t["id"]: t for t in TUTORIALS}

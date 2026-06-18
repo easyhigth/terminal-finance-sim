@@ -64,6 +64,9 @@ from scenes.scene_tutorials import TutorialsScene
 from scenes.scene_splash import SplashScene
 from scenes.scene_markethub import MarketHubScene
 from scenes.scene_examcert import ExamCertScene
+from scenes.scene_stresstest import StressTestScene
+from scenes.scene_history import HistoryScene
+from scenes.scene_team import TeamScene
 from ui.logo import make_icon_surface
 
 
@@ -141,6 +144,9 @@ class App:
         self.scenes.register("splash", SplashScene(self))
         self.scenes.register("markethub", MarketHubScene(self))
         self.scenes.register("examcert", ExamCertScene(self))
+        self.scenes.register("stresstest", StressTestScene(self))
+        self.scenes.register("history", HistoryScene(self))
+        self.scenes.register("team", TeamScene(self))
         self.scenes.go("splash")
 
     def notify(self, text, kind="info"):

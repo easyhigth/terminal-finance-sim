@@ -95,12 +95,28 @@ def snipe(player, deal, rng=None):
 ACT_SURGE_PROB = 0.12      # un rival réalise un gros coup (bond de score)
 ACT_SNIPE_PROB = 0.18      # un rival rafle un deal du joueur sur le point d'expirer
 ACT_POACH_PROB = 0.14      # un rival débauche un mandat en attente
+ACT_CLAIM_TARGET_PROB = 0.10  # un rival s'approprie une cible M&A disponible
 SNIPE_DAYS_THRESHOLD = 8   # un deal devient « vulnérable » sous ce nb de jours
+RIVAL_EVENTS_MAX = 15      # taille max du journal court d'événements rivaux
 
 
 def _set_action(rival, text, mood="flat"):
     rival["last"] = text
     rival["mood"] = mood
+
+
+def _log_rival_event(player, event):
+    """Alimente le journal court `player.rival_events` (plafonné), pour
+    affichage ultérieur dans la scène rivaux. Défensif : crée le champ s'il
+    n'existe pas encore (saves plus anciennes)."""
+    if not hasattr(player, "rival_events") or player.rival_events is None:
+        player.rival_events = []
+    entry = {"day": getattr(player, "day", 0), "quarter": getattr(player, "quarter", None),
+             "type": event.get("type"), "rival": event.get("rival"),
+             "text": event.get("text", ""), "kind": event.get("kind", "info")}
+    player.rival_events.append(entry)
+    if len(player.rival_events) > RIVAL_EVENTS_MAX:
+        player.rival_events = player.rival_events[-RIVAL_EVENTS_MAX:]
 
 
 def _rival_of_track(player, track, rng):
@@ -157,6 +173,7 @@ def act(player, market, rng=None):
     from core import crypto
     depegged = bool(crypto.active_depegs(market))
     poach_prob = ACT_POACH_PROB * 1.3 if depegged else ACT_POACH_PROB
+    claim_prob = ACT_CLAIM_TARGET_PROB * 1.5 if stressed else ACT_CLAIM_TARGET_PROB
 
     # 1) PERCÉE : un rival réalise un gros coup -> bond de score (peut dépasser le joueur)
     if rng.random() < surge_prob:
@@ -166,8 +183,10 @@ def act(player, market, rng=None):
         passed = before <= pscore < r["score"]
         _set_action(r, "conclut une opération majeure", "up")
         txt = f"{r['name']} ({r['firm']}) conclut une opération de premier plan"
-        events.append({"type": "surge", "rival": r["name"], "kind": "bad" if passed else "info",
-                       "text": txt + (" et vous double au classement." if passed else ".")})
+        ev = {"type": "surge", "rival": r["name"], "kind": "bad" if passed else "info",
+              "text": txt + (" et vous double au classement." if passed else ".")}
+        events.append(ev)
+        _log_rival_event(player, ev)
 
     # 2) SNIPING d'un deal du joueur sur le point d'expirer (pression : agir vite)
     if player.deals and rng.random() < snipe_prob:
@@ -179,10 +198,12 @@ def act(player, market, rng=None):
             r["score"] += d.get("reward_cash", 0) * 0.3
             player.adjust_reputation(-2)
             _set_action(r, f"vous coiffe sur « {d['title']} »", "up")
-            events.append({"type": "snipe", "rival": r["name"], "kind": "bad",
-                           "deal": d, "title": d["title"],
-                           "text": f"{r['name']} vous coiffe au poteau sur « {d['title']} » "
-                                   f"(−2 réputation)."})
+            ev = {"type": "snipe", "rival": r["name"], "kind": "bad",
+                  "deal": d, "title": d["title"],
+                  "text": f"{r['name']} vous coiffe au poteau sur « {d['title']} » "
+                          f"(−2 réputation)."}
+            events.append(ev)
+            _log_rival_event(player, ev)
 
     # 3) DÉBAUCHAGE d'un mandat en attente d'acceptation
     if getattr(player, "mandate_offers", None) and rng.random() < poach_prob:
@@ -192,7 +213,30 @@ def act(player, market, rng=None):
         r["score"] += o.get("capital", 0) * 0.02
         client = o.get("client", "un client")
         _set_action(r, f"décroche le mandat {client}", "up")
-        events.append({"type": "poach", "rival": r["name"], "kind": "bad", "client": client,
-                       "text": f"{r['name']} décroche le mandat de {client} que vous étudiiez."})
+        ev = {"type": "poach", "rival": r["name"], "kind": "bad", "client": client,
+              "text": f"{r['name']} décroche le mandat de {client} que vous étudiiez."}
+        events.append(ev)
+        _log_rival_event(player, ev)
+
+    # 4) APPROPRIATION D'UNE CIBLE M&A : un rival s'empare d'une cible disponible
+    # que le joueur n'a pas encore acquise (le joueur ne pourra plus l'acquérir).
+    if rng.random() < claim_prob:
+        from core import ma
+        owned_by_rivals = set(getattr(player, "rival_owned_targets", None) or [])
+        targets = [t for t in ma.available_targets(player) if t["ticker"] not in owned_by_rivals]
+        if targets:
+            t = rng.choice(targets)
+            if not hasattr(player, "rival_owned_targets") or player.rival_owned_targets is None:
+                player.rival_owned_targets = []
+            player.rival_owned_targets.append(t["ticker"])
+            r = _rival_of_track(player, "M&A", rng)
+            r["score"] += t.get("revenue", 0) * 0.5
+            _set_action(r, f"s'empare de « {t['name']} »", "up")
+            ev = {"type": "claim_target", "rival": r["name"], "kind": "bad",
+                  "target": t["name"], "ticker": t["ticker"],
+                  "text": f"{r['name']} s'empare de la cible M&A « {t['name']} » "
+                          f"que vous auriez pu viser."}
+            events.append(ev)
+            _log_rival_event(player, ev)
 
     return events

@@ -78,21 +78,41 @@ class RivalsScene(Scene):
 
     def _draw_activity_log(self, surf, rect, player):
         """Journal d'activité des rivaux : dernières actions visibles (percées,
-        sniping de deals, débauchage de mandats) tirées du journal de carrière."""
-        inner = widgets.draw_panel(surf, rect, "Journal d'activité des rivaux", config.COL_DOWN)
-        events = R.recent_activity(player, limit=6)
-        if not events:
+        sniping de deals, débauchage de mandats, appropriation de cibles M&A)
+        tirées du journal de carrière + du journal court `rival_events`."""
+        col_left = pygame.Rect(rect.x, rect.y, int(rect.w * 0.62), rect.h)
+        col_right = pygame.Rect(col_left.right + 10, rect.y, rect.right - col_left.right - 10, rect.h)
+
+        inner = widgets.draw_panel(surf, col_left, "Journal d'activité des rivaux", config.COL_DOWN)
+        log_events = R.recent_activity(player, limit=6)
+        if not log_events:
             widgets.draw_text(surf, "Aucune activité rivale récente. Avancez le temps (ADV) pour en générer.",
                               (inner.x, inner.y + 2), fonts.tiny(), config.COL_TEXT_DIM)
+        else:
+            y = inner.y
+            row_h = max(16, inner.h // len(log_events))
+            for entry in log_events:
+                kind = entry.get("kind", "info")
+                ecol = config.COL_WARN if kind in ("deal", "crisis") else config.COL_TEXT_DIM
+                label = f"T{entry.get('quarter', '?')} j{entry.get('day', '?')} — {entry.get('text', '')}"
+                widgets.draw_text(surf, widgets.fit_text(label, fonts.tiny(), inner.w),
+                                  (inner.x, y), fonts.tiny(), ecol)
+                y += row_h
+
+        inner2 = widgets.draw_panel(surf, col_right, "Coups récents", config.COL_AMBER)
+        recent = list(reversed(getattr(player, "rival_events", None) or []))[:6]
+        if not recent:
+            widgets.draw_text(surf, "Rien à signaler pour l'instant.",
+                              (inner2.x, inner2.y + 2), fonts.tiny(), config.COL_TEXT_DIM)
             return
-        y = inner.y
-        row_h = max(16, inner.h // len(events))
-        for entry in events:
+        y = inner2.y
+        row_h = max(16, inner2.h // len(recent))
+        for entry in recent:
             kind = entry.get("kind", "info")
-            col = config.COL_WARN if kind in ("deal", "crisis") else config.COL_TEXT_DIM
-            label = f"T{entry.get('quarter', '?')} j{entry.get('day', '?')} — {entry.get('text', '')}"
-            widgets.draw_text(surf, widgets.fit_text(label, fonts.tiny(), inner.w),
-                              (inner.x, y), fonts.tiny(), col)
+            ecol = config.COL_DOWN if kind == "bad" else config.COL_TEXT_DIM
+            label = f"j{entry.get('day', '?')} — {entry.get('text', '')}"
+            widgets.draw_text(surf, widgets.fit_text(label, fonts.tiny(), inner2.w),
+                              (inner2.x, y), fonts.tiny(), ecol)
             y += row_h
 
     def _draw_card(self, surf, rect, row, player, pscore, nem, cur):

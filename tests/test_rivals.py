@@ -1,7 +1,7 @@
 """Tests des rivaux actifs (core/rivals.py)."""
 import random
 
-from core import career, rivals, market
+from core import career, ma, rivals, market
 from core.game_state import PlayerState
 
 
@@ -163,6 +163,67 @@ def test_act_handles_depeg_check_without_error():
         p.mandate_offers = [{"id": 7, "client": "Caisse XYZ", "capital": 1_000_000}]
         evs = rivals.act(p, m, rng)
         assert isinstance(evs, list)
+
+
+def test_act_claim_target_removes_a_target_and_records_owner():
+    p, m = _mk()
+    rng = random.Random(5)
+    fired = False
+    for _ in range(500):
+        evs = rivals.act(p, m, rng)
+        claims = [e for e in evs if e["type"] == "claim_target"]
+        if claims:
+            ev = claims[0]
+            assert ev["ticker"] in p.rival_owned_targets
+            assert ev["target"]
+            assert ev["rival"]
+            assert ev.get("text")
+            fired = True
+            break
+    assert fired
+
+
+def test_act_claim_target_excludes_already_claimed_and_owned_targets():
+    p, m = _mk()
+    rng = random.Random(9)
+    seen_tickers = set()
+    for _ in range(300):
+        evs = rivals.act(p, m, rng)
+        for e in evs:
+            if e["type"] == "claim_target":
+                assert e["ticker"] not in seen_tickers  # jamais réclamée deux fois
+                seen_tickers.add(e["ticker"])
+    # toutes les cibles réclamées doivent être enregistrées comme prises par un rival
+    for ticker in seen_tickers:
+        assert ticker in p.rival_owned_targets
+
+
+def test_act_claim_target_deterministic_with_seeded_rng():
+    p1, m1 = _mk()
+    p2, m2 = _mk()
+    rng1 = random.Random(123)
+    rng2 = random.Random(123)
+    claims1 = []
+    claims2 = []
+    for _ in range(50):
+        evs1 = rivals.act(p1, m1, rng1)
+        claims1.extend(e["ticker"] for e in evs1 if e["type"] == "claim_target")
+    for _ in range(50):
+        evs2 = rivals.act(p2, m2, rng2)
+        claims2.extend(e["ticker"] for e in evs2 if e["type"] == "claim_target")
+    assert claims1 == claims2
+    assert p1.rival_owned_targets == p2.rival_owned_targets
+
+
+def test_rival_events_populated_and_capped():
+    p, m = _mk()
+    rng = random.Random(13)
+    for _ in range(400):
+        rivals.act(p, m, rng)
+    assert len(p.rival_events) <= rivals.RIVAL_EVENTS_MAX
+    assert p.rival_events  # au moins une action a dû se produire en 400 tours
+    for entry in p.rival_events:
+        assert "text" in entry and "type" in entry
 
 
 def test_recent_activity_respects_limit():

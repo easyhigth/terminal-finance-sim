@@ -165,3 +165,63 @@ def test_maybe_trigger_with_default_rng_does_not_raise(monkeypatch):
     random.seed(0)
     m = _setup()
     scenarios.maybe_trigger(m)   # ne doit pas lever, déclenché ou pas
+
+
+# --------------------------------------------------------- crises ciblées (pures)
+_TARGETED_IDS = {
+    "scandale_finance", "antitrust_tech", "immo_asie", "immo_europe",
+    "fx_emergent", "sante_sectoriel",
+}
+
+
+def test_targeted_scenarios_exist_and_are_purely_sectoral_or_regional():
+    """world=0.0 pour ces scénarios : aucun choc macro global, uniquement
+    sectoriel/régional — ce qui permet des shorts/hedges chirurgicaux."""
+    found = {s["id"] for s in scenarios.SCENARIOS if s["id"] in _TARGETED_IDS}
+    assert found == _TARGETED_IDS
+    for s in scenarios.SCENARIOS:
+        if s["id"] in _TARGETED_IDS:
+            assert s.get("world", 0.0) == 0.0
+
+
+def test_targeted_scenarios_inject_crisis_without_world_shock():
+    """Une fois déclenché, le Crisis injecté dans le marché ne porte aucun choc
+    `world`, et les chocs sectoriels/régionaux restent finis et raisonnables."""
+    m = _setup()
+    rng = random.Random(42)
+    seen = {}
+    for _ in range(20000):
+        n_before = len(m.crises)
+        ev = scenarios.maybe_trigger(m, rng)
+        if ev and ev["id"] in _TARGETED_IDS and ev["id"] not in seen:
+            assert len(m.crises) == n_before + 1
+            crisis = m.crises[-1]
+            assert crisis.world == 0.0
+            # pas de NaN/Inf, et amplitude raisonnable comparée aux scénarios
+            # existants ("asia"/"credit" plafonnent vers ~0.05-0.06 avant sévérité,
+            # avec sev_max <= 1.8 -> borne large à 0.15 pour rester confortable).
+            for choc_map in (crisis.sectors, crisis.regions):
+                for v in choc_map.values():
+                    assert v == v  # NaN check (NaN != NaN)
+                    assert abs(v) < 0.15
+            assert 1.0 <= crisis.vol_mult <= 4.0
+            seen[ev["id"]] = ev
+        if len(seen) == len(_TARGETED_IDS):
+            break
+    missing = _TARGETED_IDS - set(seen)
+    assert not missing, f"scénarios ciblés jamais déclenchés sur 20000 tirages : {missing}"
+
+
+def test_fx_emergent_targets_only_emerging_region_pool():
+    """fx_emergent doit cibler uniquement Am.Sud/Afrique, jamais une autre région."""
+    m = _setup()
+    rng = random.Random(99)
+    seen_regions = set()
+    for _ in range(20000):
+        ev = scenarios.maybe_trigger(m, rng)
+        if ev and ev["id"] == "fx_emergent":
+            assert ev["region"] in {"Am.Sud", "Afrique"}
+            seen_regions.add(ev["region"])
+        if len(seen_regions) == 2:
+            break
+    assert seen_regions, "fx_emergent ne s'est jamais déclenché sur 20000 tirages"

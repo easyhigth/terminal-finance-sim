@@ -27,6 +27,8 @@ from core import mandates as mandates_mod
 from core import ipo as ipo_mod
 from core import fx as fx_mod
 from core import macrocal as macrocal_mod
+from core import stresstest as stresstest_mod
+from core import team as team_mod
 from core import unlocks as unlocks_mod
 from core import history as history_mod
 from core import etfs as etfs_mod
@@ -55,6 +57,7 @@ CMD_NAMES = [
     "ALLOCATE", "HEDGE", "PROTECT", "OPTIONS", "IPO", "FX", "AGENDA", "PRONOS", "REVIEW", "REBALANCE",
     "PITCH", "FRONTIER", "RISK", "QUANT", "MA", "SHEET", "GLOSSARY",
     "SAVE", "SAVES", "NEWS", "MORE", "REG", "STATUS", "MENU",
+    "TEAM", "EQUIPE", "STRESS", "TIMELINE",
 ]
 
 SAMPLE_NEWS = {
@@ -399,8 +402,8 @@ class TerminalScene(Scene):
                     "  MISSION work · DEALS / DEAL <id>",
                     "  INBOX messages · RIVALS leaderboard",
                     "  DECIDE decisions · CAREER career",
-                    "  EVAL promotion · TRACK specialisation · REVIEW manager",
-                    "  PORTFOLIO·MA·RISK·QUANT·SHEET·GLOSSARY",
+                    "  EVAL promotion · TRACK specialisation · REVIEW manager · STRESS regulator",
+                    "  PORTFOLIO·MA·RISK·QUANT·SHEET·GLOSSARY · TEAM analysts · TIMELINE career",
                     "  STATUS · SAVE · SAVES · REG · MENU",
                 )
             else:
@@ -417,8 +420,8 @@ class TerminalScene(Scene):
                     "  MISSION travailler · DEALS / DEAL <id>",
                     "  INBOX messagerie · RIVALS classement",
                     "  DECIDE décisions · CAREER carrière",
-                    "  EVAL promotion · TRACK voie · REVIEW manager",
-                    "  PORTFOLIO·MA·RISK·QUANT·SHEET·GLOSSARY",
+                    "  EVAL promotion · TRACK voie · REVIEW manager · STRESS régulateur",
+                    "  PORTFOLIO·MA·RISK·QUANT·SHEET·GLOSSARY · TEAM analystes · TIMELINE carrière",
                     "  STATUS · SAVE · SAVES · REG · MENU",
                 )
         elif cmd in ("COMMANDS", "?", "CMD"):
@@ -469,6 +472,12 @@ class TerminalScene(Scene):
             self.app.scenes.go("calendar", return_to="terminal")
         elif cmd == "REVIEW":
             self.app.scenes.go("review", return_to="terminal")
+        elif cmd in ("TEAM", "EQUIPE"):
+            self.app.scenes.go("team", return_to="terminal")
+        elif cmd == "STRESS":
+            self.app.scenes.go("stresstest", return_to="terminal")
+        elif cmd == "TIMELINE":
+            self.app.scenes.go("history", return_to="terminal")
         elif cmd in ("CREDIT", "TITRISATION", "ABS", "CLO"):
             self.app.scenes.go("credit", return_to="terminal")
         elif cmd in ("ALM", "BANKING"):
@@ -1724,6 +1733,12 @@ class TerminalScene(Scene):
             self._log(_L("  ★ REVUE DE PERFORMANCE : votre manager souhaite vous voir (tapez REVIEW).",
                       "  ★ PERFORMANCE REVIEW: your manager wants to see you (type REVIEW)."))
             self.app.notify(_L("Revue de performance annuelle","Annual performance review"), "info")
+        # stress test réglementaire éventuel (semestriel)
+        stress_test = stresstest_mod.maybe_trigger(p, summary.get("quarter_changed"), m)
+        if stress_test:
+            self._log(_L("  ★ STRESS TEST RÉGLEMENTAIRE : le superviseur vous convoque (tapez STRESS).",
+                      "  ★ REGULATORY STRESS TEST: the supervisor wants to see you (type STRESS)."))
+            self.app.notify(_L("Stress test réglementaire","Regulatory stress test"), "info")
         # alertes de prix
         self._check_alerts()
         for d in summary["new_deals"]:

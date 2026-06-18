@@ -53,13 +53,17 @@ def owned_tickers(player):
 
 
 def is_taken(player, ticker):
-    """Vrai si la cible est déjà détenue ou a déjà été acquise puis cédée/perdue
-    (catalogue à occasion unique : pas de rachat de la même cible deux fois)."""
+    """Vrai si la cible est déjà détenue, a déjà été acquise puis cédée/perdue
+    (catalogue à occasion unique : pas de rachat de la même cible deux fois),
+    ou a été revendiquée par un rival (cf. core/rivals.py::act, branche
+    "claim_target")."""
     if ticker in (getattr(player, "ma_owned", None) or {}):
         return True
     for h in (getattr(player, "ma_history", None) or []):
         if h["ticker"] == ticker:
             return True
+    if ticker in (getattr(player, "rival_owned_targets", None) or []):
+        return True
     return False
 
 

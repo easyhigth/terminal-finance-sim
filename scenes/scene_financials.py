@@ -8,9 +8,10 @@ CINQ exercices (N … N-4). Les chiffres sont cohérents (cf. core/financials) e
 sous l'angle « santé financière ». Ouvert via FA <ticker> ou « santé financière ».
 """
 import pygame
+
+from core import charts as charts
 from core import config
 from core import financials as F
-from core import charts as charts
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

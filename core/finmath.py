@@ -7,6 +7,7 @@ portefeuille (Markowitz / efficient frontier), risque (VaR, Sharpe), LBO.
 Dépendances : numpy, scipy.
 """
 import math
+
 import numpy as np
 
 try:

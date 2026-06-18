@@ -3,71 +3,73 @@ main.py — Point d'entrée du jeu.
 Lancement :  python main.py
 Dépendances : pygame  (pip install pygame)
 """
-import sys
 import random
+import sys
+
 import pygame
+
 from core import config
 from core.game_state import GameState
-from core.scene_manager import SceneManager
 from core.market import Market
-from ui.notifications import NotificationCenter
-from scenes.scene_menu import MenuScene
+from core.scene_manager import SceneManager
+from scenes.scene_academy import AcademyScene
+from scenes.scene_alm import AlmScene
+from scenes.scene_analytics import AnalyticsScene
+from scenes.scene_bonds import BondsScene
+from scenes.scene_book import BookScene
+from scenes.scene_calendar import CalendarScene
+from scenes.scene_career import CareerScene
+from scenes.scene_cert import CertScene
+from scenes.scene_commands import CommandsScene
+from scenes.scene_commodities import CommoditiesScene
+from scenes.scene_company import CompanyScene
 from scenes.scene_continent import ContinentScene
-from scenes.scene_terminal import TerminalScene
-from scenes.scene_glossary import GlossaryScene
+from scenes.scene_credit import CreditScene
+from scenes.scene_crypto import CryptoScene
+from scenes.scene_deal import DealScene
+from scenes.scene_deals import DealsScene
+from scenes.scene_dilemma import DilemmaScene
+from scenes.scene_etfs import ETFScene
 from scenes.scene_evaluation import EvaluationScene
-from scenes.scene_portfolio import PortfolioScene
+from scenes.scene_examcert import ExamCertScene
+from scenes.scene_explorer import MarketExplorerScene
+from scenes.scene_financials import FinancialsScene
+from scenes.scene_fx import FXScene
+from scenes.scene_gameover import GameOverScene
+from scenes.scene_glossary import GlossaryScene
+from scenes.scene_governments import GovernmentsScene
+from scenes.scene_graph import GraphScene
+from scenes.scene_hedge import HedgeScene
+from scenes.scene_history import HistoryScene
+from scenes.scene_inbox import InboxScene
+from scenes.scene_intro import IntroScene
+from scenes.scene_ipo import IPOScene
 from scenes.scene_ma import MAScene
 from scenes.scene_ma_target import MATargetScene
 from scenes.scene_mandates import MandatesScene
-from scenes.scene_deals import DealsScene
-from scenes.scene_track import TrackScene
-from scenes.scene_risk import RiskScene
-from scenes.scene_quant import QuantScene
-from scenes.scene_spreadsheet import SpreadsheetScene
-from scenes.scene_saves import SavesScene
-from scenes.scene_gameover import GameOverScene
-from scenes.scene_company import CompanyScene
-from scenes.scene_commands import CommandsScene
-from scenes.scene_mission import MissionScene
-from scenes.scene_career import CareerScene
-from scenes.scene_book import BookScene
-from scenes.scene_inbox import InboxScene
-from scenes.scene_dilemma import DilemmaScene
-from scenes.scene_intro import IntroScene
-from scenes.scene_academy import AcademyScene
-from scenes.scene_cert import CertScene
-from scenes.scene_deal import DealScene
-from scenes.scene_financials import FinancialsScene
-from scenes.scene_bonds import BondsScene
-from scenes.scene_governments import GovernmentsScene
-from scenes.scene_commodities import CommoditiesScene
-from scenes.scene_crypto import CryptoScene
-from scenes.scene_etfs import ETFScene
-from scenes.scene_news import NewsScene
-from scenes.scene_more import MoreScene
-from scenes.scene_structured import StructuredScene
-from scenes.scene_credit import CreditScene
-from scenes.scene_alm import AlmScene
-from scenes.scene_swaps import SwapsScene
-from scenes.scene_hedge import HedgeScene
-from scenes.scene_options import OptionsScene
-from scenes.scene_ipo import IPOScene
-from scenes.scene_fx import FXScene
-from scenes.scene_review import ReviewScene
-from scenes.scene_calendar import CalendarScene
-from scenes.scene_graph import GraphScene
-from scenes.scene_rivals import RivalsScene
-from scenes.scene_analytics import AnalyticsScene
-from scenes.scene_explorer import MarketExplorerScene
-from scenes.scene_tutorials import TutorialsScene
-from scenes.scene_splash import SplashScene
 from scenes.scene_markethub import MarketHubScene
-from scenes.scene_examcert import ExamCertScene
+from scenes.scene_menu import MenuScene
+from scenes.scene_mission import MissionScene
+from scenes.scene_more import MoreScene
+from scenes.scene_news import NewsScene
+from scenes.scene_options import OptionsScene
+from scenes.scene_portfolio import PortfolioScene
+from scenes.scene_quant import QuantScene
+from scenes.scene_review import ReviewScene
+from scenes.scene_risk import RiskScene
+from scenes.scene_rivals import RivalsScene
+from scenes.scene_saves import SavesScene
+from scenes.scene_splash import SplashScene
+from scenes.scene_spreadsheet import SpreadsheetScene
 from scenes.scene_stresstest import StressTestScene
-from scenes.scene_history import HistoryScene
+from scenes.scene_structured import StructuredScene
+from scenes.scene_swaps import SwapsScene
 from scenes.scene_team import TeamScene
+from scenes.scene_terminal import TerminalScene
+from scenes.scene_track import TrackScene
+from scenes.scene_tutorials import TutorialsScene
 from ui.logo import make_icon_surface
+from ui.notifications import NotificationCenter
 
 
 class App:

@@ -10,7 +10,7 @@ import math
 import pytest
 
 from core import spreadsheet_engine as se
-from core.spreadsheet_engine import Spreadsheet, col_to_idx, idx_to_col, tokenize, Tok
+from core.spreadsheet_engine import Spreadsheet, Tok, col_to_idx, idx_to_col, tokenize
 
 
 # --------------------------------------------------------------- col <-> idx

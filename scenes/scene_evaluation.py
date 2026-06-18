@@ -7,8 +7,8 @@ mêmes. Calculatrice intégrée, bouton SUIVANT, explication après chaque répo
 Réussite (≥ seuil) → promotion.
 """
 import pygame
-from core import config
-from core import exam
+
+from core import config, exam
 from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
@@ -237,7 +237,8 @@ class EvaluationScene(Scene):
         self.state = "result"
 
     def _finish_cert(self, p):
-        from core import certifications as C, badges
+        from core import badges
+        from core import certifications as C
         self.new_title = None
         if self.passed:
             res = C.pass_stage(p, self.cert_program)
@@ -444,8 +445,8 @@ class EvaluationScene(Scene):
                    _L("−5 réputation. Révisez (LEARN) et retentez.","−5 reputation. Study (LEARN) and retry."),
                    _L("Astuce : utilisez la calculatrice et le glossaire (DEFINE).","Tip: use the calculator and the glossary (DEFINE).")]
         # leçons à revoir d'après les questions ratées
-        from data import lessons as lessons_data
         from core.i18n import get_lang
+        from data import lessons as lessons_data
         _lang = get_lang()
         titles = [lessons_data.title_for(lid, _lang) for lid in self.missed_lessons
                   if lessons_data.get(lid)]

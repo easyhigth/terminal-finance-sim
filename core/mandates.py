@@ -14,6 +14,7 @@ Structures (PlayerState) :
   mandates       : mandats acceptés en cours (avec snapshot de départ)
 """
 import random
+
 from core import tracks
 
 MIN_GRADE = 6              # Vice President et au-delà (cf. unlocks)

@@ -8,7 +8,8 @@ frontière efficiente estimée sur l'historique réel avec la position courante.
 Ouvert via la commande PA (ou le bouton ANALYSE du livre de positions).
 """
 import pygame
-from core import config, analytics
+
+from core import analytics, config
 from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.popups import PopupMixin

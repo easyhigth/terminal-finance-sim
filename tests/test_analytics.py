@@ -1,5 +1,5 @@
 """Tests de l'analyse de portefeuille (core/analytics.py)."""
-from core import market, analytics, bonds
+from core import analytics, bonds, market
 from core.game_state import PlayerState
 
 

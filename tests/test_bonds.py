@@ -1,10 +1,10 @@
 """Tests du marché obligataire (core/bonds.py)."""
 import pytest
 
-from core.market import Market
-from core.game_state import PlayerState
 from core import bonds as B
 from core import portfolio as pf
+from core.game_state import PlayerState
+from core.market import Market
 
 
 def _setup():

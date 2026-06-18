@@ -1,6 +1,7 @@
 """Tests des badges liés aux mécaniques récentes (couverture, swaps, contagion crypto)
 — core/badges.py."""
-from core import badges, hedging, crypto, swaps as SW, market
+from core import badges, crypto, hedging, market
+from core import swaps as SW
 from core.game_state import PlayerState
 
 

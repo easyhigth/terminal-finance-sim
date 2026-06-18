@@ -1,7 +1,7 @@
 """Tests des rivaux actifs (core/rivals.py)."""
 import random
 
-from core import career, ma, rivals, market
+from core import career, ma, market, rivals
 from core.game_state import PlayerState
 
 

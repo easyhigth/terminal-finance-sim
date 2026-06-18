@@ -1,5 +1,6 @@
 """Tests du desk FX (core/fx.py) : spot, forward, déterminisme, gating."""
-from core import fx as FX, market
+from core import fx as FX
+from core import market
 from core.game_state import PlayerState
 
 

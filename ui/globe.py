@@ -5,10 +5,12 @@ disque via une projection orthographique simple, avec rotation continue.
 Les continents sont des hotspots cliquables.
 """
 import math
+
 import pygame
+
 from core import config
 from ui import fonts, widgets
-from ui.worldmap import CONTINENTS as _LAND_POLYS   # formes (x:lon, y:lat) normalisées
+from ui.worldmap import CONTINENTS as _LAND_POLYS  # formes (x:lon, y:lat) normalisées
 
 
 def _in_poly(x, y, poly):

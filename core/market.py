@@ -21,11 +21,10 @@ Conséquences « gratuites », comme dans le réel :
 Déterminisme : tout est piloté par un numpy RandomState(seed). L'état se
 reconstruit donc exactement via (seed, nombre de pas) — pratique pour le save.
 """
-import math
 import numpy as np
 
-from data import companies as comp_data
 from core.applog import logger
+from data import companies as comp_data
 
 HIST_LEN = 400          # ~5.4 ans d'historique conservé (pour les graphes)
 

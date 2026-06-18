@@ -7,6 +7,7 @@ choix de réponse. Au clic, résout immédiatement via `core.stresstest.acknowle
 affiche le résultat avant de revenir au terminal.
 """
 import pygame
+
 from core import config
 from core import stresstest as ST
 from core.scene_manager import Scene

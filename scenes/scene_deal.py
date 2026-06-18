@@ -8,8 +8,9 @@ un succès plein, partiel ou un échec, et module la récompense.
 import random
 
 import pygame
-from core import config
-from core import deal_game, deals as deals_mod
+
+from core import config, deal_game
+from core import deals as deals_mod
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
@@ -52,7 +53,6 @@ class DealScene(Scene):
         self.state = "result"
         # traiter un deal prend du temps : le terminal avancera d'un tour au retour
         self.app.advance_on_return = 1
-        cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
         if self.result and self.result["outcome"] == "success":
             self.app.notify(f"Deal conclu : {self.deal['title']}", "good")
         elif self.result and self.result["outcome"] == "fail":

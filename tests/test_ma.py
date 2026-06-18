@@ -4,9 +4,9 @@
 """
 import pytest
 
-from core.game_state import PlayerState
 from core import ma as M
-from data.ma_targets import all_targets, TARGETS_BY_TICKER
+from core.game_state import PlayerState
+from data.ma_targets import TARGETS_BY_TICKER, all_targets
 
 
 def _player(grade_index=4, cash=2_000_000.0, day=1, quarter=1):
@@ -28,6 +28,7 @@ def test_catalog_has_fifty_unique_targets():
 
 def test_catalog_deterministic_across_imports():
     import importlib
+
     from data import ma_targets as mt
     importlib.reload(mt)
     assert [t["ticker"] for t in mt.all_targets()] == [t["ticker"] for t in all_targets()]

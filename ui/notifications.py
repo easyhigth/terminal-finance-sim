@@ -7,8 +7,9 @@ haut à droite, glissent à l'entrée et s'estompent à la sortie. Dessinés en
 overlay par le SceneManager après la scène courante.
 """
 import pygame
+
 from core import config
-from ui import fonts, widgets
+from ui import fonts
 
 _KIND_COLOR = {
     "good": config.COL_EVENT_GOOD,

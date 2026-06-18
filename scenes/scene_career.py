@@ -8,9 +8,9 @@ progression), les statistiques de run et le journal de carrière.
 Ouvert via CAREER / ROADMAP / OBJECTIVES / HISTORY depuis le terminal.
 """
 import pygame
-from core import config
-from core import career, missions
+
 from core import badges as badges_mod
+from core import career, config
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
@@ -174,7 +174,6 @@ class CareerScene(Scene):
                                   config.COL_UP if ok else config.COL_DEAL)
             y += 40
         y += 6
-        cur_c = config.CONTINENTS[p.continent]["currency"]
         widgets.draw_text(surf, "Récompense par objectif : +réputation & honoraire.",
                           (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, "Trimestre parfait = bonus de prestige.",

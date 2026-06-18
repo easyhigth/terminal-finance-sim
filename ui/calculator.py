@@ -7,7 +7,9 @@ réponses). Évaluation sûre d'expressions arithmétiques via ast :
 """
 import ast
 import operator
+
 import pygame
+
 from core import config
 from ui import fonts, widgets
 

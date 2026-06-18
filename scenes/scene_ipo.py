@@ -6,9 +6,9 @@ de cotation est réglé par core/ipo.py (evaluate_listings, appelé ailleurs
 dans le câblage central). Ouvert via IPO.
 """
 import pygame
-from core import config
+
+from core import config, unlocks
 from core import ipo as IPO
-from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

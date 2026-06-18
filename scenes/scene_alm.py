@@ -6,8 +6,8 @@ de taux pour voir l'impact sur la marge nette d'intérêt (NII) et sur la valeur
 économique des fonds propres (ΔEVE). Outil d'analyse (sandbox). Ouvert via ALM.
 """
 import pygame
-from core import config
-from core import alm
+
+from core import alm, config
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

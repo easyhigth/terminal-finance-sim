@@ -5,7 +5,8 @@ Sérialisable en JSON pour la sauvegarde/chargement.
 import json
 import os
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
+
 from core import config
 from core.applog import logger
 
@@ -270,7 +271,7 @@ class GameState:
         pour l'historique, le record et le contrôle de faillite.
         Retourne un dict-résumé pour affichage par le terminal.
         """
-        from core import events, deals, career   # imports locaux : logique pure, pas de pygame
+        from core import career, deals, events  # imports locaux : logique pure, pas de pygame
         p = self.player
         if p.game_over:
             return {"events": [], "expired": [], "new_deals": [],
@@ -388,6 +389,7 @@ class GameState:
             review_offer = _review.maybe_trigger(p, True)
             # secteur mis en avant pour le nouveau trimestre (guidance)
             import random as _r
+
             from data.companies import SECTORS as _SEC
             p.flags["hot_sector"] = _r.choice(list(_SEC.keys()))
             if getattr(p, "ma_owned", None):

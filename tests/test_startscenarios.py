@@ -1,6 +1,6 @@
 """Tests des scénarios de départ (core/startscenarios.py)."""
-from core.game_state import PlayerState
 from core import startscenarios as scen
+from core.game_state import PlayerState
 
 
 def test_all_scenarios_have_fields():

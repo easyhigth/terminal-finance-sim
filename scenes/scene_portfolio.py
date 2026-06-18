@@ -8,11 +8,11 @@ Outil réaliste basé sur core.finmath.
 """
 import numpy as np
 import pygame
-from core import config
-from core.scene_manager import Scene
-from core import finmath as fm
-from ui import fonts, widgets
 
+from core import config
+from core import finmath as fm
+from core.scene_manager import Scene
+from ui import fonts, widgets
 
 # Univers d'actifs simulé (rendements attendus annualisés + matrice de covariance)
 ASSETS = ["Equities", "Bonds", "Real Estate", "Commodities", "Cash"]

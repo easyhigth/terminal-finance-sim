@@ -1,5 +1,6 @@
 """Tests du desk d'options sur actions individuelles (core/options.py)."""
-from core import options as O, market
+from core import market
+from core import options as O
 from core.game_state import PlayerState
 
 

@@ -11,8 +11,6 @@ Les valeurs s'appuient sur core/finmath (VaR, Black-Scholes, Sharpe...).
 """
 import random
 
-from core import finmath
-
 
 def _mna(rng):
     ebitda = rng.randint(80, 220)

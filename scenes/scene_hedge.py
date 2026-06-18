@@ -7,9 +7,9 @@ Logique de cotation/dénouement dans core/hedging.py (Black-Scholes, cf.
 core.finmath). Ouvert via PROTECT.
 """
 import pygame
-from core import config
+
+from core import config, unlocks
 from core import hedging as H
-from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

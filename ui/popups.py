@@ -24,10 +24,11 @@ Usage dans une scène :
     self.open_custom_chart("Frontière", fn)    # rendu personnalisé (callback)
 """
 import pygame
-from core import config
+
+from core import bonds as bonds_mod
 from core import charts as _charts
 from core import commodities as commodities_mod
-from core import bonds as bonds_mod
+from core import config
 from core import etfs as etfs_mod
 from ui import fonts, widgets
 from ui.datawindow import DataWindow

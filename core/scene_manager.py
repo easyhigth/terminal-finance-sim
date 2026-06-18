@@ -4,6 +4,7 @@ Chaque scène gère ses événements, sa logique et son rendu.
 Un fondu (fade-in) est joué automatiquement à chaque changement de scène.
 """
 import pygame
+
 from core import config
 
 

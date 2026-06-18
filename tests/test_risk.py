@@ -1,11 +1,11 @@
 """Tests du risque sur portefeuille réel (core/risk.py)."""
 import pytest
 
-from core.market import Market
-from core.game_state import PlayerState
-from core import portfolio as pf
 from core import bonds as B
+from core import portfolio as pf
 from core import risk
+from core.game_state import PlayerState
+from core.market import Market
 
 
 def _player_with_positions():

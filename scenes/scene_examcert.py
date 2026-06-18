@@ -6,11 +6,11 @@ promotion (passer au grade suivant) et les certifications professionnelles
 (CFA / FRM / CQF). Ouvert via EXAMCERT / le rail latéral « EXAM/CERTIF ».
 """
 import pygame
-from core import config
+
 from core import career as career_mod
+from core import config
 from core.scene_manager import Scene
 from ui import fonts, widgets
-
 
 CARD_KEYS = ["exam", "cert"]
 

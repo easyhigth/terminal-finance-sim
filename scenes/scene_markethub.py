@@ -8,6 +8,7 @@ sectorielle et watchlist du joueur. Ouvert via MARKETHUB / le rail
 latéral « MARCHÉ ».
 """
 import pygame
+
 from core import config
 from core.scene_manager import Scene
 from ui import fonts, widgets

@@ -1,9 +1,9 @@
 """Tests des swaps de devises (core/swaps.py) : différentiel de taux régional."""
 import pytest
 
-from core.market import Market
-from core.game_state import PlayerState
 from core import swaps as SW
+from core.game_state import PlayerState
+from core.market import Market
 
 
 def _player(continent="Europe", cash=0.0):

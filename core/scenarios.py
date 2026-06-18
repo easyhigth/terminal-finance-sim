@@ -26,6 +26,7 @@ les valeurs par défaut quand sev_min==sev_max==1.0 et regional=False ; aucun
 scénario existant ne change de comportement moyen.
 """
 import random
+
 from core.market import Crisis
 
 # (id, nom affiché, kind, steps, world, regions{}, sectors{}, vol_mult, poids, récit)

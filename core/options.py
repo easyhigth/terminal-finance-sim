@@ -13,6 +13,7 @@ Détenu jusqu'à l'échéance (mark-to-model = valeur Black-Scholes courante).
 Holdings : PlayerState.options = [ {dict position} ].
 """
 import math
+
 import numpy as np
 
 from core import finmath as fm

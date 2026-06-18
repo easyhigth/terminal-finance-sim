@@ -11,6 +11,7 @@ Logique pure : aucun import pygame. Testable seule.
 """
 import math
 
+
 # ---------------------------------------------------------------------------
 # Fonctions intégrées. Reçoivent une liste d'arguments déjà évalués.
 # Les plages sont passées comme listes ; on les aplatit au besoin.

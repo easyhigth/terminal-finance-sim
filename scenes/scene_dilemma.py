@@ -4,6 +4,7 @@ Présente un scénario et des options aux conséquences chiffrées et visibles
 (trésorerie, réputation, scrutin réglementaire), puis l'issue du choix.
 """
 import pygame
+
 from core import config
 from core import dilemmas as D
 from core.scene_manager import Scene

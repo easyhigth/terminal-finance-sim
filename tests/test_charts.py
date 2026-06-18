@@ -1,5 +1,6 @@
 """Tests des calculs de graphes (core/charts.py) et de la préhistoire du marché."""
 import math
+
 import numpy as np
 
 from core import charts, market

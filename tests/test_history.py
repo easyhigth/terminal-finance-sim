@@ -1,7 +1,7 @@
 """Tests de la chronologie scénarisée (core/history.py)."""
-from core.market import Market
-from core.game_state import PlayerState
 from core import history
+from core.game_state import PlayerState
+from core.market import Market
 
 
 def _player(quarter):

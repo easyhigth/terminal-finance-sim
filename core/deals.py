@@ -19,9 +19,8 @@ Structure d'un deal (dict) :
   days_left   : jours restants avant échéance
 """
 import random
-from core import config
-from core import tracks
 
+from core import config, tracks
 
 MAX_ACTIVE_DEALS = 4        # au-delà, plus de génération
 GEN_PROBABILITY = 0.45      # proba de générer un deal à un tour donné

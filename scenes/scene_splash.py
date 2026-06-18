@@ -3,6 +3,7 @@ scene_splash.py — Écran de démarrage Terminal Alpha.
 Logo animé avec fondu entrant/sortant. Clic ou touche = passer au menu.
 """
 import pygame
+
 from core import config
 from core.scene_manager import Scene
 from ui import fonts

@@ -26,6 +26,7 @@ Structures (PlayerState) :
   macro_bet_history : historique des derniers paris résolus (UI)
 """
 import random
+
 import numpy as np
 
 EVENT_TYPES = [

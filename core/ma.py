@@ -26,7 +26,6 @@ vie ») :
 """
 import random
 
-from core import config
 from core import financials as F
 from core import finmath as fm
 from data.ma_targets import TARGETS_BY_TICKER, all_targets

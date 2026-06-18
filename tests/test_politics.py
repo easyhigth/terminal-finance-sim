@@ -9,10 +9,10 @@ import random
 
 import pytest
 
-from core import politics
 from core import governments as gov_mod
-from core.market import Market
+from core import politics
 from core.game_state import PlayerState
+from core.market import Market
 from data import companies as comp_data
 
 _REGIONS = set(comp_data.REGIONS)

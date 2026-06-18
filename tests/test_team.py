@@ -8,8 +8,7 @@ après chaque test.
 """
 import pytest
 
-from core import team
-from core import unlocks
+from core import team, unlocks
 from core.game_state import PlayerState
 
 REQUIRED_GRADE = 6  # grade recommandé (Vice President), cohérent avec hedge/leverage/mandates/options

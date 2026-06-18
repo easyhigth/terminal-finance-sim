@@ -3,14 +3,13 @@ import random
 
 import pytest
 
-from core.market import Market
-from core.game_state import PlayerState
-from core import governments as G
 from core import bonds as B
+from core import governments as G
 from core import politics
 from core import portfolio as pf
+from core.game_state import PlayerState
+from core.market import Market
 from data import companies as comp_data
-
 
 _VALID_RATINGS = set(B._RATING_SPREAD.keys())
 _REGIONS = set(comp_data.REGIONS)

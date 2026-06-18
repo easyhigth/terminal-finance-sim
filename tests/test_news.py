@@ -1,6 +1,5 @@
 """Tests du fil d'actualités persistant (core/news.py) et des deals souverains."""
-from core import news
-from core import deals
+from core import deals, news
 from core.game_state import PlayerState
 
 

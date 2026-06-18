@@ -9,6 +9,7 @@ Le « score » d'un acteur est exprimé dans la même unité (monétaire) que la
 valeur nette du joueur, pour permettre la comparaison.
 """
 import random
+
 from core import config
 
 RIVAL_PROFILES = [

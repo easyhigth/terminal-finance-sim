@@ -4,8 +4,8 @@ Débloqué après le grade Analyst. Chaque voie ouvre des modules,
 des questions d'évaluation et des concepts spécifiques.
 """
 import pygame
-from core import config
-from core import tracks
+
+from core import config, tracks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

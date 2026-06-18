@@ -9,9 +9,9 @@ Les ETF à effet de levier / inverses sont signalés en rouge (« risque élevé
 Achat/vente par paquets ; clic sur le nom = fiche flottante. Ouvert via ETF.
 """
 import pygame
-from core import config
+
+from core import config, unlocks
 from core import etfs as E
-from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.popups import PopupMixin

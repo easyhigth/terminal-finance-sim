@@ -8,9 +8,9 @@ chaque tour. Liste groupée par catégorie, DÉFILABLE, filtrable par catégorie
 Ouvert via CMDTY.
 """
 import pygame
-from core import config
+
 from core import commodities as C
-from core import unlocks
+from core import config, unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.popups import PopupMixin

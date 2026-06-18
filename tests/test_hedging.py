@@ -1,5 +1,6 @@
 """Tests de la couverture par put protecteur (core/hedging.py)."""
-from core import hedging as H, market
+from core import hedging as H
+from core import market
 from core.game_state import PlayerState
 
 

@@ -5,9 +5,9 @@ appels de marge sont là où se cachent les bugs : on les verrouille ici.
 """
 import pytest
 
-from core.market import Market
-from core.game_state import PlayerState
 from core import portfolio as pf
+from core.game_state import PlayerState
+from core.market import Market
 
 
 def _setup(grade_index=8, cash=1_000_000.0):
@@ -59,7 +59,6 @@ def test_short_loses_when_price_rises():
     _set_price(m, tk, 100.0)
     pf.short(p, m, tk, 100)
     _set_price(m, tk, 130.0)
-    eq = pf.net_worth(p, m)
     # equity en baisse vs cash initial: la position courte perd quand le prix monte
     res = pf.cover(p, m, tk, "ALL")
     assert res["realized"] < 0

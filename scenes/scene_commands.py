@@ -6,11 +6,10 @@ PgDn), sans chevauchement. Cliquer une commande la COPIE : elle est pré-remplie
 dans le terminal (et placée dans le presse-papiers si disponible), prête à lancer.
 """
 import pygame
-from core import config
-from core import unlocks
+
+from core import config, unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
-
 
 # Source unique de vérité (catégorie -> [(libellé, description)]). Couvre toutes
 # les commandes du parseur (alias regroupés). Les triches sont volontairement

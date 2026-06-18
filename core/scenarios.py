@@ -85,6 +85,39 @@ SCENARIOS = [
                                  "Conso": -0.02}, "vol": 1.6, "weight": 2,
      "sev_min": 0.6, "sev_max": 1.5,
      "story": "Les cours des matières premières s'envolent : gagnants et perdants sectoriels."},
+    # crises ciblées (purement sectorielles/régionales, world=0.0) — opportunités
+    # de short/hedge chirurgicales sans choc macro global.
+    {"id": "scandale_finance", "name": "Scandale comptable bancaire", "kind": "bad", "steps": 3,
+     "world": 0.0, "sectors": {"Finance": -0.06}, "vol": 1.8,
+     "weight": 2, "sev_min": 0.5, "sev_max": 1.6,
+     "story": "Un scandale de manipulation comptable éclate dans une grande banque : "
+              "le secteur Finance dévisse sur fond de défiance des investisseurs."},
+    {"id": "antitrust_tech", "name": "Amende antitrust tech", "kind": "bad", "steps": 3,
+     "world": 0.0, "sectors": {"Tech": -0.045}, "vol": 1.6,
+     "weight": 2, "sev_min": 0.5, "sev_max": 1.5,
+     "story": "Les régulateurs infligent une amende record pour abus de position dominante : "
+              "le secteur Tech encaisse le choc réglementaire."},
+    {"id": "immo_asie", "name": "Crise immobilière (Asie)", "kind": "bad", "steps": 5,
+     "world": 0.0, "regions": {"Asia": -0.045}, "sectors": {"Immobilier": -0.035}, "vol": 1.8,
+     "weight": 2, "sev_min": 0.5, "sev_max": 1.6,
+     "story": "Un promoteur surendetté fait défaut en Asie : la crise immobilière régionale "
+              "se propage aux valeurs du secteur."},
+    {"id": "immo_europe", "name": "Crise immobilière (Europe)", "kind": "bad", "steps": 5,
+     "world": 0.0, "regions": {"Europe": -0.04}, "sectors": {"Immobilier": -0.03}, "vol": 1.7,
+     "weight": 2, "sev_min": 0.5, "sev_max": 1.6,
+     "story": "La hausse du coût du crédit fait éclater une bulle immobilière en Europe, "
+              "fragilisant promoteurs et foncières de la région."},
+    {"id": "fx_emergent", "name": "Crise de change (marché émergent)", "kind": "bad", "steps": 4,
+     "world": 0.0, "regions": {}, "sectors": {}, "vol": 1.9,
+     "weight": 2, "sev_min": 0.5, "sev_max": 1.7,
+     "regional": True, "region_pool": ["Am.Sud", "Afrique"], "region_extra": -0.05,
+     "story": "Une dévaluation brutale frappe une devise émergente, asséchant les flux de "
+              "capitaux vers la région."},
+    {"id": "sante_sectoriel", "name": "Rappel sanitaire massif", "kind": "bad", "steps": 4,
+     "world": 0.0, "sectors": {"Sante": -0.05}, "vol": 1.7,
+     "weight": 2, "sev_min": 0.5, "sev_max": 1.6,
+     "story": "Un rappel de produits à grande échelle révèle des défauts de fabrication : "
+              "le secteur Santé chute sur des craintes de litiges en cascade."},
 ]
 
 TRIGGER_PROBABILITY = 0.06   # par tour

@@ -68,6 +68,8 @@ class PlayerState:
     next_msg_id: int = 1                               # compteur d'identifiants de messages
     news_history: list = field(default_factory=list)   # fil d'actualités persistant (jusqu'à 3 ans)
     rivals: list = field(default_factory=list)         # concurrents : [{name, firm, track, score}]
+    rival_owned_targets: list = field(default_factory=list)  # tickers de cibles M&A prises par des rivaux
+    rival_events: list = field(default_factory=list)   # historique court des actions de rivaux (max ~15)
     # ----- décisions & éthique -----
     heat: int = 0                                      # scrutin réglementaire 0-100 (risque d'enquête)
     pending_dilemmas: list = field(default_factory=list)  # dilemmes en attente de décision
@@ -96,6 +98,10 @@ class PlayerState:
     macro_bets: list = field(default_factory=list)       # paris placés en attente de résolution
     next_macro_event_id: int = 1                         # compteur d'identifiants d'évènements macro
     macro_bet_history: list = field(default_factory=list)  # historique des derniers paris résolus (UI)
+    # ----- stress test réglementaire périodique -----
+    last_stresstest_quarter: int = 0    # dernier trimestre où un stress test a eu lieu
+    pending_stresstest: dict = None     # stress test en attente de réponse, ou None
+    stresstest_history: list = field(default_factory=list)  # derniers résultats résolus (UI, max ~10)
 
     @property
     def grade(self):

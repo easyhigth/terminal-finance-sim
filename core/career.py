@@ -27,6 +27,26 @@ def log(player, kind, text):
 
 
 # ---------------------------------------------------------------------------
+# Profil de risque (style de jeu, indépendant de la progression de grade)
+# ---------------------------------------------------------------------------
+RISK_PROFILES = ("Prudent", "Modéré", "Risque élevé")
+
+
+def risk_profile(player):
+    """Profil de risque dérivé de l'usage du levier/marge au fil de la carrière
+    (compteurs alimentés par portfolio.check_margin_call et game_state.advance_step) :
+    survivre à des margin calls répétés en restant très levier marque le style de
+    jeu, pas seulement le grade. Sert à moduler les mandats proposés (core.mandates)."""
+    mc = player.flags.get("margin_call_count", 0)
+    hl = player.flags.get("high_leverage_steps", 0)
+    if mc >= 3 or hl >= 20:
+        return "Risque élevé"
+    if mc >= 1 or hl >= 5:
+        return "Modéré"
+    return "Prudent"
+
+
+# ---------------------------------------------------------------------------
 # Conditions de promotion (combinées)
 # ---------------------------------------------------------------------------
 def promotion_requirements(player):

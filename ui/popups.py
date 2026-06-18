@@ -29,6 +29,7 @@ from core import bonds as bonds_mod
 from core import charts as _charts
 from core import commodities as commodities_mod
 from core import config
+from core import crypto as crypto_mod
 from core import etfs as etfs_mod
 from ui import fonts, widgets
 from ui.datawindow import DataWindow
@@ -288,6 +289,78 @@ class CommodityPopup(DataWindow):
         legend_h = 16
         plot_rect = pygame.Rect(content.x, y, content.w, max(20, content.bottom - y - legend_h - 4))
         series = commodities_mod.history(self.market, self.cid, 365) if self.market else []
+        legend = _draw_series_plot(surf, plot_rect, series, self.kind)
+        if legend:
+            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+
+
+class CryptoPopup(DataWindow):
+    """Fiche crypto-actif compacte : spot, volatilité, statut (stable/CBDC/risque
+    de contagion) et mini-graphe de prix à onglets (équivalent de CompanyPopup
+    pour les crypto-actifs)."""
+
+    def __init__(self, cid, market, pos=(160, 120), accent=None):
+        self.cid = cid.upper()
+        self.market = market
+        self.kind = "line"
+        self.expand_requested = False
+        self.open_ticker = None
+        self._kind_rects = {}
+        q = crypto_mod.quote(market, self.cid) if market else None
+        accent = accent or (config.COL_CYAN if (q and (q["stable"] or q["cbdc"])) else config.COL_DOWN)
+        title = f"{self.cid} — {q['name']}" if q else self.cid
+        super().__init__(title, [], [], pos=pos, accent=accent,
+                         size=(360, 300), resizable=True, min_size=(300, 220))
+
+    def _handle_body(self, pos):
+        for k, rr in self._kind_rects.items():
+            if rr.collidepoint(pos):
+                self.kind = k
+                return True
+        return False
+
+    def draw(self, surf):
+        content = self._draw_chrome(surf)
+        if content is None:
+            return
+        q = crypto_mod.quote(self.market, self.cid) if self.market else None
+        if not q:
+            widgets.draw_text(surf, f"Crypto-actif introuvable : {self.cid}",
+                              (content.x, content.y), fonts.small(), config.COL_DOWN)
+            return
+        y = content.y
+        widgets.draw_text(surf, self.cid, (content.x, y), fonts.body(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, f"{q['spot']:,.4f}" if q["spot"] < 10 else f"{q['spot']:,.2f}",
+                          (content.right, y), fonts.body(bold=True), config.COL_WHITE, align="right")
+        y += 22
+        widgets.draw_text(surf, widgets.fit_text(q["name"], fonts.small(), content.w - 90),
+                          (content.x, y), fonts.small(), config.COL_TEXT)
+        y += 26
+        status = "CBDC" if q["cbdc"] else ("Stablecoin" if q["stable"] else "Volatil")
+        widgets.draw_badge(surf, status, (content.x, y), self.accent)
+        risk = crypto_mod.contagion_risk(self.market, self.cid) if self.market else 0.0
+        if risk > 0.01:
+            widgets.draw_badge(surf, f"Contagion {risk*100:.0f}%", (content.x + 110, y), config.COL_DOWN)
+        y += 28
+        col_a = [("Vol. annualisée", f"{q['vol']*100:.0f}%")]
+        col_b = [("Rendement", f"{q['yield']*100:.1f}%")] if q["cbdc"] else [("Type", status)]
+        cw = content.w // 2
+        for ci, col in enumerate((col_a, col_b)):
+            fx = content.x + ci * cw
+            fy = y
+            for label, val in col:
+                widgets.draw_text(surf, label, (fx, fy), fonts.tiny(), config.COL_TEXT_DIM)
+                widgets.draw_text(surf, val, (fx + cw - 16, fy), fonts.tiny(bold=True),
+                                  config.COL_WHITE, align="right")
+                fy += 15
+        y += 15 + 14
+        tabs_rect = pygame.Rect(content.x, y, content.w, 20)
+        self._kind_rects = _draw_kind_tabs(surf, tabs_rect, self.kind, self.accent)
+        y += 24
+        legend_h = 16
+        plot_rect = pygame.Rect(content.x, y, content.w, max(20, content.bottom - y - legend_h - 4))
+        series = crypto_mod.history(self.market, self.cid, 365) if self.market else []
         legend = _draw_series_plot(surf, plot_rect, series, self.kind)
         if legend:
             widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4),
@@ -597,6 +670,17 @@ class PopupMixin:
         if not market or commodities_mod.quote(market, cid.upper()) is None:
             return None
         w = CommodityPopup(cid, market, pos=self._popup_pos(), accent=accent)
+        self.popups.append(w)
+        if len(self.popups) > self._MAX_POPUPS:
+            self.popups.pop(0)
+        return w
+
+    def open_crypto(self, cid, accent=None):
+        """Ouvre (ou met au premier plan) la fiche flottante d'un crypto-actif."""
+        market = self._popup_market()
+        if not market or crypto_mod.quote(market, cid.upper()) is None:
+            return None
+        w = CryptoPopup(cid, market, pos=self._popup_pos(), accent=accent)
         self.popups.append(w)
         if len(self.popups) > self._MAX_POPUPS:
             self.popups.pop(0)

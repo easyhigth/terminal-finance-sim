@@ -42,6 +42,20 @@ LABELS = {
     "team": "Équipe d'analystes juniors (TEAM)",
 }
 
+# fonctionnalité -> id de tutoriel (data/tutorials.py) à proposer automatiquement
+# au déblocage (toutes les fonctionnalités n'ont pas de tutoriel dédié).
+FEATURE_TUTORIAL = {
+    "trade": "buy_sell",
+    "hedge": "hedge",
+    "leverage": "short",
+    "ma": "ma",
+    "options": "options",
+    "ipo": "ipo",
+    "fx": "fx",
+    "calendar": "calendar",
+    "team": "team",
+}
+
 # commande (token majuscule) -> fonctionnalité gated
 CMD_FEATURE = {
     "WATCHLIST": "analyst", "WATCH": "analyst", "WL": "analyst",

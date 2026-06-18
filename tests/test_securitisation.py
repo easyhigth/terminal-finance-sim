@@ -48,3 +48,18 @@ def test_invest_refused_without_cash():
     m = Market(seed=2024)
     p = PlayerState(); p.cash = 1000.0; p.continent = "USA"
     assert SEC.invest(p, m, "SENIOR", 100_000.0)["reason"] == "cash"
+
+
+def test_expected_pool_loss_widens_with_market_stress():
+    base = SEC.expected_pool_loss()           # sans marché : niveau de base
+    m = Market(seed=2024)
+    m.regime = "Calme"
+    assert SEC.expected_pool_loss(m) == pytest.approx(base)
+    m.regime = "Volatil"
+    volatil = SEC.expected_pool_loss(m)
+    assert volatil > base
+    m.regime = "Récession"
+    recession = SEC.expected_pool_loss(m)
+    assert recession > volatil       # la récession dégrade davantage que la volatilité seule
+    m.crises = [object()]
+    assert SEC.expected_pool_loss(m) > recession      # une crise active aggrave encore

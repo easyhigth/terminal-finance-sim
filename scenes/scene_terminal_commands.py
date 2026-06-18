@@ -236,7 +236,8 @@ class TerminalCommandsMixin:
         }
         rows = []
         reg_good = self.market.regime in ("Expansion", "Calme")
-        rows.append(("Régime de marché", self.market.regime_label(),
+        rows.append(("Régime de marché",
+                     f"{self.market.regime_label()} (depuis {self.market.regime_age()} sem.)",
                      ("", config.COL_UP if reg_good else config.COL_DOWN),
                      "toile de fond : module dérive & volatilité"))
         for key in ["rate", "inflation", "growth", "unemployment", "confidence"]:
@@ -1074,7 +1075,7 @@ class TerminalCommandsMixin:
                                    "Les objectifs n'ont pas été atteints. Nous confions "
                                    "désormais notre capital ailleurs.")
         # nouvelle offre de mandat éventuelle
-        offer = mandates_mod.maybe_offer(p, random)
+        offer = mandates_mod.maybe_offer(p, random, m)
         if offer:
             self._log(_L(f"  ✶ OFFRE DE MANDAT : {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
                       f"(MANDATES pour voir).",

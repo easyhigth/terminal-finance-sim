@@ -33,9 +33,21 @@ def tranche_loss_fraction(pool_loss, attach, detach):
     return float(np.clip((pool_loss - attach) / (detach - attach), 0.0, 1.0))
 
 
-def expected_pool_loss():
-    """Perte attendue du pool = taux de défaut attendu × LGD."""
-    return EXPECTED_DEFAULT * LGD
+def expected_pool_loss(market=None):
+    """Perte attendue du pool = taux de défaut attendu × LGD, élargie en cas de
+    stress macro (régime de marché, crise active) — comme un spread de crédit
+    qui s'élargit en récession. `market=None` retourne le niveau de base (utilisé
+    par les tests et avant le premier pas)."""
+    dr = EXPECTED_DEFAULT
+    if market is not None:
+        regime = getattr(market, "regime", "")
+        if regime == "Récession":
+            dr += 0.03
+        elif regime == "Volatil":
+            dr += 0.015
+        if getattr(market, "crises", None):
+            dr += 0.05
+    return dr * LGD
 
 
 def realized_pool_loss(market, salt=0):
@@ -54,17 +66,17 @@ def realized_pool_loss(market, salt=0):
     return dr * LGD
 
 
-def tranche_quote(tranche_id):
+def tranche_quote(tranche_id, market=None):
     t = _BY_ID[tranche_id]
-    el = expected_pool_loss()
+    el = expected_pool_loss(market)
     exp_tranche_loss = tranche_loss_fraction(el, t[2], t[3])
     return {"id": t[0], "name": t[1], "attach": t[2], "detach": t[3],
             "coupon": t[4], "rating": t[5], "exp_loss": exp_tranche_loss,
             "thickness": t[3] - t[2]}
 
 
-def all_quotes():
-    return [tranche_quote(t[0]) for t in TRANCHES]
+def all_quotes(market=None):
+    return [tranche_quote(t[0], market) for t in TRANCHES]
 
 
 def invest(player, market, tranche_id, notional):

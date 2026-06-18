@@ -51,6 +51,7 @@ class ShopScene(Scene, PopupMixin):
         self._list_rect = None
         self._name_rects = {}
         self._buy_rects = {}
+        self._sell_rects = {}
         self._type_rects = {}
         self._sort_rects = {}
         self._qty_box = None
@@ -148,6 +149,55 @@ class ShopScene(Scene, PopupMixin):
             self.app.scenes.go("crypto", return_to="shop")
         elif kind == "Structuré":
             self.app.scenes.go(key, return_to="shop")
+
+    def _held_qty(self, kind, key):
+        p = self.app.gs.player
+        if kind == "Action":
+            pos = p.portfolio.get(key)
+            return pos["shares"] if pos else 0.0
+        if kind == "ETF":
+            pos = p.etfs.get(key)
+            return pos["qty"] if pos else 0.0
+        if kind == "Obligation":
+            pos = p.bonds.get(key)
+            return pos["qty"] if pos else 0.0
+        if kind == "Commodity":
+            pos = p.commodities.get(key)
+            return pos["qty"] if pos else 0.0
+        if kind == "Crypto":
+            pos = p.crypto.get(key)
+            return pos["qty"] if pos else 0.0
+        return 0.0
+
+    def _do_sell(self, kind, key):
+        if not self._can_trade():
+            return
+        held = self._held_qty(kind, key)
+        if held <= 0:
+            return
+        qty = min(self._qty(), held)
+        if qty <= 0:
+            self.msg = "Quantité invalide : indiquez un nombre positif."
+            return
+        p, m = self.app.gs.player, self.market
+        if kind == "Action":
+            r = PF.sell(p, m, key, qty)
+        elif kind == "ETF":
+            r = ETF.sell(p, m, key, qty)
+        elif kind == "Obligation":
+            r = B.sell_bond(p, m, key, qty)
+        elif kind == "Commodity":
+            r = CM.sell(p, m, key, qty)
+        elif kind == "Crypto":
+            r = K.sell(p, m, key, qty)
+        else:
+            return
+        if r["ok"]:
+            self.msg = f"Vendu {r['qty']:g} × {key} @ {r['price']:.2f} (P&L {r['realized']:+.0f})."
+            if not p.hardcore:
+                self.app.gs.save(config.AUTOSAVE_SLOT)
+        else:
+            self.msg = f"Vente refusée ({r['reason']})."
 
     def _do_buy(self, kind, key):
         if kind == "Structuré":
@@ -265,6 +315,10 @@ class ShopScene(Scene, PopupMixin):
                 if rect.collidepoint(event.pos):
                     self._do_buy(*ident)
                     return
+            for ident, rect in self._sell_rects.items():
+                if rect.collidepoint(event.pos):
+                    self._do_sell(*ident)
+                    return
 
     def update(self, dt):
         self._t += dt
@@ -278,7 +332,8 @@ class ShopScene(Scene, PopupMixin):
         widgets.draw_text(surf, "BOUTIQUE — TOUS LES ACTIFS", (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, "Actions · ETF · obligations · commodities · crypto · structurés — "
-                                "clic sur le nom = fiche d'analyse · choisissez une quantité puis ACHETER. "
+                                "clic sur le nom = fiche d'analyse · choisissez une quantité puis ACHETER "
+                                "ou VENDRE (positions détenues). "
                                 + (self.msg if self.msg else ""),
                           (42, 72), fonts.tiny(), config.COL_TEXT_DIM)
 
@@ -371,7 +426,7 @@ class ShopScene(Scene, PopupMixin):
         list_top = inner.y + 22
         list_area = pygame.Rect(inner.x - 6, list_top, inner.w + 12, inner.bottom - list_top - 22)
         self._list_rect = list_area
-        self._name_rects, self._buy_rects = {}, {}
+        self._name_rects, self._buy_rects, self._sell_rects = {}, {}, {}
         prev_clip = surf.get_clip()
         surf.set_clip(list_area)
         ry = list_top - self.scroll
@@ -428,6 +483,12 @@ class ShopScene(Scene, PopupMixin):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, br, border_radius=3)
             widgets.draw_text(surf, "OUVRIR", br.center, fonts.tiny(bold=True), config.COL_CYAN, align="center")
         elif self._can_trade():
+            held = self._held_qty(kind, key)
+            if held > 0:
+                sr = pygame.Rect(inner.x + 995, y - 2, 72, 20)
+                self._sell_rects[ident] = sr
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, sr, border_radius=3)
+                widgets.draw_text(surf, "VENDRE", sr.center, fonts.tiny(bold=True), config.COL_DOWN, align="center")
             br = pygame.Rect(inner.x + 1075, y - 2, 80, 20)
             self._buy_rects[ident] = br
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, br, border_radius=3)

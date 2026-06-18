@@ -224,4 +224,5 @@ def check_margin_call(player, market):
             cover(player, market, t, qty)
     penalty = liquidated * LIQUIDATION_FEE
     player.cash -= penalty
+    player.flags["margin_call_count"] = player.flags.get("margin_call_count", 0) + 1
     return {"triggered": True, "liquidated": liquidated, "penalty": penalty}

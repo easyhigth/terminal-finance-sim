@@ -48,19 +48,26 @@ VOL_REGION = 0.010
 DRIFT_MULT = 0.2        # atténue les dérives propres des sociétés (anti sur-bull)
 
 # Régimes de marché — toile de fond lente (déterministe) par-dessus les crises.
-# Chaque régime module la dérive et la volatilité du facteur MONDE.
+# Chaque régime module la dérive et la volatilité du facteur MONDE. Les écarts
+# entre régimes sont volontairement marqués (et leur persistance élevée, cf.
+# REGIME_TRANSITIONS) pour que des phases bull/bear durables émergent, lisibles
+# et exploitables par le market timing — au-delà des chocs ponctuels (Crisis).
 REGIMES = {
-    "Expansion":  {"drift": 0.0005,  "vol": 0.95, "label": "Expansion"},
-    "Calme":      {"drift": 0.0001,  "vol": 0.80, "label": "Marché calme"},
-    "Volatil":    {"drift": -0.0002, "vol": 1.55, "label": "Marché volatil"},
-    "Récession":  {"drift": -0.0011, "vol": 1.80, "label": "Récession"},
+    "Expansion":  {"drift": 0.0008,  "vol": 0.85, "label": "Expansion"},
+    "Calme":      {"drift": 0.0001,  "vol": 0.75, "label": "Marché calme"},
+    "Volatil":    {"drift": -0.0004, "vol": 1.70, "label": "Marché volatil"},
+    "Récession":  {"drift": -0.0016, "vol": 2.00, "label": "Récession"},
 }
-# Matrice de transition (par pas) : régimes persistants, voisins probables.
+# Matrice de transition (par pas ≈ 1 semaine) : forte probabilité de rester dans
+# le régime courant -> durée moyenne d'un cycle de l'ordre de plusieurs trimestres
+# (1/(1-p_auto) pas), pour des phases identifiables plutôt que du bruit régime à
+# régime. Les voisins probables restent cohérents (Expansion <-> Calme,
+# Volatil <-> Récession) ; un retournement direct Expansion <-> Récession est rare.
 REGIME_TRANSITIONS = {
-    "Expansion":  [("Expansion", 0.93), ("Calme", 0.05), ("Volatil", 0.02)],
-    "Calme":      [("Calme", 0.92), ("Expansion", 0.045), ("Volatil", 0.035)],
-    "Volatil":    [("Volatil", 0.88), ("Calme", 0.06), ("Récession", 0.06)],
-    "Récession":  [("Récession", 0.90), ("Volatil", 0.08), ("Calme", 0.02)],
+    "Expansion":  [("Expansion", 0.96), ("Calme", 0.025), ("Volatil", 0.015)],
+    "Calme":      [("Calme", 0.95), ("Expansion", 0.035), ("Volatil", 0.015)],
+    "Volatil":    [("Volatil", 0.92), ("Calme", 0.04), ("Récession", 0.04)],
+    "Récession":  [("Récession", 0.94), ("Volatil", 0.05), ("Calme", 0.01)],
 }
 
 # Résultats trimestriels (« earnings ») — saison échelonnée, déterministe
@@ -114,6 +121,7 @@ class Market:
         self.earnings_log = {}       # ticker -> dernier rapport {surprise, growth, beat, step}
         self.regime = "Calme"        # régime de marché courant (toile de fond lente)
         self.regime_changed = False  # vrai au pas où le régime vient de basculer
+        self.regime_since = 0        # step_count au moment où le régime courant a démarré
         self.sec_id = np.array([self._sector_idx[c["sector"]] for c in companies])
         self.reg_id = np.array([self._region_idx[c["region"]] for c in companies])
         self.ticker_idx = {c["ticker"]: i for i, c in enumerate(companies)}
@@ -296,11 +304,18 @@ class Market:
                 if name != self.regime:
                     self.regime = name
                     self.regime_changed = True
+                    self.regime_since = self.step_count
                 return
         # reliquat de probabilité -> reste dans le régime courant
 
     def regime_label(self):
         return REGIMES[self.regime]["label"]
+
+    def regime_age(self):
+        """Nombre de pas (semaines) écoulés depuis le début du régime courant —
+        donne au joueur une lecture de la maturité du cycle (utile pour le
+        market timing et les mandats de gestion de risque)."""
+        return max(0, self.step_count - self.regime_since)
 
     def _step_earnings(self):
         """Saison de résultats échelonnée : ~1/EARN_PERIOD des sociétés publient

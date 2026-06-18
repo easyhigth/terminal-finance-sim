@@ -80,7 +80,7 @@ class CertScene(Scene):
             if relevant:
                 widgets.draw_badge(surf, "VOIE " + p.track, (rect.x+16, rect.y+44),
                                    config.COL_PRESTIGE)
-            widgets.draw_text(surf, prog["desc"], (rect.x+16, rect.y+72),
+            widgets.draw_text(surf, C.desc_for(pid), (rect.x+16, rect.y+72),
                               fonts.small(), config.COL_TEXT)
             lvl = C.level(p, pid)
             widgets.draw_text(surf, f"Statut : {C.status_label(p, pid)}  ·  "

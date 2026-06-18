@@ -42,6 +42,17 @@ EXAM_N = 12
 PASS_THRESHOLD = 0.75
 
 
+def desc_for(program):
+    """Description du programme dans la langue courante (FR par défaut)."""
+    from core.i18n import get_lang
+    if get_lang() == "en":
+        from data.certifications_en import PROGRAMS_EN
+        e = PROGRAMS_EN.get(program)
+        if e:
+            return e.get("desc", PROGRAMS[program]["desc"])
+    return PROGRAMS[program]["desc"]
+
+
 def level(player, program):
     return player.certs.get(program, 0)
 
@@ -51,11 +62,13 @@ def is_complete(player, program):
 
 
 def status_label(player, program):
+    from core.i18n import get_lang
     prog = PROGRAMS[program]
     lvl = level(player, program)
+    en = get_lang() == "en"
     if lvl >= prog["levels"]:
-        return "OBTENU"
-    return f"niveau {lvl}/{prog['levels']}"
+        return "EARNED" if en else "OBTENU"
+    return f"level {lvl}/{prog['levels']}" if en else f"niveau {lvl}/{prog['levels']}"
 
 
 def can_attempt(player, program):
@@ -84,6 +97,8 @@ def pay_and_start(player, program):
 def pass_stage(player, program):
     """Valide l'étape réussie : niveau +1, réputation, titre/badge si complet."""
     from core import career
+    from core.i18n import get_lang
+    en = get_lang() == "en"
     prog = PROGRAMS[program]
     lvl = level(player, program)
     if lvl >= prog["levels"]:
@@ -95,9 +110,15 @@ def pass_stage(player, program):
         title = f"{prog['name']} Charterholder"
         if title not in player.titles:
             player.titles.append(title)
-        career.log(player, "promo", f"Certification obtenue : {prog['name']} — {title}")
+        if en:
+            career.log(player, "promo", f"Certification earned: {prog['name']} — {title}")
+        else:
+            career.log(player, "promo", f"Certification obtenue : {prog['name']} — {title}")
     else:
-        career.log(player, "info", f"{prog['name']} niveau {player.certs[program]} réussi")
+        if en:
+            career.log(player, "info", f"{prog['name']} level {player.certs[program]} passed")
+        else:
+            career.log(player, "info", f"{prog['name']} niveau {player.certs[program]} réussi")
     return {"done": done, "rep": prog["rep"][lvl],
             "title": (f"{prog['name']} Charterholder" if done else None)}
 

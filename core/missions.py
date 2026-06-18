@@ -18,6 +18,12 @@ import math
 import random
 
 
+def _L(fr, en):
+    """Renvoie la version FR ou EN selon la langue courante du jeu."""
+    from core.i18n import get_lang
+    return en if get_lang() == "en" else fr
+
+
 # Seuil de réputation requis pour tenter l'EVAL, par grade (croissant).
 def reputation_threshold(grade_index):
     return min(92, 58 + grade_index * 2)
@@ -80,6 +86,15 @@ _SECTOR_LABELS = {
 }
 
 
+def _sector_labels():
+    """Libellés de secteur dans la langue courante."""
+    from core.i18n import get_lang
+    if get_lang() == "en":
+        from data.missions_en import SECTOR_LABELS_EN
+        return SECTOR_LABELS_EN
+    return _SECTOR_LABELS
+
+
 def _pick_company(market, rng, region=None, need_profit=False):
     """Choisit une société (de préférence dans la région) + ses métriques live."""
     pool = market.companies
@@ -102,36 +117,50 @@ def _gen_report(market, rng, region, grade):
     c, mt = _pick_company(market, rng, region)
     cur = _CURRENCY.get(c["region"], "$")
     cap = mt["mktcap"]   # en millions
+    labels = _sector_labels()
     # 1) Capitalisation (QCM : prix × actions)
     opts = [_money(cap, cur), _money(cap * 0.45, cur),
             _money(cap * 1.8, cur), _money(cap * 0.12, cur)]
     items = [_mcq(
-        f"{c['ticker']} cote {mt['price']:.2f} {cur} pour {c['shares']:.0f}M d'actions. "
-        f"Capitalisation boursière ≈ ?",
+        _L(f"{c['ticker']} cote {mt['price']:.2f} {cur} pour {c['shares']:.0f}M d'actions. "
+           f"Capitalisation boursière ≈ ?",
+           f"{c['ticker']} trades at {mt['price']:.2f} {cur} for {c['shares']:.0f}M shares. "
+           f"Market capitalization ≈ ?"),
         opts, 0,
-        "Capitalisation = prix de l'action × nombre d'actions en circulation.", rng)]
+        _L("Capitalisation = prix de l'action × nombre d'actions en circulation.",
+           "Market cap = share price × number of shares outstanding."), rng)]
     # 2) BPA (texte à trou)
     items.append(_fill(
-        f"Résultat net {mt['net_income']:.0f}M {cur}, {c['shares']:.0f}M d'actions. "
-        f"BPA (EPS) ≈ ? (en {cur})",
-        mt["eps"], "BPA = Résultat net / Nombre d'actions.", tol=0.06, unit=cur))
+        _L(f"Résultat net {mt['net_income']:.0f}M {cur}, {c['shares']:.0f}M d'actions. "
+           f"BPA (EPS) ≈ ? (en {cur})",
+           f"Net income {mt['net_income']:.0f}M {cur}, {c['shares']:.0f}M shares. "
+           f"EPS ≈ ? (in {cur})"),
+        mt["eps"], _L("BPA = Résultat net / Nombre d'actions.",
+                       "EPS = Net income / Number of shares."), tol=0.06, unit=cur))
     # 3) Marge nette (texte à trou)
     items.append(_fill(
-        f"Chiffre d'affaires {mt['revenue']:.0f}M, résultat net {mt['net_income']:.0f}M. "
-        f"Marge nette ≈ ? (en %)",
-        mt["net_margin"] * 100, "Marge nette = Résultat net / Chiffre d'affaires.",
+        _L(f"Chiffre d'affaires {mt['revenue']:.0f}M, résultat net {mt['net_income']:.0f}M. "
+           f"Marge nette ≈ ? (en %)",
+           f"Revenue {mt['revenue']:.0f}M, net income {mt['net_income']:.0f}M. "
+           f"Net margin ≈ ? (in %)"),
+        mt["net_margin"] * 100, _L("Marge nette = Résultat net / Chiffre d'affaires.",
+                                    "Net margin = Net income / Revenue."),
         abstol=1.0, unit="%"))
     # 4) Secteur (QCM)
-    good = _SECTOR_LABELS.get(c["sector"], c["sector"])
-    distract = rng.sample([v for k, v in _SECTOR_LABELS.items() if k != c["sector"]], 3)
+    good = labels.get(c["sector"], c["sector"])
+    distract = rng.sample([v for k, v in labels.items() if k != c["sector"]], 3)
     items.append(_mcq(
-        f"Dans quel secteur classez-vous {c['name']} ({c['ticker']}) ?",
+        _L(f"Dans quel secteur classez-vous {c['name']} ({c['ticker']}) ?",
+           f"Which sector would you classify {c['name']} ({c['ticker']}) in?"),
         [good] + distract, 0,
-        f"{c['name']} relève du secteur « {good} ».", rng))
+        _L(f"{c['name']} relève du secteur « {good} ».",
+           f"{c['name']} belongs to the '{good}' sector."), rng))
     return {"grade": grade, "kind": "report",
-            "title": f"Compte-rendu : {c['ticker']}",
-            "brief": f"On vous transmet les données brutes de {c['name']} ({c['region']}). "
-                     "Organisez-les, calculez les indicateurs clés et identifiez la société.",
+            "title": _L(f"Compte-rendu : {c['ticker']}", f"Report: {c['ticker']}"),
+            "brief": _L(f"On vous transmet les données brutes de {c['name']} ({c['region']}). "
+                        "Organisez-les, calculez les indicateurs clés et identifiez la société.",
+                        f"You're handed raw data for {c['name']} ({c['region']}). "
+                        "Organize it, compute the key indicators and identify the company."),
             "items": items, "reward_rep": _rep_base(grade), "reward_cash": 0, "charts": {}}
 
 
@@ -157,27 +186,40 @@ def _gen_graph(market, rng, region, grade):
     retA = (A[-1] / A[0] - 1) * 100
     retB = (B[-1] / B[0] - 1) * 100
     volA, volB = _stdev_logret(A), _stdev_logret(B)
-    trend = ("haussière" if retA > 5 else "baissière" if retA < -5 else "latérale")
+    trend_fr = ("haussière" if retA > 5 else "baissière" if retA < -5 else "latérale")
+    trend_en = ("upward" if retA > 5 else "downward" if retA < -5 else "sideways")
+    trend = _L(trend_fr, trend_en)
     items = [
-        _mcq("Quelle est la tendance générale du titre A sur la période ?",
-             ["haussière", "baissière", "latérale"],
-             {"haussière": 0, "baissière": 1, "latérale": 2}[trend],
-             f"Le titre A passe de {A[0]:.0f} à {A[-1]:.0f}, soit {retA:+.1f}% : tendance {trend}.",
+        _mcq(_L("Quelle est la tendance générale du titre A sur la période ?",
+                "What is the overall trend of stock A over the period?"),
+             _L(["haussière", "baissière", "latérale"], ["upward", "downward", "sideways"]),
+             {"haussière": 0, "baissière": 1, "latérale": 2}.get(
+                 trend_fr, {"upward": 0, "downward": 1, "sideways": 2}.get(trend_en, 2)),
+             _L(f"Le titre A passe de {A[0]:.0f} à {A[-1]:.0f}, soit {retA:+.1f}% : tendance {trend}.",
+                f"Stock A goes from {A[0]:.0f} to {A[-1]:.0f}, i.e. {retA:+.1f}%: {trend} trend."),
              rng, chart="A"),
-        _fill("Rendement total du titre A sur la période ? (en %)",
-              retA, "Rendement = (valeur finale / valeur initiale − 1) × 100.",
+        _fill(_L("Rendement total du titre A sur la période ? (en %)",
+                  "Total return of stock A over the period? (in %)"),
+              retA, _L("Rendement = (valeur finale / valeur initiale − 1) × 100.",
+                        "Return = (final value / initial value − 1) × 100."),
               abstol=3.0, unit="%", chart="A"),
-        _mcq("Lequel des deux titres est le PLUS volatil ?",
-             ["Titre A", "Titre B"], 0 if volA > volB else 1,
-             "La volatilité se lit à l'amplitude des oscillations (écart-type des rendements).",
+        _mcq(_L("Lequel des deux titres est le PLUS volatil ?",
+                "Which of the two stocks is MORE volatile?"),
+             _L(["Titre A", "Titre B"], ["Stock A", "Stock B"]), 0 if volA > volB else 1,
+             _L("La volatilité se lit à l'amplitude des oscillations (écart-type des rendements).",
+                "Volatility is read from the amplitude of swings (standard deviation of returns)."),
              rng, chart="AB"),
-        _mcq("Lequel a le mieux performé sur la période ?",
-             ["Titre A", "Titre B"], 0 if retA > retB else 1,
+        _mcq(_L("Lequel a le mieux performé sur la période ?",
+                "Which one performed better over the period?"),
+             _L(["Titre A", "Titre B"], ["Stock A", "Stock B"]), 0 if retA > retB else 1,
              f"A : {retA:+.1f}%   B : {retB:+.1f}%.", rng, chart="AB"),
     ]
-    return {"grade": grade, "kind": "graph", "title": "Lecture de graphes",
-            "brief": "Analysez les cours fournis : tendance, performance et risque. "
-                     "Un analyste doit lire un graphe d'un coup d'oeil.",
+    return {"grade": grade, "kind": "graph",
+            "title": _L("Lecture de graphes", "Chart reading"),
+            "brief": _L("Analysez les cours fournis : tendance, performance et risque. "
+                        "Un analyste doit lire un graphe d'un coup d'oeil.",
+                        "Analyze the provided prices: trend, performance and risk. "
+                        "An analyst must be able to read a chart at a glance."),
             "items": items, "reward_rep": _rep_base(grade), "reward_cash": 0, "charts": charts}
 
 
@@ -194,22 +236,34 @@ def _gen_decision(market, rng, region, grade):
         mom = round(rng.uniform(-18, 18), 1)   # momentum 3 mois (donné au joueur)
         if pe < 16 and mom > 1:
             ans = 0
-            why = "P/E raisonnable et momentum positif : signal d'achat."
+            why = _L("P/E raisonnable et momentum positif : signal d'achat.",
+                      "Reasonable P/E and positive momentum: buy signal.")
         elif pe > 38 or mom < -9:
             ans = 2
-            why = ("Valorisation tendue (P/E élevé)" if pe > 38 else
-                   "Momentum nettement négatif") + " : alléger / vendre."
+            why = _L(("Valorisation tendue (P/E élevé)" if pe > 38 else
+                       "Momentum nettement négatif") + " : alléger / vendre.",
+                      ("Stretched valuation (high P/E)" if pe > 38 else
+                       "Clearly negative momentum") + ": trim / sell.")
         else:
             ans = 1
-            why = "Ni signal d'achat franc ni de vente : conserver et surveiller."
-        prompt = (f"{c['ticker']} ({_SECTOR_LABELS.get(c['sector'], c['sector'])}) — "
-                  f"P/E {pe:.1f}, momentum 3 mois {mom:+.1f}%, "
-                  f"marge nette {mt['net_margin']*100:.0f}%. Votre décision ?")
-        items.append(_mcq(prompt, ["ACHETER", "CONSERVER", "VENDRE"], ans, why, rng))
+            why = _L("Ni signal d'achat franc ni de vente : conserver et surveiller.",
+                      "Neither a clear buy nor sell signal: hold and monitor.")
+        prompt = _L(
+            f"{c['ticker']} ({_sector_labels().get(c['sector'], c['sector'])}) — "
+            f"P/E {pe:.1f}, momentum 3 mois {mom:+.1f}%, "
+            f"marge nette {mt['net_margin']*100:.0f}%. Votre décision ?",
+            f"{c['ticker']} ({_sector_labels().get(c['sector'], c['sector'])}) — "
+            f"P/E {pe:.1f}, 3-month momentum {mom:+.1f}%, "
+            f"net margin {mt['net_margin']*100:.0f}%. Your decision?")
+        items.append(_mcq(prompt, _L(["ACHETER", "CONSERVER", "VENDRE"],
+                                       ["BUY", "HOLD", "SELL"]), ans, why, rng))
         cases += 1
-    return {"grade": grade, "kind": "decision", "title": "Décisions d'investissement",
-            "brief": "Pour chaque dossier, tranchez : acheter, conserver ou vendre. "
-                     "Justifiez par la valorisation (P/E) et le momentum.",
+    return {"grade": grade, "kind": "decision",
+            "title": _L("Décisions d'investissement", "Investment decisions"),
+            "brief": _L("Pour chaque dossier, tranchez : acheter, conserver ou vendre. "
+                        "Justifiez par la valorisation (P/E) et le momentum.",
+                        "For each case, decide: buy, hold or sell. "
+                        "Justify using valuation (P/E) and momentum."),
             "items": items, "reward_rep": _rep_base(grade), "reward_cash": 0, "charts": {}}
 
 
@@ -249,13 +303,27 @@ _PORTFOLIO_TASKS = [
 ]
 
 
+def _portfolio_tasks():
+    """Banque de tâches portefeuille/hedging dans la langue courante."""
+    from core.i18n import get_lang
+    if get_lang() == "en":
+        from data.missions_en import PORTFOLIO_TASKS_EN
+        return PORTFOLIO_TASKS_EN
+    return _PORTFOLIO_TASKS
+
+
 def _gen_portfolio(market, rng, region, grade):
-    chosen = rng.sample(_PORTFOLIO_TASKS, 4)
+    bank = _portfolio_tasks()
+    idxs = rng.sample(range(len(bank)), 4)
+    chosen = [bank[i] for i in idxs]
     items = [_mcq(p, list(ch), idx, expl, rng) for (p, ch, idx, expl) in chosen]
     return {"grade": grade, "kind": "portfolio",
-            "title": "Construction & couverture de portefeuille",
-            "brief": "Décisions d'allocation et de hedging. À ce niveau, vous arbitrez "
-                     "l'exposition au risque de marché, de change et de concentration.",
+            "title": _L("Construction & couverture de portefeuille",
+                        "Portfolio construction & hedging"),
+            "brief": _L("Décisions d'allocation et de hedging. À ce niveau, vous arbitrez "
+                        "l'exposition au risque de marché, de change et de concentration.",
+                        "Allocation and hedging decisions. At this level, you manage "
+                        "exposure to market, currency and concentration risk."),
             "items": items, "reward_rep": _rep_base(grade),
             "reward_cash": 0, "charts": {}}
 
@@ -278,12 +346,21 @@ def generate(grade_index, market, rng=None, region=None):
 
 def grade_focus(grade_index):
     """Phrase décrivant l'objectif du grade (pour l'UI), selon le tier."""
-    return {
-        "report": "Comprendre et organiser les données, produire des comptes-rendus.",
-        "graph": "Lire les graphes, mesurer performance et risque.",
-        "decision": "Décider d'investir, conserver ou vendre.",
-        "portfolio": "Construire et couvrir des portefeuilles, arbitrer le risque.",
-    }[mission_tier(grade_index)]
+    tier = mission_tier(grade_index)
+    return _L(
+        {
+            "report": "Comprendre et organiser les données, produire des comptes-rendus.",
+            "graph": "Lire les graphes, mesurer performance et risque.",
+            "decision": "Décider d'investir, conserver ou vendre.",
+            "portfolio": "Construire et couvrir des portefeuilles, arbitrer le risque.",
+        }[tier],
+        {
+            "report": "Understand and organize data, produce reports.",
+            "graph": "Read charts, measure performance and risk.",
+            "decision": "Decide whether to buy, hold or sell.",
+            "portfolio": "Build and hedge portfolios, manage risk.",
+        }[tier],
+    )
 
 
 def compute_rewards(mission, correct, total):

@@ -94,6 +94,12 @@ def progress(player, market, m):
 MAX_HISTORY = 12   # nb de postmortems conservés pour affichage (scene_mandates)
 
 
+def _L(fr, en):
+    """Renvoie la version FR ou EN selon la langue courante du jeu."""
+    from core.i18n import get_lang
+    return en if get_lang() == "en" else fr
+
+
 def failure_reason(m, growth, beta):
     """Construit un message d'échec SPÉCIFIQUE (chiffré) plutôt qu'un « Échoué » générique.
     Un mandat peut échouer sur l'un des deux critères, ou les deux à la fois."""
@@ -101,12 +107,15 @@ def failure_reason(m, growth, beta):
     miss_risk = beta > m["max_beta"] + 0.01
     parts = []
     if miss_target:
-        parts.append(f"Rendement cible non atteint : {growth:+.1f}% vs objectif "
-                      f"+{m['target_pct']:.1f}%")
+        parts.append(_L(f"Rendement cible non atteint : {growth:+.1f}% vs objectif "
+                         f"+{m['target_pct']:.1f}%",
+                         f"Target return missed: {growth:+.1f}% vs target "
+                         f"+{m['target_pct']:.1f}%"))
     if miss_risk:
-        parts.append(f"Risque dépassé : bêta {beta:.2f} vs limite {m['max_beta']:.2f}")
+        parts.append(_L(f"Risque dépassé : bêta {beta:.2f} vs limite {m['max_beta']:.2f}",
+                         f"Risk limit exceeded: beta {beta:.2f} vs limit {m['max_beta']:.2f}"))
     if not parts:
-        parts.append("Échoué")
+        parts.append(_L("Échoué", "Failed"))
     return " · ".join(parts)
 
 
@@ -127,13 +136,17 @@ def evaluate_due(player, market):
             player.adjust_cash(m["reward_cash"])
             player.adjust_reputation(m["reward_rep"])
             player.flags["mandates_won"] = player.flags.get("mandates_won", 0) + 1
-            reason = f"Objectif atteint : {growth:+.1f}% (cible +{m['target_pct']:.1f}%), " \
-                     f"bêta {beta:.2f} sous la limite {m['max_beta']:.2f}."
-            career.log(player, "deal", f"Mandat {m['client']} réussi (+{growth:.1f}%)")
+            reason = _L(f"Objectif atteint : {growth:+.1f}% (cible +{m['target_pct']:.1f}%), "
+                        f"bêta {beta:.2f} sous la limite {m['max_beta']:.2f}.",
+                        f"Target reached: {growth:+.1f}% (target +{m['target_pct']:.1f}%), "
+                        f"beta {beta:.2f} under the limit {m['max_beta']:.2f}.")
+            career.log(player, "deal", _L(f"Mandat {m['client']} réussi (+{growth:.1f}%)",
+                                          f"Mandate {m['client']} succeeded (+{growth:.1f}%)"))
         else:
             player.adjust_reputation(-m["penalty_rep"])
             reason = failure_reason(m, growth, beta)
-            career.log(player, "crisis", f"Mandat {m['client']} échoué ({reason})")
+            career.log(player, "crisis", _L(f"Mandat {m['client']} échoué ({reason})",
+                                            f"Mandate {m['client']} failed ({reason})"))
         result = {"mandate": m, "ok": ok, "growth": growth, "beta": beta, "reason": reason,
                   "client": m["client"], "target_pct": m["target_pct"], "max_beta": m["max_beta"],
                   "reward_cash": m["reward_cash"], "reward_rep": m["reward_rep"],

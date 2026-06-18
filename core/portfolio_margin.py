@@ -57,7 +57,11 @@ def gross_exposure(player, market):
 
 
 def net_worth(player, market):
-    """Valeur nette = trésorerie + positions actions signées + obligations."""
+    """Valeur nette = trésorerie + positions actions signées + TOUTES les autres
+    classes d'actifs détenues (obligations, commodities, crypto, ETF, produits
+    structurés, titrisation, M&A, options, FX, couvertures). Cette valeur nette
+    sert aussi d'equity de base pour le levier et l'appel de marge : elle doit
+    donc refléter l'intégralité du patrimoine, sinon le levier est surestimé."""
     nw = player.cash + positions_value(player, market)
     if getattr(player, "bonds", None):
         from core import bonds
@@ -80,6 +84,15 @@ def net_worth(player, market):
     if getattr(player, "ma_owned", None):
         from core import ma
         nw += ma.holdings_value(player)
+    if getattr(player, "options", None):
+        from core import options as options_mod
+        nw += options_mod.holdings_value(player, market)
+    if getattr(player, "fx_positions", None):
+        from core import fx as fx_mod
+        nw += fx_mod.holdings_value(player, market)
+    if getattr(player, "hedges", None):
+        from core import hedging
+        nw += hedging.holdings_value(player, market)
     return nw
 
 

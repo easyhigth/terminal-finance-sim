@@ -44,6 +44,8 @@ CMD_NAMES = [
     "PITCH", "FRONTIER", "RISK", "QUANT", "MA", "SHEET", "GLOSSARY",
     "SAVE", "SAVES", "NEWS", "MORE", "REG", "STATUS", "MENU",
     "TEAM", "EQUIPE", "STRESS", "TIMELINE",
+    "GP", "GPC", "GPO", "GPCH", "COMP", "HS", "HVOL", "BETA", "CORR",
+    "GEG", "GC", "RV", "ECO", "DEFINE", "PA",
 ]
 
 SAMPLE_NEWS = {

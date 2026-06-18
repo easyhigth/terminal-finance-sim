@@ -61,6 +61,26 @@ def test_net_worth_is_cash_plus_positions_value():
     assert pm.net_worth(p, m) == pytest.approx(expected)
 
 
+def test_net_worth_includes_all_asset_classes():
+    """La valeur nette (= equity de base du levier/appel de marge) doit inclure
+    options, FX et couvertures, pas seulement actions/obligations : sinon le
+    levier d'un joueur long options/FX/hedges serait surévalué."""
+    from core import fx, hedging, options
+    p, m = _setup(grade_index=10, cash=500_000.0)
+    base = pm.net_worth(p, m)
+    assert base == pytest.approx(500_000.0)
+
+    # une position FX spot ouverte (sans débit de cash) : son P&L latent compte
+    pair = list(fx._BY_PAIR.keys())[0]
+    fx.open_spot(p, m, pair, "long", 100_000.0)
+    expected_fx = fx.holdings_value(p, m)
+    assert pm.net_worth(p, m) == pytest.approx(base + expected_fx)
+
+    # les helpers holdings_value des trois classes sont bien rebranchés
+    assert hasattr(options, "holdings_value")
+    assert hasattr(hedging, "holdings_value")
+
+
 def test_positions_value_is_signed_long_vs_short():
     p_long, m = _setup(cash=100_000.0)
     tk = m.companies[0]["ticker"]

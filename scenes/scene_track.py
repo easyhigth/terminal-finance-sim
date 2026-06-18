@@ -45,12 +45,13 @@ TRACK_INFO = {
 
 class TrackScene(Scene):
     def on_enter(self, **kwargs):
+        self.return_to = kwargs.get("return_to", "terminal")
         self.selected = None
         self.confirm = widgets.Button(
             (config.SCREEN_WIDTH//2-150, config.SCREEN_HEIGHT-80, 300, 50),
             "CONFIRMER LA VOIE", config.COL_UP, enabled=False)
         self.back = widgets.Button(
-            (40, config.SCREEN_HEIGHT-80, 160, 50), "← TERMINAL", config.COL_TEXT_DIM)
+            (40, config.SCREEN_HEIGHT-80, 160, 50), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self._cards = {}
         self._names = list(TRACK_INFO.keys())
         self.focus = 0   # index de la carte ayant le focus clavier
@@ -66,7 +67,7 @@ class TrackScene(Scene):
         p.track = self.selected
         p.flags["can_choose_track"] = False
         self.app.gs.save(config.AUTOSAVE_SLOT)
-        self.app.scenes.go("terminal")
+        self.app.scenes.go(self.return_to)
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -74,6 +75,9 @@ class TrackScene(Scene):
                 if rect.collidepoint(event.pos):
                     self._select(name)
         if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.app.scenes.go(self.return_to)
+                return
             cols = 3
             if event.key in (pygame.K_TAB, pygame.K_RIGHT, pygame.K_LEFT,
                              pygame.K_UP, pygame.K_DOWN):
@@ -90,7 +94,7 @@ class TrackScene(Scene):
             elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                 self._select(self._names[self.focus])
         if self.back.handle(event):
-            self.app.scenes.go("terminal")
+            self.app.scenes.go(self.return_to)
         if self.confirm.handle(event):
             self._confirm_track()
 

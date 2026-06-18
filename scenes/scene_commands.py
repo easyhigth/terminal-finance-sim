@@ -94,6 +94,7 @@ CATALOG = [
         ("MARGIN", "État de marge : equity, levier, pouvoir d'achat"),
         ("ALLOCATE <tk> <pct>", "Ajuster une position à pct% de la valeur nette"),
         ("HEDGE [pct]", "Réduire l'exposition (bêta) du portefeuille"),
+        ("PROTECT", "Acheter un put protecteur sur l'indice (couverture par options)"),
         ("REBALANCE", "Ramener les positions à poids égaux"),
         ("FRONTIER", "Frontière efficiente, optimisation Sharpe"),
         ("PITCH", "Démarcher un client pour un mandat"),
@@ -109,6 +110,8 @@ CATALOG = [
         ("STRUCT", "Produits structurés (capital garanti, autocallable…)"),
         ("CREDIT", "Desk crédit : tranches de titrisation & waterfall"),
         ("ALM", "Gestion actif-passif : gaps de taux, NII, ΔEVE"),
+        ("OPTIONS / OPTION", "Desk d'options vanille (calls/puts) sur une action"),
+        ("IPO / IPOS", "Desk d'IPO : souscrire à une introduction en bourse"),
     ]),
     ("Modules d'analyse", [
         ("MA", "M&A : LBO, accretion / dilution"),

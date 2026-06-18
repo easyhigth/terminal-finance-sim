@@ -25,6 +25,8 @@ SECTIONS = [
         ("Swaps de devises", "swaps", {}),
         ("Gouvernements", "governments", {}),
         ("Desk FX", "fx", {}),
+        ("Desk d'options (calls/puts)", "options", {}),
+        ("IPO", "ipo", {}),
     ]),
     ("Analyse & outils", [
         ("Graphes", "graph", {"kind": "line"}),
@@ -33,6 +35,7 @@ SECTIONS = [
         ("Quant (options)", "quant", {}),
         ("M&A (cibles & LBO)", "ma", {}),
         ("Frontière efficiente", "portfolio", {}),
+        ("Couverture (hedge)", "hedge", {}),
         ("ALM bancaire", "alm", {}),
         ("Tableur", "spreadsheet", {}),
     ]),
@@ -45,6 +48,7 @@ SECTIONS = [
         ("Rivaux", "rivals", {}),
         ("Inbox", "inbox", {}),
         ("News & événements", "news", {}),
+        ("Calendrier macro", "calendar", {}),
         ("Mandats clients", "mandates", {}),
         ("Deals", "deals", {}),
         ("Historique complet", "history", {}),
@@ -126,8 +130,8 @@ class MoreScene(Scene):
                     y += BTN_H + BTN_GAP
                 x = area.x + col * (BTN_W + BTN_GAP)
                 rect = pygame.Rect(x, y, BTN_W, BTN_H)
-                self._btn_rects.append((rect, scene, kw))
                 if area.top - BTN_H < rect.y < area.bottom:
+                    self._btn_rects.append((rect, scene, kw))
                     hover = rect.collidepoint(mp)
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL,
                                      rect, border_radius=5)

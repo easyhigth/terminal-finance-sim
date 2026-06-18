@@ -145,6 +145,17 @@ class TerminalRenderMixin:
         r = widgets.draw_text(surf, f"{p.day} (T{p.quarter})",
                               (x + fonts.small().size("DAY  ")[0], y), fonts.small(bold=True),
                               config.COL_WHITE)
+        x = r.right + 18
+        # levier / marge — toujours visible, pour anticiper un margin call
+        st = pf_mod.margin_status(p, self.market)
+        r = widgets.draw_text(surf, "LEV  ", (x, y), fonts.small(), config.COL_TEXT_DIM)
+        lev = st["leverage"]
+        lev_txt = f"{lev:.2f}x" if lev != float("inf") else "∞"
+        lev_col = config.COL_DOWN if st["margin_call"] else (
+            config.COL_WARN if lev >= 0.85 * st["max_leverage"] else config.COL_UP)
+        r = widgets.draw_text(surf, lev_txt, (r.right, y), fonts.small(bold=True), lev_col)
+        if st["margin_call"]:
+            widgets.draw_badge(surf, "⚠ MARGIN CALL", (r.right + 10, y - 2), config.COL_DOWN)
         # badge messagerie (non-lus) — aligné à droite
         unread = inbox_mod.unread_count(p)
         if unread:

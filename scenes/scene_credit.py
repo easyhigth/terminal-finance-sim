@@ -80,8 +80,9 @@ class CreditScene(Scene):
         cur = config.CONTINENTS[p.continent]["currency"]
         widgets.draw_text(surf, "DESK CRÉDIT — TITRISATION", (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
-        el = SEC.expected_pool_loss() * 100
-        widgets.draw_text(surf, f"Pool de prêts · perte attendue ≈ {el:.1f}% · cascade : "
+        el = SEC.expected_pool_loss(m) * 100
+        regime_note = f" · régime : {m.regime_label()}" if m else ""
+        widgets.draw_text(surf, f"Pool de prêts · perte attendue ≈ {el:.1f}%{regime_note} · cascade : "
                                 "l'equity encaisse les premières pertes, le senior est protégé. "
                                 + self.msg,
                           (42, 74), fonts.small(), config.COL_TEXT_DIM)
@@ -114,7 +115,7 @@ class CreditScene(Scene):
         self.invest_rects = {}
         y = inner.y + 26
         q_filter = self.search.strip().lower()
-        quotes = [q for q in SEC.all_quotes()
+        quotes = [q for q in SEC.all_quotes(m)
                   if not q_filter or q_filter in q["name"].lower() or q_filter in q["rating"].lower()]
         for q in quotes:
             widgets.draw_text(surf, q["name"], (cols[0][1], y), fonts.small(bold=True), config.COL_TEXT)

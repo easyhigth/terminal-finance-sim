@@ -31,8 +31,28 @@ def _scale(grade):
     return 1.0 + 0.6 * grade
 
 
-def maybe_offer(player, rng=None):
-    """Génère éventuellement une offre de mandat. Retourne l'offre ou None."""
+# Modulation par régime de marché courant (cf. core.market.REGIMES) : en phase
+# de Récession/Volatil, les clients resserrent la limite de risque tolérée
+# (mais paient plus pour la prudence) et visent des objectifs plus modestes ;
+# en Expansion, ils tolèrent davantage de bêta et visent plus haut. Donne du
+# sens aux mandats de risk management au-delà du seul profil du joueur.
+_REGIME_MULT = {
+    "Expansion": {"beta": 1.10, "fee": 0.90, "target": 1.15},
+    "Calme":     {"beta": 1.00, "fee": 1.00, "target": 1.00},
+    "Volatil":   {"beta": 0.85, "fee": 1.15, "target": 0.85},
+    "Récession": {"beta": 0.70, "fee": 1.30, "target": 0.65},
+}
+
+
+def maybe_offer(player, rng=None, market=None):
+    """Génère éventuellement une offre de mandat. Retourne l'offre ou None.
+    Le profil de risque (cf. core.career.risk_profile, dérivé du style de jeu
+    plutôt que du grade) module les offres : les clients qui acceptent un
+    bêta plus large paient une commission plus élevée à un gérant réputé
+    tolérant au risque ; un profil prudent reçoit des offres plus standard.
+    Le régime de marché courant (`market`, si fourni) module aussi la limite
+    de risque et l'objectif visés (cf. _REGIME_MULT)."""
+    from core import career
     rng = rng or random
     if player.grade_index < MIN_GRADE:
         return None
@@ -42,9 +62,20 @@ def maybe_offer(player, rng=None):
         return None
     capital = round(rng.uniform(300_000, 1_200_000) * _scale(player.grade_index), -3)
     horizon = rng.choice([2, 3, 4])
-    target = round(rng.uniform(4.0, 7.0) * horizon, 1)     # % cumulé sur l'horizon
-    max_beta = round(rng.choice([1.0, 1.15, 1.3, 1.5]), 2)
-    fee_pct = rng.uniform(0.010, 0.025)
+    rmult = _REGIME_MULT.get(getattr(market, "regime", None), _REGIME_MULT["Calme"])
+    target = round(rng.uniform(4.0, 7.0) * horizon * rmult["target"], 1)  # % cumulé sur l'horizon
+    profile = career.risk_profile(player)
+    if profile == "Risque élevé":
+        max_beta = round(rng.choice([1.3, 1.5, 1.8, 2.0]), 2)
+        fee_pct = rng.uniform(0.018, 0.035)
+    elif profile == "Modéré":
+        max_beta = round(rng.choice([1.15, 1.3, 1.5, 1.65]), 2)
+        fee_pct = rng.uniform(0.014, 0.028)
+    else:
+        max_beta = round(rng.choice([1.0, 1.15, 1.3, 1.5]), 2)
+        fee_pct = rng.uniform(0.010, 0.025)
+    max_beta = round(max_beta * rmult["beta"], 2)
+    fee_pct *= rmult["fee"]
     offer = {
         "id": player.next_mandate_id,
         "client": rng.choice(CLIENTS),

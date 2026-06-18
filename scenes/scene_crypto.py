@@ -10,11 +10,12 @@ from core import config, unlocks
 from core import crypto as K
 from core.scene_manager import Scene
 from ui import fonts, widgets
+from ui.popups import PopupMixin
 
 LOT = 1
 
 
-class CryptoScene(Scene):
+class CryptoScene(Scene, PopupMixin):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
         self.msg = ""
@@ -22,6 +23,8 @@ class CryptoScene(Scene):
         self._search_clear_rect = None
         self._t = 0.0
         self.buy_rects, self.sell_rects = {}, {}
+        self.name_rects = {}
+        self.init_popups()
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
@@ -35,6 +38,8 @@ class CryptoScene(Scene):
         return pygame.Rect(40, 100, 280, 24)
 
     def handle_event(self, event):
+        if self.popups_handle_event(event):
+            return
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 if self.search:
@@ -58,6 +63,10 @@ class CryptoScene(Scene):
             if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
                 self.search = ""
                 return
+            for cid, rect in self.name_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.open_crypto(cid)
+                    return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self._can_trade():
             p, m = self.app.gs.player, self.app.market
             for cid, rect in self.buy_rects.items():
@@ -122,6 +131,7 @@ class CryptoScene(Scene):
         for label, x in cols:
             widgets.draw_text(surf, label, (x, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         self.buy_rects, self.sell_rects = {}, {}
+        self.name_rects = {}
         y = inner.y + 26
         q_filter = self.search.strip().lower()
         quotes = [q for q in K.all_quotes(m)
@@ -129,8 +139,11 @@ class CryptoScene(Scene):
         for q in quotes:
             pos = p.crypto.get(q["id"])
             held = pos["qty"] if pos else 0
+            name_rect = pygame.Rect(cols[0][1], y - 2, 280, 22)
+            self.name_rects[q["id"]] = name_rect
+            hover = name_rect.collidepoint(pygame.mouse.get_pos())
             widgets.draw_text(surf, f"{q['name']} ({q['id']})", (cols[0][1], y),
-                              fonts.small(bold=True), config.COL_TEXT)
+                              fonts.small(bold=True), config.COL_CYAN if hover else config.COL_TEXT)
             widgets.draw_text(surf, f"{q['spot']:,.2f}".replace(",", " "), (cols[1][1], y),
                               fonts.small(bold=True), config.COL_WHITE)
             widgets.draw_text(surf, f"{q['vol']*100:.0f}%", (cols[2][1], y), fonts.small(),
@@ -167,3 +180,4 @@ class CryptoScene(Scene):
                           config.COL_UP if hv else config.COL_TEXT_DIM)
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)
+        self.popups_draw(surf)

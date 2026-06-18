@@ -138,22 +138,26 @@ class CareerScene(Scene):
     def _draw_stats(self, surf, rect, p):
         inner = widgets.draw_panel(surf, rect, "Statistiques de run", config.COL_CYAN)
         cur = config.CONTINENTS[p.continent]["currency"]
+        profile = career.risk_profile(p)
+        profile_col = {"Risque élevé": config.COL_DOWN, "Modéré": config.COL_WARN,
+                       "Prudent": config.COL_UP}.get(profile, config.COL_TEXT)
         rows = [
-            ("Trésorerie", widgets.format_money(p.cash, cur)),
-            ("Record trésorerie", widgets.format_money(max(p.best_cash, p.cash), cur)),
-            ("Réputation", f"{p.reputation}/100"),
-            ("Deals conclus", str(p.deals_won)),
-            ("Missions réalisées", str(p.missions_done)),
-            ("Scrutin réglementaire", f"{p.heat}/100"),
-            ("Temps", f"jour {p.day} (T{p.quarter})"),
+            ("Trésorerie", widgets.format_money(p.cash, cur), config.COL_WHITE),
+            ("Record trésorerie", widgets.format_money(max(p.best_cash, p.cash), cur), config.COL_WHITE),
+            ("Réputation", f"{p.reputation}/100", config.COL_WHITE),
+            ("Profil de risque", profile, profile_col),
+            ("Deals conclus", str(p.deals_won), config.COL_WHITE),
+            ("Missions réalisées", str(p.missions_done), config.COL_WHITE),
+            ("Scrutin réglementaire", f"{p.heat}/100", config.COL_WHITE),
+            ("Temps", f"jour {p.day} (T{p.quarter})", config.COL_WHITE),
         ]
         # pas de ligne adaptatif : toutes les lignes tiennent dans le panneau
         step = max(18, min(25, inner.h // len(rows)))
         y = inner.y
-        for label, val in rows:
+        for label, val, col in rows:
             widgets.draw_text(surf, label, (inner.x, y), fonts.small(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, val, (inner.right, y), fonts.small(bold=True),
-                              config.COL_WHITE, align="right")
+                              col, align="right")
             y += step
 
     def _draw_objectives(self, surf, rect, p):

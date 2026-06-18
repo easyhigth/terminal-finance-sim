@@ -17,16 +17,18 @@ le jeu interactivement : on vérifie via la compilation, les tests, et le harnai
 ## Tests
 
 ```bash
-pip install numpy scipy pytest
+pip install numpy scipy pytest pygame
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
 ```
 
-- Suite pytest dans `tests/` (~150 tests). Couvre la logique pure : finmath (formules),
+- Suite pytest dans `tests/` (~200 tests). Couvre la logique pure : finmath (formules),
   market (déterminisme, calibration, crises, earnings, régimes, attribution), portfolio
   (levier/short), exam, tracks, deal_game, financials.
-- Les tests ciblent la logique pure : numpy/scipy suffisent, **pygame n'est pas requis** pour
-  pytest. La CI (`.github/workflows/tests.yml`) installe seulement `numpy scipy pytest`.
-- `SDL_VIDEODRIVER=dummy` permet d'instancier les scènes sans écran si besoin.
+- `tests/test_scene_smoke.py` est un test de fumée headless qui visite **chaque** scène
+  enregistrée dans `main.py::App` via `on_enter()`/`update()`/`draw()`, pour attraper en CI
+  les régressions de rendu (AttributeError...) qu'un simple `py_compile` ne voit pas. Ce
+  test nécessite pygame ; la CI (`.github/workflows/tests.yml`) installe donc
+  `numpy scipy pytest pygame` avec `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy`.
 
 ## Vérification d'une modif
 

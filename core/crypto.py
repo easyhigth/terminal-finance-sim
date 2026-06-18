@@ -152,6 +152,22 @@ def spot(market, cid):
     return p[step] * (_BY_ID[cid][2] if _BY_ID[cid][5] else 1.0)  # stable: niveau×base(=1)
 
 
+def history(market, cid, n=None):
+    """Historique de spot complet (depuis l'origine) d'un crypto-actif.
+    `n` borne au dernier n points si fourni. Retourne une liste de floats."""
+    if cid not in _BY_ID:
+        return []
+    step = int(getattr(market, "step_count", 0))
+    if is_cbdc(cid):
+        path = [1.0] * (step + 1)
+        return path[-n:] if n else path
+    c = _BY_ID[cid]
+    raw = _path(market, cid, step)[:step + 1]
+    factor = c[2] if c[5] else 1.0   # stable: niveau×base ; sinon le path est déjà au prix
+    path = [v * factor for v in raw]
+    return path[-n:] if n else path
+
+
 def quote(market, cid):
     c = _BY_ID.get(cid)
     if not c:

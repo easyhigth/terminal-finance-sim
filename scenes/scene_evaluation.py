@@ -237,6 +237,9 @@ class EvaluationScene(Scene):
                 if grade == p.grade_index:
                     self.app.notify(_L(f"⊘→✓ Débloqué : {unlocks.feature_label(feat)}",
                                         f"⊘→✓ Unlocked: {unlocks.feature_label(feat)}"), "good")
+                    tid = unlocks.FEATURE_TUTORIAL.get(feat)
+                    if tid and not p.flags.get("pending_tutorial"):
+                        p.flags["pending_tutorial"] = tid
         else:
             p.reputation = max(0, p.reputation - 5)
         self.app.gs.save(config.AUTOSAVE_SLOT)

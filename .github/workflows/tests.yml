@@ -26,7 +26,11 @@ jobs:
         with:
           python-version: "3.13"
       - name: Installer les dépendances de test
-        # Les tests ciblent la logique pure (finmath + market) : pas besoin de pygame.
-        run: pip install numpy scipy pytest
+        # pygame est requis depuis l'ajout du test de fumée des scènes
+        # (tests/test_scene_smoke.py), exécuté en mode headless (SDL dummy).
+        run: pip install numpy scipy pytest pygame
       - name: Lancer pytest
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
         run: pytest

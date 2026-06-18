@@ -139,6 +139,10 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
             self.app.advance_on_return = 0
             self._log(_L("  ⏱ Le temps avance pendant que vous travaillez…","  ⏱ Time advances while you work…"))
             self._advance_time()
+        # tutoriel auto-déclenché à l'unlock d'une fonctionnalité (cf. scene_evaluation._finish)
+        tid = p.flags.pop("pending_tutorial", None)
+        if tid:
+            self.app.scenes.go("tutorials", tid=tid, return_to="terminal")
 
     # --------------------------------------------------------------- events
     def handle_event(self, event):

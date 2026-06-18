@@ -346,6 +346,10 @@ class GameState:
                     dividends += cbi
             financing = portfolio.accrue_financing(p, market, config.DAYS_PER_STEP)
             margin_call = portfolio.check_margin_call(p, market)
+            # échantillonnage du levier (style de jeu, indépendant de la progression de
+            # grade) : utilisé par career.risk_profile() pour moduler les mandats proposés.
+            if portfolio.leverage(p, market) >= 2.5:
+                p.flags["high_leverage_steps"] = p.flags.get("high_leverage_steps", 0) + 1
             # produits structurés arrivés à échéance
             if getattr(p, "structured", None):
                 from core import structured as _struct

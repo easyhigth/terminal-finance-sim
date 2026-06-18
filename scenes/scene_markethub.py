@@ -266,9 +266,10 @@ class MarketHubScene(Scene, PopupMixin):
         if self._regime_rect.collidepoint(mp):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._regime_rect, border_radius=3)
         widgets.draw_text(surf, "Régime de marché", (inner.x, y), fonts.small(), config.COL_TEXT)
-        widgets.draw_text(surf, self.market.regime_label(), (inner.right, y),
-                          fonts.small(bold=True), config.COL_UP if reg_good else config.COL_DOWN,
-                          align="right")
+        age = self.market.regime_age()
+        widgets.draw_text(surf, f"{self.market.regime_label()} (depuis {age} sem.)",
+                          (inner.right, y), fonts.small(bold=True),
+                          config.COL_UP if reg_good else config.COL_DOWN, align="right")
         y += 26
         self._eco_row_rects = {}
         for key in ["rate", "inflation", "growth", "unemployment", "confidence"]:

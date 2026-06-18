@@ -33,7 +33,7 @@ from ui.worldmap import WorldMap
 CMD_NAMES = [
     "HELP", "COMMANDS", "ADV", "MISSION", "EVAL", "EXAMCERT", "TRACK", "CAREER", "INBOX",
     "RIVALS", "MANDATES", "MANDATE", "DECIDE", "MARKET", "MARKETHUB", "TOP", "MOVERS",
-    "COMPANY", "FA", "SEARCH", "ACCESS", "EXPLORE", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
+    "COMPANY", "FA", "SEARCH", "ACCESS", "EXPLORE", "SHOP", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS",
     "PORTFOLIO", "BOOK", "BUY", "SELL", "LONG", "SHORT", "COVER", "MARGIN",
     "BONDS", "BUYBOND", "SELLBOND", "GOV", "GOVERNMENTS", "PAYS",
@@ -426,6 +426,8 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
             self._cmd_top(arg)
         elif cmd in ("EXPLORE", "EXPLORER", "EXPLO"):
             self.app.scenes.go("explorer", return_to="terminal")
+        elif cmd == "SHOP":
+            self.app.scenes.go("shop", return_to="terminal")
         elif cmd in ("MOVERS", "MOVER"):
             self._cmd_movers()
         elif cmd in ("COMPANY", "CO", "TICKER", "DES"):

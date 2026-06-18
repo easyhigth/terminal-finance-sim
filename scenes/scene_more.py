@@ -15,6 +15,7 @@ from ui import fonts, widgets
 SECTIONS = [
     ("Marchés & actifs", [
         ("Marché", "markethub", {}),
+        ("Boutique (acheter tout actif)", "shop", {}),
         ("Explorateur", "explorer", {}),
         ("ETF", "etfs", {}),
         ("Obligations", "bonds", {}),

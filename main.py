@@ -59,6 +59,7 @@ from scenes.scene_review import ReviewScene
 from scenes.scene_risk import RiskScene
 from scenes.scene_rivals import RivalsScene
 from scenes.scene_saves import SavesScene
+from scenes.scene_shop import ShopScene
 from scenes.scene_splash import SplashScene
 from scenes.scene_spreadsheet import SpreadsheetScene
 from scenes.scene_stresstest import StressTestScene
@@ -145,6 +146,7 @@ class App:
         self.scenes.register("tutorials", TutorialsScene(self))
         self.scenes.register("splash", SplashScene(self))
         self.scenes.register("markethub", MarketHubScene(self))
+        self.scenes.register("shop", ShopScene(self))
         self.scenes.register("examcert", ExamCertScene(self))
         self.scenes.register("stresstest", StressTestScene(self))
         self.scenes.register("history", HistoryScene(self))

@@ -60,6 +60,7 @@ CATALOG = [
         ("COMPANY / DES <tk>", "Fiche société type Bloomberg. Ex : DES MVC"),
         ("FA <tk>", "États financiers : résultat + bilan (N/N-1/N-2)"),
         ("RV <tk>", "Valeur relative : multiples vs pairs du secteur"),
+        ("SHOP", "Boutique unifiée : acheter actions, ETF, obligations, commodities, crypto…"),
         ("SEARCH <texte>", "Rechercher une société par nom ou ticker"),
         ("SECTOR [nom]", "Vue par secteur"),
         ("REGION [nom]", "Vue par région"),

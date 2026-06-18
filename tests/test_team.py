@@ -1,7 +1,32 @@
-"""Tests de l'équipe d'analystes juniors (core/team.py)."""
+"""Tests de l'équipe d'analystes juniors (core/team.py).
+
+NB : la clé "team" est ajoutée à `unlocks.UNLOCKS` par l'orchestrateur central
+(cf. CLAUDE.md de la tâche), pas par ce module. Pour tester le gating par
+grade indépendamment de cet ajout, ces tests forcent temporairement la
+présence de la clé via un fixture monkeypatch, en restaurant l'état d'origine
+après chaque test.
+"""
+import pytest
+
 from core import team
 from core import unlocks
 from core.game_state import PlayerState
+
+REQUIRED_GRADE = 6  # grade recommandé (Vice President), cohérent avec hedge/leverage/mandates/options
+
+
+@pytest.fixture(autouse=True)
+def _ensure_team_unlock_key():
+    """Garantit que la clé "team" existe dans UNLOCKS pendant le test, quel que
+    soit l'état d'intégration de l'orchestrateur, puis restaure l'état initial."""
+    had_key = "team" in unlocks.UNLOCKS
+    original = unlocks.UNLOCKS.get("team")
+    unlocks.UNLOCKS["team"] = REQUIRED_GRADE
+    yield
+    if had_key:
+        unlocks.UNLOCKS["team"] = original
+    else:
+        del unlocks.UNLOCKS["team"]
 
 
 def _mk(grade_index=6, cash=100_000.0):

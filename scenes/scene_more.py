@@ -23,6 +23,7 @@ SECTIONS = [
         ("Titrisation / ABS", "credit", {}),
         ("Swaps de devises", "swaps", {}),
         ("Gouvernements", "governments", {}),
+        ("Desk FX", "fx", {}),
     ]),
     ("Analyse & outils", [
         ("Graphes", "graph", {"kind": "line"}),
@@ -45,6 +46,9 @@ SECTIONS = [
         ("News & événements", "news", {}),
         ("Mandats clients", "mandates", {}),
         ("Deals", "deals", {}),
+        ("Historique complet", "history", {}),
+        ("Stress test régulateur", "stresstest", {}),
+        ("Équipe / analystes", "team", {}),
     ]),
     ("Apprendre", [
         ("Académie", "academy", {}),

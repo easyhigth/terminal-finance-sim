@@ -7,9 +7,9 @@ scene_ma_target.py — Fiche détaillée d'une cible / société M&A.
 Ouverte via le clic sur une ligne de la scène MA (CIBLES/PORTEFEUILLE).
 """
 import pygame
-from core import config
+
+from core import config, unlocks
 from core import ma as M
-from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

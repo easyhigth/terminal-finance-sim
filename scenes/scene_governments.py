@@ -11,9 +11,10 @@ stabilité) pilote le rendement exigé des obligations, et que les événements
 politiques régionaux font bouger ces spreads.
 """
 import pygame
+
+from core import bonds as B
 from core import config
 from core import governments as G
-from core import bonds as B
 from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets

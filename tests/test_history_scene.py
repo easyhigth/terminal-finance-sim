@@ -3,6 +3,7 @@ tests/test_history_scene.py — Tests de core/career_history.py (logique pure)
 et smoke-test headless de scenes/scene_history.py::HistoryScene.
 """
 import os
+
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 

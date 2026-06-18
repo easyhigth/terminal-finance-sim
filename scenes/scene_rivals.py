@@ -7,7 +7,9 @@ rival juste au-dessus du joueur est mis en avant comme « némésis ». Ouvert v
 la commande RIVALS ou le rail latéral.
 """
 import pygame
-from core import config, rivals as R
+
+from core import config
+from core import rivals as R
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

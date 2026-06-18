@@ -45,7 +45,7 @@ def unread_count(player):
 # Déclencheurs contextuels
 # ---------------------------------------------------------------------------
 def on_promotion(player):
-    push(player, "manager", manager_name(player), f"Bravo pour votre promotion",
+    push(player, "manager", manager_name(player), "Bravo pour votre promotion",
          f"{player.name}, votre passage au grade {player.grade} est mérité. "
          "De nouvelles responsabilités vous attendent — ne décevez pas le comité.")
     if player.grade_index >= 6:

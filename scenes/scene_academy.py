@@ -5,6 +5,7 @@ formule, exemple chiffré, à retenir). Lire une leçon la marque comme apprise
 (+1 réputation la 1ʳᵉ fois) ; tout lire débloque un badge. Ouvert via LEARN.
 """
 import pygame
+
 from core import config
 from core.scene_manager import Scene
 from data import lessons as L
@@ -71,7 +72,7 @@ class AcademyScene(Scene):
         self.tuto_btn.update(mp, dt)
 
     def draw(self, surf):
-        from core.i18n import t, get_lang
+        from core.i18n import get_lang, t
         lang = get_lang()
         lessons_loc, topics_loc = L.localized(lang)
         surf.fill(config.COL_BG)

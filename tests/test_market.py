@@ -8,7 +8,7 @@ l'émergence des indices et l'effet des crises.
 import numpy as np
 import pytest
 
-from core.market import Market, Crisis, REGIMES
+from core.market import REGIMES, Crisis, Market
 
 STEPS_PER_YEAR = 52  # un pas de marché ≈ une semaine (cf. market.py)
 
@@ -87,7 +87,6 @@ def test_annualized_return_and_vol_in_target_range():
     vol absurde) qui casserait l'équilibrage.
     """
     m = Market(seed=2024)
-    p0 = m.price.copy()
     n_steps = 5 * STEPS_PER_YEAR
     # collecte des rendements log agrégés (moyenne des sociétés par pas)
     step_rets = []

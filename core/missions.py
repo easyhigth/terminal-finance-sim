@@ -193,14 +193,14 @@ def _gen_decision(market, rng, region, grade):
         pe = mt["pe"]
         mom = round(rng.uniform(-18, 18), 1)   # momentum 3 mois (donné au joueur)
         if pe < 16 and mom > 1:
-            ans, label = 0, "ACHETER"
+            ans = 0
             why = "P/E raisonnable et momentum positif : signal d'achat."
         elif pe > 38 or mom < -9:
-            ans, label = 2, "VENDRE"
+            ans = 2
             why = ("Valorisation tendue (P/E élevé)" if pe > 38 else
                    "Momentum nettement négatif") + " : alléger / vendre."
         else:
-            ans, label = 1, "CONSERVER"
+            ans = 1
             why = "Ni signal d'achat franc ni de vente : conserver et surveiller."
         prompt = (f"{c['ticker']} ({_SECTOR_LABELS.get(c['sector'], c['sector'])}) — "
                   f"P/E {pe:.1f}, momentum 3 mois {mom:+.1f}%, "

@@ -11,8 +11,8 @@ Regroupe :
 Aucune dépendance pygame : testable en headless.
 """
 import random
-from core import config
-from core import missions
+
+from core import config, missions
 
 
 # ---------------------------------------------------------------------------

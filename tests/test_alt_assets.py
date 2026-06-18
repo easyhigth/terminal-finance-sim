@@ -1,11 +1,11 @@
 """Tests des classes d'actifs alternatives : commodities (futures) et crypto."""
 import pytest
 
-from core.market import Market
-from core.game_state import PlayerState
 from core import commodities as C
 from core import crypto as K
 from core import portfolio as pf
+from core.game_state import PlayerState
+from core.market import Market
 
 
 def _setup():

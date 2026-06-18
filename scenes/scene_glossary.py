@@ -4,11 +4,12 @@ Navigation par catégorie à gauche, liste des termes au centre,
 définition détaillée à droite. Filtre de recherche au clavier.
 """
 import pygame
+
 from core import config
-from core.scene_manager import Scene
-from ui import fonts, widgets
 from core.i18n import get_lang
+from core.scene_manager import Scene
 from data import glossary_data
+from ui import fonts, widgets
 
 
 class GlossaryScene(Scene):

@@ -5,10 +5,9 @@ bêta vs limite de risque) pour faciliter la décision ACCEPTER/REFUSER.
 Ouvert via MANDATS/MANDATE, le rail ou PLUS.
 """
 import pygame
-from core import config
+
+from core import config, unlocks
 from core import mandates as MD
-from core import portfolio
-from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

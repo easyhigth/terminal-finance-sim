@@ -12,10 +12,12 @@ Interaction : handle_click(pos, rect, market) renvoie une action :
   ("zoom", region) | ("company", ticker) | ("unzoom", None) | None
 """
 import math
+
 import pygame
+
 from core import config
+from data.worldmap_geo import WORLD as CONTINENTS  # côtes détaillées (normalisées)
 from ui import fonts, widgets
-from data.worldmap_geo import WORLD as CONTINENTS   # côtes détaillées (normalisées)
 
 REGION_HUBS = {
     "USA":     {"pos": (0.16, 0.31), "color": config.COL_USA},

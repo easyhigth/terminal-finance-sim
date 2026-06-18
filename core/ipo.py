@@ -22,6 +22,7 @@ Structures (PlayerState) :
                encore liquidées par evaluate_listings, transitoirement)
 """
 import random
+
 import numpy as np
 
 MIN_GRADE = 4              # Associate et au-delà (cf. unlocks "ipo")

@@ -10,30 +10,28 @@ Disposition :
 
 Tout se pilote au clavier. COMMANDS affiche le catalogue complet.
 """
-import math
 import pygame
+
+from core import badges as badges_mod
+from core import career as career_mod
 from core import config
 from core import deals as deals_mod
-from core import missions as missions_mod
-from core import career as career_mod
-from core import portfolio as pf_mod
+from core import dilemmas as dilemmas_mod
+from core import etfs as etfs_mod
+from core import history as history_mod
 from core import inbox as inbox_mod
+from core import ipo as ipo_mod
+from core import macrocal as macrocal_mod
+from core import mandates as mandates_mod
+from core import news as news_mod
+from core import politics as politics_mod
+from core import portfolio as pf_mod
 from core import rivals as rivals_mod
 from core import scenarios as scenarios_mod
-from core import politics as politics_mod
-from core import dilemmas as dilemmas_mod
-from core import badges as badges_mod
-from core import mandates as mandates_mod
-from core import ipo as ipo_mod
-from core import fx as fx_mod
-from core import macrocal as macrocal_mod
 from core import stresstest as stresstest_mod
-from core import team as team_mod
 from core import unlocks as unlocks_mod
-from core import history as history_mod
-from core import etfs as etfs_mod
-from core import news as news_mod
-from core.i18n import t as _t, get_lang
+from core.i18n import get_lang
+from core.i18n import t as _t
 from core.scene_manager import Scene
 
 
@@ -882,8 +880,8 @@ class TerminalScene(Scene):
         if not q:
             self._log(_L("  Usage : DEFINE <terme>  (ex: DEFINE WACC). Voir aussi GLOSSARY.","  Usage: DEFINE <term>  (e.g. DEFINE WACC). See also GLOSSARY."))
             return
-        from data import glossary_data
         from core.i18n import get_lang
+        from data import glossary_data
         GLOSSARY, _ = glossary_data.localized(get_lang())
         ql = q.lower()
         hit = None
@@ -1159,8 +1157,6 @@ class TerminalScene(Scene):
         rating = ("ACHAT" if upside > 12 else "VENTE" if upside < -12 else "NEUTRE")
         p.research[tk] = {"fair": round(fair, 2), "rating": rating,
                           "upside": round(upside, 1), "day": p.day}
-        rcol = (config.COL_UP if rating == "ACHAT" else
-                config.COL_DOWN if rating == "VENTE" else config.COL_WARN)
         self._log(_L(f"  Recherche {tk} : valeur intrinsèque {fair:.2f} "
                   f"(potentiel {upside:+.0f}%) → {rating}.",
                   f"  Research {tk}: intrinsic value {fair:.2f} "

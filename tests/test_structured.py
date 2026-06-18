@@ -1,9 +1,9 @@
 """Tests des produits structurés (core/structured.py) : payoffs non linéaires."""
 import pytest
 
-from core.market import Market
-from core.game_state import PlayerState
 from core import structured as S
+from core.game_state import PlayerState
+from core.market import Market
 
 
 def _prod(ti, notional=100_000.0, start=1000.0):

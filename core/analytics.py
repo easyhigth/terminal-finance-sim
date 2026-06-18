@@ -8,8 +8,9 @@ efficiente estimées sur l'historique réel. Logique pure (numpy), sans pygame.
 """
 import numpy as np
 
-from core import portfolio as pf, finmath, charts
+from core import charts, finmath
 from core import market as _market
+from core import portfolio as pf
 
 STEPS_PER_YEAR = _market.STEPS_PER_YEAR
 _HIST = 120          # fenêtre d'historique pour vol / corrélation / frontière

@@ -17,6 +17,7 @@ clics spécifiques au contenu, et `draw()` pour le rendu (en appelant d'abord
 `self._draw_chrome(surf)`, qui renvoie le rect de contenu, ou None si réduite).
 """
 import pygame
+
 from core import config
 from ui import fonts, widgets
 

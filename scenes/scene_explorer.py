@@ -24,9 +24,10 @@ Ouvert via EXPLORE, ou en cliquant le titre du panneau « Entreprises » du
 terminal.
 """
 import pygame
-from core import config
+
 from core import bonds as B
 from core import commodities as C
+from core import config
 from core import etfs as ETF
 from core import governments as GOV
 from core import unlocks as unlocks_mod

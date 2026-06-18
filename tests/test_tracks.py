@@ -3,10 +3,10 @@ le portefeuille, les deals et les mandats.
 """
 import pytest
 
-from core import tracks, deals
-from core.market import Market
-from core.game_state import PlayerState
+from core import deals, tracks
 from core import portfolio as pf
+from core.game_state import PlayerState
+from core.market import Market
 
 
 def _player(track="General", grade=8):
@@ -69,6 +69,5 @@ def test_mna_track_richer_deal_reward():
     import random
     pg = _player("M&A")
     # force un template M&A et compare la récompense au multiplicateur de voie
-    base_t = next(t for t in deals.DEAL_TEMPLATES if t["kind"] == "M&A")
     mult = tracks.perk(pg, "deal_reward_mult")
     assert mult > 1.0

@@ -7,9 +7,9 @@ absorbée de bas en haut (subordination). L'equity paie gros mais saute en
 premier ; le senior est protégé. Ouvert via CREDIT.
 """
 import pygame
-from core import config
+
+from core import config, unlocks
 from core import securitisation as SEC
-from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

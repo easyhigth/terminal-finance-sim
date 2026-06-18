@@ -3,11 +3,13 @@ scene_menu.py — Écran titre / menu principal.
 Bouton CONTINUER (reprend l'autosave) + résumé de la dernière partie.
 """
 import math
+
 import pygame
+
 from core import config
-from core.i18n import t, toggle_lang, get_lang
-from core.scene_manager import Scene
 from core.game_state import GameState
+from core.i18n import get_lang, t, toggle_lang
+from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.logo import draw_ta_logo
 

@@ -6,6 +6,7 @@ Grille de boutons regroupés par thème donnant accès en un clic à chaque scè
 apprentissage, système. Ouvert via le bouton PLUS du rail ou la commande MORE.
 """
 import pygame
+
 from core import config
 from core.scene_manager import Scene
 from ui import fonts, widgets

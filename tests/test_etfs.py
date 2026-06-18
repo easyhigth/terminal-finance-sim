@@ -2,9 +2,9 @@
 import numpy as np
 import pytest
 
-from core.market import Market
 from core import etfs
 from core.game_state import PlayerState
+from core.market import Market
 
 
 @pytest.fixture

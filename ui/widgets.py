@@ -4,6 +4,7 @@ Tout est dessiné à la main avec pygame.draw pour garder l'esthétique
 Bloomberg : panneaux à bordure fine, en-têtes ambre, texte monospace.
 """
 import pygame
+
 from core import config
 from ui import fonts
 

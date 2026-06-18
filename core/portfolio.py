@@ -20,7 +20,6 @@ Conventions :
   exposition brute      = Σ |shares|·prix
   levier                = exposition brute / equity
 """
-from core import config
 from core import tracks
 
 COMMISSION = 0.001        # 10 points de base par transaction

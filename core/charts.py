@@ -7,6 +7,7 @@ régression, spreads/ratios, courbe des taux. Toutes les fonctions travaillent
 sur des listes de prix/valeurs déjà fournies par le moteur de marché.
 """
 import math
+
 import numpy as np
 
 from core import market as _market

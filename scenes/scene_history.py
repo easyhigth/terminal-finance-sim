@@ -9,6 +9,7 @@ core/career_history.py::format_timeline.
 Ouvert via HISTORY depuis le terminal (câblage central, hors périmètre ici).
 """
 import pygame
+
 from core import config
 from core.career_history import format_timeline
 from core.scene_manager import Scene

@@ -6,6 +6,7 @@ répartition par secteur et le bêta. Le trading se fait au clavier depuis le
 terminal (BUY / SELL / ALLOCATE / HEDGE / REBALANCE).
 """
 import pygame
+
 from core import config
 from core import portfolio as pf
 from core.scene_manager import Scene
@@ -60,7 +61,6 @@ class BookScene(Scene, PopupMixin):
 
         pos_val = pf.positions_value(p, m)
         nw = pf.net_worth(p, m)        # valeur nette TOTALE (toutes classes d'actifs)
-        upnl = pf.unrealized_pnl(p, m)
         beta = pf.portfolio_beta(p, m)
         # bandeau de synthèse
         widgets.draw_text(surf, f"Valeur nette {widgets.format_money(nw, cur)}",
@@ -71,7 +71,10 @@ class BookScene(Scene, PopupMixin):
         widgets.draw_text(surf, sub, (config.SCREEN_WIDTH - 40, 70), fonts.small(),
                           config.COL_TEXT_DIM, align="right")
         # ventilation des autres classes d'actifs (obligataire / cmdty / crypto / ETF)
-        from core import bonds as _b, commodities as _c, crypto as _cr, etfs as _e
+        from core import bonds as _b
+        from core import commodities as _c
+        from core import crypto as _cr
+        from core import etfs as _e
         alt_bits = []
         for label, val in (("Oblig.", _b.holdings_value(p, m) if p.bonds else 0.0),
                            ("Cmdty", _c.holdings_value(p, m) if p.commodities else 0.0),

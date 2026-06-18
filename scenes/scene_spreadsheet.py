@@ -5,6 +5,7 @@ Affiche valeurs calculées dans la grille, formule brute dans la barre.
 Pré-rempli avec un mini-modèle DCF pour illustrer l'usage.
 """
 import pygame
+
 from core import config
 from core.scene_manager import Scene
 from core.spreadsheet_engine import Spreadsheet, idx_to_col

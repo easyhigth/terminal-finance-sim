@@ -6,9 +6,9 @@ scenes/scene_mandates.py pour le style (panneau gauche = catalogue/action,
 panneau droit = liste actuelle + licencier).
 """
 import pygame
-from core import config
+
+from core import config, unlocks
 from core import team as TEAM
-from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

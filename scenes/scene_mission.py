@@ -8,9 +8,10 @@ réputation (et un honoraire), nécessaires pour débloquer l'EVAL.
 États : intro → item → feedback → result.
 """
 import pygame
+
 from core import config
-from core.scene_manager import Scene
 from core import missions as M
+from core.scene_manager import Scene
 from ui import fonts, widgets
 
 # couleurs des deux courbes des missions graphiques

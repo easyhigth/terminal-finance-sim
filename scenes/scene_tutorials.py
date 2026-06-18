@@ -6,7 +6,9 @@ du jeu, étapes numérotées et encart « à comprendre ». Ouvert via la comman
 TUTO (ou le bouton TUTORIELS de l'Académie). Pensé pour ne jamais être perdu.
 """
 import os
+
 import pygame
+
 from core import config
 from core.scene_manager import Scene
 from data import tutorials as T

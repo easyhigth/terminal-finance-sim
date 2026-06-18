@@ -4,10 +4,12 @@ Affiche le motif, un récapitulatif de carrière, et renvoie au menu.
 En mode hardcore, la sauvegarde automatique est effacée (run définitif).
 """
 import math
+
 import pygame
+
 from core import config
-from core.scene_manager import Scene
 from core.game_state import GameState
+from core.scene_manager import Scene
 from ui import fonts, widgets
 
 

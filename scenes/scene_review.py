@@ -6,6 +6,7 @@ proposé) puis trois choix de négociation. Au clic, résout immédiatement via
 `core.review.negotiate` et affiche le résultat avant de revenir au terminal.
 """
 import pygame
+
 from core import config
 from core import review as R
 from core.scene_manager import Scene

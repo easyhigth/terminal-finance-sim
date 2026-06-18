@@ -1,9 +1,9 @@
 """Tests du desk crédit / titrisation (core/securitisation.py)."""
 import pytest
 
-from core.market import Market
-from core.game_state import PlayerState
 from core import securitisation as SEC
+from core.game_state import PlayerState
+from core.market import Market
 
 
 def test_waterfall_subordination():

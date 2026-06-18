@@ -9,6 +9,7 @@ sont aussi affichées en marqueurs persistants sur la carte du terminal.
 Ouvert via NEWS.
 """
 import pygame
+
 from core import config
 from core import news as N
 from core.scene_manager import Scene

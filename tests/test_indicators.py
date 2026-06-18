@@ -1,8 +1,7 @@
 """Tests pour core/indicators.py — indicateurs techniques (logique pure)."""
 import math
 
-from core.indicators import sma, ema, bollinger_bands, rsi
-
+from core.indicators import bollinger_bands, ema, rsi, sma
 
 # ----------------------------------------------------------------- fixtures
 SIMPLE = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]

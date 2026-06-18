@@ -5,8 +5,8 @@ bilan, recoupement de la dette nette, monotonie de l'historique, déterminisme.
 """
 import pytest
 
-from core.market import Market
 from core import financials as F
+from core.market import Market
 
 
 def _market():

@@ -9,12 +9,12 @@ Basé sur core.finmath (value_at_risk, conditional_var, parametric_var).
 """
 import numpy as np
 import pygame
+
 from core import config
-from core.scene_manager import Scene
 from core import finmath as fm
 from core import risk as risk_mod
+from core.scene_manager import Scene
 from ui import fonts, widgets
-
 
 # Exposition du portefeuille à des facteurs (valeur notionnelle en M)
 FACTORS = ["Equities", "Rates", "Credit", "FX", "Commodities"]
@@ -179,7 +179,6 @@ class RiskScene(Scene):
                                   (inner.right, y), fonts.small(bold=True),
                                   config.COL_WHITE, align="right")
                 y += 34
-            cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
             widgets.draw_text(surf, f"Max drawdown valeur nette : {self.max_dd*100:.1f}%",
                               (inner.x, inner.bottom - 40), fonts.small(bold=True),
                               config.COL_DOWN if self.max_dd > 0.15 else config.COL_TEXT_DIM)

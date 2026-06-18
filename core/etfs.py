@@ -30,8 +30,7 @@ dédiés (TQQ, SQQ…).
 """
 import numpy as np
 
-from core import config
-from core import finmath
+from core import config, finmath
 from data import companies as comp_data
 
 COMMISSION = 0.001        # 10 bps sur le notionnel échangé

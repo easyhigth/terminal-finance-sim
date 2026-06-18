@@ -19,7 +19,8 @@ ans d'historique du moteur de marché (préhistoire incluse) :
 Ouvrable depuis la console (GP/GPC/COMP/...), ou via le bouton GRAPHE des fiches.
 """
 import pygame
-from core import config, charts, indicators
+
+from core import charts, config, indicators
 from core import etfs as ETF
 from core.scene_manager import Scene
 from ui import fonts, widgets

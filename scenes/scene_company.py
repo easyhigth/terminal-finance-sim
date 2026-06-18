@@ -4,6 +4,7 @@ Affiche prix, capitalisation, multiples (P/E, EV/EBITDA), marges, dette,
 dividende, bêta et un graphe de prix. Ouverte via la commande COMPANY <ticker>.
 """
 import pygame
+
 from core import config
 from core.scene_manager import Scene
 from ui import fonts, widgets

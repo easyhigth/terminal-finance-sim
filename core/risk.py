@@ -13,7 +13,6 @@ import numpy as np
 
 from core import finmath
 from core import market as market_mod
-from core import portfolio as pf
 
 RATE_VOL_WEEKLY = 0.0010      # écart-type hebdo du taux (≈ 16 bps/an annualisé √52)
 

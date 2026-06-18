@@ -10,7 +10,9 @@ puis sur la police par défaut de pygame.
 """
 import os
 import sys
+
 import pygame
+
 from core import config
 
 

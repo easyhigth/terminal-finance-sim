@@ -7,9 +7,9 @@ cotation/dénouement dans core/options.py (Black-Scholes, cf. core.finmath).
 Calqué sur scenes/scene_hedge.py (puts protecteurs sur indice).
 """
 import pygame
-from core import config
+
+from core import config, unlocks
 from core import options as O
-from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

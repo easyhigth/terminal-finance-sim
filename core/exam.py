@@ -532,7 +532,7 @@ def g_forward(rng):
     S = _money(rng, 50, 400, 5)
     r = rng.choice([0.02, 0.03, 0.04, 0.05])
     T = rng.choice([1, 2, 3])
-    return _fill(_L(f"Spot {S}, taux {r*100:.0f}%, {T} an(s), sans dividende. ", f"Spot {S}, rate {r*100:.0f}%, {T}y, no dividend. ") + 
+    return _fill(_L(f"Spot {S}, taux {r*100:.0f}%, {T} an(s), sans dividende. ", f"Spot {S}, rate {r*100:.0f}%, {T}y, no dividend. ") +
                  _L("Prix forward ≈ ?", "Forward price ≈ ?"), S * ((1 + r) ** T),
                  _L("Cost of carry : F = S·(1+r)^T.", "Cost of carry: F = S·(1+r)^T."), tol=0.02)
 

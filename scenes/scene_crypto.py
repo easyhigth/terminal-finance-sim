@@ -5,9 +5,9 @@ Classe d'actifs très volatile. Le stablecoin (USDX) vise 1.0 mais peut DÉCROCH
 (depeg). Achat/vente au spot. Ouvert via CRYPTO.
 """
 import pygame
-from core import config
+
+from core import config, unlocks
 from core import crypto as K
-from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

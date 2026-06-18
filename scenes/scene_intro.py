@@ -3,6 +3,7 @@ scene_intro.py — Briefing de lancement d'une nouvelle partie.
 Explique le but du jeu et son fonctionnement avant d'entrer dans le terminal.
 """
 import pygame
+
 from core import config
 from core.scene_manager import Scene
 from ui import fonts, widgets

@@ -6,9 +6,9 @@ convertible, autocallable) sur l'indice de sa région. Le payoff est évalué à
 l'échéance (cf. core/structured). Ouvert via STRUCT.
 """
 import pygame
-from core import config
+
+from core import config, unlocks
 from core import structured as S
-from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

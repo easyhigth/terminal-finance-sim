@@ -5,8 +5,9 @@ Liste les programmes, leur statut, et permet de s'inscrire à l'examen suivant
 liée à votre voie booste la réputation et accélère les promotions.
 """
 import pygame
-from core import config
+
 from core import certifications as C
+from core import config
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

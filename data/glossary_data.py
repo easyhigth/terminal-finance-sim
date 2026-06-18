@@ -574,7 +574,8 @@ GLOSSARY.update({
 CATEGORIES = sorted(set(cat for cat, _ in GLOSSARY.values()))
 
 # ---- accès localisé (FR / EN) ---------------------------------------------
-from data.glossary_en import GLOSSARY_EN, display_name
+from data.glossary_en import GLOSSARY_EN, display_name  # noqa: F401 (ré-exporté)
+
 _CATEGORIES_EN = sorted(set(cat for cat, _ in GLOSSARY_EN.values()))
 
 

@@ -5,9 +5,9 @@ d'échéance, pour faciliter le choix avant de lancer le mini-jeu (DEAL <id>).
 Ouvert via DEALS, le rail ou PLUS.
 """
 import pygame
-from core import config
+
+from core import config, unlocks
 from core import deals as D
-from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

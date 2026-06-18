@@ -19,7 +19,6 @@ Chaque modèle d'événement :
               dépendant du grade (les montants grossissent avec la carrière)
 """
 import random
-from core import config
 
 # Atténuateur global de l'impact cash des événements aléatoires legacy.
 # Mis à 0 : dans la refonte « autour du marché », l'impact financier d'un choc

@@ -7,9 +7,9 @@ le taux domestique), une maturité et un notionnel, puis conclut un swap qui
 jusqu'à l'échéance (cf. core/swaps.py). Ouvert via SWAP/SWAPS.
 """
 import pygame
-from core import config
+
+from core import config, unlocks
 from core import swaps as SW
-from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

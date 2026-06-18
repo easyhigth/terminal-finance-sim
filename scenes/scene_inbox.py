@@ -4,6 +4,7 @@ Liste des messages à gauche (non-lus en gras), volet de lecture à droite.
 Cliquer un message le marque comme lu. Ouvert via INBOX / MAIL.
 """
 import pygame
+
 from core import config
 from core.scene_manager import Scene
 from ui import fonts, widgets
@@ -107,7 +108,6 @@ class InboxScene(Scene):
                               fonts.body(), config.COL_TEXT_DIM)
         else:
             y = linner.y
-            mp = pygame.mouse.get_pos()
             for idx in order:
                 m = msgs[idx]
                 row = pygame.Rect(linner.x - 4, y - 2, linner.w + 8, 46)

@@ -3,11 +3,12 @@ scene_continent.py — Choix du continent de départ.
 Affiche le globe interactif + panneaux réglementaires par région.
 """
 import pygame
+
 from core import config
-from core.i18n import t
 from core import startscenarios as scen
-from core.scene_manager import Scene
 from core.game_state import GameState, PlayerState
+from core.i18n import t
+from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.globe import Globe
 
@@ -58,6 +59,7 @@ class ContinentScene(Scene):
             )
             scen.apply(gs.player, scen.SCENARIOS[self.scen_idx]["id"])  # conditions de départ
             import random as _r
+
             from core import market as _mkt
             gs.player.market_seed = _r.randint(1, 2_000_000_000)
             # démarre la carrière après 5 ans de marché : les graphes ont un passé

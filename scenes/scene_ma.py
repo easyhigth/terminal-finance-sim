@@ -7,11 +7,11 @@ scene_ma.py — Hub M&A : trois onglets.
 Ouvert via MA, le rail (M&A) ou PLUS.
 """
 import pygame
-from core import config
-from core import ma as M
-from core import unlocks
-from core.scene_manager import Scene
+
+from core import config, unlocks
 from core import finmath as fm
+from core import ma as M
+from core.scene_manager import Scene
 from ui import fonts, widgets
 
 ROW_H = 24

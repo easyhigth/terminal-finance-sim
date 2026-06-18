@@ -548,6 +548,65 @@ TUTORIALS = [
                    "pari sur l'appétit du marché au moment de la cotation, "
                    "distinct de l'analyse fondamentale classique.",
     },
+    {
+        "id": "fx",
+        "title": "Desk FX : spot et forward sur devises",
+        "image": "fx.png",
+        "intro": "Le DESK FX permet de prendre position sur des paires de devises "
+                 "majeures, en SPOT (position ouverte/fermée librement) ou en "
+                 "FORWARD (verrouillée à l'avance, réglée à échéance). Ouvert "
+                 "avec FX.",
+        "steps": [
+            "Ouvrez le desk : FX — choisissez une paire (ex. EUR/USD) et une "
+            "direction : LONG (vous gagnez si la devise de base monte) ou "
+            "SHORT (vous gagnez si elle baisse).",
+            "En SPOT : aucun cash débité à l'ouverture (position notionnelle, "
+            "comme une couverture) — le P&L latent suit l'écart entre le taux "
+            "courant et le taux d'entrée ; fermez quand vous le souhaitez pour "
+            "réaliser le P&L en cash.",
+            "En FORWARD : choisissez une maturité (1, 3 ou 6 mois) — le taux "
+            "est verrouillé immédiatement, sans débit de cash, et le contrat se "
+            "règle automatiquement à l'échéance selon le taux final.",
+            "Le FORWARD nécessite un grade plus élevé que le SPOT — la "
+            "certification ACI (desk de change) réduit cette exigence.",
+        ],
+        "concept": "Une position FX SPOT est un pari direct sur le taux de "
+                   "change courant, sans levier formel ni débit de cash "
+                   "immédiat (le notionnel n'est qu'une référence de calcul). "
+                   "Un FORWARD verrouille aujourd'hui un taux pour une date "
+                   "future : c'est l'outil de couverture de change classique "
+                   "des entreprises exportatrices, mais aussi un instrument "
+                   "spéculatif si la direction prise diverge du taux réalisé.",
+    },
+    {
+        "id": "calendar",
+        "title": "Calendrier macro : paris sur évènements programmés",
+        "image": "calendar.png",
+        "intro": "Le CALENDRIER MACRO annonce à l'avance des évènements "
+                 "économiques (décision de banque centrale, inflation, "
+                 "emploi...) sur lesquels vous pouvez parier une issue avant "
+                 "leur résolution. Ouvert avec AGENDA.",
+        "steps": [
+            "Ouvrez l'agenda : AGENDA — consultez les évènements programmés "
+            "(type, nombre de pas restants, probabilités a priori de chaque "
+            "issue : positif/neutre/négatif).",
+            "Choisissez une issue et une mise : le cash est débité "
+            "immédiatement.",
+            "Le multiplicateur de gain dépend de la probabilité a priori de "
+            "l'issue choisie (plus elle est rare, plus le multiplicateur est "
+            "élevé, plafonné).",
+            "À la résolution, l'issue réelle est tirée : si elle correspond à "
+            "votre pari, le gain (mise × multiplicateur) est crédité ; sinon "
+            "la mise est perdue.",
+        ],
+        "concept": "Ce calendrier est un marché de paris autonome : il ne "
+                   "modifie pas le marché réel, il ne fait que matérialiser un "
+                   "pari sur l'anticipation collective d'un évènement "
+                   "macroéconomique. Le multiplicateur inversement "
+                   "proportionnel à la probabilité a priori reproduit la "
+                   "logique d'une cote de bookmaker : plus l'issue est "
+                   "surprenante, plus elle paie — mais plus elle est rare.",
+    },
 ]
 
 _BY_ID = {t["id"]: t for t in TUTORIALS}

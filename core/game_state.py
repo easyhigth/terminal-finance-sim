@@ -272,8 +272,8 @@ class GameState:
         p.day += config.DAYS_PER_STEP
         p.quarter = p.quarter_of_day()
 
-        # salaire net du tour (salaire - coûts)
-        net = p.salary_per_step() - p.costs_per_step()
+        # salaire net du tour (salaire - coûts + supplément négocié en revue de performance)
+        net = p.salary_per_step() - p.costs_per_step() + getattr(p, "salary_bonus_per_step", 0.0)
         p.adjust_cash(net)
 
         # vieillissement des deals : ceux arrivés à échéance non traités pénalisent
@@ -295,6 +295,8 @@ class GameState:
         hedges_due = None
         options_due = None
         ipos_settled = None
+        fx_due = None
+        macro_resolved = None
         swaps_expired = []
         if market is not None:
             from core import portfolio
@@ -340,6 +342,12 @@ class GameState:
             if getattr(p, "ipos", None):
                 from core import ipo as _ipo
                 ipos_settled = _ipo.evaluate_listings(p, market)
+            if getattr(p, "fx_forwards", None):
+                from core import fx as _fx
+                fx_due = _fx.evaluate_due(p, market)
+            if getattr(p, "macro_events", None):
+                from core import macrocal as _macrocal
+                macro_resolved = _macrocal.resolve_due_events(p, market)
             if getattr(p, "currency_swaps", None):
                 from core import swaps as _swaps
                 swap_flow, swaps_expired = _swaps.accrue(p, market, config.DAYS_PER_STEP)
@@ -353,9 +361,12 @@ class GameState:
         # bascule de trimestre : clôture des objectifs + génération des suivants
         quarter_report = None
         ma_events = []
+        review_offer = None
         if p.quarter != prev_quarter:
             quarter_report = career.close_quarter(p)
             career.ensure_objectives(p)
+            from core import review as _review
+            review_offer = _review.maybe_trigger(p, True)
             # secteur mis en avant pour le nouveau trimestre (guidance)
             import random as _r
             from data.companies import SECTORS as _SEC
@@ -399,9 +410,12 @@ class GameState:
             "hedges_due": hedges_due,
             "options_due": options_due,
             "ipos_settled": ipos_settled,
+            "fx_due": fx_due,
+            "macro_resolved": macro_resolved,
             "swaps_expired": swaps_expired,
             "quarter_changed": p.quarter != prev_quarter,
             "quarter_report": quarter_report,
             "ma_events": ma_events,
+            "review_offer": review_offer,
             "game_over": p.game_over,
         }

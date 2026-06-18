@@ -20,6 +20,8 @@ UNLOCKS = {
     "ma": 4,         # M&A : acquisition de cibles privées (LBO réel)
     "options": 6,    # options sur actions individuelles (calls/puts)
     "ipo": 4,        # souscription aux introductions en bourse
+    "fx": 5,         # desk FX (spot + forward sur devises)
+    "calendar": 2,   # calendrier macro (paris sur évènements programmés)
 }
 
 LABELS = {
@@ -34,6 +36,8 @@ LABELS = {
     "ma": "M&A : acquisition de cibles privées",
     "options": "Options sur actions (OPTIONS)",
     "ipo": "Souscription aux IPO (IPO)",
+    "fx": "Desk FX (spot & forward) (FX)",
+    "calendar": "Calendrier macro (MACRO)",
 }
 
 # commande (token majuscule) -> fonctionnalité gated
@@ -58,6 +62,8 @@ CMD_FEATURE = {
     "SWAP": "trade", "SWAPS": "trade",
     "OPTIONS": "options", "OPTION": "options",
     "IPO": "ipo", "IPOS": "ipo",
+    "FX": "fx",
+    "AGENDA": "calendar", "PRONOS": "calendar",
 }
 
 

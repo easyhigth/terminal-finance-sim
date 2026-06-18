@@ -25,6 +25,8 @@ from core import dilemmas as dilemmas_mod
 from core import badges as badges_mod
 from core import mandates as mandates_mod
 from core import ipo as ipo_mod
+from core import fx as fx_mod
+from core import macrocal as macrocal_mod
 from core import unlocks as unlocks_mod
 from core import history as history_mod
 from core import etfs as etfs_mod
@@ -50,7 +52,7 @@ CMD_NAMES = [
     "CMDTY", "BUYCMDTY", "SELLCMDTY",
     "CRYPTO", "BUYCRYPTO", "SELLCRYPTO", "ETF", "ETFS", "BUYETF", "SELLETF",
     "STRUCT", "CREDIT", "ALM", "SWAP", "SWAPS",
-    "ALLOCATE", "HEDGE", "PROTECT", "OPTIONS", "IPO", "REBALANCE",
+    "ALLOCATE", "HEDGE", "PROTECT", "OPTIONS", "IPO", "FX", "AGENDA", "PRONOS", "REVIEW", "REBALANCE",
     "PITCH", "FRONTIER", "RISK", "QUANT", "MA", "SHEET", "GLOSSARY",
     "SAVE", "SAVES", "NEWS", "MORE", "REG", "STATUS", "MENU",
 ]
@@ -390,14 +392,14 @@ class TerminalScene(Scene):
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
                     "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC charts",
                     "  SECTOR · REGION · SCREEN · RANKING · CALENDAR",
-                    "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE · PROTECT · OPTIONS · IPO",
+                    "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE · PROTECT · OPTIONS · IPO · FX · AGENDA",
                     "  RESEARCH <tk> · ALERT <tk> <px> · MANDATES · PITCH",
                     "  LEARN academy · CERT certifications · ECO macro",
                     "  RV <tk> · DEFINE <term>",
                     "  MISSION work · DEALS / DEAL <id>",
                     "  INBOX messages · RIVALS leaderboard",
                     "  DECIDE decisions · CAREER career",
-                    "  EVAL promotion · TRACK specialisation",
+                    "  EVAL promotion · TRACK specialisation · REVIEW manager",
                     "  PORTFOLIO·MA·RISK·QUANT·SHEET·GLOSSARY",
                     "  STATUS · SAVE · SAVES · REG · MENU",
                 )
@@ -408,14 +410,14 @@ class TerminalScene(Scene):
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
                     "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC graphes",
                     "  SECTOR · REGION · SCREEN · RANKING · CALENDAR",
-                    "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE · PROTECT · OPTIONS · IPO",
+                    "  PORTFOLIO · BUY/SELL · ALLOCATE · HEDGE · REBALANCE · PROTECT · OPTIONS · IPO · FX · AGENDA",
                     "  RESEARCH <tk> · ALERT <tk> <px> · MANDATES · PITCH",
                     "  LEARN académie · CERT certifications · ECO macro",
                     "  RV <tk> · DEFINE <terme>",
                     "  MISSION travailler · DEALS / DEAL <id>",
                     "  INBOX messagerie · RIVALS classement",
                     "  DECIDE décisions · CAREER carrière",
-                    "  EVAL promotion · TRACK voie",
+                    "  EVAL promotion · TRACK voie · REVIEW manager",
                     "  PORTFOLIO·MA·RISK·QUANT·SHEET·GLOSSARY",
                     "  STATUS · SAVE · SAVES · REG · MENU",
                 )
@@ -461,6 +463,12 @@ class TerminalScene(Scene):
             self.app.scenes.go("options", return_to="terminal")
         elif cmd in ("IPO", "IPOS"):
             self.app.scenes.go("ipo", return_to="terminal")
+        elif cmd == "FX":
+            self.app.scenes.go("fx", return_to="terminal")
+        elif cmd in ("AGENDA", "PRONOS"):
+            self.app.scenes.go("calendar", return_to="terminal")
+        elif cmd == "REVIEW":
+            self.app.scenes.go("review", return_to="terminal")
         elif cmd in ("CREDIT", "TITRISATION", "ABS", "CLO"):
             self.app.scenes.go("credit", return_to="terminal")
         elif cmd in ("ALM", "BANKING"):
@@ -1537,6 +1545,29 @@ class TerminalScene(Scene):
                       f"{widgets.format_money(res['proceeds'], cur)} "
                       f"(P&L {sign}{widgets.format_money(res['pnl'], cur)})."))
             self.app.notify(_L(f"IPO cotée : {pos['ticker']}", f"IPO listed: {pos['ticker']}"), "good" if res["pnl"] >= 0 else "bad")
+        for res in (summary.get("fx_due") or []):
+            pos = res["position"]
+            sign = "+" if res["pnl"] >= 0 else ""
+            self._log(_L(f"  ■ Forward FX échu : {pos['pair']} → "
+                      f"{widgets.format_money(res['payoff'], cur)} "
+                      f"(P&L {sign}{widgets.format_money(res['pnl'], cur)}).",
+                      f"  ■ FX forward matured: {pos['pair']} → "
+                      f"{widgets.format_money(res['payoff'], cur)} "
+                      f"(P&L {sign}{widgets.format_money(res['pnl'], cur)})."))
+            self.app.notify(_L("Forward FX arrivé à échéance","FX forward matured"), "info")
+        for res in (summary.get("macro_resolved") or []):
+            ev = res["event"]
+            won_bets = [b for b in res["bets_resolved"] if b["won"]]
+            total_payout = sum(b["payout"] for b in res["bets_resolved"])
+            self._log(_L(f"  ■ Évènement macro résolu : {ev['event_type']} → issue {res['actual_outcome']} "
+                      f"({len(won_bets)}/{len(res['bets_resolved'])} pari(s) gagné(s), "
+                      f"{widgets.format_money(total_payout, cur)}).",
+                      f"  ■ Macro event resolved: {ev['event_type']} → outcome {res['actual_outcome']} "
+                      f"({len(won_bets)}/{len(res['bets_resolved'])} bet(s) won, "
+                      f"{widgets.format_money(total_payout, cur)})."))
+            if res["bets_resolved"]:
+                self.app.notify(_L(f"Évènement résolu : {ev['event_type']}", f"Event resolved: {ev['event_type']}"),
+                                 "good" if won_bets else "bad")
         mc = summary.get("margin_call")
         if mc:
             self._log(_L(f"  ⚠ APPEL DE MARGE : liquidation forcée de "
@@ -1680,6 +1711,19 @@ class TerminalScene(Scene):
                       f"{widgets.format_money(ipo_offer['price_min'], cur)}-"
                       f"{widgets.format_money(ipo_offer['price_max'], cur)} (type IPO to view)."))
             self.app.notify(_L(f"Nouvelle IPO : {ipo_offer['ticker']}", f"New IPO: {ipo_offer['ticker']}"), "info")
+        # nouvel évènement macro éventuel
+        macro_event = macrocal_mod.maybe_schedule(p, random, m)
+        if macro_event:
+            self._log(_L(f"  ✶ AGENDA MACRO : {macro_event['event_type']} dans "
+                      f"{macro_event['resolve_step'] - m.step_count} pas (AGENDA pour voir).",
+                      f"  ✶ MACRO CALENDAR: {macro_event['event_type']} in "
+                      f"{macro_event['resolve_step'] - m.step_count} steps (type AGENDA to view)."))
+            self.app.notify(_L(f"Agenda macro : {macro_event['event_type']}", f"Macro calendar: {macro_event['event_type']}"), "info")
+        # revue de performance éventuelle (déclenchée par advance_step)
+        if summary.get("review_offer"):
+            self._log(_L("  ★ REVUE DE PERFORMANCE : votre manager souhaite vous voir (tapez REVIEW).",
+                      "  ★ PERFORMANCE REVIEW: your manager wants to see you (type REVIEW)."))
+            self.app.notify(_L("Revue de performance annuelle","Annual performance review"), "info")
         # alertes de prix
         self._check_alerts()
         for d in summary["new_deals"]:

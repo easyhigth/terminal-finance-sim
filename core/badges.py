@@ -53,6 +53,14 @@ BADGES = [
      "test": lambda p, m: _all_lessons(p)},
     {"id": "certified", "name": "Certifié", "desc": "Obtenir une certification (CFA/FRM/CQF).",
      "test": lambda p, m: _has_full_cert(p)},
+    {"id": "hedged", "name": "Parapluie prêt", "desc": "Souscrire un put protecteur.",
+     "test": lambda p, m: len(getattr(p, "hedges", []) or []) >= 1},
+    {"id": "hedge_in_the_money", "name": "Bien couvert", "desc": "Détenir un put protecteur actuellement dans la monnaie.",
+     "test": lambda p, m: _has_itm_hedge(p, m)},
+    {"id": "swapper", "name": "Cambiste", "desc": "Conclure un swap de devises.",
+     "test": lambda p, m: len(getattr(p, "currency_swaps", []) or []) >= 1},
+    {"id": "contagion_trader", "name": "Sang-froid crypto", "desc": "Détenir une crypto du groupe corrélé pendant un depeg actif, sans stablecoin décroché en portefeuille.",
+     "test": lambda p, m: _traded_through_contagion(p, m)},
 ]
 
 
@@ -78,6 +86,28 @@ def _pf_alloc(player, market):
         return portfolio.allocation_by(player, market, "sector")
     except Exception:
         return {}
+
+def _has_itm_hedge(player, market):
+    try:
+        from core import hedging
+        return any(h.get("in_money") for h in hedging.holdings(player, market))
+    except Exception:
+        return False
+
+
+def _traded_through_contagion(player, market):
+    try:
+        from core import crypto
+        depegged = set(crypto.active_depegs(market))
+        if not depegged:
+            return False
+        held = getattr(player, "crypto", {}) or {}
+        if any(cid in depegged for cid in held):
+            return False
+        return any(cid in crypto.CONTAGION_GROUP for cid in held)
+    except Exception:
+        return False
+
 
 _BY_ID = {b["id"]: b for b in BADGES}
 

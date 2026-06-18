@@ -137,14 +137,29 @@ def recent_activity(player, limit=8):
 def act(player, market, rng=None):
     """Actions VISIBLES des rivaux ce tour. Modifie l'état (retire deals/mandats
     raflés, fait grimper les scores) et retourne une liste d'événements :
-    {type, text, rival, kind, deal?/title?}. Le terminal en tire inbox/news/toasts."""
+    {type, text, rival, kind, deal?/title?}. Le terminal en tire inbox/news/toasts.
+
+    Réactivité au marché : en régime « Volatil » ou « Récession », les rivaux
+    sont plus agressifs (percées et sniping plus fréquents, ~1.5-2x la
+    probabilité de base) ; un depeg de stablecoin actif augmente légèrement
+    leur propension au débauchage de mandats. En « Expansion »/« Calme », le
+    comportement de base est inchangé."""
     rng = rng or random
     ensure(player, rng)
     events = []
     pscore = player_score(player, market)
 
+    regime = getattr(market, "regime", None)
+    stressed = regime in ("Volatil", "Récession")
+    surge_prob = ACT_SURGE_PROB * 1.8 if stressed else ACT_SURGE_PROB
+    snipe_prob = ACT_SNIPE_PROB * 1.5 if stressed else ACT_SNIPE_PROB
+
+    from core import crypto
+    depegged = bool(crypto.active_depegs(market))
+    poach_prob = ACT_POACH_PROB * 1.3 if depegged else ACT_POACH_PROB
+
     # 1) PERCÉE : un rival réalise un gros coup -> bond de score (peut dépasser le joueur)
-    if rng.random() < ACT_SURGE_PROB:
+    if rng.random() < surge_prob:
         r = rng.choice(player.rivals)
         before = r["score"]
         r["score"] = before * (1.0 + rng.uniform(0.10, 0.28))
@@ -155,7 +170,7 @@ def act(player, market, rng=None):
                        "text": txt + (" et vous double au classement." if passed else ".")})
 
     # 2) SNIPING d'un deal du joueur sur le point d'expirer (pression : agir vite)
-    if player.deals and rng.random() < ACT_SNIPE_PROB:
+    if player.deals and rng.random() < snipe_prob:
         vulnerable = [d for d in player.deals if d["days_left"] <= SNIPE_DAYS_THRESHOLD]
         if vulnerable:
             d = rng.choice(vulnerable)
@@ -170,7 +185,7 @@ def act(player, market, rng=None):
                                    f"(−2 réputation)."})
 
     # 3) DÉBAUCHAGE d'un mandat en attente d'acceptation
-    if getattr(player, "mandate_offers", None) and rng.random() < ACT_POACH_PROB:
+    if getattr(player, "mandate_offers", None) and rng.random() < poach_prob:
         o = rng.choice(player.mandate_offers)
         player.mandate_offers = [x for x in player.mandate_offers if x.get("id") != o.get("id")]
         r = rng.choice(player.rivals)

@@ -106,6 +106,65 @@ def test_recent_activity_returns_matching_entries_most_recent_first():
     assert [e["text"] for e in out] == [f"{name} débauche un mandat.", f"{name} rafle un deal."]
 
 
+def test_act_surge_more_frequent_in_volatil_than_calme():
+    p1, m1 = _mk()
+    m1.regime = "Volatil"
+    rng1 = random.Random(42)
+    count_volatil = 0
+    for _ in range(1000):
+        evs = rivals.act(p1, m1, rng1)
+        if any(e["type"] == "surge" for e in evs):
+            count_volatil += 1
+
+    p2, m2 = _mk()
+    m2.regime = "Calme"
+    rng2 = random.Random(42)
+    count_calme = 0
+    for _ in range(1000):
+        evs = rivals.act(p2, m2, rng2)
+        if any(e["type"] == "surge" for e in evs):
+            count_calme += 1
+
+    assert count_volatil > count_calme
+
+
+def test_act_snipe_more_frequent_in_recession_than_expansion():
+    p1, m1 = _mk()
+    m1.regime = "Récession"
+    rng1 = random.Random(7)
+    count_recession = 0
+    for _ in range(1000):
+        p1.deals = [{"id": 1, "title": "Deal tardif", "kind": "M&A",
+                     "reward_cash": 100_000, "days_left": 5}]
+        evs = rivals.act(p1, m1, rng1)
+        if any(e["type"] == "snipe" for e in evs):
+            count_recession += 1
+
+    p2, m2 = _mk()
+    m2.regime = "Expansion"
+    rng2 = random.Random(7)
+    count_expansion = 0
+    for _ in range(1000):
+        p2.deals = [{"id": 1, "title": "Deal tardif", "kind": "M&A",
+                     "reward_cash": 100_000, "days_left": 5}]
+        evs = rivals.act(p2, m2, rng2)
+        if any(e["type"] == "snipe" for e in evs):
+            count_expansion += 1
+
+    assert count_recession > count_expansion
+
+
+def test_act_handles_depeg_check_without_error():
+    # Vérifie que act() interroge crypto.active_depegs(market) sans planter,
+    # avec un market réel construit comme dans les autres tests.
+    p, m = _mk()
+    rng = random.Random(11)
+    for _ in range(20):
+        p.mandate_offers = [{"id": 7, "client": "Caisse XYZ", "capital": 1_000_000}]
+        evs = rivals.act(p, m, rng)
+        assert isinstance(evs, list)
+
+
 def test_recent_activity_respects_limit():
     p, _ = _mk()
     name = p.rivals[0]["name"]

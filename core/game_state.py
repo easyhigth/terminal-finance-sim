@@ -39,6 +39,7 @@ class PlayerState:
     structured: list = field(default_factory=list)     # produits structurés souscrits
     securitised: list = field(default_factory=list)    # tranches de titrisation détenues
     hedges: list = field(default_factory=list)         # puts protecteurs (couverture) en cours
+    options: list = field(default_factory=list)        # options sur actions (calls/puts) en cours
     currency_swaps: list = field(default_factory=list)  # swaps de devises actifs
     next_swap_id: int = 1                                # compteur d'identifiants de swaps
     ma_owned: dict = field(default_factory=dict)        # sociétés M&A détenues : ticker -> instance
@@ -75,6 +76,9 @@ class PlayerState:
     mandate_offers: list = field(default_factory=list)  # offres de mandats en attente
     next_mandate_id: int = 1
     mandate_history: list = field(default_factory=list)  # postmortems résolus (succès/échec, capé)
+    ipos: list = field(default_factory=list)            # positions IPO souscrites (en attente de cotation)
+    ipo_offers: list = field(default_factory=list)       # offres d'IPO en attente de souscription/refus
+    next_ipo_id: int = 1                                 # compteur d'identifiants d'offres d'IPO
     research: dict = field(default_factory=dict)        # ticker -> {fair, rating, day}
     alerts: list = field(default_factory=list)          # [{ticker, price, above}]
     learned: list = field(default_factory=list)         # ids des leçons lues (Académie)

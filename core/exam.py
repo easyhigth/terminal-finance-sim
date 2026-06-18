@@ -506,10 +506,8 @@ def g_graph_vol(rng):
 # ---------------------------------------------------------------------------
 def _concept_from_bank(rng, max_grade):
     from core.i18n import get_lang
-    if get_lang() == "en":
-        return g_def(rng)               # banque conceptuelle FR -> repli def EN
-    from data.question_bank import QUESTIONS
-    pool = [q for q in QUESTIONS if q["grade"] <= max_grade]
+    from data.question_bank import localized
+    pool = [q for q in localized(get_lang()) if q["grade"] <= max_grade]
     if not pool:
         return g_def(rng)
     q = rng.choice(pool)

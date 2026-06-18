@@ -56,8 +56,9 @@ def quote(player, market, ticker, option_type, strike_pct, years):
     sigma = _stock_vol(market, ticker)
     r = risk_free_rate(market)
     premium = fm.black_scholes(spot, strike, years, r, sigma, option=option_type)
+    greeks = fm.bs_greeks(spot, strike, years, r, sigma, option=option_type)
     return {"ok": True, "ticker": ticker, "option_type": option_type, "spot": spot,
-            "strike": strike, "sigma": sigma, "rate": r, "premium": premium}
+            "strike": strike, "sigma": sigma, "rate": r, "premium": premium, "greeks": greeks}
 
 
 def buy(player, market, ticker, option_type, strike_pct, years, contracts):
@@ -131,18 +132,23 @@ def holdings_value(player, market):
 def holdings(player, market):
     """Détail des positions d'options en cours, pour affichage."""
     out = []
+    r = risk_free_rate(market)
     for pos in getattr(player, "options", []) or []:
         cur = market.price_of(pos["ticker"])
         cur = cur if cur is not None else pos["start_spot"]
         perf = (cur / pos["start_spot"] - 1.0) * 100 if pos["start_spot"] else 0.0
         steps_left = max(0, pos["maturity_step"] - market.step_count)
+        years_left = steps_left / STEPS_PER_YEAR
         if pos["option_type"] == "call":
             in_money = cur > pos["strike"]
         else:
             in_money = cur < pos["strike"]
+        sigma = _stock_vol(market, pos["ticker"])
+        greeks = fm.bs_greeks(cur, pos["strike"], years_left, r, sigma,
+                              option=pos["option_type"])
         out.append({"ticker": pos["ticker"], "option_type": pos["option_type"],
                      "contracts": pos["contracts"], "strike_pct": pos["strike_pct"],
                      "strike": pos["strike"], "premium": pos["premium"],
                      "spot": cur, "perf": perf, "steps_left": steps_left,
-                     "years_left": steps_left / STEPS_PER_YEAR, "in_money": in_money})
+                     "years_left": years_left, "in_money": in_money, "greeks": greeks})
     return out

@@ -240,7 +240,12 @@ class OptionsScene(Scene):
                 y += 20
                 widgets.draw_text(surf, f"Prime totale : {widgets.format_money(total_premium, cur)}",
                                   (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
-                y += 30
+                y += 22
+                g = q["greeks"]
+                widgets.draw_text(surf, f"Δ {g['delta']:+.2f}  Γ {g['gamma']:.3f}  "
+                                        f"V {g['vega']:+.3f}  Θ {g['theta']:+.3f}  ρ {g['rho']:+.3f}",
+                                  (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+                y += 26
                 self.buy_btn = pygame.Rect(inner.x, y, 200, 32)
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, self.buy_btn, border_radius=4)
                 pygame.draw.rect(surf, config.COL_UP, self.buy_btn, 1, border_radius=4)
@@ -270,7 +275,11 @@ class OptionsScene(Scene):
                                         + (" · DANS LA MONNAIE" if h["in_money"] else ""),
                                   (pinner.x, yy + 18), fonts.tiny(),
                                   config.COL_UP if h["in_money"] else config.COL_TEXT_DIM)
-                yy += 40
+                g = h["greeks"]
+                widgets.draw_text(surf, f"Δ {g['delta']:+.2f}  Γ {g['gamma']:.3f}  "
+                                        f"V {g['vega']:+.3f}  Θ {g['theta']:+.3f}",
+                                  (pinner.x, yy + 34), fonts.tiny(), config.COL_TEXT_DIM)
+                yy += 56
 
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)

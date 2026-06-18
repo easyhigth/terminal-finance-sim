@@ -121,3 +121,76 @@ def test_available_for_returns_matching_programs():
     assert certifications.available_for("Risk") == ["FRM"]
     assert certifications.available_for("Quant") == ["CQF"]
     assert certifications.available_for("Advisory") == []
+
+
+# ---------------------------------------------------------------- ACI (desk FX)
+def test_aci_program_present_with_expected_schema():
+    prog = certifications.PROGRAMS["ACI"]
+    assert prog["name"] == "ACI"
+    assert prog["full"] == "ACI Dealing Certificate"
+    assert prog["track"] is None
+    assert prog["levels"] == 1
+    assert prog["min_grade"] == 5
+    assert prog["fee"] == [30000]
+    assert prog["rep"] == [10]
+    assert prog["tier"] == 4
+
+
+def test_aci_can_attempt_blocked_by_grade():
+    p = _player(grade_index=4)
+    code, target, tier = certifications.can_attempt(p, "ACI")
+    assert code == "grade"
+    assert target == certifications.PROGRAMS["ACI"]["min_grade"]
+
+
+def test_aci_can_attempt_blocked_by_cash():
+    p = _player(grade_index=5, cash=0.0)
+    code, fee, tier = certifications.can_attempt(p, "ACI")
+    assert code == "cash"
+    assert fee == certifications.PROGRAMS["ACI"]["fee"][0]
+
+
+def test_aci_can_attempt_ok_when_grade_and_cash_sufficient():
+    p = _player(grade_index=5, cash=1_000_000.0)
+    code, fee, tier = certifications.can_attempt(p, "ACI")
+    assert code == "ok"
+    assert fee == certifications.PROGRAMS["ACI"]["fee"][0]
+    assert tier == certifications.PROGRAMS["ACI"]["tier"]
+
+
+def test_aci_level_is_complete_status_label():
+    p = _player(grade_index=5)
+    assert certifications.level(p, "ACI") == 0
+    assert not certifications.is_complete(p, "ACI")
+    assert certifications.status_label(p, "ACI") == "niveau 0/1"
+    p.certs["ACI"] = 1
+    assert certifications.level(p, "ACI") == 1
+    assert certifications.is_complete(p, "ACI")
+    assert certifications.status_label(p, "ACI") == "OBTENU"
+
+
+def test_aci_promotion_bonus_never_matches_any_track():
+    # track=None pour ACI : ne doit jamais matcher la voie d'un joueur réel,
+    # quel que soit le track et même une fois la certification complète.
+    p = _player(grade_index=5, track="Risk")
+    p.certs["ACI"] = certifications.PROGRAMS["ACI"]["levels"]
+    assert certifications.promotion_bonus(p) == (0, 0)
+
+
+def test_aci_unlocks_fx_forward_via_certification():
+    """Intégration : core.fx.forward_unlocked(player) doit passer de False à
+    True quand la certification ACI complète réduit le grade requis de 3."""
+    from core import fx as FX
+    from core.game_state import PlayerState
+
+    grade = FX.FORWARD_MIN_GRADE - 1
+    assert FX.FORWARD_MIN_GRADE - 3 <= grade < FX.FORWARD_MIN_GRADE
+
+    p = PlayerState(grade_index=grade, track="Risk")
+    p.cash = 1_000_000.0
+
+    assert FX.forward_unlocked(p) is False
+
+    p.certs["ACI"] = 1
+    assert certifications.is_complete(p, "ACI")
+    assert FX.forward_unlocked(p) is True

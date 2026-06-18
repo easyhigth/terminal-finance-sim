@@ -19,7 +19,7 @@ ans d'historique du moteur de marché (préhistoire incluse) :
 Ouvrable depuis la console (GP/GPC/COMP/...), ou via le bouton GRAPHE des fiches.
 """
 import pygame
-from core import config, charts
+from core import config, charts, indicators
 from core import etfs as ETF
 from core.scene_manager import Scene
 from ui import fonts, widgets
@@ -81,6 +81,19 @@ class GraphScene(Scene):
             config.back_button_rect(180), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.mode_btn = widgets.Button(
             (240, config.SCREEN_HEIGHT - 50, 200, 42), "SPREAD : RATIO", config.COL_CYAN)
+        # indicateurs techniques superposables (lecture seule, purement analytique) :
+        # désactivés par défaut, jamais persistés (pas de champ de sauvegarde).
+        self.show_sma = False
+        self.show_bollinger = False
+        self.show_rsi = False
+        self.sma_btn = widgets.Button((0, 0, 96, 26), "SMA20", config.COL_AMBER)
+        self.boll_btn = widgets.Button((0, 0, 110, 26), "BOLLINGER", config.COL_TEXT_DIM)
+        self.rsi_btn = widgets.Button((0, 0, 80, 26), "RSI", config.COL_PRESTIGE)
+        # (attribut d'état, bouton, couleur active "à elle" — restaurée quand activé)
+        self._indicator_btns = (
+            ("show_sma", self.sma_btn, config.COL_AMBER),
+            ("show_bollinger", self.boll_btn, config.COL_TEXT_DIM),
+            ("show_rsi", self.rsi_btn, config.COL_PRESTIGE))
 
     # ------------------------------------------------------------- events
     def handle_event(self, event):
@@ -110,6 +123,10 @@ class GraphScene(Scene):
         if self.kind == "spread" and self.mode_btn.handle(event):
             self.spread_mode = "diff" if self.spread_mode == "ratio" else "ratio"
             self.mode_btn.label = f"SPREAD : {self.spread_mode.upper()}"
+        if self.kind == "line":
+            for attr, btn, _ in self._indicator_btns:
+                if btn.handle(event):
+                    setattr(self, attr, not getattr(self, attr))
 
     def _commit_input(self, ticker=None):
         # recherche intelligente : résout un nom/ticker partiel vers un ticker
@@ -137,6 +154,9 @@ class GraphScene(Scene):
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp, dt)
         self.mode_btn.update(mp, dt)
+        if self.kind == "line":
+            for _, btn, _accent in self._indicator_btns:
+                btn.update(mp, dt)
 
     # -------------------------------------------------------------- data
     def _series(self, tk):
@@ -165,12 +185,21 @@ class GraphScene(Scene):
         self._draw_type_tabs(surf)
         self._draw_controls(surf)
 
-        canvas = pygame.Rect(40, 168, config.SCREEN_WIDTH - 80, config.footer_y() - 178)
+        canvas_top = 198 if self.kind == "line" else 168
+        canvas_bottom = config.footer_y() - 10
+        rsi_h = 110 if (self.kind == "line" and self.show_rsi) else 0
+        main_h = canvas_bottom - canvas_top - (rsi_h + 12 if rsi_h else 0)
+        canvas = pygame.Rect(40, canvas_top, config.SCREEN_WIDTH - 80, main_h)
         widgets.draw_panel(surf, canvas, None)
         inner = canvas.inflate(-24, -24)
         drawer = getattr(self, f"_draw_{self.kind}", None)
         if drawer:
             drawer(surf, inner)
+
+        if rsi_h:
+            rsi_canvas = pygame.Rect(40, canvas.bottom + 12, config.SCREEN_WIDTH - 80, rsi_h)
+            widgets.draw_panel(surf, rsi_canvas, None)
+            self._draw_rsi_panel(surf, rsi_canvas.inflate(-24, -16))
 
         self.back_btn.draw(surf)
         if self.kind == "spread":
@@ -219,6 +248,21 @@ class GraphScene(Scene):
                               (box.right + 12, box.y + 5), fonts.tiny(), config.COL_TEXT_DIM)
         else:
             self._input_box = None
+        if self.kind == "line":
+            self._draw_indicator_toggles(surf)
+
+    def _draw_indicator_toggles(self, surf):
+        """Rangée de boutons toggle pour les indicateurs techniques superposables
+        (SMA20, Bollinger, RSI) — purement analytique, aucun impact gameplay."""
+        x, y = 40, 130 + 34
+        for attr, btn, accent in self._indicator_btns:
+            btn.rect.topleft = (x, y)
+            active = getattr(self, attr)
+            btn.accent = accent if active else config.COL_TEXT_DIM
+            btn.draw(surf)
+            if active:
+                pygame.draw.rect(surf, accent, btn.rect, 2, border_radius=6)
+            x += btn.rect.w + 8
 
     def _draw_suggestions(self, surf):
         """Menu déroulant de recherche intelligente (dessiné EN DERNIER, au-dessus
@@ -264,9 +308,23 @@ class GraphScene(Scene):
         if len(s) < 2:
             return self._empty(surf, rect, "Historique indisponible.")
         ma20, ma50 = charts.sma(s, 20), charts.sma(s, 50)
+        # indicateurs techniques optionnels (overlay, lecture seule) : élargissent
+        # les bornes Y si besoin (bandes de Bollinger peuvent dépasser le prix).
+        boll = indicators.bollinger_bands(s, period=20, num_std=2.0) if self.show_bollinger else None
+        sma_ind = indicators.sma(s, 20) if self.show_sma else None
         allv = [v for v in s]
+        if boll:
+            allv += [v for v in boll[0] if v is not None]
+            allv += [v for v in boll[2] if v is not None]
         lo, hi = min(allv), max(allv)
         lo, hi, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:.0f}")
+        legend = [("Cours", config.COL_AMBER),
+                  ("MM20", config.COL_CYAN), ("MM50", config.COL_TEXT_DIM)]
+        if boll:
+            lower, mid, upper = boll
+            self._overlay_aligned(surf, rect, lower, lo, span, (150, 150, 160), width=1)
+            self._overlay_aligned(surf, rect, upper, lo, span, (150, 150, 160), width=1)
+            legend.append(("Bollinger 20·2σ", (150, 150, 160)))
         self._polyline(surf, rect, s, lo, span, config.COL_AMBER)
         for ma, col in ((ma20, config.COL_CYAN), (ma50, config.COL_TEXT_DIM)):
             seg = [v for v in ma if v is not None]
@@ -276,8 +334,51 @@ class GraphScene(Scene):
                 pts = [(rect.x + int((start + i) / (len(s) - 1) * rect.w),
                         rect.bottom - int((v - lo) / span * rect.h)) for i, v in enumerate(seg)]
                 pygame.draw.aalines(surf, col, False, pts)
-        self._legend(surf, rect, [("Cours", config.COL_AMBER),
-                                  ("MM20", config.COL_CYAN), ("MM50", config.COL_TEXT_DIM)])
+        if sma_ind:
+            self._overlay_aligned(surf, rect, sma_ind, lo, span, config.COL_WARN, width=2)
+            legend.append(("SMA20 (indicators)", config.COL_WARN))
+        self._legend(surf, rect, legend)
+
+    def _overlay_aligned(self, surf, rect, series, lo, span, color, width=1):
+        """Trace une série alignée sur l'axe x du graphe principal (même longueur,
+        `None` autorisés en tête/au milieu) — ne dessine que les segments
+        contigus définis, en suivant exactement le même mapping pixel que
+        `_polyline`/`_draw_line` pour ne pas décaler l'overlay."""
+        n = len(series)
+        if n < 2:
+            return
+        seg = []
+        for i, v in enumerate(series):
+            if v is None:
+                if len(seg) >= 2:
+                    pygame.draw.lines(surf, color, False, seg, width)
+                seg = []
+                continue
+            x = rect.x + int(i / (n - 1) * rect.w)
+            y = rect.bottom - int((v - lo) / span * rect.h)
+            seg.append((x, y))
+        if len(seg) >= 2:
+            pygame.draw.lines(surf, color, False, seg, width)
+
+    def _draw_rsi_panel(self, surf, rect):
+        """Panneau RSI(14) sous le graphique principal, échelle fixe 0-100 avec
+        repères survente/surachat à 30/70."""
+        if not self.tickers:
+            return self._empty(surf, rect, "")
+        s = self._series(self.tickers[0])
+        vals = indicators.rsi(s, period=14)
+        lo, hi, span = self._plot_axes(surf, rect, 0, 100, lambda v: f"{v:.0f}", rows=4)
+        for level, col in ((30, config.COL_DOWN), (70, config.COL_UP)):
+            yy = rect.bottom - int((level - lo) / span * rect.h)
+            pygame.draw.line(surf, col, (rect.x, yy), (rect.right, yy), 1)
+        if any(v is not None for v in vals):
+            self._overlay_aligned(surf, rect, vals, lo, span, config.COL_PRESTIGE, width=2)
+            last = next((v for v in reversed(vals) if v is not None), None)
+            if last is not None:
+                self._legend(surf, rect, [(f"RSI(14) = {last:.1f}", config.COL_PRESTIGE)])
+        else:
+            widgets.draw_text(surf, "Historique insuffisant pour le RSI(14).",
+                              (rect.x, rect.y), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_candles(self, surf, rect):
         if not self.tickers:

@@ -28,6 +28,13 @@ PROGRAMS = {
         "fee": [45000], "rep": [16], "tier": 4,
         "desc": "Finance quantitative : dérivés, modèles stochastiques, ML.",
     },
+    "ACI": {
+        "name": "ACI", "full": "ACI Dealing Certificate",
+        "track": None, "levels": 1, "min_grade": 5,
+        "fee": [30000], "rep": [10], "tier": 4,
+        "desc": "Référence des salles de marché en change (FX) : conventions de cotation, "
+                "règlement, gestion du risque de change.",
+    },
 }
 
 # Examen de certification : moins de questions mais plus dur, seuil plus élevé.

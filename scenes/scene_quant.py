@@ -19,6 +19,7 @@ from ui import fonts, widgets
 
 class QuantScene(Scene):
     def on_enter(self, **kwargs):
+        self.return_to = kwargs.get("return_to", "terminal")
         self.S = 100.0     # spot
         self.K = 100.0     # strike
         self.T = 1.0       # maturité (années)
@@ -26,7 +27,7 @@ class QuantScene(Scene):
         self.sigma = 0.20  # volatilité
         self.option = "call"
         self.back_btn = widgets.Button(
-            (40, config.SCREEN_HEIGHT-66, 160, 44), "← TERMINAL", config.COL_TEXT_DIM)
+            (40, config.SCREEN_HEIGHT-66, 160, 44), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.toggle_btn = widgets.Button(
             (220, config.SCREEN_HEIGHT-66, 200, 44), "TYPE : CALL", config.COL_UP)
         self.tuto_btn = widgets.Button(
@@ -43,8 +44,11 @@ class QuantScene(Scene):
         setattr(self, key, max(lo, min(hi, round(getattr(self, key)+delta, 4))))
 
     def handle_event(self, event):
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.app.scenes.go(self.return_to)
+            return
         if self.back_btn.handle(event):
-            self.app.scenes.go("terminal")
+            self.app.scenes.go(self.return_to)
         if self.toggle_btn.handle(event):
             self.option = "put" if self.option == "call" else "call"
         if self.tuto_btn.handle(event):

@@ -28,6 +28,7 @@ class EvaluationScene(Scene):
         self.cert_program = kwargs.get("program")
         self.cert_level = kwargs.get("level", 0)
         self.mode = kwargs.get("mode", "promotion")
+        self.return_to = kwargs.get("return_to", "terminal")
         saved = p.eval_state if isinstance(p.eval_state, dict) else {}
         resume = bool(saved) and saved.get("mode") == self.mode and saved.get("items")
         if resume:
@@ -40,6 +41,7 @@ class EvaluationScene(Scene):
             self.target_grade = saved.get("target_grade", "")
             self.cert_program = saved.get("cert_program", self.cert_program)
             self.cert_level = saved.get("cert_level", self.cert_level)
+            self.return_to = saved.get("return_to", self.return_to)
             self.state = "question"
         else:
             if self.mode == "cert":
@@ -83,11 +85,12 @@ class EvaluationScene(Scene):
             "score": self.score, "missed_lessons": list(self.missed_lessons),
             "pass_threshold": self.pass_threshold, "target_grade": self.target_grade,
             "cert_program": self.cert_program, "cert_level": self.cert_level,
+            "return_to": self.return_to,
         }
         if not p.hardcore:
             self.app.gs.save(config.AUTOSAVE_SLOT)
         self.app.notify(_L("Examen mis en pause — reprenez via EVAL","Exam paused — resume via EVAL"), "info")
-        self.app.scenes.go("terminal")
+        self.app.scenes.go(self.return_to)
 
     # ------------------------------------------------------------- helpers
     def _item(self):
@@ -113,8 +116,11 @@ class EvaluationScene(Scene):
             else:
                 self.calc = None
             return
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.app.scenes.go(self.return_to)
+            return
         if self.back_btn.handle(event):
-            self.app.scenes.go("terminal")
+            self.app.scenes.go(self.return_to)
             return
         if self.state in ("question", "feedback") and self.pause_btn.handle(event):
             self._pause()
@@ -142,7 +148,7 @@ class EvaluationScene(Scene):
             elif self.state == "feedback" and self.continue_btn.rect.collidepoint(event.pos):
                 self._next()
             elif self.state == "result" and self.continue_btn.rect.collidepoint(event.pos):
-                self.app.scenes.go("terminal")
+                self.app.scenes.go(self.return_to)
 
     def _type(self, it, ch):
         if not ch:
@@ -160,7 +166,7 @@ class EvaluationScene(Scene):
         elif self.state == "feedback":
             self._next()
         elif self.state == "result":
-            self.app.scenes.go("terminal")
+            self.app.scenes.go(self.return_to)
 
     def _answer_mcq(self, i, it):
         self.chosen = i
@@ -480,5 +486,5 @@ class EvaluationScene(Scene):
                                   (cx, y), fonts.tiny(), config.COL_TEXT_DIM, align="center")
                 y += 20
         self.continue_btn.rect.center = (cx, inner.bottom-30)
-        self.continue_btn.label = _L("RETOUR AU TERMINAL","BACK TO TERMINAL")
+        self.continue_btn.label = _L(f"RETOUR : {self.return_to.upper()}", f"BACK: {self.return_to.upper()}")
         self.continue_btn.draw(surf)

@@ -46,7 +46,7 @@ class CertScene(Scene):
         if started:
             tier, level = started
             self.app.scenes.go("evaluation", mode="cert", program=pid,
-                               tier=tier, level=level)
+                               tier=tier, level=level, return_to="cert")
 
     def _cur(self):
         return config.CONTINENTS[self.app.gs.player.continent]["currency"]

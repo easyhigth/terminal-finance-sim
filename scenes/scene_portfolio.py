@@ -29,10 +29,11 @@ RF = 0.02
 
 class PortfolioScene(Scene):
     def on_enter(self, **kwargs):
+        self.return_to = kwargs.get("return_to", "terminal")
         self.weights = np.array([0.4, 0.3, 0.1, 0.1, 0.1])
         self._recompute_frontier()
         self.back_btn = widgets.Button(
-            (40, config.SCREEN_HEIGHT-66, 160, 44), "← TERMINAL", config.COL_TEXT_DIM)
+            (40, config.SCREEN_HEIGHT-66, 160, 44), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.optim_sharpe_btn = widgets.Button(
             (760, 150, 220, 40), "OPTIMISER (SHARPE)", config.COL_UP)
         self.optim_minvar_btn = widgets.Button(
@@ -53,8 +54,11 @@ class PortfolioScene(Scene):
         return ret, vol, sharpe
 
     def handle_event(self, event):
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.app.scenes.go(self.return_to)
+            return
         if self.back_btn.handle(event):
-            self.app.scenes.go("terminal")
+            self.app.scenes.go(self.return_to)
         if self.optim_sharpe_btn.handle(event):
             self.weights = self.w_sharpe.copy()
         if self.optim_minvar_btn.handle(event):

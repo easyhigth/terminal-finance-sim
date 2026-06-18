@@ -40,6 +40,7 @@ STRESS_SCENARIOS = {
 
 class RiskScene(Scene):
     def on_enter(self, **kwargs):
+        self.return_to = kwargs.get("return_to", "terminal")
         self.exposure = DEFAULT_EXPOSURE.copy()
         self.confidence = 0.95
         self.scenario = None
@@ -50,7 +51,7 @@ class RiskScene(Scene):
         self.stress_real = None
         self._simulate()
         self.back_btn = widgets.Button(
-            (40, config.SCREEN_HEIGHT-66, 160, 44), "← TERMINAL", config.COL_TEXT_DIM)
+            (40, config.SCREEN_HEIGHT-66, 160, 44), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.mode_btn = widgets.Button(
             (210, config.SCREEN_HEIGHT-66, 240, 44), "MODE : —", config.COL_CYAN)
         self.tuto_btn = widgets.Button(
@@ -118,8 +119,11 @@ class RiskScene(Scene):
             self._run_scenario(self.scenario)
 
     def handle_event(self, event):
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.app.scenes.go(self.return_to)
+            return
         if self.back_btn.handle(event):
-            self.app.scenes.go("terminal")
+            self.app.scenes.go(self.return_to)
         if self.mode_btn.handle(event):
             self.real = not self.real
             self.scenario = None

@@ -82,10 +82,12 @@ class _FakeApp:
 
 @pytest.fixture(scope="module", autouse=True)
 def _pygame_init():
+    # Pas de pygame.quit() en teardown : ça invaliderait les pygame.font.Font
+    # déjà mis en cache par ui/fonts.py, et ferait segfaulter tout module de
+    # test qui les réutilise plus loin dans la même session pytest.
     pygame.init()
     pygame.display.set_mode((1, 1))
     yield
-    pygame.quit()
 
 
 def _make_player_state():

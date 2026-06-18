@@ -80,13 +80,43 @@ class MoreScene(Scene):
         self._max_scroll = 0
         self._btn_rects = []      # [(Rect, scene, kwargs)]
         self._list_rect = None
+        self.search = ""
+        self._search_clear_rect = None
+        self._t = 0.0
         self.back_btn = widgets.Button(config.back_button_rect(180),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
+    def _search_rect(self):
+        return pygame.Rect(40, 100, 320, 24)
+
+    def _filtered_sections(self):
+        q = self.search.strip().lower()
+        if not q:
+            return SECTIONS
+        out = []
+        for title, items in SECTIONS:
+            kept = [(label, scene, kw) for label, scene, kw in items if q in label.lower()]
+            if kept:
+                out.append((title, kept))
+        return out
+
     def handle_event(self, event):
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
-            return
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                if self.search:
+                    self.search = ""
+                    self.scroll = 0
+                    return
+                self.app.scenes.go(self.return_to)
+                return
+            elif event.key == pygame.K_BACKSPACE:
+                self.search = self.search[:-1]
+                self.scroll = 0
+                return
+            elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
+                self.search += event.unicode
+                self.scroll = 0
+                return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
             return
@@ -96,22 +126,45 @@ class MoreScene(Scene):
                                          self.scroll + (-48 if event.button == 4 else 48)))
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
+                self.search = ""
+                self.scroll = 0
+                return
             for rect, scene, kw in self._btn_rects:
                 if rect.collidepoint(event.pos):
                     self.app.scenes.go(scene, return_to="more", **kw)
                     return
 
     def update(self, dt):
+        self._t += dt
         self.back_btn.update(pygame.mouse.get_pos(), dt)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
         widgets.draw_text(surf, "PLUS — TOUTES LES PAGES", (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Accès rapide à toutes les scènes du jeu. Clic = ouvrir.",
+        widgets.draw_text(surf, "Accès rapide à toutes les scènes du jeu. Clic = ouvrir, "
+                                "ou recherchez une page par nom.",
                           (42, 72), fonts.small(), config.COL_TEXT_DIM)
 
-        top = config.content_top()
+        search_rect = self._search_rect()
+        pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_AMBER if self.search else config.COL_BORDER,
+                          search_rect, 1, border_radius=4)
+        cursor = "_" if int(self._t * 2) % 2 == 0 else " "
+        label = (self.search + cursor) if self.search else "Rechercher une page…"
+        txt_col = config.COL_TEXT if self.search else config.COL_TEXT_DIM
+        widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
+                          (search_rect.x + 8, search_rect.y + 4), fonts.small(), txt_col)
+        self._search_clear_rect = None
+        if self.search:
+            self._search_clear_rect = pygame.Rect(search_rect.right - 22, search_rect.y,
+                                                   22, search_rect.h)
+            widgets.draw_text(surf, "✕", self._search_clear_rect.center, fonts.small(bold=True),
+                              config.COL_TEXT_DIM, align="center")
+
+        sections = self._filtered_sections()
+        top = search_rect.bottom + 10
         area = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - top)
         self._list_rect = area
         mp = pygame.mouse.get_pos()
@@ -119,7 +172,10 @@ class MoreScene(Scene):
         prev_clip = surf.get_clip()
         surf.set_clip(area)
         y = area.y - self.scroll
-        for title, items in SECTIONS:
+        if not sections:
+            widgets.draw_text(surf, "Aucune page ne correspond à cette recherche.",
+                              (area.x, area.y), fonts.small(), config.COL_TEXT_DIM)
+        for title, items in sections:
             if area.top - 20 < y < area.bottom:
                 widgets.draw_text(surf, f"— {title}", (area.x, y), fonts.small(bold=True),
                                   config.COL_PRESTIGE)
@@ -131,7 +187,10 @@ class MoreScene(Scene):
                 x = area.x + col * (BTN_W + BTN_GAP)
                 rect = pygame.Rect(x, y, BTN_W, BTN_H)
                 if area.top - BTN_H < rect.y < area.bottom:
-                    self._btn_rects.append((rect, scene, kw))
+                    # rect cliquable = intersection avec la zone visible : un bouton
+                    # partiellement masqué par le clip ne doit pas déborder sur le
+                    # bouton retour (footer) ni sur le reste de l'UI.
+                    self._btn_rects.append((rect.clip(area), scene, kw))
                     hover = rect.collidepoint(mp)
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL,
                                      rect, border_radius=5)

@@ -120,9 +120,43 @@ def _general(rng):
                     "que la tech non rentable et l'immobilier souffrent (cf. leçon Taux)."}
 
 
+def _dcm(rng):
+    from core import bonds as bonds_mod
+    from core import credit
+    from data import companies as comp_data
+    c = rng.choice(comp_data.COMPANIES)
+    ebitda = c["revenue"] * c["ebitda_margin"]
+    nd_ebitda = c["net_debt"] / ebitda if ebitda > 0 else None
+    rating = credit.rating_for(nd_ebitda, c["sigma"])
+    years = rng.choice([3, 5, 7, 10])
+    fair_bps = round(bonds_mod._RATING_SPREAD.get(rating, 0.02) * 10000)
+    tight = max(5, round(fair_bps * 0.6))
+    wide = round(fair_bps * 1.6)
+    choices = [
+        {"text": f"Émettre à {fair_bps} pb au-dessus de la courbe (spread de marché pour {rating})",
+         "quality": "good"},
+        {"text": f"Émettre à {tight} pb — trop serré, risque d'échec du book-building",
+         "quality": "bad"},
+        {"text": f"Émettre à {wide} pb — trop large, {c['name']} paierait un coupon excessif",
+         "quality": "ok"},
+    ]
+    rng.shuffle(choices)
+    expl = (f"{c['name']} est notée {rating} (levier dette nette/EBITDA ≈ "
+            f"{nd_ebitda:.1f}x). Une émission à {years} ans se price autour de {fair_bps} pb "
+            "au-dessus de la courbe : trop serré, les investisseurs ne souscrivent pas ; "
+            "trop large, l'émetteur surpaie inutilement.") if nd_ebitda is not None else (
+            f"{c['name']} est notée {rating}. Une émission à {years} ans se price autour "
+            f"de {fair_bps} pb au-dessus de la courbe.")
+    return {"prompt": f"À quel spread structurez-vous l'émission obligataire de {c['name']} "
+                       f"({years} ans, notée {rating}) ?",
+            "context": "Mandat DCM : origination et book-building d'une émission de dette.",
+            "choices": choices, "expl": expl}
+
+
 _BUILDERS = {
     "M&A": _mna, "Portfolio": _portfolio, "Risk": _risk,
     "Quant": _quant, "Advisory": _advisory, "General": _general,
+    "DCM": _dcm,
 }
 
 

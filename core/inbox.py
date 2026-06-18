@@ -13,6 +13,8 @@ Les messages sont déclenchés par le contexte (promotion, trimestre, crise,
 """
 import random
 
+from data.inbox_en import _SENS_EN, INBOX_EN
+
 MAX_INBOX = 40
 
 _MANAGERS = {
@@ -24,6 +26,14 @@ _MANAGERS = {
 
 def manager_name(player):
     return _MANAGERS.get(player.track, _MANAGERS["General"])
+
+
+def _tpl(msg_id):
+    """Renvoie le modèle (sender/subject/body) localisé pour msg_id, ou {} si absent."""
+    from core.i18n import get_lang
+    if get_lang() == "en":
+        return INBOX_EN.get(msg_id, {})
+    return {}
 
 
 def push(player, kind, sender, subject, body):
@@ -45,13 +55,18 @@ def unread_count(player):
 # Déclencheurs contextuels
 # ---------------------------------------------------------------------------
 def on_promotion(player):
-    push(player, "manager", manager_name(player), "Bravo pour votre promotion",
-         f"{player.name}, votre passage au grade {player.grade} est mérité. "
-         "De nouvelles responsabilités vous attendent — ne décevez pas le comité.")
+    e = _tpl("promotion")
+    push(player, "manager", manager_name(player),
+         e.get("subject", "Bravo pour votre promotion"),
+         e.get("body", "{name}, votre passage au grade {grade} est mérité. "
+               "De nouvelles responsabilités vous attendent — ne décevez pas le comité.")
+         .format(name=player.name, grade=player.grade))
     if player.grade_index >= 6:
-        push(player, "hr", "RH", "Nouveau package",
-             "Votre accès aux mandats stratégiques et aux deals premium est activé. "
-             "Le desk compte sur vous.")
+        e = _tpl("promotion_package")
+        push(player, "hr", e.get("sender", "RH"),
+             e.get("subject", "Nouveau package"),
+             e.get("body", "Votre accès aux mandats stratégiques et aux deals premium "
+                   "est activé. Le desk compte sur vous."))
 
 
 def on_quarter(player, report):
@@ -59,34 +74,51 @@ def on_quarter(player, report):
         return
     done, total = report["done"], report["total"]
     if done == total:
-        push(player, "hr", "RH", "Bonus trimestriel exceptionnel",
-             f"Tous vos objectifs du trimestre sont atteints ({done}/{total}). "
-             "Le comité salue la performance : bonus et visibilité accrue.")
+        e = _tpl("quarter_all")
+        push(player, "hr", e.get("sender", "RH"),
+             e.get("subject", "Bonus trimestriel exceptionnel"),
+             e.get("body", "Tous vos objectifs du trimestre sont atteints ({done}/{total}). "
+                   "Le comité salue la performance : bonus et visibilité accrue.")
+             .format(done=done, total=total))
     elif done == 0:
-        push(player, "manager", manager_name(player), "Trimestre décevant",
-             "Aucun objectif atteint ce trimestre. Le comité surveille vos résultats. "
-             "Ressaisissez-vous : missions, deals, gestion du book.")
+        e = _tpl("quarter_none")
+        push(player, "manager", manager_name(player),
+             e.get("subject", "Trimestre décevant"),
+             e.get("body", "Aucun objectif atteint ce trimestre. Le comité surveille vos "
+                   "résultats. Ressaisissez-vous : missions, deals, gestion du book."))
     else:
-        push(player, "manager", manager_name(player), "Revue trimestrielle",
-             f"{done}/{total} objectifs atteints. Correct, mais le comité attend mieux "
-             "pour valider une progression.")
+        e = _tpl("quarter_partial")
+        push(player, "manager", manager_name(player),
+             e.get("subject", "Revue trimestrielle"),
+             e.get("body", "{done}/{total} objectifs atteints. Correct, mais le comité "
+                   "attend mieux pour valider une progression.")
+             .format(done=done, total=total))
 
 
 def on_crisis(player, name, kind):
     if kind == "good":
-        push(player, "desk", "Desk", f"Opportunité : {name}",
-             "Le marché s'emballe favorablement. Le desk recommande d'évaluer les "
-             "positions à renforcer — mais gare aux retournements.")
+        e = _tpl("crisis_good")
+        push(player, "desk", e.get("sender", "Desk"),
+             e.get("subject", "Opportunité : {name}").format(name=name),
+             e.get("body", "Le marché s'emballe favorablement. Le desk recommande "
+                   "d'évaluer les positions à renforcer — mais gare aux retournements."))
     else:
-        push(player, "manager", manager_name(player), f"Alerte marché : {name}",
-             "Le marché décroche. Gardez la tête froide : vérifiez votre exposition "
-             "(bêta), votre liquidité et vos couvertures. On compte sur votre sang-froid.")
+        e = _tpl("crisis_bad")
+        push(player, "manager", manager_name(player),
+             e.get("subject", "Alerte marché : {name}").format(name=name),
+             e.get("body", "Le marché décroche. Gardez la tête froide : vérifiez votre "
+                   "exposition (bêta), votre liquidité et vos couvertures. On compte sur "
+                   "votre sang-froid."))
 
 
 def on_deal_sniped(player, deal, rival_name):
-    push(player, "client", f"Client — {deal['title']}", "Mandat confié ailleurs",
-         f"Faute de réponse de votre part, nous avons confié « {deal['title']} » à "
-         f"{rival_name}. Soyez plus réactif la prochaine fois.")
+    e = _tpl("deal_sniped")
+    push(player, "client",
+         e.get("sender", "Client — {title}").format(title=deal["title"]),
+         e.get("subject", "Mandat confié ailleurs"),
+         e.get("body", "Faute de réponse de votre part, nous avons confié « {title} » à "
+               "{rival_name}. Soyez plus réactif la prochaine fois.")
+         .format(title=deal["title"], rival_name=rival_name))
 
 
 # ---------------------------------------------------------------------------
@@ -110,15 +142,22 @@ def _compliance_check(player, market):
     top = max(alloc.values()) / total if alloc else 0.0
     if beta > 1.35:
         player.flags["compliance_day"] = player.day
-        return push(player, "compliance", "Conformité", "Exposition de marché élevée",
-                    f"Votre portefeuille affiche un bêta de {beta:.2f}. En cas de "
-                    "retournement, les pertes seraient amplifiées. Envisagez HEDGE.")
+        e = _tpl("compliance_beta")
+        return push(player, "compliance", e.get("sender", "Conformité"),
+                    e.get("subject", "Exposition de marché élevée"),
+                    e.get("body", "Votre portefeuille affiche un bêta de {beta:.2f}. En cas "
+                          "de retournement, les pertes seraient amplifiées. Envisagez HEDGE.")
+                    .format(beta=beta))
     if top > 0.55:
         sector = max(alloc, key=alloc.get)
         player.flags["compliance_day"] = player.day
-        return push(player, "compliance", "Conformité", "Concentration sectorielle",
-                    f"{top*100:.0f}% du book est sur le secteur {sector}. La diversification "
-                    "est insuffisante au regard de nos limites internes (REBALANCE).")
+        e = _tpl("compliance_concentration")
+        return push(player, "compliance", e.get("sender", "Conformité"),
+                    e.get("subject", "Concentration sectorielle"),
+                    e.get("body", "{top:.0f}% du book est sur le secteur {sector}. La "
+                          "diversification est insuffisante au regard de nos limites "
+                          "internes (REBALANCE).")
+                    .format(top=top * 100, sector=sector))
     return None
 
 
@@ -131,10 +170,17 @@ def _periodic(player, market, rng):
         if best is None or abs(chg) > abs(best[1]):
             best = (name, chg)
     if best and abs(best[1]) > 0.3:
+        from core.i18n import get_lang
         sens = "bondit" if best[1] > 0 else "recule"
-        return push(player, "desk", "Desk", f"Brief : {best[0]} {sens}",
-                    f"Le {best[0]} {sens} de {best[1]:+.2f}% sur la séance. "
-                    "Réunion de desk pour ajuster les vues. Restez attentif aux flux.")
+        if get_lang() == "en":
+            sens = _SENS_EN.get(sens, sens)
+        e = _tpl("periodic_brief")
+        subject = e.get("subject", "Brief : {index_name} {sens}").format(
+            index_name=best[0], sens=sens)
+        body = e.get("body", "Le {index_name} {sens} de {chg:+.2f}% sur la séance. "
+              "Réunion de desk pour ajuster les vues. Restez attentif aux flux.").format(
+            index_name=best[0], sens=sens, chg=best[1])
+        return push(player, "desk", e.get("sender", "Desk"), subject, body)
     return None
 
 

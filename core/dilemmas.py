@@ -179,12 +179,44 @@ DILEMMAS = [
 ]
 
 
+# ---- accès localisé (FR / EN) ----------------------------------------------
+from data.dilemmas_en import DILEMMAS_EN
+
+
+def _localize_dilemma(d):
+    e = DILEMMAS_EN.get(d["id"])
+    if not e:
+        return d
+    out = dict(d)
+    out["title"] = e.get("title", d["title"])
+    out["scenario"] = e.get("scenario", d["scenario"])
+    options = []
+    for i, o in enumerate(d["options"]):
+        eo = e.get("options", [])
+        eo = eo[i] if i < len(eo) else {}
+        no = dict(o)
+        no["label"] = eo.get("label", o["label"])
+        no["outcome"] = eo.get("outcome", o["outcome"])
+        options.append(no)
+    out["options"] = options
+    return out
+
+
+def localized(lang):
+    """Renvoie la liste de dilemmes dans la langue demandée."""
+    if lang == "en":
+        return [_localize_dilemma(d) for d in DILEMMAS]
+    return DILEMMAS
+
+
 def _scale(grade_index):
     return 1.0 + 0.5 * grade_index
 
 
 def eligible(player):
-    return [d for d in DILEMMAS if d["min_grade"] <= player.grade_index]
+    from core.i18n import get_lang
+    pool = localized(get_lang())
+    return [d for d in pool if d["min_grade"] <= player.grade_index]
 
 
 def generate(player, rng=None, category=None):

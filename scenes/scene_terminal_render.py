@@ -69,6 +69,10 @@ class TerminalRenderMixin:
         for w in self.datawins:
             w.draw(surf)
 
+        # overlay : panneau de triche (mode test uniquement)
+        if self.cheat_panel is not None:
+            self.cheat_panel.draw(surf)
+
     def _draw_rail(self, surf, rect, p):
         inner = widgets.draw_panel(surf, rect, _t("term.commands"), config.COL_AMBER)
         self._rail_rects = {}
@@ -163,6 +167,17 @@ class TerminalRenderMixin:
                                config.COL_CYAN, align="right")
         widgets.draw_text(surf, f"{info['currency']}", (config.SCREEN_WIDTH - 90, 10),
                           fonts.body(bold=True), accent, align="right")
+        # bouton triche (mode test uniquement, jamais en jeu normal)
+        self._cheat_btn_rect = None
+        if getattr(self.app, "cheats", False):
+            btn = pygame.Rect(config.SCREEN_WIDTH - 330, 6, 96, 22)
+            hover = btn.collidepoint(pygame.mouse.get_pos())
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL,
+                             btn, border_radius=4)
+            pygame.draw.rect(surf, config.COL_DOWN, btn, 1, border_radius=4)
+            widgets.draw_text(surf, "🛠 CHEAT", btn.center, fonts.tiny(bold=True),
+                              config.COL_DOWN, align="center")
+            self._cheat_btn_rect = btn
 
     def _draw_ticker(self, surf):
         y = config.TOPBAR_H + 4

@@ -103,6 +103,8 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
         self.news = list(SAMPLE_NEWS.get(p.continent, SAMPLE_NEWS["USA"]))
         self.recent_events = []
         self.datawins = []        # fenêtres de données déplaçables (overlay)
+        self.cheat_panel = None   # panneau de triche (overlay, mode test uniquement)
+        self._cheat_btn_rect = None
         self._rail_rects = {}     # boutons du rail latéral (label -> Rect)
         self._topco_rects = {}    # sociétés cliquables (panneau top sociétés)
         self._topco_header_rect = None   # titre du panneau (clic → explorateur)
@@ -121,7 +123,7 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
         # rail latéral : (libellé, commande), regroupé par usage
         self.rail = [
             ("ADV ▸", "ADV"),
-            ("PORTEF.", "PORTFOLIO"), ("MARCHÉ", "MARKETHUB"), ("BOUTIQUE", "SHOP"),
+            ("PORTEF.", "PORTFOLIO"), ("MARCHÉ", "MARKETHUB"), ("SHOP", "SHOP"),
             ("MISSION", "MISSION"), ("EXAM/CERTIF", "EXAMCERT"),
             ("MANDATS", "MANDATES"), ("DEALS", "DEALS"), ("M&A", "MA"),
             ("INBOX", "INBOX"), ("NEWS", "NEWS"), ("DÉCIDE", "DECIDE"),
@@ -146,6 +148,12 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
 
     # --------------------------------------------------------------- events
     def handle_event(self, event):
+        # 0) panneau de triche (mode test uniquement) : priorité sur tout le reste
+        if self.cheat_panel is not None:
+            if self.cheat_panel.handle(event):
+                if self.cheat_panel.closed:
+                    self.cheat_panel = None
+                return
         # 1) fenêtres de données déplaçables (la plus au-dessus d'abord)
         for w in reversed(self.datawins):
             if w.handle(event):
@@ -177,6 +185,14 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
                 return
         # 2) souris : boutons console + rail latéral + carte
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if (getattr(self.app, "cheats", False) and self._cheat_btn_rect
+                    and self._cheat_btn_rect.collidepoint(event.pos)):
+                if self.cheat_panel is None:
+                    from ui.cheatpanel import CheatPanel
+                    self.cheat_panel = CheatPanel(self.app)
+                else:
+                    self.cheat_panel = None
+                return
             for key, rect in self._console_btns.items():
                 if rect.collidepoint(event.pos):
                     if key == "expand":

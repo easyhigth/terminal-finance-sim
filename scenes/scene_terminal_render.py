@@ -107,12 +107,20 @@ class TerminalRenderMixin:
         inner = widgets.draw_panel(surf, rect, _t("term.commands"), config.COL_AMBER)
         self._rail_rects = {}
         gap = 4
-        n = max(1, len(self.rail))
+        n_headers = sum(1 for label, _ in self.rail if label is None)
+        n_buttons = max(1, len(self.rail) - n_headers)
+        hh = 16  # hauteur d'un en-tête de section
         # pas adaptatif borné à la hauteur du panneau (jamais de débordement vers le bas)
-        bh = max(14, min(26, (inner.h - gap * (n - 1)) // n))
+        avail = inner.h - n_headers * (hh + gap) - gap * (n_buttons - 1)
+        bh = max(13, min(24, avail // n_buttons))
         y = inner.y
         mp = pygame.mouse.get_pos()
         for label, cmd in self.rail:
+            if label is None:
+                widgets.draw_text(surf, cmd, (inner.x + 2, y + 2), fonts.tiny(bold=True),
+                                  config.COL_TEXT_DIM)
+                y += hh + gap
+                continue
             br = pygame.Rect(inner.x, y, inner.w, bh)
             self._rail_rects[label] = br
             hover = br.collidepoint(mp)

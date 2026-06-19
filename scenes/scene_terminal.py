@@ -127,14 +127,21 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
         self._onboarding_skip_rect = None  # bouton « passer » du bandeau d'intégration
         self.rail_w = 150         # largeur du rail latéral
         self._map_rect = None     # rect de la carte (pour le clic)
-        # rail latéral : (libellé, commande), regroupé par usage
+        # rail latéral : (libellé, commande), regroupé par phase de la boucle de jeu
+        # (observer → décider → agir) plutôt que par domaine métier — les entrées
+        # (None, "TITRE") sont des en-têtes de section, ignorées par le clic
+        # (cf. TerminalRenderMixin._draw_rail).
         self.rail = [
-            ("ADV ▸", "ADV"),
-            ("PORTEF.", "PORTFOLIO"), ("MARCHÉ", "MARKETHUB"), ("SHOP", "SHOP"),
-            ("MISSION", "MISSION"), ("EXAM/CERTIF", "EXAMCERT"),
-            ("MANDATS", "MANDATES"), ("DEALS", "DEALS"), ("M&A", "MA"),
-            ("INBOX", "INBOX"), ("NEWS", "NEWS"), ("DÉCIDE", "DECIDE"),
-            ("TABLEUR", "SHEET"), ("ACADÉMIE", "LEARN"),
+            (None, "OBSERVER"),
+            ("MARCHÉ", "MARKETHUB"), ("PORTEF.", "PORTFOLIO"),
+            ("INBOX", "INBOX"), ("NEWS", "NEWS"),
+            (None, "DÉCIDER"),
+            ("MISSION", "MISSION"), ("MANDATS", "MANDATES"),
+            ("DEALS", "DEALS"), ("M&A", "MA"), ("DÉCIDE", "DECIDE"),
+            (None, "AGIR & PROGRESSER"),
+            ("ADV ▸", "ADV"), ("EXAM/CERTIF", "EXAMCERT"),
+            (None, "OUTILS"),
+            ("SHOP", "SHOP"), ("TABLEUR", "SHEET"), ("ACADÉMIE", "LEARN"),
             ("GLOSSAIRE", "GLOSSARY"), ("PLUS", "MORE"),
             ("SAUVER", "SAVE"), ("AIDE", "COMMANDS"),
         ]

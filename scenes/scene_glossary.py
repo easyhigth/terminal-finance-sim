@@ -20,6 +20,7 @@ class GlossaryScene(Scene):
         self.selected_term = None
         self.scroll = 0
         self.cursor = 0  # curseur clavier dans la liste visible de termes
+        self._t = 0.0
         from core.i18n import t
         self.back_btn = widgets.Button(
             (40, config.SCREEN_HEIGHT-70, 180, 46), t("common.back"), config.COL_TEXT_DIM)
@@ -94,6 +95,7 @@ class GlossaryScene(Scene):
             self.app.scenes.go(self.return_to)
 
     def update(self, dt):
+        self._t += dt
         self.back_btn.update(pygame.mouse.get_pos())
 
     def draw(self, surf):
@@ -103,8 +105,9 @@ class GlossaryScene(Scene):
         gloss, CATEGORIES = glossary_data.localized(lang)
         widgets.draw_text(surf, t("gloss.title"), (40, 24),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, f"{t('gloss.search')} : {self.search}_",
-                          (42, 74), fonts.small(), config.COL_CYAN)
+        cursor = "_" if int(self._t * 2) % 2 == 0 else " "
+        search_label = f"{t('gloss.search')} : " + (self.search + cursor if self.search else cursor)
+        widgets.draw_text(surf, search_label, (42, 74), fonts.small(), config.COL_CYAN)
 
         # --- Colonne catégories ---
         cat_panel = pygame.Rect(40, 110, 220, 560)

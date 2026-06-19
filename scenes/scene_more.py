@@ -191,10 +191,9 @@ class MoreScene(Scene):
 
         search_rect = self._search_rect()
         pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
-        pygame.draw.rect(surf, config.COL_AMBER if self.search else config.COL_BORDER,
-                          search_rect, 1, border_radius=4)
+        pygame.draw.rect(surf, config.COL_AMBER, search_rect, 1, border_radius=4)
         cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        label = (self.search + cursor) if self.search else "Rechercher une page…"
+        label = (self.search + cursor) if self.search else (cursor + "Rechercher une page…")
         txt_col = config.COL_TEXT if self.search else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
                           (search_rect.x + 8, search_rect.y + 4), fonts.small(), txt_col)

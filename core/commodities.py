@@ -12,6 +12,8 @@ Holdings : PlayerState.commodities = { id : {"qty": nb de contrats, "avg": prix}
 """
 import numpy as np
 
+from core import liquidity as liq_mod
+
 # (id, nom, spot de base, dérive annuelle, vol annuelle, pente de courbe annuelle, catégorie)
 COMMODITIES = [
     # ---- Métaux précieux (7) ----
@@ -219,7 +221,7 @@ def quote(market, cid):
     structure = "Contango" if c[5] > 0 else "Backwardation" if c[5] < 0 else "Plate"
     return {"id": cid, "name": c[1], "spot": sp, "front": front,
             "slope": c[5], "structure": structure, "roll_yield": roll_yield(market, cid),
-            "vol": c[4], "category": c[6]}
+            "vol": c[4], "category": c[6], "liquidity": liq_mod.commodity_tier(c[6])}
 
 
 def all_quotes(market):
@@ -231,12 +233,27 @@ def _contract_value(market, cid, qty):
     return futures_price(market, cid, 1) * MULTIPLIER * qty
 
 
+def fill_price(market, cid, qty, side):
+    """Prix d'exécution réel (spread + impact de marché, calibrés par tier de
+    liquidité — métaux précieux/énergie liquides vs. minéraux stratégiques et
+    exotiques illiquides, cf. core/liquidity.py). Le prix coté (`quote()["front"]`)
+    reste le mid utilisé pour la valorisation."""
+    c = _BY_ID.get(cid)
+    if not c:
+        return None
+    mid = futures_price(market, cid, 1)
+    order_value = mid * MULTIPLIER * abs(qty)
+    category = c[6]
+    return liq_mod.fill_price(mid, order_value, liq_mod.commodity_depth(category),
+                               liq_mod.commodity_tier(category), side)
+
+
 def buy(player, market, cid, qty):
     if cid not in _BY_ID:
         return {"ok": False, "reason": "id"}
     if qty <= 0:
         return {"ok": False, "reason": "qty"}
-    price = futures_price(market, cid, 1)
+    price = fill_price(market, cid, qty, "buy")
     cost = price * MULTIPLIER * qty
     fee = cost * COMMISSION
     if cost + fee > player.cash:
@@ -256,11 +273,11 @@ def sell(player, market, cid, qty):
     pos = player.commodities.get(cid)
     if not pos:
         return {"ok": False, "reason": "noposition"}
-    price = futures_price(market, cid, 1)
     if qty == "ALL" or qty >= pos["qty"]:
         qty = pos["qty"]
     if qty <= 0:
         return {"ok": False, "reason": "qty"}
+    price = fill_price(market, cid, qty, "sell")
     proceeds = price * MULTIPLIER * qty
     fee = proceeds * COMMISSION
     realized = (price - pos["avg"]) * MULTIPLIER * qty - fee

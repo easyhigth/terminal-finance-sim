@@ -54,6 +54,7 @@ from scenes.scene_mission import MissionScene
 from scenes.scene_more import MoreScene
 from scenes.scene_news import NewsScene
 from scenes.scene_options import OptionsScene
+from scenes.scene_performance import PerformanceScene
 from scenes.scene_portfolio import PortfolioScene
 from scenes.scene_quant import QuantScene
 from scenes.scene_review import ReviewScene
@@ -143,6 +144,7 @@ class App:
         self.scenes.register("graph", GraphScene(self))
         self.scenes.register("rivals", RivalsScene(self))
         self.scenes.register("analytics", AnalyticsScene(self))
+        self.scenes.register("performance", PerformanceScene(self))
         self.scenes.register("explorer", MarketExplorerScene(self))
         self.scenes.register("tutorials", TutorialsScene(self))
         self.scenes.register("alerts", AlertsScene(self))

@@ -92,6 +92,7 @@ CATALOG = [
     ("Portefeuille & trading", [
         ("PORTFOLIO / BOOK / PRT", "Livre de positions (valeur nette, P&L)"),
         ("PA / ANALYSE", "Analyse détaillée : poids, risque, corrél., frontière"),
+        ("ATTR / ATTRIBUTION", "Attribution de performance : secteur, région, style, sélection, timing"),
         ("BUY / LONG <tk> <qté>", "Acheter des actions (position longue)"),
         ("SELL <tk> <qté|ALL>", "Vendre des actions"),
         ("SHORT <tk> <qté>", "Vente à découvert (parier à la baisse)"),

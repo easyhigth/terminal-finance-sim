@@ -47,7 +47,7 @@ CMD_NAMES = [
     "SAVE", "SAVES", "NEWS", "MORE", "SHORTCUTS", "REG", "STATUS", "MENU",
     "TEAM", "EQUIPE", "STRESS", "TIMELINE",
     "GP", "GPC", "GPO", "GPCH", "COMP", "HS", "HVOL", "BETA", "CORR",
-    "GEG", "GC", "RV", "ECO", "DEFINE", "PA",
+    "GEG", "GC", "RV", "ECO", "DEFINE", "PA", "ATTR",
 ]
 
 SAMPLE_NEWS = {
@@ -618,6 +618,8 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
             self.app.scenes.go("book", return_to="terminal")
         elif cmd in ("PA", "ANALYSE", "ANALYTICS", "DETAIL", "PORT"):
             self.app.scenes.go("analytics", return_to="terminal")
+        elif cmd in ("ATTR", "ATTRIBUTION", "PERFATTR"):
+            self.app.scenes.go("performance", return_to="terminal")
         elif cmd in ("FRONTIER", "MARKOWITZ", "FRONTIERE"):
             self.app.scenes.go("portfolio")
         elif cmd in ("BUY", "ACHETER", "LONG"):

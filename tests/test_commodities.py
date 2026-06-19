@@ -123,18 +123,18 @@ def test_buy_creates_position_with_qty_and_avg():
     pos = p.commodities["GOLD"]
     assert set(pos.keys()) == {"qty", "avg"}
     assert pos["qty"] == 3.0
-    assert pos["avg"] == commodities.futures_price(m, "GOLD", 1)
+    assert pos["avg"] == commodities.fill_price(m, "GOLD", 3, "buy")
 
 
 def test_buy_twice_updates_average_price():
     p = _player()
     m = Market(seed=10)
+    price1 = commodities.fill_price(m, "GOLD", 2, "buy")
     commodities.buy(p, m, "GOLD", 2)
-    price1 = p.commodities["GOLD"]["avg"]
     m.step()
+    price2 = commodities.fill_price(m, "GOLD", 2, "buy")
     commodities.buy(p, m, "GOLD", 2)
     pos = p.commodities["GOLD"]
-    price2 = commodities.futures_price(m, "GOLD", 1)
     assert pos["qty"] == 4.0
     assert pos["avg"] == (2 * price1 + 2 * price2) / 4
 
@@ -274,6 +274,21 @@ def test_holdings_view_structure_and_sorted_by_value_desc():
         assert set(h.keys()) == expected_keys
     # trié par valeur décroissante
     assert out[0]["value"] >= out[1]["value"]
+
+
+def test_fill_price_more_expensive_for_illiquid_category():
+    """Une matière première peu profonde (minéraux stratégiques) coûte plus
+    cher à l'exécution qu'un métal précieux liquide, pour un même ordre (item 25/26)."""
+    m = Market(seed=10)
+    gold_mid = commodities.futures_price(m, "GOLD", 1)
+    ree_mid = commodities.futures_price(m, "REE", 1)
+    gold_fill = commodities.fill_price(m, "GOLD", 5, "buy")
+    ree_fill = commodities.fill_price(m, "REE", 5, "buy")
+    gold_cost_frac = gold_fill / gold_mid - 1
+    ree_cost_frac = ree_fill / ree_mid - 1
+    assert ree_cost_frac > gold_cost_frac
+    assert commodities.quote(m, "GOLD")["liquidity"] == "Liquide"
+    assert commodities.quote(m, "REE")["liquidity"] == "Illiquide"
 
 
 def test_holdings_view_empty_when_no_positions():

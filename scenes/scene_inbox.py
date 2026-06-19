@@ -18,6 +18,7 @@ _KIND = {
     "country": ("PAYS", config.COL_PRESTIGE),
 }
 FILTER_CHIPS = [(None, "TOUS")] + [(k, v[0]) for k, v in _KIND.items()]
+ROW_H = 46
 
 
 class InboxScene(Scene):
@@ -37,6 +38,9 @@ class InboxScene(Scene):
         self._kind_rects = {}
         self._t = 0.0
         self.cursor = 0  # position clavier dans la liste visible (curseur ≠ sélection active)
+        self.scroll = 0
+        self._max_scroll = 0
+        self._list_rect = None
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
@@ -52,6 +56,18 @@ class InboxScene(Scene):
                               f"{msgs[idx].get('subject', '')} {msgs[idx].get('body', '')}".lower()]
         return order
 
+    def _scroll_to_cursor(self):
+        """Ajuste le scroll pour garder la ligne sélectionnée au clavier visible."""
+        if not self._list_rect:
+            return
+        row_top = self.cursor * ROW_H
+        row_bottom = row_top + ROW_H
+        if row_top < self.scroll:
+            self.scroll = row_top
+        elif row_bottom > self.scroll + self._list_rect.h:
+            self.scroll = row_bottom - self._list_rect.h
+        self.scroll = max(0, min(self._max_scroll, self.scroll))
+
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
@@ -66,6 +82,8 @@ class InboxScene(Scene):
             elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
                 visible = self._visible_order()
                 self.cursor, activate = widgets.list_key_nav(event, self.cursor, len(visible))
+                if visible:
+                    self._scroll_to_cursor()
                 if activate:
                     idx = visible[self.cursor]
                     self.sel = idx
@@ -73,9 +91,15 @@ class InboxScene(Scene):
                 return
             elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
                 self.search += event.unicode
+                self.scroll = 0
                 return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            if self._list_rect and self._list_rect.collidepoint(event.pos):
+                self.scroll = max(0, min(self._max_scroll,
+                                         self.scroll + (-48 if event.button == 4 else 48)))
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
@@ -84,6 +108,7 @@ class InboxScene(Scene):
             for kind, rect in self._kind_rects.items():
                 if rect.collidepoint(event.pos):
                     self.kind_filter = kind
+                    self.scroll = 0
                     return
             for idx, rect in self.row_rects.items():
                 if rect.collidepoint(event.pos):
@@ -143,35 +168,46 @@ class InboxScene(Scene):
         order = self._visible_order()
         self.cursor = min(self.cursor, len(order) - 1) if order else 0
         linner = widgets.draw_panel(surf, listp, f"Reçus ({len(order)})", config.COL_CYAN)
+        list_area = pygame.Rect(linner.x - 4, linner.y, linner.w + 8, linner.h)
+        self._list_rect = list_area
         self.row_rects = {}
         if not msgs:
             widgets.draw_text(surf, "Aucun message pour l'instant.", (linner.x, linner.y),
                               fonts.body(), config.COL_TEXT_DIM)
+            self.scroll = self._max_scroll = 0
         elif not order:
             widgets.draw_text(surf, "Aucun message ne correspond au filtre.", (linner.x, linner.y),
                               fonts.body(), config.COL_TEXT_DIM)
+            self.scroll = self._max_scroll = 0
         else:
-            y = linner.y
+            prev_clip = surf.get_clip()
+            surf.set_clip(list_area)
+            y = linner.y - self.scroll
             for pos, idx in enumerate(order):
-                m = msgs[idx]
-                row = pygame.Rect(linner.x - 4, y - 2, linner.w + 8, 46)
-                self.row_rects[idx] = row
-                sel = (idx == self.sel)
-                if sel:
-                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, row)
-                widgets.draw_row_selection(surf, row, pos == self.cursor)
-                tag, tcol = _KIND.get(m["kind"], ("•", config.COL_TEXT))
-                bold = not m.get("read")
-                widgets.draw_text(surf, tag, (linner.x, y), fonts.tiny(bold=True), tcol)
-                widgets.draw_text(surf, f"J{m['day']}", (linner.right - 40, y),
-                                  fonts.tiny(), config.COL_TEXT_DIM)
-                subj = ("● " if bold else "") + m["subject"]
-                widgets.draw_text(surf, subj[:42], (linner.x, y + 16),
-                                  fonts.small(bold=bold),
-                                  config.COL_WHITE if bold else config.COL_TEXT)
-                y += 46
-                if y > linner.bottom - 30:
-                    break
+                visible = (list_area.top - ROW_H) < y < list_area.bottom
+                if visible:
+                    m = msgs[idx]
+                    row = pygame.Rect(linner.x - 4, y - 2, linner.w + 8, ROW_H)
+                    self.row_rects[idx] = row
+                    sel = (idx == self.sel)
+                    if sel:
+                        pygame.draw.rect(surf, config.COL_PANEL_HEAD, row)
+                    widgets.draw_row_selection(surf, row, pos == self.cursor)
+                    tag, tcol = _KIND.get(m["kind"], ("•", config.COL_TEXT))
+                    bold = not m.get("read")
+                    widgets.draw_text(surf, tag, (linner.x, y), fonts.tiny(bold=True), tcol)
+                    widgets.draw_text(surf, f"J{m['day']}", (linner.right - 40, y),
+                                      fonts.tiny(), config.COL_TEXT_DIM)
+                    subj = ("● " if bold else "") + m["subject"]
+                    widgets.draw_text(surf, subj[:42], (linner.x, y + 16),
+                                      fonts.small(bold=bold),
+                                      config.COL_WHITE if bold else config.COL_TEXT)
+                y += ROW_H
+            surf.set_clip(prev_clip)
+            content_h = (y + self.scroll) - linner.y
+            self._max_scroll = max(0, content_h - list_area.h)
+            self.scroll = min(self.scroll, self._max_scroll)
+            widgets.draw_scrollbar(surf, listp, list_area, self.scroll, self._max_scroll, content_h)
 
         # volet de lecture à droite
         readp = pygame.Rect(540, list_top, config.SCREEN_WIDTH - 580, ph)

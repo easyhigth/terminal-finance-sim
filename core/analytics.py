@@ -72,6 +72,51 @@ def max_drawdown(history):
     return mdd * 100.0
 
 
+def recovery_time(history):
+    """Temps de récupération (en pas) après le drawdown le plus profond de la
+    série : nombre de pas entre le creux le plus bas (sous le pic le plus
+    pénalisant) et le retour au-dessus de ce même pic. 0 si aucun drawdown.
+    None si le portefeuille n'a pas encore récupéré."""
+    if not history or len(history) < 2:
+        return 0
+    peak, peak_i = history[0], 0
+    worst_dd, worst_peak_i, worst_trough_i = 0.0, 0, 0
+    for i, v in enumerate(history):
+        if v > peak:
+            peak, peak_i = v, i
+        dd = (peak - v) / peak if peak > 0 else 0.0
+        if dd > worst_dd:
+            worst_dd, worst_peak_i, worst_trough_i = dd, peak_i, i
+    if worst_dd <= 0:
+        return 0
+    recovery_level = history[worst_peak_i]
+    for i in range(worst_trough_i + 1, len(history)):
+        if history[i] >= recovery_level:
+            return i - worst_trough_i
+    return None
+
+
+def tracking_error(player, market):
+    """Tracking error (%) du portefeuille vs l'indice régional du joueur, sur
+    l'historique commun le plus long disponible (cf. finmath.tracking_error).
+    0.0 si l'historique est trop court pour être significatif."""
+    hist = getattr(player, "cash_history", [])
+    idx = {n: r for n, r, *_ in market.index_defs}
+    ref = next((n for n, r in idx.items() if r == player.continent), None)
+    if ref is None or len(hist) < 3:
+        return 0.0
+    bench_hist = market.index_history(ref)
+    n = min(len(hist), len(bench_hist))
+    if n < 3:
+        return 0.0
+    port_rets = charts.simple_returns(hist[-n:])
+    bench_rets = charts.simple_returns(bench_hist[-n:])
+    m = min(len(port_rets), len(bench_rets))
+    if m < 2:
+        return 0.0
+    return finmath.tracking_error(port_rets[-m:], bench_rets[-m:]) * 100.0
+
+
 def equity_volatility(player, market):
     """Volatilité annualisée (%) du sous-portefeuille ACTIONS, estimée par la
     covariance des rendements d'historique, pondérée par les poids signés."""
@@ -156,6 +201,8 @@ def summary(player, market):
         "buying_power": ms["buying_power"], "margin_call": ms["margin_call"],
         "volatility": equity_volatility(player, market),
         "max_drawdown": max_drawdown(getattr(player, "cash_history", [])),
+        "recovery_time": recovery_time(getattr(player, "cash_history", [])),
+        "tracking_error": tracking_error(player, market),
         "by_class": by_class, "by_sector": by_sector, "by_region": by_region,
         "top_weight": (max(weights) * 100 if weights else 0.0),
         "hhi": hhi, "effective_positions": eff_n, "n_positions": len(rows),

@@ -47,6 +47,34 @@ def test_max_drawdown():
     assert analytics.max_drawdown([100]) == 0.0
 
 
+def test_recovery_time_no_drawdown():
+    assert analytics.recovery_time([]) == 0
+    assert analytics.recovery_time([100]) == 0
+    assert analytics.recovery_time([100, 110, 120]) == 0
+
+
+def test_recovery_time_measures_steps_to_new_peak():
+    # pic à 120 (index 1), creux à 90 (index 2), récupération à 130 (index 4)
+    assert analytics.recovery_time([100, 120, 90, 110, 130]) == 2
+
+
+def test_recovery_time_none_when_not_recovered():
+    assert analytics.recovery_time([100, 120, 90, 110]) is None
+
+
+def test_tracking_error_zero_with_short_history():
+    p, m = _mk()
+    assert analytics.tracking_error(p, m) == 0.0
+
+
+def test_tracking_error_in_summary():
+    p, m = _mk()
+    p.cash_history = [500_000.0 + i * 1000 for i in range(10)]
+    s = analytics.summary(p, m)
+    assert "tracking_error" in s
+    assert s["tracking_error"] >= 0.0
+
+
 def test_correlation_and_frontier_need_two_equities():
     p, m = _mk()
     p.portfolio[m.companies[0]["ticker"]] = {"shares": 100, "avg": 10}

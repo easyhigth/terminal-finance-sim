@@ -64,3 +64,37 @@ def test_drawdown_from_history():
     p.cash_history = [100, 120, 90, 110, 70, 130]
     dd = risk.net_worth_drawdown(p)
     assert dd == pytest.approx((120 - 70) / 120, rel=1e-6)
+
+
+def test_new_scenarios_are_registered_and_runnable():
+    p, m = _player_with_positions()
+    for name in ("Choc d'inflation", "Crise Europe", "Choc énergie",
+                 "Crise de crédit", "Crise de liquidité"):
+        assert name in risk.STRESS
+        s = risk.stress(p, m, name)
+        assert s["total"] == pytest.approx(s["equity"] + s["bond"] + s["oil"], rel=1e-9)
+
+
+def test_sensitivity_reports_all_factors():
+    p, m = _player_with_positions()
+    sens = risk.sensitivity(p, m)
+    for key in ("Taux (+100bps)", "Spread de crédit (+100bps)", "FX (-10%)",
+                "Pétrole (-10%)", "Actions (-10% monde)", "Volatilité"):
+        assert key in sens
+    assert sens["Taux (+100bps)"] < 0   # +100bps fait perdre sur les obligations détenues
+
+
+def test_reverse_stress_scales_to_target_loss():
+    p, m = _player_with_positions()
+    rs = risk.reverse_stress(p, m, target_loss_pct=20.0, scenario="Krach actions")
+    assert rs["ok"] is True
+    scaled = risk.STRESS["Krach actions"]["world"] * rs["scale"]
+    assert rs["shocked"]["world"] == pytest.approx(scaled)
+    assert rs["target_loss_pct"] == 20.0
+
+
+def test_reverse_stress_no_exposure():
+    m = Market(seed=2024)
+    p = PlayerState()
+    rs = risk.reverse_stress(p, m, target_loss_pct=10.0)
+    assert rs["ok"] is False

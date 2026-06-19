@@ -110,6 +110,12 @@ class PlayerState:
     # ----- parcours d'intégration (premiers jours guidés) -----
     onboarding_step: int = 0            # index de l'étape courante (core/onboarding.py)
     onboarding_done: bool = False       # terminé ou explicitement passé
+    # ----- journal d'investissement (core/journal.py) -----
+    trade_journal: list = field(default_factory=list)  # entrées de trades : voir core/journal.py
+    next_journal_id: int = 1            # compteur d'identifiants d'entrées de journal
+    # ----- idées/opportunités (core/opportunities.py) -----
+    saved_screens: list = field(default_factory=list)  # critères de recherche sauvegardés
+    next_screen_id: int = 1             # compteur d'identifiants de critères sauvegardés
 
     @property
     def grade(self):

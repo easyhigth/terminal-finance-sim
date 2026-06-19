@@ -20,7 +20,7 @@ Structure d'un deal (dict) :
 """
 import random
 
-from core import config, tracks
+from core import config, tracks, unlocks
 
 MAX_ACTIVE_DEALS = 4        # au-delà, plus de génération
 GEN_PROBABILITY = 0.45      # proba de générer un deal à un tour donné
@@ -164,6 +164,8 @@ def _eligible_templates(player):
 def maybe_generate(player, rng=None):
     """Génère éventuellement un nouveau deal. Retourne la liste des deals créés."""
     rng = rng or random
+    if not unlocks.unlocked(player, "deals"):
+        return []
     if len(player.deals) >= MAX_ACTIVE_DEALS:
         return []
     prob_bonus = 0.0

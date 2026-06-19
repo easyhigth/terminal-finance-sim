@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from core.market import REGIMES, Crisis, Market
+from core.market import STEPS_PER_YEAR as STEPS_PER_YEAR_ENGINE
 
 STEPS_PER_YEAR = 52  # un pas de marché ≈ une semaine (cf. market.py)
 
@@ -410,3 +411,49 @@ def test_defensive_sectors_outperform_relatively_when_unemployment_rises():
     low = _perf_after(2024, 50, {"unemployment": 3.0})
     for sector in ("Sante", "Telecom", "Agro"):
         assert high[sector] > low[sector]
+
+
+# ----------------------------------------------- top movers / breadth / heatmap
+def test_returns_over_matches_history_of_for_one_year():
+    m = Market(seed=5); m.fast_forward(80)
+    chg = m.returns_over(STEPS_PER_YEAR_ENGINE)
+    tk = m.companies[0]["ticker"]
+    i = m.ticker_idx[tk]
+    mt = m.metrics(tk)
+    assert chg[i] == pytest.approx(mt["change_pct"], rel=1e-6)
+
+
+def test_top_movers_gain_and_loss_are_sorted_and_disjoint_extremes():
+    m = Market(seed=6); m.fast_forward(60)
+    gainers = m.top_movers(10, by="gain", n=5)
+    losers = m.top_movers(10, by="loss", n=5)
+    g = [c["change_pct"] for c in gainers]
+    l = [c["change_pct"] for c in losers]
+    assert g == sorted(g, reverse=True)
+    assert l == sorted(l)
+    assert g[0] >= l[0]
+
+
+def test_top_movers_respects_sector_filter():
+    m = Market(seed=6); m.fast_forward(60)
+    sector = m.companies[0]["sector"]
+    out = m.top_movers(10, sector=sector, n=50)
+    assert out
+    assert all(c["sector"] == sector for c in out)
+
+
+def test_breadth_counts_sum_to_universe_size():
+    m = Market(seed=7); m.fast_forward(60)
+    b = m.breadth()
+    assert b["advancers"] + b["decliners"] + b["unchanged"] == m.n
+    assert 0.0 <= b["pct_above_ma"] <= 100.0
+    assert 0 <= b["new_highs"] <= m.n
+    assert 0 <= b["new_lows"] <= m.n
+
+
+def test_heatmap_covers_all_sectors_with_region_breakdown():
+    m = Market(seed=8); m.fast_forward(30)
+    grid = m.heatmap()
+    assert {row["sector"] for row in grid} == set(m.sectors)
+    for row in grid:
+        assert set(row["regions"].keys()) == set(m.regions)

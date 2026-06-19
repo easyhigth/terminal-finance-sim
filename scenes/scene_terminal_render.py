@@ -7,6 +7,7 @@ import pygame
 from core import career as career_mod
 from core import config
 from core import inbox as inbox_mod
+from core import onboarding as onboarding_mod
 from core import portfolio as pf_mod
 from core import unlocks as unlocks_mod
 from core.i18n import get_lang
@@ -31,6 +32,14 @@ class TerminalRenderMixin:
 
         M = config.MARGIN
         top = config.TOPBAR_H + config.TICKER_H + M
+        onb_step = onboarding_mod.active_step(p)
+        onb_h = 40 if onb_step else 0
+        if onb_step:
+            self._draw_onboarding_banner(
+                surf, pygame.Rect(M, top, config.SCREEN_WIDTH - 2 * M, onb_h - M), p, onb_step)
+            top += onb_h
+        else:
+            self._onboarding_skip_rect = None
         console_h = self._console_height()
         bottom = config.SCREEN_HEIGHT - console_h - M     # bas de la zone de contenu
         avail_h = bottom - top
@@ -76,6 +85,23 @@ class TerminalRenderMixin:
         # overlay : panneau des raccourcis clavier
         if self.shortcuts_panel is not None:
             self.shortcuts_panel.draw(surf)
+
+    def _draw_onboarding_banner(self, surf, rect, p, step):
+        n = len(onboarding_mod.STEPS)
+        idx = p.onboarding_step + 1
+        pygame.draw.rect(surf, config.COL_PANEL, rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN, rect, 1, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN, (rect.x, rect.y, 3, rect.h))
+        skip = pygame.Rect(rect.right - 90, rect.y + (rect.h - 22) // 2, 80, 22)
+        self._onboarding_skip_rect = skip
+        title = f"PARCOURS — Étape {idx}/{n} : {step['title']}"
+        widgets.draw_text(surf, title, (rect.x + 12, rect.y + 4), fonts.tiny(bold=True), config.COL_CYAN)
+        widgets.draw_text(surf, widgets.fit_text(step["hint"], fonts.tiny(), rect.w - 220),
+                          (rect.x + 12, rect.y + 20), fonts.tiny(), config.COL_TEXT_DIM)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, skip, border_radius=3)
+        pygame.draw.rect(surf, config.COL_BORDER, skip, 1, border_radius=3)
+        widgets.draw_text(surf, "✕ Passer", skip.center, fonts.tiny(bold=True),
+                          config.COL_TEXT_DIM, align="center")
 
     def _draw_rail(self, surf, rect, p):
         inner = widgets.draw_panel(surf, rect, _t("term.commands"), config.COL_AMBER)

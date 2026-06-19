@@ -105,6 +105,9 @@ class PlayerState:
     last_stresstest_quarter: int = 0    # dernier trimestre où un stress test a eu lieu
     pending_stresstest: dict = None     # stress test en attente de réponse, ou None
     stresstest_history: list = field(default_factory=list)  # derniers résultats résolus (UI, max ~10)
+    # ----- parcours d'intégration (premiers jours guidés) -----
+    onboarding_step: int = 0            # index de l'étape courante (core/onboarding.py)
+    onboarding_done: bool = False       # terminé ou explicitement passé
 
     @property
     def grade(self):
@@ -182,6 +185,10 @@ class GameState:
             k: p.get(k, getattr(PlayerState(), k))
             for k in PlayerState().__dataclass_fields__
         })
+        # sauvegardes antérieures au parcours d'intégration : pas de clé du tout
+        # -> partie déjà en cours, on ne l'impose pas après coup.
+        if "onboarding_done" not in p:
+            gs.player.onboarding_done = True
         return gs
 
     # ----- Fichiers ------------------------------------------------------

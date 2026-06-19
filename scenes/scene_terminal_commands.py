@@ -328,6 +328,7 @@ class TerminalCommandsMixin:
     def _cmd_eval(self):
         """Ouvre l'examen si TOUS les critères de promotion sont remplis."""
         p = self.app.gs.player
+        p.flags["onboarding_seen_eval"] = True
         # un examen mis en pause se reprend directement (peu importe les critères)
         if isinstance(p.eval_state, dict) and p.eval_state.get("mode") == "promotion" \
                 and p.eval_state.get("items"):

@@ -25,8 +25,12 @@ _ECO_NOTES = {
     "liquidity": "facilité d'exécution du marché ; ↓ = conditions tendues",
 }
 
-_TABS = [("overview", "Vue d'ensemble"), ("sectors", "Secteurs"), ("watchlist", "Watchlist")]
+_TABS = [("overview", "Vue d'ensemble"), ("sectors", "Secteurs"), ("topflop", "Top/Flop"),
+         ("heatmap", "Heatmap"), ("watchlist", "Watchlist")]
 _SECTOR_BAR_MAX = 1.5    # % de variation correspondant à une jauge pleine
+
+_TOPFLOP_PERIODS = [("1 pas", 1), ("1 mois", 6), ("3 mois", 18), ("1 an", 73)]
+_HEATMAP_MAX = 1.5       # % de variation correspondant à une teinte pleine
 
 
 class MarketHubScene(Scene, PopupMixin):
@@ -35,6 +39,8 @@ class MarketHubScene(Scene, PopupMixin):
         self.market = self.app.ensure_market()
         self.top_region = self.app.gs.player.continent
         self.tab = "overview"
+        self.topflop_steps = _TOPFLOP_PERIODS[0][1]
+        self._period_rects = {}
         self.init_popups()
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
@@ -59,6 +65,10 @@ class MarketHubScene(Scene, PopupMixin):
             for tab_id, rect in self._tab_rects.items():
                 if rect.collidepoint(event.pos):
                     self.tab = tab_id
+                    return
+            for steps, rect in self._period_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.topflop_steps = steps
                     return
             for region, rect in self._region_rects.items():
                 if rect.collidepoint(event.pos):
@@ -156,6 +166,10 @@ class MarketHubScene(Scene, PopupMixin):
             self._draw_eco(surf, pygame.Rect(x2, y2, colw, row_h))
         elif self.tab == "sectors":
             self._draw_sectors(surf, pygame.Rect(M, top, config.SCREEN_WIDTH - 2 * M, bottom - top))
+        elif self.tab == "topflop":
+            self._draw_topflop(surf, pygame.Rect(M, top, config.SCREEN_WIDTH - 2 * M, bottom - top))
+        elif self.tab == "heatmap":
+            self._draw_heatmap(surf, pygame.Rect(M, top, config.SCREEN_WIDTH - 2 * M, bottom - top))
         else:
             self._draw_watchlist(surf, pygame.Rect(M, top, config.SCREEN_WIDTH - 2 * M, bottom - top))
 
@@ -328,6 +342,97 @@ class MarketHubScene(Scene, PopupMixin):
                               fonts.tiny(), config.COL_TEXT_DIM, align="right")
             widgets.draw_text(surf, widgets.format_money(s["mktcap"] * 1e6, cur), (inner.right, y),
                               fonts.tiny(bold=True), config.COL_WHITE, align="right")
+            y += row_h
+
+    def _draw_topflop(self, surf, rect):
+        inner = widgets.draw_panel(surf, rect, "Top/Flop — plus forts mouvements sur la période", config.COL_DEAL)
+        mp = pygame.mouse.get_pos()
+        x = inner.x
+        y = inner.y
+        self._period_rects = {}
+        for label, steps in _TOPFLOP_PERIODS:
+            w = fonts.tiny(bold=True).size(label)[0] + 14
+            r = pygame.Rect(x, y, w, 18)
+            self._period_rects[steps] = r
+            active = (steps == self.topflop_steps)
+            col = config.COL_AMBER if active else config.COL_TEXT_DIM
+            if r.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, r, border_radius=3)
+            widgets.draw_text(surf, label, (r.x + 7, r.y + 1), fonts.tiny(bold=active), col)
+            x = r.right + 6
+
+        b = self.market.breadth(period_steps=self.topflop_steps)
+        y += 26
+        widgets.draw_text(surf,
+                          f"Pouls du marché : {b['advancers']} hausses / {b['decliners']} baisses "
+                          f"/ {b['unchanged']} stables  ·  {b['pct_above_ma']:.0f}% au-dessus de leur "
+                          f"moyenne mobile  ·  {b['new_highs']} plus-hauts / {b['new_lows']} plus-bas (1 an)",
+                          (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+        y += 22
+
+        colw = (inner.w - 16) // 2
+        col_x1, col_x2 = inner.x, inner.x + colw + 16
+        n = max(1, (inner.bottom - y - 18) // 24)
+
+        widgets.draw_text(surf, "HAUSSES", (col_x1, y), fonts.tiny(bold=True), config.COL_UP)
+        widgets.draw_text(surf, "BAISSES", (col_x2, y), fonts.tiny(bold=True), config.COL_DOWN)
+        y_rows = y + 18
+        for c in self.market.top_movers(self.topflop_steps, n=n, by="gain"):
+            row = pygame.Rect(col_x1 - 4, y_rows - 2, colw + 8, 22)
+            self._ticker_rects[c["ticker"]] = row
+            if row.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+            widgets.draw_text(surf, "↑ " + c["ticker"], (col_x1, y_rows), fonts.small(bold=True), config.COL_UP)
+            widgets.draw_text(surf, c["name"][:16], (col_x1 + 70, y_rows), fonts.small(), config.COL_TEXT)
+            widgets.draw_text(surf, f"{'+' if c['change_pct']>=0 else ''}{c['change_pct']:.2f}%",
+                              (col_x1 + colw, y_rows), fonts.tiny(bold=True), config.COL_UP, align="right")
+            y_rows += 24
+        y_rows = y + 18
+        for c in self.market.top_movers(self.topflop_steps, n=n, by="loss"):
+            row = pygame.Rect(col_x2 - 4, y_rows - 2, colw + 8, 22)
+            self._ticker_rects[c["ticker"]] = row
+            if row.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+            widgets.draw_text(surf, "↓ " + c["ticker"], (col_x2, y_rows), fonts.small(bold=True), config.COL_DOWN)
+            widgets.draw_text(surf, c["name"][:16], (col_x2 + 70, y_rows), fonts.small(), config.COL_TEXT)
+            widgets.draw_text(surf, f"{'+' if c['change_pct']>=0 else ''}{c['change_pct']:.2f}%",
+                              (col_x2 + colw, y_rows), fonts.tiny(bold=True), config.COL_DOWN, align="right")
+            y_rows += 24
+
+    def _draw_heatmap(self, surf, rect):
+        inner = widgets.draw_panel(surf, rect, "Heatmap secteur × région (dernier pas, pondérée par capitalisation)",
+                                   config.COL_PRESTIGE)
+        grid = self.market.heatmap()
+        regions = self.market.regions
+        mp = pygame.mouse.get_pos()
+
+        label_w = 110
+        col_w = max(70, (inner.w - label_w) // max(1, len(regions)))
+        row_h = max(20, (inner.h - 24) // max(1, len(grid)))
+
+        def cell_color(v):
+            if v is None:
+                return config.COL_PANEL
+            ratio = max(-1.0, min(1.0, v / _HEATMAP_MAX))
+            base = config.COL_UP if ratio >= 0 else config.COL_DOWN
+            t = abs(ratio)
+            return tuple(int(config.COL_PANEL[i] + (base[i] - config.COL_PANEL[i]) * t) for i in range(3))
+
+        y = inner.y + 20
+        x0 = inner.x + label_w
+        for ci, region in enumerate(regions):
+            widgets.draw_text(surf, region[:8], (x0 + ci * col_w, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        for row in grid:
+            widgets.draw_text(surf, row["sector"], (inner.x, y + 4), fonts.small(), config.COL_TEXT)
+            for ci, region in enumerate(regions):
+                v = row["regions"].get(region)
+                cell = pygame.Rect(x0 + ci * col_w, y, col_w - 4, row_h - 4)
+                pygame.draw.rect(surf, cell_color(v), cell)
+                pygame.draw.rect(surf, config.COL_BORDER, cell, 1)
+                if v is not None:
+                    txt_col = config.COL_BG if abs(v) / _HEATMAP_MAX > 0.5 else config.COL_TEXT
+                    widgets.draw_text(surf, f"{'+' if v>=0 else ''}{v:.2f}%", cell.center,
+                                      fonts.tiny(bold=True), txt_col, align="center")
             y += row_h
 
     def _draw_watchlist(self, surf, rect):

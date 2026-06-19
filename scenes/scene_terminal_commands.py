@@ -12,6 +12,7 @@ from core import etfs as etfs_mod
 from core import history as history_mod
 from core import inbox as inbox_mod
 from core import ipo as ipo_mod
+from core import legacy as legacy_mod
 from core import macrocal as macrocal_mod
 from core import mandates as mandates_mod
 from core import news as news_mod
@@ -573,6 +574,20 @@ class TerminalCommandsMixin:
         self._open_window("ALERTES DE PRIX",
                           [("Tk", 60), ("Seuil", 70), ("Sens", 50), ("Cours", 70)], rows)
 
+    def _cmd_legacy(self):
+        """Affiche l'avancement des 5 objectifs de légende (ambitions de carrière)."""
+        p = self.app.gs.player
+        rows = []
+        for g in legacy_mod.all_goals():
+            done = g["id"] in p.legacy
+            cur, target = g["progress"](p, self.market)
+            status = "✓ ATTEINT" if done else f"{min(cur, target)}/{target}"
+            col = config.COL_UP if done else config.COL_TEXT
+            rows.append(((g["name"], config.COL_PRESTIGE), g["desc"], (status, col)))
+        self._open_window(_L("OBJECTIFS DE LÉGENDE", "LEGACY GOALS"),
+                          [("Objectif", 180), ("Description", 420), ("Avancement", 110)],
+                          rows, accent=config.COL_PRESTIGE)
+
     def _check_alerts(self):
         """Vérifie les alertes ; notifie au franchissement et les retire."""
         p = self.app.gs.player
@@ -610,6 +625,15 @@ class TerminalCommandsMixin:
         for b in badges_mod.check_new(self.app.gs.player, self.market):
             self.app.notify(f"✶ Badge : {b['name']}", "prestige")
             career_mod.log(self.app.gs.player, "info", f"Badge débloqué : {b['name']}")
+        self._check_legacy()
+
+    def _check_legacy(self):
+        """Attribue les objectifs de légende nouvellement atteints et notifie
+        (toast renforcé + journal) : ce sont les ambitions de carrière, pas de
+        simples jalons."""
+        for g in legacy_mod.check_new(self.app.gs.player, self.market):
+            self.app.notify(f"★ OBJECTIF DE LÉGENDE : {g['name']}", "prestige")
+            career_mod.log(self.app.gs.player, "info", f"Objectif de légende atteint : {g['name']}")
 
     def _cmd_buy(self, args):
         if len(args) < 2 or not args[1].lstrip("-").isdigit():
@@ -991,6 +1015,8 @@ class TerminalCommandsMixin:
             self.app.notify(scenario["name"], scenario["kind"])
             if scenario["kind"] == "bad":
                 p.flags["crises"] = p.flags.get("crises", 0) + 1
+                if scenario.get("severity", 1.0) >= 1.35:
+                    p.flags["major_crises"] = p.flags.get("major_crises", 0) + 1
         # événement HISTORIQUE scénarisé (campagne déterministe dans le temps)
         hist = history_mod.maybe_trigger(p, m)
         if hist:
@@ -1049,6 +1075,7 @@ class TerminalCommandsMixin:
                 self.app.notify(_L(f"Mandat souverain : {pol['country']}",
                                    f"Sovereign mandate: {pol['country_en']}"), "info")
         if summary.get("quarter_changed"):
+            legacy_mod.on_quarter_close(p, m)
             self._log(_L(f"  ── Nouveau trimestre : T{p.quarter} ──", f"  ── New quarter: Q{p.quarter} ──"))
             qr = summary.get("quarter_report")
             if qr and qr["total"]:
@@ -1082,11 +1109,19 @@ class TerminalCommandsMixin:
         # nouvelle offre de mandat éventuelle
         offer = mandates_mod.maybe_offer(p, random, m)
         if offer:
-            self._log(_L(f"  ✶ OFFRE DE MANDAT : {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
-                      f"(MANDATES pour voir).",
-                      f"  ✶ MANDATE OFFER: {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
-                      f"(type MANDATES to view)."))
-            self.app.notify(_L(f"Offre de mandat : {offer['client']}", f"Mandate offer: {offer['client']}"), "info")
+            if offer.get("transformant"):
+                self._log(_L(f"  ★★ MANDAT TRANSFORMANT : {offer['client']} — "
+                          f"{widgets.format_money(offer['capital'], cur)} (MANDATES pour voir).",
+                          f"  ★★ TRANSFORMATIVE MANDATE: {offer['client']} — "
+                          f"{widgets.format_money(offer['capital'], cur)} (type MANDATES to view)."))
+                self.app.notify(_L(f"Mandat transformant : {offer['client']}",
+                                   f"Transformative mandate: {offer['client']}"), "prestige")
+            else:
+                self._log(_L(f"  ✶ OFFRE DE MANDAT : {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
+                          f"(MANDATES pour voir).",
+                          f"  ✶ MANDATE OFFER: {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
+                          f"(type MANDATES to view)."))
+                self.app.notify(_L(f"Offre de mandat : {offer['client']}", f"Mandate offer: {offer['client']}"), "info")
             inbox_mod.push(p, "client", offer["client"], "Proposition de mandat",
                            f"Nous souhaitons vous confier {widgets.format_money(offer['capital'], cur)} : "
                            f"objectif +{offer['target_pct']:.0f}% en {offer['horizon']} trimestres, "

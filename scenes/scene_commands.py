@@ -32,6 +32,7 @@ CATALOG = [
         ("HISTORY / JOURNAL", "Journal de carrière"),
         ("TRACK", "Choisir / voir sa voie de spécialisation"),
         ("CERT", "Certifications CFA / FRM / CQF (boost de carrière)"),
+        ("LEGACY", "Objectifs de légende : ambitions de carrière long terme"),
     ]),
     ("Monde vivant", [
         ("INBOX / MAIL", "Messagerie (manager, clients, conformité, desk)"),

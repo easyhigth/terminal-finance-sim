@@ -222,7 +222,8 @@ def check_margin_call(player, market):
             sell(player, market, t, qty)
         else:
             cover(player, market, t, qty)
-    penalty = liquidated * LIQUIDATION_FEE
+    from core import archetypes
+    penalty = liquidated * LIQUIDATION_FEE * archetypes.perk(player, "margin_call_penalty_mult")
     player.cash -= penalty
     player.flags["margin_call_count"] = player.flags.get("margin_call_count", 0) + 1
     return {"triggered": True, "liquidated": liquidated, "penalty": penalty}

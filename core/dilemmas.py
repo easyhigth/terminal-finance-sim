@@ -255,10 +255,14 @@ def maybe_trigger(player, rng=None, base_prob=0.10):
 
 def apply_choice(player, dilemma, option_index):
     """Applique l'option choisie. Retourne l'option (avec son issue)."""
+    from core import archetypes
     opt = dilemma["options"][option_index]
     player.adjust_cash(opt["cash"])
     player.adjust_reputation(opt["rep"])
-    player.heat = max(0, min(100, player.heat + opt["heat"]))
+    heat_delta = opt["heat"]
+    if heat_delta > 0:
+        heat_delta *= archetypes.perk(player, "heat_gain_mult")
+    player.heat = max(0, min(100, player.heat + heat_delta))
     # retire le dilemme de la file
     player.pending_dilemmas = [d for d in player.pending_dilemmas
                                if d.get("id") != dilemma.get("id")]

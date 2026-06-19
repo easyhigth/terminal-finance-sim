@@ -4,7 +4,7 @@ Affiche le globe interactif + panneaux réglementaires par région.
 """
 import pygame
 
-from core import config
+from core import archetypes, config
 from core import startscenarios as scen
 from core.game_state import GameState, PlayerState
 from core.i18n import t
@@ -19,10 +19,13 @@ class ContinentScene(Scene):
         self.selected = None
         self.hardcore = kwargs.get("hardcore", False)
         self.scen_idx = 0          # scénario de départ sélectionné
+        self.arch_idx = 0         # archétype de run sélectionné (philosophie de jeu)
         fy = config.SCREEN_HEIGHT - 50
         self.back_btn = widgets.Button((40, fy, 150, 42), t("common.back"), config.COL_TEXT_DIM)
         self.scen_btn = widgets.Button((460, fy, 300, 42),
                                        "SCÉNARIO : " + scen.SCENARIOS[0]["name"], config.COL_CYAN)
+        self.arch_btn = widgets.Button((770, fy, 200, 42),
+                                       "ARCHÉTYPE : " + archetypes.ARCHETYPES[0]["name"], config.COL_AMBER)
         self.hardcore_btn = widgets.Button(
             (200, fy, 250, 42), t("continent.hardcore_off"), config.COL_WARN)
         self.confirm_btn = widgets.Button(
@@ -55,6 +58,9 @@ class ContinentScene(Scene):
         if self.scen_btn.handle(event):
             self.scen_idx = (self.scen_idx + 1) % len(scen.SCENARIOS)
             self.scen_btn.label = "SCÉNARIO : " + scen.SCENARIOS[self.scen_idx]["name"]
+        if self.arch_btn.handle(event):
+            self.arch_idx = (self.arch_idx + 1) % len(archetypes.ARCHETYPES)
+            self.arch_btn.label = "ARCHÉTYPE : " + archetypes.ARCHETYPES[self.arch_idx]["name"]
         if self.hardcore_btn.handle(event):
             self.hardcore = not self.hardcore
             self.hardcore_btn.label = t("continent.hardcore_on") if self.hardcore else t("continent.hardcore_off")
@@ -67,6 +73,7 @@ class ContinentScene(Scene):
                 hardcore=getattr(self, "hardcore", False),
             )
             scen.apply(gs.player, scen.SCENARIOS[self.scen_idx]["id"])  # conditions de départ
+            archetypes.apply(gs.player, archetypes.ARCHETYPES[self.arch_idx]["id"])  # philosophie de run
             import random as _r
 
             from core import market as _mkt
@@ -85,6 +92,7 @@ class ContinentScene(Scene):
         self.back_btn.update(mp, dt)
         self.hardcore_btn.update(mp, dt)
         self.scen_btn.update(mp, dt)
+        self.arch_btn.update(mp, dt)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -126,15 +134,19 @@ class ContinentScene(Scene):
             widgets.draw_text_wrapped(surf, info["blurb"], (x+12, y+74),
                                       fonts.tiny(), config.COL_NEUTRAL, cw-24, line_gap=2)
 
-        # description du scénario de départ sélectionné
+        # description du scénario de départ + de l'archétype de run sélectionnés
         sc = scen.SCENARIOS[self.scen_idx]
+        arch = archetypes.ARCHETYPES[self.arch_idx]
         widgets.draw_text(surf, f"Scénario : {sc['name']} — capital "
                           f"{widgets.format_money(sc['cash'], '$')}, "
-                          f"grade {config.GRADES[sc['grade_index']]}, réputation {sc['reputation']}",
+                          f"grade {config.GRADES[sc['grade_index']]}, réputation {sc['reputation']}"
+                          f"   ·   Archétype : {arch['name']} — {arch['tagline']}",
                           (40, config.SCREEN_HEIGHT - 132), fonts.tiny(bold=True), config.COL_CYAN)
-        widgets.draw_text_wrapped(surf, sc["desc"], (40, config.SCREEN_HEIGHT - 116),
+        widgets.draw_text_wrapped(surf, sc["desc"] + "  —  " + arch["desc"],
+                                  (40, config.SCREEN_HEIGHT - 116),
                                   fonts.tiny(), config.COL_TEXT_DIM, 700, line_gap=2)
         self.hardcore_btn.draw(surf)
         self.scen_btn.draw(surf)
+        self.arch_btn.draw(surf)
         self.confirm_btn.draw(surf)
         self.back_btn.draw(surf)

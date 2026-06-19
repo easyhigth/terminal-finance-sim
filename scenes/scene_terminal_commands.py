@@ -3,6 +3,7 @@ scene_terminal_commands.py — Gestionnaires de commandes du terminal (TerminalC
 Extrait de scene_terminal.py pour limiter sa taille ; mixé dans TerminalScene.
 """
 
+from core import archetypes as archetypes_mod
 from core import badges as badges_mod
 from core import career as career_mod
 from core import config
@@ -587,6 +588,31 @@ class TerminalCommandsMixin:
         self._open_window(_L("OBJECTIFS DE LÉGENDE", "LEGACY GOALS"),
                           [("Objectif", 180), ("Description", 420), ("Avancement", 110)],
                           rows, accent=config.COL_PRESTIGE)
+
+    def _cmd_archetype(self):
+        """Affiche l'archétype de run du joueur (philosophie de jeu choisie au
+        départ) et le détail de ses avantages/coûts mécaniques."""
+        p = self.app.gs.player
+        arch = archetypes_mod.get(p.archetype)
+        if arch is None:
+            self._log(_L("  Aucun archétype (parties créées avant cette mise à jour).",
+                          "  No archetype (game started before this update)."))
+            return
+        self._log(f"  {arch['name']} — {arch['tagline']}")
+        rows = []
+        for key, label, direction in archetypes_mod.PERK_INFO:
+            value = archetypes_mod.perk(p, key)
+            default = archetypes_mod._DEFAULTS.get(key)
+            if value == default:
+                continue
+            additive = key == "deal_success_bonus"
+            shown = f"{value*100:+.0f}%" if additive else f"x{value:.2f}"
+            better = (value > default) if direction == "higher" else (value < default)
+            col = config.COL_UP if better else config.COL_DOWN
+            rows.append((label, (shown, col)))
+        self._open_window(_L(f"ARCHÉTYPE : {arch['name']}", f"ARCHETYPE: {arch['name']}"),
+                          [("Effet", 280), ("Valeur", 110)],
+                          rows, accent=config.COL_AMBER)
 
     def _check_alerts(self):
         """Vérifie les alertes ; notifie au franchissement et les retire."""

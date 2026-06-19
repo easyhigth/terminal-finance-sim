@@ -20,7 +20,7 @@ Structure d'un deal (dict) :
 """
 import random
 
-from core import config, tracks, unlocks
+from core import archetypes, config, tracks, unlocks
 
 MAX_ACTIVE_DEALS = 4        # au-delà, plus de génération
 GEN_PROBABILITY = 0.45      # proba de générer un deal à un tour donné
@@ -174,15 +174,18 @@ def maybe_generate(player, rng=None):
         prob_bonus = team.team_deal_prob_bonus(player)
     except Exception:
         pass
-    gen_prob = GEN_PROBABILITY * tracks.perk(player, "deal_gen_prob_mult")
+    gen_prob = (GEN_PROBABILITY * tracks.perk(player, "deal_gen_prob_mult")
+                * archetypes.perk(player, "deal_gen_prob_mult"))
     if rng.random() > gen_prob + prob_bonus:
         return []
     t = rng.choice(_eligible_templates(player))
     scale = _scale(player)
     own_track = t["kind"] == player.track
-    # bonus de récompense si le deal relève de la voie du joueur (M&A surtout)
+    # bonus de récompense si le deal relève de la voie du joueur (M&A surtout),
+    # composé avec le multiplicateur de l'archétype (philosophie de run)
     track_mult = tracks.perk(player, "deal_reward_mult") if own_track else 1.0
-    reward_cash = round(t["base_cash"] * scale * track_mult * rng.uniform(0.85, 1.25), 2)
+    arch_mult = archetypes.perk(player, "deal_reward_mult")
+    reward_cash = round(t["base_cash"] * scale * track_mult * arch_mult * rng.uniform(0.85, 1.25), 2)
     # délai de traitement modulé par voie (M&A : plus long ; Quant : plus court)
     days_mult = tracks.perk(player, "deal_days_mult") if own_track else 1.0
     days_left = max(3, round(t["days"] * days_mult))
@@ -237,7 +240,7 @@ def success_probability(player, deal):
     rep_factor = player.reputation / 100.0          # 0..1
     edge, relief = tracks.deal_edge(player, deal)    # bonus si deal de sa voie
     diff_penalty = max(0.0, (deal["difficulty"] - 1) * 0.12 - relief)
-    p = 0.45 + 0.5 * rep_factor - diff_penalty + edge
+    p = 0.45 + 0.5 * rep_factor - diff_penalty + edge + archetypes.perk(player, "deal_success_bonus")
     return max(0.10, min(0.95, p))
 
 
@@ -262,7 +265,7 @@ def apply_outcome(player, deal_id, quality):
         outcome = "partial"
     else:  # bad
         player.adjust_cash(-deal["penalty_cash"])
-        player.adjust_reputation(-deal["penalty_rep"])
+        player.adjust_reputation(-round(deal["penalty_rep"] * archetypes.perk(player, "rep_loss_mult")))
         outcome = "fail"
     player.deals = [d for d in player.deals if d["id"] != deal_id]
     return {"ok": True, "outcome": outcome, "deal": deal, "quality": quality}
@@ -287,6 +290,6 @@ def resolve_deal(player, deal_id, rng=None):
         player.grade_deals += 1
     else:
         player.adjust_cash(-deal["penalty_cash"])
-        player.adjust_reputation(-deal["penalty_rep"])
+        player.adjust_reputation(-round(deal["penalty_rep"] * archetypes.perk(player, "rep_loss_mult")))
     player.deals = [d for d in player.deals if d["id"] != deal_id]
     return {"ok": True, "success": success, "deal": deal, "prob": prob}

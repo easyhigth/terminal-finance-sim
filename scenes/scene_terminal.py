@@ -36,6 +36,7 @@ CMD_NAMES = [
     "RIVALS", "MANDATES", "MANDATE", "DECIDE", "MARKET", "MARKETHUB", "TOP", "MOVERS",
     "COMPANY", "FA", "SEARCH", "ACCESS", "EXPLORE", "SHOP", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS", "LEGACY", "ARCHETYPE",
+    "TENSION",
     "PORTFOLIO", "BOOK", "BUY", "SELL", "LONG", "SHORT", "COVER", "MARGIN",
     "BONDS", "BUYBOND", "SELLBOND", "GOV", "GOVERNMENTS", "PAYS",
     "CMDTY", "BUYCMDTY", "SELLCMDTY",
@@ -649,6 +650,8 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
             self._cmd_legacy()
         elif cmd == "ARCHETYPE":
             self._cmd_archetype()
+        elif cmd == "TENSION":
+            self._cmd_tension()
         elif cmd in ("WATCHLIST", "WATCH", "WL"):
             self._cmd_watchlist(parts[1:])
         elif cmd in ("COMPARE", "CMP"):

@@ -182,6 +182,8 @@ def maybe_trigger(market, rng=None):
     from core.i18n import get_lang
     lang = get_lang()
     rng = rng or random
+    if getattr(market, "crisis_cooldown", 0) > 0:
+        return None   # accalmie forcée après une crise majeure : pas de nouveau choc
     if rng.random() > TRIGGER_PROBABILITY:
         return None
     pool = localized(lang)
@@ -209,7 +211,8 @@ def maybe_trigger(market, rng=None):
 
     market.add_crisis(Crisis(
         s["name"], steps=s["steps"], world=world,
-        regions=regions, sectors=sectors, vol_mult=vol))
+        regions=regions, sectors=sectors, vol_mult=vol,
+        severity=severity, kind=s["kind"]))
 
     sev_word = _severity_label(severity, lang)
     story = s["story"]

@@ -30,6 +30,7 @@ import random
 
 from core import portfolio as pf
 from core import risk
+from core import tracks
 
 STRESSTEST_PERIOD_QUARTERS = 2   # un stress test tous les 2 trimestres (~semestriel)
 
@@ -56,7 +57,8 @@ def maybe_trigger(player, quarter_changed, market=None):
         return None
     if player.pending_stresstest is not None:
         return None
-    if player.quarter - player.last_stresstest_quarter < STRESSTEST_PERIOD_QUARTERS:
+    period = max(1, round(STRESSTEST_PERIOD_QUARTERS * tracks.perk(player, "stresstest_period_mult")))
+    if player.quarter - player.last_stresstest_quarter < period:
         return None
     if market is None:
         return None

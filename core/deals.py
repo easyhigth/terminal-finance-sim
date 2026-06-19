@@ -174,13 +174,18 @@ def maybe_generate(player, rng=None):
         prob_bonus = team.team_deal_prob_bonus(player)
     except Exception:
         pass
-    if rng.random() > GEN_PROBABILITY + prob_bonus:
+    gen_prob = GEN_PROBABILITY * tracks.perk(player, "deal_gen_prob_mult")
+    if rng.random() > gen_prob + prob_bonus:
         return []
     t = rng.choice(_eligible_templates(player))
     scale = _scale(player)
+    own_track = t["kind"] == player.track
     # bonus de récompense si le deal relève de la voie du joueur (M&A surtout)
-    track_mult = tracks.perk(player, "deal_reward_mult") if t["kind"] == player.track else 1.0
+    track_mult = tracks.perk(player, "deal_reward_mult") if own_track else 1.0
     reward_cash = round(t["base_cash"] * scale * track_mult * rng.uniform(0.85, 1.25), 2)
+    # délai de traitement modulé par voie (M&A : plus long ; Quant : plus court)
+    days_mult = tracks.perk(player, "deal_days_mult") if own_track else 1.0
+    days_left = max(3, round(t["days"] * days_mult))
     deal = {
         "id": player.next_deal_id,
         "title": t["title"],
@@ -191,7 +196,7 @@ def maybe_generate(player, rng=None):
         "penalty_cash": round(reward_cash * MISS_PENALTY_FRAC, 2),
         "penalty_rep": max(1, t["difficulty"] - 1),
         "difficulty": t["difficulty"],
-        "days_left": t["days"],
+        "days_left": days_left,
     }
     player.next_deal_id += 1
     player.deals.append(deal)

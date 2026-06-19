@@ -9,7 +9,7 @@ import random
 
 import pygame
 
-from core import config, deal_game
+from core import career, config, deal_game
 from core import deals as deals_mod
 from core.scene_manager import Scene
 from ui import fonts, widgets
@@ -53,10 +53,28 @@ class DealScene(Scene):
         self.state = "result"
         # traiter un deal prend du temps : le terminal avancera d'un tour au retour
         self.app.advance_on_return = 1
-        if self.result and self.result["outcome"] == "success":
-            self.app.notify(f"Deal conclu : {self.deal['title']}", "good")
-        elif self.result and self.result["outcome"] == "fail":
-            self.app.notify(f"Deal échoué : {self.deal['title']}", "bad")
+        if self.result:
+            p = self.app.gs.player
+            cur = config.CONTINENTS[p.continent]["currency"]
+            cash_txt = widgets.format_money(abs(self.result["cash_delta"]), cur)
+            rep = self.result["rep_delta"]
+            outcome = self.result["outcome"]
+            if outcome == "success":
+                self.app.notify(f"Deal conclu : {self.deal['title']} "
+                                 f"(+{cash_txt}, +{rep} rép.)", "good")
+                career.log(p, "deal", f"Deal #{self.deal_id} conclu ({ch['text']}) : "
+                                       f"+{cash_txt}, +{rep} réputation.")
+            elif outcome == "partial":
+                self.app.notify(f"Succès partiel : {self.deal['title']} "
+                                 f"(+{cash_txt}, +{rep} rép.)", "warn")
+                career.log(p, "deal", f"Deal #{self.deal_id} en demi-teinte ({ch['text']}) : "
+                                       f"+{cash_txt}, +{rep} réputation (récompense réduite, "
+                                       f"décision sous-optimale).")
+            else:
+                self.app.notify(f"Deal échoué : {self.deal['title']} "
+                                 f"(-{cash_txt}, {rep} rép.)", "bad")
+                career.log(p, "deal", f"Deal #{self.deal_id} échoué ({ch['text']}) : "
+                                       f"-{cash_txt}, {rep} réputation.")
         if not self.app.gs.player.hardcore:
             self.app.gs.save(config.AUTOSAVE_SLOT)
 

@@ -252,23 +252,30 @@ def apply_outcome(player, deal_id, quality):
     if deal is None:
         return {"ok": False}
     if quality == "good":
-        player.adjust_cash(deal["reward_cash"])
-        player.adjust_reputation(deal["reward_rep"])
+        cash_delta = deal["reward_cash"]
+        rep_delta = deal["reward_rep"]
+        player.adjust_cash(cash_delta)
+        player.adjust_reputation(rep_delta)
         player.deals_won += 1
         player.grade_deals += 1
         outcome = "success"
     elif quality == "ok":
-        player.adjust_cash(round(deal["reward_cash"] * 0.5, 2))
-        player.adjust_reputation(max(1, deal["reward_rep"] // 2))
+        cash_delta = round(deal["reward_cash"] * 0.5, 2)
+        rep_delta = max(1, deal["reward_rep"] // 2)
+        player.adjust_cash(cash_delta)
+        player.adjust_reputation(rep_delta)
         player.deals_won += 1
         player.grade_deals += 1
         outcome = "partial"
     else:  # bad
-        player.adjust_cash(-deal["penalty_cash"])
-        player.adjust_reputation(-round(deal["penalty_rep"] * archetypes.perk(player, "rep_loss_mult")))
+        cash_delta = -deal["penalty_cash"]
+        rep_delta = -round(deal["penalty_rep"] * archetypes.perk(player, "rep_loss_mult"))
+        player.adjust_cash(cash_delta)
+        player.adjust_reputation(rep_delta)
         outcome = "fail"
     player.deals = [d for d in player.deals if d["id"] != deal_id]
-    return {"ok": True, "outcome": outcome, "deal": deal, "quality": quality}
+    return {"ok": True, "outcome": outcome, "deal": deal, "quality": quality,
+            "cash_delta": cash_delta, "rep_delta": rep_delta}
 
 
 def resolve_deal(player, deal_id, rng=None):

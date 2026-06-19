@@ -1052,13 +1052,26 @@ class TerminalCommandsMixin:
                                  "good" if won_bets else "bad")
         mc = summary.get("margin_call")
         if mc:
-            self._log(_L(f"  ⚠ APPEL DE MARGE : liquidation forcée de "
-                      f"{widgets.format_money(mc['liquidated'], cur)} "
-                      f"(pénalité {widgets.format_money(mc['penalty'], cur)}).",
-                      f"  ⚠ MARGIN CALL: forced liquidation of "
-                      f"{widgets.format_money(mc['liquidated'], cur)} "
-                      f"(penalty {widgets.format_money(mc['penalty'], cur)})."))
+            self._log(_L(
+                f"  ⚠ APPEL DE MARGE : capitaux propres {widgets.format_money(mc['equity'], cur)} "
+                f"< seuil de maintenance {widgets.format_money(mc['threshold'], cur)} "
+                f"(levier {mc['leverage_before']:.2f}x). Liquidation forcée de "
+                f"{widgets.format_money(mc['liquidated'], cur)} ({mc['reduce_frac']*100:.0f}% des positions) "
+                f"→ levier ramené à {mc['leverage_after']:.2f}x (pénalité "
+                f"{widgets.format_money(mc['penalty'], cur)}).",
+                f"  ⚠ MARGIN CALL: equity {widgets.format_money(mc['equity'], cur)} "
+                f"< maintenance threshold {widgets.format_money(mc['threshold'], cur)} "
+                f"(leverage {mc['leverage_before']:.2f}x). Forced liquidation of "
+                f"{widgets.format_money(mc['liquidated'], cur)} ({mc['reduce_frac']*100:.0f}% of positions) "
+                f"→ leverage brought down to {mc['leverage_after']:.2f}x (penalty "
+                f"{widgets.format_money(mc['penalty'], cur)})."))
+            career_mod.log(p, "crisis", _L(
+                f"Appel de marge : levier {mc['leverage_before']:.2f}x → {mc['leverage_after']:.2f}x "
+                f"(liquidation {widgets.format_money(mc['liquidated'], cur)})",
+                f"Margin call: leverage {mc['leverage_before']:.2f}x → {mc['leverage_after']:.2f}x "
+                f"(liquidated {widgets.format_money(mc['liquidated'], cur)})"))
             self.app.notify(_L("Appel de marge : liquidation forcée","Margin call: forced liquidation"), "bad")
+
         # news marché en tête du flux
         self.recent_events = [{"title": n["text"], "kind": n["kind"], "cash": 0, "rep": 0}
                               for n in market_news] + summary["events"] + self.recent_events
@@ -1232,10 +1245,12 @@ class TerminalCommandsMixin:
         # scrutin réglementaire : décroissance + risque d'enquête
         inv = dilemmas_mod.maybe_investigate(p, random)
         if inv:
-            self._log(_L(f"  ⚠ ENQUÊTE RÉGLEMENTAIRE : amende "
-                      f"{widgets.format_money(inv['fine'], cur)}, réputation -{inv['rep_loss']}.",
-                      f"  ⚠ REGULATORY INVESTIGATION: fine "
-                      f"{widgets.format_money(inv['fine'], cur)}, reputation -{inv['rep_loss']}."))
+            self._log(_L(f"  ⚠ ENQUÊTE RÉGLEMENTAIRE : scrutin {inv['heat_before']:.0f}/100 "
+                      f"(seuil 55) — vos décisions risquées récentes ont déclenché un contrôle. "
+                      f"Amende {widgets.format_money(inv['fine'], cur)}, réputation -{inv['rep_loss']}.",
+                      f"  ⚠ REGULATORY INVESTIGATION: scrutiny {inv['heat_before']:.0f}/100 "
+                      f"(threshold 55) — your recent risky decisions triggered a probe. "
+                      f"Fine {widgets.format_money(inv['fine'], cur)}, reputation -{inv['rep_loss']}."))
             self.app.notify(_L("Enquête réglementaire : sanction","Regulatory investigation: penalty"), "bad")
             today_news.append(news_mod.make("regulatory", "bad",
                               _L("Enquête réglementaire ouverte à votre encontre",

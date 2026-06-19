@@ -198,14 +198,17 @@ def cover(player, market, ticker, qty):
 def check_margin_call(player, market):
     """Si l'equity passe sous la marge de maintenance, liquide d'office des
     positions (au prorata) pour ramener le levier en zone sûre. Retourne un
-    rapport, ou None si rien à faire."""
+    rapport (avec de quoi expliquer la CAUSE et l'effet au joueur), ou None
+    si rien à faire."""
     st = margin_status(player, market)
     if not st["margin_call"]:
         return None
     eq = st["equity"]
+    gross = st["gross"]
+    leverage_before = st["leverage"]
+    threshold = _maint_margin(player) * gross
     safe_lev = min(_max_leverage(player), 1.5)
     target_gross = max(0.0, eq * safe_lev)
-    gross = st["gross"]
     if gross <= target_gross:
         return None
     reduce_frac = min(1.0, (gross - target_gross) / gross)
@@ -226,4 +229,8 @@ def check_margin_call(player, market):
     penalty = liquidated * LIQUIDATION_FEE * archetypes.perk(player, "margin_call_penalty_mult")
     player.cash -= penalty
     player.flags["margin_call_count"] = player.flags.get("margin_call_count", 0) + 1
-    return {"triggered": True, "liquidated": liquidated, "penalty": penalty}
+    leverage_after = leverage(player, market)
+    return {"triggered": True, "liquidated": liquidated, "penalty": penalty,
+            "equity": eq, "threshold": threshold, "gross_before": gross,
+            "leverage_before": leverage_before, "leverage_after": leverage_after,
+            "reduce_frac": reduce_frac}

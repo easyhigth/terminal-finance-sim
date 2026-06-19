@@ -20,6 +20,9 @@ _ECO_NOTES = {
     "growth": "PIB ; ↑ soutient les bénéfices",
     "unemployment": "↑ = ralentissement",
     "confidence": "moral des marchés",
+    "credit_ig": "coût d'emprunt des émetteurs Investment Grade ; ↑ = stress",
+    "credit_hy": "coût d'emprunt des émetteurs High Yield ; ↑ = stress marqué",
+    "liquidity": "facilité d'exécution du marché ; ↓ = conditions tendues",
 }
 
 _TABS = [("overview", "Vue d'ensemble"), ("sectors", "Secteurs"), ("watchlist", "Watchlist")]
@@ -270,9 +273,17 @@ class MarketHubScene(Scene, PopupMixin):
         widgets.draw_text(surf, f"{self.market.regime_label()} (depuis {age} sem.)",
                           (inner.right, y), fonts.small(bold=True),
                           config.COL_UP if reg_good else config.COL_DOWN, align="right")
-        y += 26
+        if hasattr(self.market, "curve_slope"):
+            slope = self.market.curve_slope()
+            phase = self.market.curve_phase()
+            scol = config.COL_DOWN if slope < 0 else config.COL_UP
+            widgets.draw_text(surf, "Courbe des taux (10Y-2Y)", (inner.x, y), fonts.small(), config.COL_TEXT)
+            widgets.draw_text(surf, f"{phase} ({'+' if slope>=0 else ''}{slope:.2f}pb)",
+                              (inner.right, y), fonts.small(bold=True), scol, align="right")
+            y += 26
         self._eco_row_rects = {}
-        for key in ["rate", "inflation", "growth", "unemployment", "confidence"]:
+        for key in ["rate", "inflation", "growth", "unemployment", "confidence",
+                    "credit_ig", "credit_hy", "liquidity"]:
             d = m[key]
             ch = self.market.macro_change(key)
             ccol = config.COL_UP if ch >= 0 else config.COL_DOWN

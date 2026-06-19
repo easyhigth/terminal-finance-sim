@@ -68,3 +68,28 @@ def test_net_worth_includes_bonds():
     nw1 = pf.net_worth(p, m)
     # la valeur nette est conservée (cash -> obligations) à la commission près
     assert nw1 == pytest.approx(nw0, rel=2e-3)
+
+
+def test_high_yield_ytm_rises_when_credit_hy_spread_widens():
+    """Un High Yield doit coûter plus cher à émettre (rendement exigé plus haut)
+    quand le spread de crédit HY macro se tend, alors qu'un AAA y est insensible."""
+    _, m = _setup()
+    sov_before = B.quote(m, "UST10")["ytm"]
+    hy_before = B.quote(m, "CORP_HY")["ytm"]
+    m.macro["credit_hy"]["v"] = 760.0   # double du niveau de référence
+    hy_after = B.quote(m, "CORP_HY")["ytm"]
+    sov_after = B.quote(m, "UST10")["ytm"]
+    assert hy_after > hy_before
+    assert sov_after == pytest.approx(sov_before, abs=1e-9)   # AAA insensible au spread HY
+
+
+def test_bond_yield_curve_term_premium_matches_market_curve():
+    """La prime de terme d'une obligation doit suivre la courbe du marché (et
+    non plus une prime fixe) : une courbe inversée réduit le rendement exigé
+    des maturités longues par rapport au court terme."""
+    _, m = _setup()
+    m.regime = "Récession"
+    m.macro["growth"]["v"] = -4.0
+    long_premium = B.term_premium(m, 10.0)
+    short_premium = B.term_premium(m, 2.0)
+    assert long_premium < short_premium   # courbe inversée

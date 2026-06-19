@@ -148,13 +148,32 @@ def _region_bump(market, region):
     return getattr(market, "region_credit_bump", {}).get(region, 0.0)
 
 
+def term_premium(market, years):
+    """Composante de prime de terme dérivée de la courbe des taux du marché
+    (pentue en expansion, plate/inversée en récession/marché volatil). Sans
+    marché disponible (ou ancienne API), retombe sur la prime fixe historique."""
+    if market is None or not hasattr(market, "curve_point"):
+        return TERM_PREMIUM * years
+    return market.curve_point(years) - base_yield_level(market)
+
+
+def credit_spread(market, rating):
+    """Spread de crédit d'un rating, modulé par les indicateurs macro IG/HY
+    courants (core.market.Market.credit_spread_multiplier) — un High Yield
+    coûte plus cher à émettre quand le marché du crédit se tend, et inversement."""
+    base = _RATING_SPREAD.get(rating, 0.02)
+    if market is not None and hasattr(market, "credit_spread_multiplier"):
+        return base * market.credit_spread_multiplier(rating)
+    return base
+
+
 def ytm(market, bond_id):
     """Rendement exigé d'une obligation = courbe + prime de terme + spread crédit
     (+ prime pays pour les souverains) + bump de crédit régional (politique)."""
     b = _BY_ID[bond_id]
     y = (base_yield_level(market)
-         + TERM_PREMIUM * b["years"]
-         + _RATING_SPREAD.get(b["rating"], 0.02)
+         + term_premium(market, b["years"])
+         + credit_spread(market, b["rating"])
          + _region_bump(market, b["region"]))
     if b["kind"] == "Souverain" and b["gov"]:
         y += gov_mod.country_premium(gov_mod.get(b["gov"]))
@@ -187,7 +206,7 @@ def price_history(market, bond_id, n=None):
     rates = getattr(market, "macro_hist", {}).get("rate", [])
     if not rates:
         return []
-    spread = TERM_PREMIUM * b["years"] + _RATING_SPREAD.get(b["rating"], 0.02) \
+    spread = term_premium(market, b["years"]) + credit_spread(market, b["rating"]) \
         + _region_bump(market, b["region"])
     if b["kind"] == "Souverain" and b["gov"]:
         spread += gov_mod.country_premium(gov_mod.get(b["gov"]))

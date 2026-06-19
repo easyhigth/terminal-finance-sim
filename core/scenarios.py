@@ -172,6 +172,28 @@ def _scale_dict(d, factor):
     return {k: v * factor for k, v in (d or {}).items()}
 
 
+def macro_stress(market):
+    """Score de tension macro (1.0 = neutre) dérivé des indicateurs macro
+    courants : spread de crédit HY tendu, croissance proche de zéro/négative,
+    chômage en hausse marquée, courbe des taux inversée. Sert à faire dépendre
+    le déclenchement des crises de conditions macro cohérentes plutôt que d'un
+    pur tirage indépendant du contexte (cf. CLAUDE.md, brief stratégique pt.5)."""
+    if market is None or not hasattr(market, "macro"):
+        return 1.0
+    mc = market.macro
+    from core.market import BASE_CREDIT_HY_BPS
+    hy = mc.get("credit_hy", {}).get("v", BASE_CREDIT_HY_BPS)
+    growth = mc.get("growth", {}).get("v", 2.0)
+    unemp = mc.get("unemployment", {}).get("v", 5.0)
+    score = 1.0
+    score += max(0.0, (hy - BASE_CREDIT_HY_BPS) / BASE_CREDIT_HY_BPS) * 1.2
+    score += max(0.0, 1.0 - growth) * 0.25
+    score += max(0.0, unemp - 6.0) * 0.12
+    if hasattr(market, "curve_inverted") and market.curve_inverted():
+        score += 0.5
+    return min(score, 4.0)
+
+
 def maybe_trigger(market, rng=None):
     """Déclenche éventuellement un scénario. Retourne un dict narratif ou None.
 
@@ -184,10 +206,19 @@ def maybe_trigger(market, rng=None):
     rng = rng or random
     if getattr(market, "crisis_cooldown", 0) > 0:
         return None   # accalmie forcée après une crise majeure : pas de nouveau choc
-    if rng.random() > TRIGGER_PROBABILITY:
+    stress = macro_stress(market)
+    if rng.random() > min(0.9, TRIGGER_PROBABILITY * stress):
         return None
     pool = localized(lang)
-    s = rng.choices(pool, weights=[x["weight"] for x in pool], k=1)[0]
+    weights = []
+    for x in pool:
+        w = x["weight"]
+        if stress > 1.2 and x["kind"] == "bad":
+            w *= stress
+        elif stress < 0.85 and x["kind"] == "good":
+            w *= (1.0 / max(stress, 0.4))
+        weights.append(w)
+    s = rng.choices(pool, weights=weights, k=1)[0]
 
     sev_min = s.get("sev_min", 1.0)
     sev_max = s.get("sev_max", 1.0)

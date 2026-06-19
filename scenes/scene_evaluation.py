@@ -221,6 +221,8 @@ class EvaluationScene(Scene):
             return
         if self.passed and p.can_promote():
             p.promote()
+            from core import profile
+            profile.record_grade_reached(p.grade_index)
             p.reputation = min(100, p.reputation + 8)
             if p.grade_index >= 2 and p.track == "General":
                 p.flags["can_choose_track"] = True

@@ -140,7 +140,7 @@ class TerminalRenderMixin:
             pygame.draw.rect(surf, acc, br, 1, border_radius=4)
             ty = br.y + (bh - fonts.small().get_height()) // 2
             if locked:
-                g = unlocks_mod.required_grade(unlocks_mod.CMD_FEATURE[cmd])
+                g = unlocks_mod.effective_required_grade(p, unlocks_mod.CMD_FEATURE[cmd])
                 widgets.draw_text(surf, widgets.fit_text(f"⊘ {label}", fonts.small(), br.w - 36),
                                   (br.x + 8, ty),
                                   fonts.small(), config.COL_TEXT_DIM)

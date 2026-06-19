@@ -84,18 +84,30 @@ CMD_FEATURE = {
 }
 
 
+VETERAN_HEADSTART = 2   # grades d'avance sur les paliers pour un profil "vétéran"
+
+
+def required_grade(feature):
+    return UNLOCKS.get(feature, 0)
+
+
+def effective_required_grade(player, feature):
+    """Grade minimal requis, raccourci pour un profil vétéran (déjà allé loin
+    dans une partie antérieure) : il rouvre la complexité plus vite."""
+    g = required_grade(feature)
+    if player.flags.get("veteran"):
+        g = max(0, g - VETERAN_HEADSTART)
+    return g
+
+
 def unlocked(player, feature):
-    return player.grade_index >= UNLOCKS.get(feature, 0)
+    return player.grade_index >= effective_required_grade(player, feature)
 
 
 def cmd_unlocked(player, cmd):
     """Vrai si la commande (token) est autorisée au grade courant."""
     feat = CMD_FEATURE.get(cmd)
     return feat is None or unlocked(player, feat)
-
-
-def required_grade(feature):
-    return UNLOCKS.get(feature, 0)
 
 
 def feature_label(feature):
@@ -105,7 +117,8 @@ def feature_label(feature):
 def next_unlock(player):
     """Prochaine fonctionnalité à débloquer (label, grade) ou None si tout est ouvert."""
     best = None
-    for feat, g in UNLOCKS.items():
+    for feat in UNLOCKS:
+        g = effective_required_grade(player, feat)
         if g > player.grade_index and (best is None or g < best[1]):
             best = (LABELS[feat], g)
     return best

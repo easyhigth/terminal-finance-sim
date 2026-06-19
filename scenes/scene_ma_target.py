@@ -151,7 +151,7 @@ class MATargetScene(Scene):
                           (40, 64), fonts.small(), config.COL_TEXT_DIM)
 
         if not self._can_ma():
-            g = unlocks.required_grade("ma")
+            g = unlocks.effective_required_grade(self.app.gs.player, "ma")
             widgets.draw_text(surf, f"⊘ M&A débloqué au grade {config.GRADES[g]}.",
                               (40, 92), fonts.small(), config.COL_DOWN)
             self.back_btn.draw(surf)

@@ -116,7 +116,7 @@ class DealsScene(Scene):
                           fonts.title(bold=True), config.COL_AMBER)
         p = self.app.gs.player
         if not self._can():
-            g = unlocks.required_grade("deals")
+            g = unlocks.effective_required_grade(self.app.gs.player, "deals")
             widgets.draw_text(surf, f"⊘ Deals débloqués au grade {config.GRADES[g]}.",
                               (42, 56), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)

@@ -122,7 +122,7 @@ class FXScene(Scene):
         widgets.draw_text(surf, "DESK FX — SPOT / FORWARD", (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         if not self._can():
-            g = unlocks.required_grade("fx")
+            g = unlocks.effective_required_grade(self.app.gs.player, "fx")
             widgets.draw_text(surf, f"⊘ Desk FX débloqué au grade {config.GRADES[g]}.",
                               (42, 74), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)

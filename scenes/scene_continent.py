@@ -5,6 +5,7 @@ Affiche le globe interactif + panneaux réglementaires par région.
 import pygame
 
 from core import archetypes, config
+from core import profile as profile_mod
 from core import startscenarios as scen
 from core.game_state import GameState, PlayerState
 from core.i18n import t
@@ -74,6 +75,12 @@ class ContinentScene(Scene):
             )
             scen.apply(gs.player, scen.SCENARIOS[self.scen_idx]["id"])  # conditions de départ
             archetypes.apply(gs.player, archetypes.ARCHETYPES[self.arch_idx]["id"])  # philosophie de run
+            # asymétrie novice/expert : un profil qui a déjà prouvé sa maîtrise dans
+            # une partie antérieure démarre "vétéran" — complexité ouverte plus vite,
+            # onboarding écourté (cf. CLAUDE.md, brief stratégique point 4).
+            if profile_mod.is_veteran():
+                gs.player.flags["veteran"] = True
+                gs.player.onboarding_done = True
             import random as _r
 
             from core import market as _mkt

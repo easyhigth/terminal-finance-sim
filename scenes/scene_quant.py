@@ -13,6 +13,7 @@ import pygame
 
 from core import config
 from core import finmath as fm
+from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
@@ -33,6 +34,9 @@ class QuantScene(Scene):
         self.tuto_btn = widgets.Button(
             (440, config.SCREEN_HEIGHT-66, 150, 44), "📘 TUTO", config.COL_CYAN)
         self._params = {}
+
+    def _can(self):
+        return unlocks.unlocked(self.app.gs.player, "quant")
 
     def _adj(self, key, delta):
         bounds = {
@@ -74,6 +78,12 @@ class QuantScene(Scene):
         widgets.draw_text(surf, "MODULE QUANT — PRICING D'OPTIONS (BLACK-SCHOLES)",
                           (40, 24), fonts.title(bold=True), config.COL_AMBER)
         self._params = {}
+        if not self._can():
+            g = unlocks.effective_required_grade(self.app.gs.player, "quant")
+            widgets.draw_text(surf, f"⊘ Module Quant débloqué au grade {config.GRADES[g]}.",
+                              (42, 76), fonts.small(), config.COL_TEXT_DIM)
+            self.back_btn.draw(surf)
+            return
         self._draw_inputs(surf)
         self._draw_outputs(surf)
         self._draw_price_curve(surf)

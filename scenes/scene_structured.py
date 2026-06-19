@@ -35,7 +35,7 @@ class StructuredScene(Scene):
                                        "📘 TUTO", config.COL_CYAN)
 
     def _can_trade(self):
-        return unlocks.unlocked(self.app.gs.player, "trade")
+        return unlocks.unlocked(self.app.gs.player, "structured")
 
     def _search_rect(self):
         return pygame.Rect(40, 100, 280, 24)
@@ -173,9 +173,12 @@ class StructuredScene(Scene):
         pinner = widgets.draw_panel(surf, posp, "Vos produits", config.COL_AMBER)
         hold = S.holdings(p, m)
         if not hold:
-            widgets.draw_text(surf, "Aucun produit en cours." if self._can_trade()
-                              else "⊘ trading débloqué au grade Associate.",
-                              (pinner.x, pinner.y), fonts.small(), config.COL_TEXT_DIM)
+            if self._can_trade():
+                lock_msg = "Aucun produit en cours."
+            else:
+                g = unlocks.effective_required_grade(p, "structured")
+                lock_msg = f"⊘ trading débloqué au grade {config.GRADES[g]}."
+            widgets.draw_text(surf, lock_msg, (pinner.x, pinner.y), fonts.small(), config.COL_TEXT_DIM)
         else:
             y = pinner.y
             for h in hold:

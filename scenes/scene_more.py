@@ -32,6 +32,8 @@ SECTIONS = [
     ("Analyse & outils", [
         ("Graphes", "graph", {"kind": "line"}),
         ("Analyse portefeuille", "analytics", {}),
+        ("Performance & attribution", "performance", {}),
+        ("Alertes de prix", "alerts", {}),
         ("Risque (VaR)", "risk", {}),
         ("Quant (options)", "quant", {}),
         ("M&A (cibles & LBO)", "ma", {}),
@@ -45,6 +47,7 @@ SECTIONS = [
         ("Carrière", "career", {}),
         ("Mission", "mission", {}),
         ("Exam / Certif", "examcert", {}),
+        ("Revue annuelle (bonus)", "review", {}),
         ("Voie (Track)", "track", {}),
         ("Rivaux", "rivals", {}),
         ("Inbox", "inbox", {}),

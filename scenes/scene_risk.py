@@ -14,6 +14,7 @@ from core import config
 from core import finmath as fm
 from core import risk as risk_mod
 from core import risklimits
+from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
@@ -62,6 +63,9 @@ class RiskScene(Scene):
         self._conf_btns = {}
         self._reverse_btns = {}
         self._reverse_target = None
+
+    def _can(self):
+        return unlocks.unlocked(self.app.gs.player, "risk")
 
     def _cov_matrix(self):
         """Matrice de covariance des P&L des facteurs (en M$)."""
@@ -168,6 +172,12 @@ class RiskScene(Scene):
                "DÉMO · Monte-Carlo corrélé (Cholesky) · horizon 1 jour · "
                "notionnel {:.0f} M$".format(self.exposure.sum()))
         widgets.draw_text(surf, sub, (42, 76), fonts.small(), config.COL_TEXT_DIM)
+        if not self._can():
+            g = unlocks.effective_required_grade(self.app.gs.player, "risk")
+            widgets.draw_text(surf, f"⊘ Module Risk débloqué au grade {config.GRADES[g]}.",
+                              (42, 110), fonts.small(), config.COL_TEXT_DIM)
+            self.back_btn.draw(surf)
+            return
 
         self._draw_exposures(surf)
         self._draw_histogram(surf)

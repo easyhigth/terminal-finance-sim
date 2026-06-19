@@ -32,7 +32,7 @@ class CreditScene(Scene):
                                        "📘 TUTO", config.COL_CYAN)
 
     def _can_trade(self):
-        return unlocks.unlocked(self.app.gs.player, "trade")
+        return unlocks.unlocked(self.app.gs.player, "credit")
 
     def _search_rect(self):
         return pygame.Rect(40, 100, 280, 24)
@@ -159,7 +159,8 @@ class CreditScene(Scene):
         if held:
             sub += "  ·  " + ", ".join(f"{h['name']} ({h['years_left']:.1f}a)" for h in held)
         if not self._can_trade():
-            sub = "⊘ trading débloqué au grade Associate."
+            g = unlocks.effective_required_grade(p, "credit")
+            sub = f"⊘ trading débloqué au grade {config.GRADES[g]}."
         widgets.draw_text(surf, sub, (inner.x, inner.bottom - 22), fonts.small(bold=True),
                           config.COL_UP if hv else config.COL_TEXT_DIM)
         self.back_btn.draw(surf)

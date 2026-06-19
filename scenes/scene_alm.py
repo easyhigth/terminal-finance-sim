@@ -7,7 +7,7 @@ de taux pour voir l'impact sur la marge nette d'intérêt (NII) et sur la valeur
 """
 import pygame
 
-from core import alm, config
+from core import alm, config, unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
@@ -35,6 +35,9 @@ class AlmScene(Scene):
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
                                         config.back_button_rect(160)[1], 150, 42),
                                        "📘 TUTO", config.COL_CYAN)
+
+    def _can(self):
+        return unlocks.unlocked(self.app.gs.player, "alm")
 
     def _adj(self, key, delta):
         lo = 0.0
@@ -69,6 +72,14 @@ class AlmScene(Scene):
         widgets.draw_text(surf, "Banking book : risque de taux & de liquidité. Réglez le bilan, "
                                 "appliquez un choc de taux, lisez NII et ΔEVE.",
                           (42, 74), fonts.small(), config.COL_TEXT_DIM)
+        self._field_btns = {}
+        self._shock_btns = {}
+        if not self._can():
+            g = unlocks.effective_required_grade(self.app.gs.player, "alm")
+            widgets.draw_text(surf, f"⊘ Desk ALM débloqué au grade {config.GRADES[g]}.",
+                              (42, 110), fonts.small(), config.COL_TEXT_DIM)
+            self.back_btn.draw(surf)
+            return
         ph = config.footer_y() - 8 - 100
 
         # ----- réglage du bilan (gauche) -----

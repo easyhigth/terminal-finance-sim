@@ -99,15 +99,16 @@ def test_compute_rewards_partial_correct_is_at_least_one_rep():
     assert rep == 1   # arrondi à 0 mais plancher à 1 car correct > 0
 
 
-def test_generate_decision_items_have_three_choices():
+def test_generate_items_unique_within_mission():
+    m = _market()
+    for grade_index, seed in [(0, 1), (2, 2), (4, 3), (7, 9)]:
+        mission = missions.generate(grade_index, m, rng=random.Random(seed))
+        prompts = [it["prompt"] for it in mission["items"]]
+        assert len(prompts) == len(set(prompts))
+
+
+def test_generate_caps_items_at_max():
     m = _market()
     mission = missions.generate(4, m, rng=random.Random(3))
-    for item in mission["items"]:
-        assert set(item["choices"]) == {"ACHETER", "CONSERVER", "VENDRE"}
-
-
-def test_generate_portfolio_items_unique_within_mission():
-    m = _market()
-    mission = missions.generate(7, m, rng=random.Random(9))
-    prompts = [it["prompt"] for it in mission["items"]]
-    assert len(prompts) == len(set(prompts))
+    assert len(mission["items"]) <= missions.MAX_ITEMS
+    assert all(item["kind"] == "mcq" for item in mission["items"])

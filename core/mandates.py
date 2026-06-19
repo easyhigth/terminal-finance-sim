@@ -21,6 +21,14 @@ MIN_GRADE = 6              # Vice President et au-delà (cf. unlocks)
 MAX_ACTIVE = 2            # mandats simultanés
 OFFER_PROB = 0.18         # proba d'une offre par tour (si place dispo)
 
+# Mandat SOUVERAIN... non, ici : mandat TRANSFORMANT — un mandat hors-norme,
+# réservé aux grades les plus seniors, qui peut transformer la firme (capital
+# bien plus large, commission proportionnellement plus élevée). Rare par
+# construction : un objectif de carrière à part, pas une opportunité courante.
+TRANSFORMANT_MIN_GRADE = 9
+TRANSFORMANT_PROB = 0.07   # proba, SI une offre est générée, qu'elle soit transformante
+TRANSFORMANT_SCALE = 3.5
+
 CLIENTS = [
     "Fonds de pension Helven", "Family Office Drax", "Assureur Norvik",
     "Fondation Maray", "Hedge Fund Cyrl", "Trésorerie Ostia", "Dotation Veles",
@@ -76,6 +84,10 @@ def maybe_offer(player, rng=None, market=None):
         fee_pct = rng.uniform(0.010, 0.025)
     max_beta = round(max_beta * rmult["beta"], 2)
     fee_pct *= rmult["fee"]
+    transformant = (player.grade_index >= TRANSFORMANT_MIN_GRADE
+                     and rng.random() < TRANSFORMANT_PROB)
+    if transformant:
+        capital = round(capital * TRANSFORMANT_SCALE, -3)
     offer = {
         "id": player.next_mandate_id,
         "client": rng.choice(CLIENTS),
@@ -84,8 +96,9 @@ def maybe_offer(player, rng=None, market=None):
         "horizon": horizon,
         "max_beta": max_beta,
         "reward_cash": round(capital * fee_pct * tracks.perk(player, "mandate_reward_mult"), 2),
-        "reward_rep": rng.randint(6, 11),
+        "reward_rep": rng.randint(6, 11) * (3 if transformant else 1),
         "penalty_rep": rng.randint(4, 8),
+        "transformant": transformant,
     }
     player.next_mandate_id += 1
     player.mandate_offers.append(offer)
@@ -167,6 +180,9 @@ def evaluate_due(player, market):
             player.adjust_cash(m["reward_cash"])
             player.adjust_reputation(m["reward_rep"])
             player.flags["mandates_won"] = player.flags.get("mandates_won", 0) + 1
+            if m.get("transformant"):
+                player.flags["mandates_transformant_won"] = (
+                    player.flags.get("mandates_transformant_won", 0) + 1)
             reason = _L(f"Objectif atteint : {growth:+.1f}% (cible +{m['target_pct']:.1f}%), "
                         f"bêta {beta:.2f} sous la limite {m['max_beta']:.2f}.",
                         f"Target reached: {growth:+.1f}% (target +{m['target_pct']:.1f}%), "

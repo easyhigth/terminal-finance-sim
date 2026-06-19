@@ -83,6 +83,22 @@ def test_high_yield_ytm_rises_when_credit_hy_spread_widens():
     assert sov_after == pytest.approx(sov_before, abs=1e-9)   # AAA insensible au spread HY
 
 
+def test_buy_fill_price_above_mid_high_yield_more_than_sovereign():
+    """L'exécution coûte plus cher (spread/impact) qu'un high yield illiquide
+    qu'un souverain noté liquide, pour un même ordre (item 25/26)."""
+    _, m = _setup()
+    sov_mid = B.quote(m, "UST10")["price"]
+    hy_mid = B.quote(m, "CORP_HY")["price"]
+    sov_fill = B.fill_price(m, "UST10", 10, "buy")
+    hy_fill = B.fill_price(m, "CORP_HY", 10, "buy")
+    sov_cost_frac = sov_fill / sov_mid - 1
+    hy_cost_frac = hy_fill / hy_mid - 1
+    assert sov_fill > sov_mid
+    assert hy_cost_frac > sov_cost_frac
+    assert B.quote(m, "UST10")["liquidity"] == "Liquide"
+    assert B.quote(m, "CORP_HY")["liquidity"] == "Illiquide"
+
+
 def test_bond_yield_curve_term_premium_matches_market_curve():
     """La prime de terme d'une obligation doit suivre la courbe du marché (et
     non plus une prime fixe) : une courbe inversée réduit le rendement exigé

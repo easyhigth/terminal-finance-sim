@@ -75,6 +75,11 @@ CATALOG = [
         ("RESEARCH <tk>", "Valeur intrinsèque + reco analyste"),
         ("ALERT <tk> <prix>", "Alerte au franchissement d'un cours"),
         ("ALERTS", "Lister vos alertes de cours"),
+        ("CRITERIA ADD <stock|etf> [clé=valeur...]", "Sauvegarder un critère de recherche (idées)"),
+        ("CRITERIA LIST / REMOVE <id>", "Lister / supprimer vos critères sauvegardés"),
+        ("IDEAS [id]", "Remonte les actifs correspondant à vos critères sauvegardés"),
+        ("TRADES [classe]", "Journal de trading : date, taille, P&L, contexte macro"),
+        ("NOTE <id> <texte>", "Annoter une entrée du journal de trading"),
     ]),
     ("Graphes analytiques (5 ans d'historique dès le jour 1)", [
         ("GP <tk>", "Ligne de prix + moyennes mobiles MM20/MM50"),
@@ -92,6 +97,7 @@ CATALOG = [
     ("Portefeuille & trading", [
         ("PORTFOLIO / BOOK / PRT", "Livre de positions (valeur nette, P&L)"),
         ("PA / ANALYSE", "Analyse détaillée : poids, risque, corrél., frontière"),
+        ("ATTR / ATTRIBUTION", "Attribution de performance : secteur, région, style, sélection, timing"),
         ("BUY / LONG <tk> <qté>", "Acheter des actions (position longue)"),
         ("SELL <tk> <qté|ALL>", "Vendre des actions"),
         ("SHORT <tk> <qté>", "Vente à découvert (parier à la baisse)"),

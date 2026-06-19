@@ -88,3 +88,26 @@ def test_correlation_and_frontier_need_two_equities():
     assert len(labels) == 3 and corr.shape == (3, 3)
     fr = analytics.equity_frontier(p, m)
     assert fr is not None and len(fr["vols"]) > 0
+
+
+def test_holdings_table_has_avg_liquidity_and_contributions():
+    p, m = _mk()
+    for c in m.companies[:2]:
+        p.portfolio[c["ticker"]] = {"shares": 100, "avg": m.price_of(c["ticker"])}
+    bonds.buy_bond(p, m, "CORP_HY", 10)
+    rows = analytics.holdings_table(p, m)
+    for r in rows:
+        assert "avg" in r and "liquidity" in r
+        assert r["liquidity"] in ("Liquide", "Peu liquide", "Illiquide")
+        assert "risk_contribution_pct" in r and "perf_contribution_pct" in r
+    assert abs(sum(r["risk_contribution_pct"] for r in rows) - 100.0) < 1e-6
+
+
+def test_summary_has_net_exposure_and_by_liquidity():
+    p, m = _mk()
+    for c in m.companies[:3]:
+        p.portfolio[c["ticker"]] = {"shares": 200, "avg": m.price_of(c["ticker"])}
+    s = analytics.summary(p, m)
+    assert "net_exposure" in s and "by_liquidity" in s
+    assert s["net_exposure"] > 0   # tout long ici
+    assert sum(s["by_liquidity"].values()) > 0

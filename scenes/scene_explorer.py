@@ -1,14 +1,15 @@
 """
-scene_explorer.py — Explorateur de marché global.
+scene_explorer.py — Explorateur de marché global ("univers d'investissement").
 
 Vue unifiée et filtrable de TOUT l'univers investissable : actions (roster de
-sociétés), obligations (souverains + corporate), commodities (futures) et
-gouvernements. Recherche libre, filtres (type / continent / secteur ou
-catégorie selon le type) et tri (nom / cours / valeur / rendement / variation,
-croissant ou décroissant).
+sociétés), ETF (dont les familles thématiques/ESG, cf. core/etfs.py CATEGORIES),
+obligations (souverains + corporate = crédit), commodities (futures), crypto
+et FX (paires de change), ainsi que les gouvernements (souverains). Recherche
+libre, filtres (type / continent / secteur ou catégorie selon le type) et tri
+(nom / cours / valeur / rendement / variation, croissant ou décroissant).
 
-Interactions sur n'importe quelle ligne (Action / Obligation / Commodity /
-Gouvernement) :
+Interactions sur n'importe quelle ligne (Action / ETF / Obligation / Commodity /
+Crypto / FX / Gouvernement) :
   - clic gauche  : ouvre la fiche flottante de l'actif (PopupMixin) — pour un
                    gouvernement, ouvre directement l'écran GOV (fiche pays déjà
                    riche, pas besoin de popup) ;
@@ -28,7 +29,9 @@ import pygame
 from core import bonds as B
 from core import commodities as C
 from core import config
+from core import crypto as CRY
 from core import etfs as ETF
+from core import fx as FX
 from core import governments as GOV
 from core import unlocks as unlocks_mod
 from core.scene_manager import Scene
@@ -40,12 +43,14 @@ SORT_FIELDS = [("name", "NOM"), ("price", "COURS"), ("value", "VALEUR"),
                ("yield_pct", "RENDEMENT"), ("change_pct", "VAR %")]
 TYPE_CHIPS = [(None, "TOUTES"), ("Action", "ACTIONS"), ("ETF", "ETF"),
               ("Obligation", "OBLIGATIONS"), ("Commodity", "COMMODITIES"),
-              ("Gouvernement", "GOUVERNEMENTS")]
+              ("Crypto", "CRYPTO"), ("FX", "FX"), ("Gouvernement", "GOUVERNEMENTS")]
 KIND_COLOR = {"Action": config.COL_AMBER, "ETF": config.COL_PRESTIGE,
               "Obligation": config.COL_CYAN,
-              "Commodity": config.COL_WARN, "Gouvernement": config.COL_PRESTIGE}
+              "Commodity": config.COL_WARN, "Crypto": config.COL_UP,
+              "FX": config.COL_DOWN, "Gouvernement": config.COL_PRESTIGE}
 KIND_LABEL = {"Action": "Action", "ETF": "ETF", "Obligation": "Oblig.",
-              "Commodity": "Cmdty", "Gouvernement": "Gouv."}
+              "Commodity": "Cmdty", "Crypto": "Crypto", "FX": "FX",
+              "Gouvernement": "Gouv."}
 WATCHLIST_ATTR = {"Action": "watchlist", "Obligation": "bond_watchlist",
                    "Commodity": "commodity_watchlist", "Gouvernement": "gov_watchlist"}
 WATCHLIST_CAP = {"Action": 10}
@@ -119,6 +124,22 @@ class MarketExplorerScene(Scene, PopupMixin):
                 "price": q["price"], "value": q["price"],
                 "yield_pct": q["yield"] * 100.0, "change_pct": q["change_pct"],
             })
+        for q in CRY.all_quotes(m):
+            rows.append({
+                "kind": "Crypto", "key": q["id"], "ticker": None, "name": q["name"],
+                "sub": "Stablecoin" if q["stable"] else "Crypto-actif", "region": None,
+                "price": q["spot"], "value": q["spot"],
+                "yield_pct": (q["yield"] * 100.0) if q["yield"] else None, "change_pct": None,
+            })
+        for q in FX.all_quotes(m):
+            if not q["ok"]:
+                continue
+            rows.append({
+                "kind": "FX", "key": q["pair"], "ticker": None, "name": q["pair"],
+                "sub": "Paire de change", "region": None,
+                "price": q["spot"], "value": q["spot"],
+                "yield_pct": None, "change_pct": None,
+            })
         best_by_gov = {}
         for q in B.all_quotes(m):
             if q["kind"] != "Souverain" or not q["gov"]:
@@ -188,7 +209,7 @@ class MarketExplorerScene(Scene, PopupMixin):
             return
         attr = WATCHLIST_ATTR.get(kind)
         if attr is None:
-            self.app.notify("Les ETF se consultent via leur fiche (clic), pas de watchlist dédiée.", "info")
+            self.app.notify(f"{kind} se consulte via sa fiche (clic), pas de watchlist dédiée.", "info")
             return
         lst = getattr(p, attr)
         if key in lst:
@@ -365,6 +386,10 @@ class MarketExplorerScene(Scene, PopupMixin):
             self.open_bond(key)
         elif kind == "Commodity":
             self.open_commodity(key)
+        elif kind == "Crypto":
+            self.open_crypto(key)
+        elif kind == "FX":
+            self.app.scenes.go("fx", return_to="explorer")
         elif kind == "Gouvernement":
             self.app.scenes.go("governments", return_to="explorer", focus=key)
 
@@ -382,7 +407,8 @@ class MarketExplorerScene(Scene, PopupMixin):
         p = self.app.gs.player
         cur = config.CONTINENTS[p.continent]["currency"]
         widgets.draw_text(surf, "EXPLORATEUR DE MARCHÉ", (40, 22), fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Actions · obligations · commodities · gouvernements — clic = détail · "
+        widgets.draw_text(surf, "Actions · ETF (dont thèmes ESG) · obligations/crédit/souverains · "
+                                "commodities · crypto · FX — clic = détail · "
                                 "Ctrl+clic / Shift+clic = sélection · clic droit = ajout rapide",
                           (42, 72), fonts.tiny(), config.COL_TEXT_DIM)
 

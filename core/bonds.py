@@ -23,6 +23,7 @@ Nominal (face) = 1000 par obligation.
 """
 from core import finmath
 from core import governments as gov_mod
+from core import liquidity as liq_mod
 from data import companies as comp_data
 
 FACE = 1000.0
@@ -193,7 +194,8 @@ def quote(market, bond_id):
             "region": b["region"], "kind": b["kind"], "rating": b["rating"],
             "coupon": b["coupon"], "years": b["years"], "gov": b["gov"],
             "ticker": b["ticker"], "ytm": y, "price": price,
-            "mod_duration": dur, "convexity": conv}
+            "mod_duration": dur, "convexity": conv,
+            "liquidity": liq_mod.bond_tier(b)}
 
 
 def price_history(market, bond_id, n=None):
@@ -215,6 +217,20 @@ def price_history(market, bond_id, n=None):
     return prices[-n:] if n else prices
 
 
+def fill_price(market, bond_id, qty, side):
+    """Prix d'exécution réel (spread + impact de marché, calibrés par tier de
+    liquidité — souverain noté vs. corporate high yield, cf. core/liquidity.py).
+    Le prix coté (`quote()["price"]`) reste le mid utilisé pour la valorisation."""
+    b = _BY_ID.get(bond_id)
+    q = quote(market, bond_id)
+    if not b or not q:
+        return None
+    mid = q["price"]
+    order_value = mid * qty
+    return liq_mod.fill_price(mid, order_value, liq_mod.bond_depth(b),
+                               liq_mod.bond_tier(b), side)
+
+
 def all_quotes(market):
     return [quote(market, b["id"]) for b in BONDS]
 
@@ -234,7 +250,8 @@ def buy_bond(player, market, bond_id, qty):
         return {"ok": False, "reason": "id"}
     if qty <= 0:
         return {"ok": False, "reason": "qty"}
-    cost = q["price"] * qty
+    fill = fill_price(market, bond_id, qty, "buy")
+    cost = fill * qty
     fee = cost * COMMISSION
     total = cost + fee
     if total > player.cash:
@@ -246,29 +263,29 @@ def buy_bond(player, market, bond_id, qty):
         pos["avg"] = (pos["qty"] * pos["avg"] + cost) / n
         pos["qty"] = n
     else:
-        player.bonds[bond_id] = {"qty": float(qty), "avg": q["price"]}
-    return {"ok": True, "price": q["price"], "qty": qty, "total": total, "fee": fee}
+        player.bonds[bond_id] = {"qty": float(qty), "avg": fill}
+    return {"ok": True, "price": fill, "qty": qty, "total": total, "fee": fee}
 
 
 def sell_bond(player, market, bond_id, qty):
     pos = player.bonds.get(bond_id)
     if not pos:
         return {"ok": False, "reason": "noposition"}
-    q = quote(market, bond_id)
     if qty == "ALL" or qty >= pos["qty"]:
         qty = pos["qty"]
     if qty <= 0:
         return {"ok": False, "reason": "qty"}
-    proceeds = q["price"] * qty
+    fill = fill_price(market, bond_id, qty, "sell")
+    proceeds = fill * qty
     fee = proceeds * COMMISSION
     net = proceeds - fee
-    realized = (q["price"] - pos["avg"]) * qty - fee
+    realized = (fill - pos["avg"]) * qty - fee
     player.cash += net
     player.realized_pnl = getattr(player, "realized_pnl", 0.0) + realized
     pos["qty"] -= qty
     if pos["qty"] <= 1e-9:
         del player.bonds[bond_id]
-    return {"ok": True, "price": q["price"], "qty": qty, "net": net, "realized": realized}
+    return {"ok": True, "price": fill, "qty": qty, "net": net, "realized": realized}
 
 
 # ---------------------------------------------------------------- valuation

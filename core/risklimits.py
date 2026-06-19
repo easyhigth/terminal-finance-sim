@@ -18,6 +18,7 @@ DEFAULT_LIMITS = {
     "region_pct": 50.0,
     "class_pct": 70.0,
     "beta_max": 2.0,
+    "illiquid_pct": 30.0,
 }
 
 
@@ -63,5 +64,12 @@ def check_limits(player, market, limits=None):
     if lim.get("beta_max") is not None and abs(s["beta"]) > lim["beta_max"]:
         breaches.append({"type": "beta", "label": "Bêta portefeuille",
                           "value": s["beta"], "limit": lim["beta_max"]})
+
+    if lim.get("illiquid_pct") is not None:
+        illiquid = s["by_liquidity"].get("Illiquide", 0.0)
+        pct = illiquid / invested * 100.0
+        if pct > lim["illiquid_pct"]:
+            breaches.append({"type": "liquidity", "label": "Actifs illiquides",
+                              "value": pct, "limit": lim["illiquid_pct"]})
 
     return {"ok": not breaches, "breaches": breaches}

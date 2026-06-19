@@ -47,7 +47,8 @@ CMD_NAMES = [
     "SAVE", "SAVES", "NEWS", "MORE", "SHORTCUTS", "REG", "STATUS", "MENU",
     "TEAM", "EQUIPE", "STRESS", "TIMELINE",
     "GP", "GPC", "GPO", "GPCH", "COMP", "HS", "HVOL", "BETA", "CORR",
-    "GEG", "GC", "RV", "ECO", "DEFINE", "PA",
+    "GEG", "GC", "RV", "ECO", "DEFINE", "PA", "ATTR",
+    "TRADES", "NOTE", "IDEAS", "CRITERIA",
 ]
 
 SAMPLE_NEWS = {
@@ -618,6 +619,8 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
             self.app.scenes.go("book", return_to="terminal")
         elif cmd in ("PA", "ANALYSE", "ANALYTICS", "DETAIL", "PORT"):
             self.app.scenes.go("analytics", return_to="terminal")
+        elif cmd in ("ATTR", "ATTRIBUTION", "PERFATTR"):
+            self.app.scenes.go("performance", return_to="terminal")
         elif cmd in ("FRONTIER", "MARKOWITZ", "FRONTIERE"):
             self.app.scenes.go("portfolio")
         elif cmd in ("BUY", "ACHETER", "LONG"):
@@ -688,6 +691,14 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
             self._cmd_region(arg)
         elif cmd in ("SCREEN", "SCREENER", "EQS"):
             self._cmd_screen(parts[1:])
+        elif cmd in ("CRITERIA", "CRITERES"):
+            self._cmd_criteria(parts[1:])
+        elif cmd in ("IDEAS", "IDEES", "OPPORTUNITIES"):
+            self._cmd_ideas(parts[1:])
+        elif cmd in ("TRADES", "TRADELOG", "TJOURNAL"):
+            self._cmd_trades(parts[1:])
+        elif cmd == "NOTE":
+            self._cmd_note(parts[1:])
         elif cmd in ("RANKING", "RANK"):
             self._cmd_top(arg)
         elif cmd in ("BENCHMARK", "BENCH"):

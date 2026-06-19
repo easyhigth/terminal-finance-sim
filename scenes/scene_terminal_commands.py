@@ -13,6 +13,8 @@ from core import etfs as etfs_mod
 from core import history as history_mod
 from core import inbox as inbox_mod
 from core import ipo as ipo_mod
+from core import journal as journal_mod
+from core import opportunities as opportunities_mod
 from core import legacy as legacy_mod
 from core import macrocal as macrocal_mod
 from core import market as market_mod
@@ -112,6 +114,9 @@ class TerminalCommandsMixin:
                           f"{widgets.format_money(r['total'], self._cur())}.",
                           f"  ✓ Bought {qty} × {bid} @ {r['price']:.2f} = "
                           f"{widgets.format_money(r['total'], self._cur())}."))
+                journal_mod.log_trade(p, m, asset_class="Obligation", key=bid, label=bid,
+                                      side="achat", qty=r["qty"], price=r["price"],
+                                      fee=r.get("fee", 0.0))
             else:
                 self._log(_L(f"  Achat refusé ({r['reason']}).", f"  Buy rejected ({r['reason']})."))
         else:
@@ -121,6 +126,9 @@ class TerminalCommandsMixin:
                           f"{r['realized']:+.0f}).",
                           f"  ✓ Sold {int(r['qty'])} × {bid} (realised P&L "
                           f"{r['realized']:+.0f})."))
+                journal_mod.log_trade(p, m, asset_class="Obligation", key=bid, label=bid,
+                                      side="vente", qty=r["qty"], price=r["price"],
+                                      fee=r.get("fee", 0.0), realized=r["realized"])
             else:
                 self._log(_L(f"  Vente refusée ({r['reason']}).", f"  Sell rejected ({r['reason']})."))
         self._after_trade()
@@ -143,6 +151,7 @@ class TerminalCommandsMixin:
                 return
             qty = int(args[1])
         p, m = self.app.gs.player, self.market
+        asset_class = "Crypto" if asset == "crypto" else "Commodity"
         if cmd.startswith("BUY"):
             if qty == "ALL":
                 self._log(_L("  Précisez une quantité pour l'achat.","  Specify a quantity to buy."))
@@ -150,10 +159,18 @@ class TerminalCommandsMixin:
             r = mod.buy(p, m, cid, qty)
             self._log(_L(f"  ✓ Achat {qty} {cid} @ {r['price']:.2f}.", f"  ✓ Bought {qty} {cid} @ {r['price']:.2f}.") if r["ok"]
                       else _L(f"  Achat refusé ({r['reason']}).", f"  Buy rejected ({r['reason']})."))
+            if r["ok"]:
+                journal_mod.log_trade(p, m, asset_class=asset_class, key=cid, label=cid,
+                                      side="achat", qty=qty, price=r["price"],
+                                      fee=r.get("fee", 0.0))
         else:
             r = mod.sell(p, m, cid, qty)
             self._log(_L(f"  ✓ Vente {cid} (P&L réalisé {r['realized']:+.0f}).", f"  ✓ Sold {cid} (realised P&L {r['realized']:+.0f}).") if r["ok"]
                       else _L(f"  Vente refusée ({r['reason']}).", f"  Sell rejected ({r['reason']})."))
+            if r["ok"]:
+                journal_mod.log_trade(p, m, asset_class=asset_class, key=cid, label=cid,
+                                      side="vente", qty=r.get("qty", qty), price=r["price"],
+                                      fee=r.get("fee", 0.0), realized=r["realized"])
         self._after_trade()
 
     def _cmd_financials(self, ticker):
@@ -509,6 +526,122 @@ class TerminalCommandsMixin:
         self._open_window(_L(f"SCREEN ACTIONS ({len(found)})", f"SCREEN STOCKS ({len(found)})"),
                           [("Tk", 60), ("Nom", 140), ("Secteur", 90), ("P/E", 50), ("Var 1an", 60)], rows)
 
+    # ---------------------------------------------------- idées/opportunités (core/opportunities.py)
+    def _cmd_criteria(self, args):
+        """CRITERIA ADD <stock|etf> clé=valeur...  ·  CRITERIA LIST  ·  CRITERIA REMOVE <id>."""
+        p = self.app.gs.player
+        if not args:
+            self._log(_L("  Usage : CRITERIA ADD <stock|etf> [clé=valeur...] [label=...] · LIST · REMOVE <id>.",
+                         "  Usage: CRITERIA ADD <stock|etf> [key=value...] [label=...] · LIST · REMOVE <id>."))
+            return
+        sub = args[0].upper()
+        if sub == "LIST":
+            screens = opportunities_mod.list_screens(p)
+            rows = [((str(s["id"]), config.COL_AMBER), s["kind"], s["label"],
+                     ", ".join(f"{k}={v}" for k, v in s["criteria"].items())[:40])
+                    for s in screens]
+            if not rows:
+                rows = [("—", "—", "aucun critère sauvegardé", "—")]
+            self._open_window("CRITÈRES SAUVEGARDÉS", [("Id", 30), ("Type", 50),
+                              ("Label", 110), ("Critères", 180)], rows)
+            return
+        if sub == "REMOVE":
+            if len(args) < 2 or not args[1].isdigit():
+                self._log(_L("  Usage : CRITERIA REMOVE <id>.", "  Usage: CRITERIA REMOVE <id>."))
+                return
+            ok = opportunities_mod.remove_screen(p, int(args[1]))
+            self._log(_L("  ✓ Critère supprimé." if ok else "  Identifiant inconnu.",
+                         "  ✓ Criterion removed." if ok else "  Unknown id."))
+            return
+        if sub == "ADD":
+            if len(args) < 2 or args[1].lower() not in ("stock", "etf"):
+                self._log(_L("  Usage : CRITERIA ADD <stock|etf> [clé=valeur...].",
+                             "  Usage: CRITERIA ADD <stock|etf> [key=value...]."))
+                return
+            kind = args[1].lower()
+            rest = args[2:]
+            label = ""
+            tokens = []
+            for tok in rest:
+                if tok.lower().startswith("label="):
+                    label = tok.split("=", 1)[1]
+                else:
+                    tokens.append(tok)
+            criteria = self._parse_screen_args(tokens)
+            try:
+                e = opportunities_mod.add_screen(p, kind, criteria, label=label)
+            except ValueError as exc:
+                self._log(_L(f"  Refusé : {exc}.", f"  Rejected: {exc}."))
+                return
+            self._log(_L(f"  ✓ Critère #{e['id']} sauvegardé ({e['label']}).",
+                         f"  ✓ Criterion #{e['id']} saved ({e['label']})."))
+            return
+        self._log(_L("  Sous-commande inconnue (ADD/LIST/REMOVE).", "  Unknown subcommand (ADD/LIST/REMOVE)."))
+
+    def _cmd_ideas(self, args):
+        """IDEAS [id] : exécute les critères sauvegardés et remonte les correspondances."""
+        p = self.app.gs.player
+        if not p.saved_screens:
+            self._log(_L("  Aucun critère sauvegardé. Voir CRITERIA ADD.",
+                         "  No saved criteria. See CRITERIA ADD."))
+            return
+        if args and args[0].isdigit():
+            sid = int(args[0])
+            screens = [s for s in p.saved_screens if s["id"] == sid]
+            if not screens:
+                self._log(_L("  Identifiant inconnu.", "  Unknown id."))
+                return
+            pairs = [(s, opportunities_mod.run_screen(self.market, s, limit=20)) for s in screens]
+        else:
+            pairs = opportunities_mod.run_all(p, self.market, limit=8)
+        rows = []
+        for s, results in pairs:
+            if s["kind"] == "etf":
+                for q in results:
+                    rows.append(((q["id"], config.COL_AMBER), s["label"], q["name"][:18],
+                                 f"{q['price']:.2f}"))
+            else:
+                for c in results:
+                    rows.append(((c["ticker"], config.COL_AMBER), s["label"], c["name"][:18],
+                                 f"{c['pe']:.1f}" if c["pe"] is not None else "n.m."))
+        if not rows:
+            rows = [("—", "—", "aucune correspondance", "—")]
+        self._open_window(_L("IDÉES D'INVESTISSEMENT", "INVESTMENT IDEAS"),
+                          [("Tk", 60), ("Critère", 90), ("Nom", 130), ("P/E ou NAV", 70)], rows)
+
+    # ---------------------------------------------------- journal d'investissement (core/journal.py)
+    def _cmd_trades(self, args):
+        """TRADES [classe] : affiche les dernières entrées du journal de trading."""
+        p = self.app.gs.player
+        asset_class = args[0].capitalize() if args else None
+        entries = journal_mod.list_entries(p, asset_class=asset_class, limit=30)
+        rows = []
+        for e in entries:
+            res = f"{e['realized']:+.0f}" if e["realized"] is not None else "—"
+            rows.append(((str(e["id"]), config.COL_AMBER), f"j{e['day']}", e["asset_class"],
+                         e["side"], e["key"], f"{e['notional']:,.0f}", res, e["regime"],
+                         (e["reason"] or "—")[:16]))
+        if not rows:
+            rows = [("—", "—", "—", "—", "—", "—", "—", "—", "aucune entrée")]
+        self._open_window(_L("JOURNAL DE TRADING", "TRADING JOURNAL"),
+                          [("Id", 30), ("Jour", 45), ("Classe", 70), ("Sens", 60),
+                           ("Actif", 60), ("Taille", 80), ("P&L", 60), ("Régime", 70),
+                           ("Raison", 120)], rows)
+
+    def _cmd_note(self, args):
+        """NOTE <id> <commentaire...> : annote une entrée existante du journal."""
+        p = self.app.gs.player
+        if len(args) < 2 or not args[0].isdigit():
+            self._log(_L("  Usage : NOTE <id> <commentaire>.", "  Usage: NOTE <id> <comment>."))
+            return
+        entry_id = int(args[0])
+        comment = " ".join(args[1:])
+        e = journal_mod.annotate(p, entry_id, comment=comment)
+        if e is None:
+            self._log(_L("  Identifiant de journal inconnu.", "  Unknown journal id."))
+            return
+        self._log(_L(f"  ✓ Note ajoutée à l'entrée #{entry_id}.", f"  ✓ Note added to entry #{entry_id}."))
+
     def _cmd_benchmark(self):
         p = self.app.gs.player
         idx = {n: r for n, r, *_ in self.market.index_defs}
@@ -753,6 +886,9 @@ class TerminalCommandsMixin:
                      f"{widgets.format_money(res['total'], self._cur())} (fees incl.)."))
         if res["total"] > 60000:
             career_mod.log(self.app.gs.player, "deal", f"Achat {qty} {tk}")
+        journal_mod.log_trade(self.app.gs.player, self.market, asset_class="Action",
+                              key=tk, label=tk, side="achat", qty=qty,
+                              price=res["price"], fee=res.get("fee", 0.0))
         self._after_trade()
 
     def _cmd_sell(self, args):
@@ -777,6 +913,10 @@ class TerminalCommandsMixin:
                      f"  ✓ Sold {int(res['qty'])} {tk} @ {res['price']:.2f} = "
                      f"{widgets.format_money(res['net'], self._cur())}  "
                      f"(realised P&L {sign}{widgets.format_money(res['realized'], self._cur())})."))
+        journal_mod.log_trade(self.app.gs.player, self.market, asset_class="Action",
+                              key=tk, label=tk, side="vente", qty=res["qty"],
+                              price=res["price"], fee=res.get("fee", 0.0),
+                              realized=res["realized"])
         self._after_trade()
 
     def _cmd_short(self, args):
@@ -799,6 +939,9 @@ class TerminalCommandsMixin:
                      f"  ✓ Shorted {qty} {tk} @ {res['price']:.2f} = "
                      f"+{widgets.format_money(res['net'], self._cur())} cash "
                      "(buy back via COVER)."))
+        journal_mod.log_trade(self.app.gs.player, self.market, asset_class="Action",
+                              key=tk, label=tk, side="short", qty=qty,
+                              price=res["price"], fee=res.get("fee", 0.0))
         self._after_trade()
 
     def _cmd_cover(self, args):
@@ -822,6 +965,10 @@ class TerminalCommandsMixin:
                      f"(P&L réalisé {sign}{widgets.format_money(res['realized'], self._cur())}).",
                      f"  ✓ Covered {int(res['qty'])} {tk} @ {res['price']:.2f} "
                      f"(realised P&L {sign}{widgets.format_money(res['realized'], self._cur())})."))
+        journal_mod.log_trade(self.app.gs.player, self.market, asset_class="Action",
+                              key=tk, label=tk, side="couverture", qty=res["qty"],
+                              price=res["price"], fee=res.get("fee", 0.0),
+                              realized=res["realized"])
         self._after_trade()
 
     def _cmd_margin(self):

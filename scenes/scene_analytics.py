@@ -120,6 +120,8 @@ class AnalyticsScene(Scene, PopupMixin):
             ("Max DD", f"{s['max_drawdown']:.1f}%",
              config.COL_DOWN if s["max_drawdown"] > 15 else config.COL_TEXT),
             ("Concentration", f"top {s['top_weight']:.0f}%", config.COL_TEXT),
+            ("Exposition nette", fm(s["net_exposure"]),
+             config.COL_UP if s["net_exposure"] >= 0 else config.COL_DOWN),
         ]
         n = len(tiles)
         gap = 8
@@ -170,9 +172,15 @@ class AnalyticsScene(Scene, PopupMixin):
             pcol = config.COL_UP if h["pnl"] >= 0 else config.COL_DOWN
             widgets.draw_text(surf, f"{h['weight']:.1f}%", (inner.right, y),
                               fonts.small(), pcol, align="right")
-            # 2e ligne fine : nom + P&L %
+            # 2e ligne fine : nom + coût moyen + liquidité + P&L %
             widgets.draw_text(surf, widgets.fit_text(h["name"], fonts.tiny(), 240),
                               (inner.x + 46, y + 13), fonts.tiny(), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, f"PM {h['avg']:.2f}", (inner.x + 390, y + 13),
+                              fonts.tiny(), config.COL_TEXT_DIM, align="right")
+            liq_col = {"Liquide": config.COL_UP, "Peu liquide": config.COL_WARN,
+                       "Illiquide": config.COL_DOWN}.get(h["liquidity"], config.COL_TEXT_DIM)
+            widgets.draw_text(surf, h["liquidity"], (inner.x + 490, y + 13),
+                              fonts.tiny(), liq_col, align="right")
             sign = "+" if h["pnl_pct"] >= 0 else ""
             widgets.draw_text(surf, f"{sign}{h['pnl_pct']:.1f}%", (inner.right, y + 13),
                               fonts.tiny(), pcol, align="right")
@@ -194,6 +202,11 @@ class AnalyticsScene(Scene, PopupMixin):
         y += 6
         y = self._alloc_block(surf, inner, y, "Par région", s["by_region"],
                               lambda k: config.COL_PRESTIGE, limit=5)
+        y += 6
+        liq_col = {"Liquide": config.COL_UP, "Peu liquide": config.COL_WARN,
+                   "Illiquide": config.COL_DOWN}
+        y = self._alloc_block(surf, inner, y, "Par liquidité", s["by_liquidity"],
+                              lambda k: liq_col.get(k, config.COL_TEXT))
         # diversification
         y += 4
         pygame.draw.line(surf, config.COL_BORDER, (inner.x, y), (inner.right, y), 1)
@@ -205,6 +218,18 @@ class AnalyticsScene(Scene, PopupMixin):
         ccol = config.COL_DOWN if s["top_weight"] > 35 else config.COL_WARN if s["top_weight"] > 20 else config.COL_UP
         widgets.draw_text(surf, f"Concentration : {conc} (top {s['top_weight']:.0f}%)",
                           (inner.x, y), fonts.tiny(bold=True), ccol)
+        y += 18
+        top_risk = sorted(s["rows"], key=lambda r: -r["risk_contribution_pct"])[:3]
+        if top_risk:
+            widgets.draw_text(surf, "Top contributeurs au risque",
+                              (inner.x, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+            y += 16
+            for r in top_risk:
+                widgets.draw_text(surf, widgets.fit_text(r["label"], fonts.tiny(), 110),
+                                  (inner.x, y), fonts.tiny(), config.COL_TEXT)
+                widgets.draw_text(surf, f"{r['risk_contribution_pct']:.0f}%",
+                                  (inner.right, y), fonts.tiny(bold=True), config.COL_WARN, align="right")
+                y += 14
 
     def _alloc_block(self, surf, inner, y, title, data, colfn, limit=None):
         widgets.draw_text(surf, title, (inner.x, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)

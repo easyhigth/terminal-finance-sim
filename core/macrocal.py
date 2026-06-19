@@ -34,6 +34,8 @@ EVENT_TYPES = [
     "Inflation (CPI)",
     "Emploi (NFP)",
     "Croissance (PIB)",
+    "Indice PMI (manufacturier/services)",
+    "Émission de dette souveraine",
 ]
 
 OUTCOMES = ["positif", "neutre", "négatif"]
@@ -50,6 +52,9 @@ _CONSENSUS_LABELS = {
     "Inflation (CPI)": ["en ligne", "léger dépassement", "léger ralentissement"],
     "Emploi (NFP)": ["en ligne", "créations supérieures aux attentes", "créations inférieures aux attentes"],
     "Croissance (PIB)": ["en ligne", "accélération", "ralentissement"],
+    "Indice PMI (manufacturier/services)": ["en ligne", "expansion confirmée", "contraction"],
+    "Émission de dette souveraine": ["demande conforme", "sur-souscription (forte demande)",
+                                      "sous-souscription (demande faible)"],
 }
 
 

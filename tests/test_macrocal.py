@@ -193,6 +193,14 @@ def test_resolve_due_events_removes_only_resolved_bets():
     assert remaining == [2]
 
 
+# ---------------------------------------------------------------- types d'évènements
+
+def test_pmi_and_sovereign_issuance_event_types_have_consensus_labels():
+    for event_type in ("Indice PMI (manufacturier/services)", "Émission de dette souveraine"):
+        assert event_type in MACRO.EVENT_TYPES
+        assert event_type in MACRO._CONSENSUS_LABELS
+
+
 # ---------------------------------------------------------------- pending_bets_for
 
 def test_pending_bets_for_filters_by_event():

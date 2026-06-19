@@ -367,3 +367,46 @@ def test_top_companies_filters_by_sector():
     out = m.top_companies(sector=sector, n=50)
     assert out
     assert all(c["sector"] == sector for c in out)
+
+
+# ------------------------------------------------ liens secteur ↔ régime macro
+def _perf_after(seed, n_warmup, overrides):
+    m = Market(seed=seed)
+    m.fast_forward(n_warmup)
+    for key, value in overrides.items():
+        m.macro[key]["v"] = value
+    m.step()
+    return {p["sector"]: p["change_pct"] for p in m.sector_performance()}
+
+
+def test_energie_outperforms_when_inflation_rises():
+    high = _perf_after(2024, 50, {"inflation": 6.0})
+    low = _perf_after(2024, 50, {"inflation": -1.0})
+    assert high["Energie"] > low["Energie"]
+
+
+def test_cyclical_sectors_outperform_when_growth_rises():
+    high = _perf_after(2024, 50, {"growth": 6.0})
+    low = _perf_after(2024, 50, {"growth": -3.0})
+    assert high["Materiaux"] > low["Materiaux"]
+    assert high["Industrie"] > low["Industrie"]
+
+
+def test_auto_underperforms_when_rates_rise():
+    high = _perf_after(2024, 50, {"rate": 8.0})
+    low = _perf_after(2024, 50, {"rate": 1.0})
+    assert high["Auto"] < low["Auto"]
+
+
+def test_conso_and_luxe_outperform_with_high_confidence():
+    high = _perf_after(2024, 50, {"confidence": 130.0})
+    low = _perf_after(2024, 50, {"confidence": 70.0})
+    assert high["Conso"] > low["Conso"]
+    assert high["Luxe"] > low["Luxe"]
+
+
+def test_defensive_sectors_outperform_relatively_when_unemployment_rises():
+    high = _perf_after(2024, 50, {"unemployment": 12.0})
+    low = _perf_after(2024, 50, {"unemployment": 3.0})
+    for sector in ("Sante", "Telecom", "Agro"):
+        assert high[sector] > low[sector]

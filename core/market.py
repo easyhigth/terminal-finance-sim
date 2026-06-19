@@ -261,6 +261,30 @@ class Market:
             # s'aplatit ou s'inverse comprime leur rentabilité, en plus de l'effet
             # de niveau de taux déjà modélisé ci-dessus.
             sec_shock[self._sector_idx["Finance"]] += min(0.0, self.curve_slope() * 0.0009)
+        if "Energie" in self._sector_idx:
+            # secteur traditionnellement protecteur contre l'inflation (pouvoir
+            # de fixation des prix sur les matières premières).
+            sec_shock[self._sector_idx["Energie"]] += (mc["inflation"]["v"] - 2.0) * 0.0010
+        if "Materiaux" in self._sector_idx:
+            # cyclique : la demande de matières premières suit la croissance.
+            sec_shock[self._sector_idx["Materiaux"]] += (mc["growth"]["v"] - 2.0) * 0.0009
+        if "Industrie" in self._sector_idx:
+            sec_shock[self._sector_idx["Industrie"]] += (mc["growth"]["v"] - 2.0) * 0.0008
+        if "Semicon" in self._sector_idx:
+            # même logique de duration longue que la tech, effet plus modéré.
+            sec_shock[self._sector_idx["Semicon"]] += -(self.curve_point(10.0) * 100.0 - 4.5) * 0.0009
+        if "Auto" in self._sector_idx:
+            # achats à crédit (financement auto) sensibles au coût du crédit.
+            sec_shock[self._sector_idx["Auto"]] += -(mc["rate"]["v"] - 2.5) * 0.0010
+        if "Conso" in self._sector_idx:
+            sec_shock[self._sector_idx["Conso"]] += (mc["confidence"]["v"] - 100.0) * 0.00006
+        if "Luxe" in self._sector_idx:
+            sec_shock[self._sector_idx["Luxe"]] += (mc["confidence"]["v"] - 100.0) * 0.00008
+        for _defensif in ("Sante", "Telecom", "Agro"):
+            if _defensif in self._sector_idx:
+                # secteurs défensifs : surperformance relative quand le chômage
+                # monte (demande peu cyclique, rotation défensive des flux).
+                sec_shock[self._sector_idx[_defensif]] += (mc["unemployment"]["v"] - 5.0) * 0.0003
 
         F_world = self.rng.normal(MU_WORLD + reg["drift"], VOL_WORLD * vol_mult) + world_shock
         F_sector = self.rng.normal(0.0, VOL_SECTOR * vol_mult, size=len(self.sectors)) + sec_shock

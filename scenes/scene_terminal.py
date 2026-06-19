@@ -119,6 +119,9 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
         self._indices_scroll = 0
         self._indices_max_scroll = 0
         self._career_panel_rect = None   # panneau CARRIÈRE (ex-priorités) → scène carrière
+        self._career_content_rect = None  # zone défilable (molette)
+        self._career_scroll = 0
+        self._career_max_scroll = 0
         self._feed_header_rect = None    # panneau FLUX & ÉVÉNEMENTS → scène historique
         self.rail_w = 150         # largeur du rail latéral
         self._map_rect = None     # rect de la carte (pour le clic)
@@ -190,6 +193,10 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
             if self._topco_panel_rect and self._topco_panel_rect.collidepoint(mp):
                 self._topco_scroll = max(0, min(self._topco_max_scroll,
                     self._topco_scroll + (-28 if event.button == 4 else 28)))
+                return
+            if self._career_content_rect and self._career_content_rect.collidepoint(mp):
+                self._career_scroll = max(0, min(self._career_max_scroll,
+                    self._career_scroll + (-28 if event.button == 4 else 28)))
                 return
         # 2) souris : boutons console + rail latéral + carte
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:

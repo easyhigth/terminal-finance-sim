@@ -23,6 +23,11 @@ UNLOCKS = {
     "fx": 5,         # desk FX (spot + forward sur devises)
     "calendar": 2,   # calendrier macro (paris sur évènements programmés)
     "team": 6,       # recrutement d'analystes juniors (équipe)
+    "alm": 1,        # desk ALM (sandbox actif-passif, lecture/simulation seule)
+    "risk": 1,       # module risk (VaR/stress sur exposition de référence, sandbox)
+    "quant": 1,      # module quant (pricing d'options, sandbox)
+    "credit": 6,     # titrisation : tranches de pool de prêts (cash réellement investi)
+    "structured": 6,  # produits structurés (cash réellement investi)
 }
 
 LABELS = {
@@ -40,6 +45,11 @@ LABELS = {
     "fx": "Desk FX (spot & forward) (FX)",
     "calendar": "Calendrier macro (MACRO)",
     "team": "Équipe d'analystes juniors (TEAM)",
+    "alm": "Desk ALM bancaire (ALM)",
+    "risk": "Module risque / VaR (RISK)",
+    "quant": "Module quant / pricing d'options (QUANT)",
+    "credit": "Titrisation / tranches de crédit (CREDIT)",
+    "structured": "Produits structurés (STRUCT)",
 }
 
 # fonctionnalité -> id de tutoriel (data/tutorials.py) à proposer automatiquement
@@ -54,6 +64,11 @@ FEATURE_TUTORIAL = {
     "fx": "fx",
     "calendar": "calendar",
     "team": "team",
+    "alm": "alm",
+    "risk": "risk",
+    "quant": "quant",
+    "credit": "credit",
+    "structured": "structured",
 }
 
 # commande (token majuscule) -> fonctionnalité gated
@@ -81,6 +96,11 @@ CMD_FEATURE = {
     "FX": "fx",
     "AGENDA": "calendar", "PRONOS": "calendar",
     "TEAM": "team", "EQUIPE": "team",
+    "ALM": "alm", "BANKING": "alm",
+    "RISK": "risk",
+    "QUANT": "quant",
+    "CREDIT": "credit", "TITRISATION": "credit", "ABS": "credit", "CLO": "credit",
+    "STRUCT": "structured", "STRUCTURED": "structured", "STRUCTURES": "structured",
 }
 
 

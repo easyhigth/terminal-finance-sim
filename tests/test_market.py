@@ -58,6 +58,90 @@ def test_macro_stays_within_bounds():
     assert 0.0 <= macro["rate"]["v"] <= 12.0
     assert -2.0 <= macro["inflation"]["v"] <= 15.0
     assert 50.0 <= macro["confidence"]["v"] <= 140.0
+    assert 20.0 <= macro["credit_ig"]["v"] <= 400.0
+    assert 100.0 <= macro["credit_hy"]["v"] <= 1500.0
+    assert 10.0 <= macro["liquidity"]["v"] <= 100.0
+
+
+# --------------------------------------------------------------- courbe des taux
+def test_yield_curve_is_increasing_at_neutral_regime():
+    m = Market(seed=3)
+    curve = m.yield_curve()
+    tenors = ["3M", "2Y", "5Y", "10Y", "30Y"]
+    values = [curve[t] for t in tenors]
+    assert values == sorted(values)   # pentue/normale par défaut (régime Calme)
+
+
+def test_curve_point_matches_legacy_term_premium_at_neutral_state():
+    """À l'état neutre (régime Calme, croissance == mean macro 2.0), la courbe se
+    réduit à l'ancienne prime de terme fixe (0.15%/an) : pas de régression sur
+    les niveaux de rendement déjà calibrés."""
+    m = Market(seed=3)
+    m.macro["growth"]["v"] = 2.0
+    short = m.macro["rate"]["v"] / 100.0
+    for years in (0.25, 2.0, 10.0, 30.0):
+        assert m.curve_point(years) == pytest.approx(short + 0.0015 * years)
+
+
+def test_curve_inverts_under_recession_conditions():
+    m = Market(seed=3)
+    m.regime = "Récession"
+    m.macro["growth"]["v"] = -4.0
+    assert m.curve_slope() < 0.0
+    assert m.curve_inverted()
+    assert m.curve_phase() == "Inversion"
+
+
+def test_curve_steepens_under_expansion_conditions():
+    m = Market(seed=3)
+    m.regime = "Expansion"
+    m.macro["growth"]["v"] = 5.0
+    assert m.curve_slope() > 1.0
+    assert m.curve_phase() == "Pentification"
+
+
+# --------------------------------------------------------- crédit & liquidité
+def test_credit_spreads_widen_under_recession_stress():
+    m = Market(seed=11)
+    base_ig, base_hy = m.macro["credit_ig"]["v"], m.macro["credit_hy"]["v"]
+    m.macro["growth"]["v"] = -3.0
+    m.macro["unemployment"]["v"] = 9.0
+    for _ in range(40):
+        m._step_credit_liquidity()
+    assert m.macro["credit_ig"]["v"] > base_ig
+    assert m.macro["credit_hy"]["v"] > base_hy
+    # le HY se tend toujours plus que l'IG en conditions de stress
+    assert (m.macro["credit_hy"]["v"] - base_hy) > (m.macro["credit_ig"]["v"] - base_ig)
+
+
+def test_liquidity_drops_when_credit_hy_widens():
+    m = Market(seed=11)
+    base_liq = m.macro["liquidity"]["v"]
+    m.macro["growth"]["v"] = -3.0
+    m.macro["unemployment"]["v"] = 9.0
+    m.regime = "Volatil"
+    for _ in range(150):
+        m._step_credit_liquidity()
+    assert m.macro["liquidity"]["v"] < base_liq
+
+
+def test_credit_spread_multiplier_reacts_to_macro_state():
+    m = Market(seed=11)
+    assert m.credit_spread_multiplier("AAA") == pytest.approx(1.0, abs=1e-6)
+    assert m.credit_spread_multiplier("B") == pytest.approx(1.0, abs=1e-6)
+    m.macro["credit_hy"]["v"] = 760.0   # double du niveau de référence
+    assert m.credit_spread_multiplier("B") == pytest.approx(2.0, abs=1e-6)
+    assert m.credit_spread_multiplier("AAA") == pytest.approx(1.0, abs=1e-6)   # IG inchangé
+
+
+def test_step_macro_does_not_consume_extra_rng_draws_for_credit():
+    """Le crédit/la liquidité sont dérivés sans tirage rng propre : deux marchés
+    de même graine doivent rester synchronisés sur les autres indicateurs."""
+    a, b = Market(seed=55), Market(seed=55)
+    a.fast_forward(10)
+    b.fast_forward(10)
+    assert a.macro["rate"]["v"] == pytest.approx(b.macro["rate"]["v"])
+    assert a.macro["credit_hy"]["v"] == pytest.approx(b.macro["credit_hy"]["v"])
 
 
 # --------------------------------------------------------------- indices

@@ -80,6 +80,26 @@ EARN_NEWS_THRESH = 0.06 # |surprise| au-delà de laquelle on génère une news
 CRISIS_SEVERE_SEVERITY = 1.35  # seuil au-delà duquel une crise est jugée "majeure"
 CRISIS_COOLDOWN_STEPS = 5      # accalmie forcée après une crise majeure (pas de nouveau choc)
 
+# Courbe des taux : DÉRIVÉE du taux directeur courant + une pente qui dépend du
+# cycle (régime + croissance), pas un indicateur mean-reverting séparé. À l'état
+# neutre (régime Calme, croissance = mean macro), elle se réduit à l'ancienne
+# prime de terme fixe (CURVE_TERM_PREMIUM == ancien core.bonds.TERM_PREMIUM),
+# pour ne pas changer les niveaux de rendement déjà calibrés.
+CURVE_TENORS = {"3M": 0.25, "2Y": 2.0, "5Y": 5.0, "10Y": 10.0, "30Y": 30.0}
+CURVE_TERM_PREMIUM = 0.0015
+# pentification en expansion (le marché anticipe une croissance soutenue),
+# aplatissement/inversion en marché volatil/récession (le marché anticipe des
+# baisses de taux directeur futures) — capé aux 10 premières années (la partie
+# longue de la courbe réagit peu au cycle court terme).
+_REGIME_SLOPE_BIAS = {"Expansion": 0.0028, "Calme": 0.0, "Volatil": -0.0065, "Récession": -0.015}
+
+# Spreads de crédit IG/HY — niveaux de référence (en points de base), utilisés
+# comme indicateurs macro centraux de stress de marché (core.bonds les lit pour
+# faire varier le coût d'emprunt des émetteurs notés, core.scenarios pour faire
+# dépendre la probabilité de crise de conditions macro cohérentes).
+BASE_CREDIT_IG_BPS = 90.0
+BASE_CREDIT_HY_BPS = 380.0
+
 # tension ambiante de fond par régime (toile de fond lente, cf. _step_regime) —
 # base du niveau de tension affiché au joueur, avant prise en compte des crises actives.
 _REGIME_BASE_TENSION = {"Expansion": 8.0, "Calme": 4.0, "Volatil": 42.0, "Récession": 58.0}
@@ -188,6 +208,12 @@ class Market:
                             "label": "Chômage"},
             "confidence":  {"v": 100.0, "mean": 100.0, "k": 0.05, "vol": 1.2, "unit": "",
                             "label": "Confiance"},
+            "credit_ig":   {"v": BASE_CREDIT_IG_BPS, "mean": BASE_CREDIT_IG_BPS, "k": 0.04,
+                            "vol": 3.0, "unit": "bps", "label": "Spread crédit IG"},
+            "credit_hy":   {"v": BASE_CREDIT_HY_BPS, "mean": BASE_CREDIT_HY_BPS, "k": 0.05,
+                            "vol": 14.0, "unit": "bps", "label": "Spread crédit HY"},
+            "liquidity":   {"v": 70.0, "mean": 70.0, "k": 0.06, "vol": 1.5, "unit": "",
+                            "label": "Liquidité de marché"},
         }
         self.macro_hist = {k: [self.macro[k]["v"]] for k in self.macro}
         logger.info("Market.__init__: seed=%s n_companies=%s", self.seed, self.n)
@@ -222,6 +248,19 @@ class Market:
             sec_shock[self._sector_idx["Finance"]] += -(mc["rate"]["v"] - 2.5) * 0.0016
         if "Immobilier" in self._sector_idx:
             sec_shock[self._sector_idx["Immobilier"]] += -(mc["rate"]["v"] - 2.5) * 0.0020
+        if "Utilities" in self._sector_idx:
+            # valeurs « obligataires » (rendement du dividende comparé au taux sans
+            # risque) : pénalisées quand les taux montent, comme l'immobilier.
+            sec_shock[self._sector_idx["Utilities"]] += -(mc["rate"]["v"] - 2.5) * 0.0014
+        if "Tech" in self._sector_idx:
+            # valorisation de croissance : sensible au taux LONG (actualisation de
+            # cash-flows lointains), donc à la courbe plutôt qu'au seul taux court.
+            sec_shock[self._sector_idx["Tech"]] += -(self.curve_point(10.0) * 100.0 - 4.5) * 0.0011
+        if "Finance" in self._sector_idx:
+            # les banques vivent de la marge d'intérêt nette : une courbe qui
+            # s'aplatit ou s'inverse comprime leur rentabilité, en plus de l'effet
+            # de niveau de taux déjà modélisé ci-dessus.
+            sec_shock[self._sector_idx["Finance"]] += min(0.0, self.curve_slope() * 0.0009)
 
         F_world = self.rng.normal(MU_WORLD + reg["drift"], VOL_WORLD * vol_mult) + world_shock
         F_sector = self.rng.normal(0.0, VOL_SECTOR * vol_mult, size=len(self.sectors)) + sec_shock
@@ -293,6 +332,13 @@ class Market:
             self.step_count, self.regime, self.last_world, len(self._last_news))
         return self._last_news
 
+    # indicateurs pilotés par un AR(1) bruité (tirage rng) — le crédit et la
+    # liquidité sont volontairement EXCLUS : ils sont dérivés déterministiquement
+    # des autres indicateurs juste après (cf. _step_credit_liquidity), pour ne
+    # pas consommer de tirage rng supplémentaire et décaler tout l'état de
+    # marché qui suit dans step() (cf. CLAUDE.md, déterminisme).
+    _STOCHASTIC_KEYS = ("rate", "inflation", "growth", "unemployment", "confidence")
+
     def _step_macro(self):
         """Met à jour les indicateurs macro (AR(1) à retour à la moyenne)."""
         m = self.macro
@@ -302,17 +348,43 @@ class Market:
         m["confidence"]["mean"] = 100.0 + self.last_world * 300
         # chômage inversement lié à la croissance
         m["unemployment"]["mean"] = 5.0 - (m["growth"]["v"] - 2.0) * 0.4
-        for d in m.values():
+        for k in self._STOCHASTIC_KEYS:
+            d = m[k]
             d["v"] += d["k"] * (d["mean"] - d["v"]) + self.rng.normal(0, d["vol"])
         m["rate"]["v"] = min(12.0, max(0.0, m["rate"]["v"]))
         m["inflation"]["v"] = min(15.0, max(-2.0, m["inflation"]["v"]))
         m["growth"]["v"] = min(8.0, max(-6.0, m["growth"]["v"]))
         m["unemployment"]["v"] = min(20.0, max(2.0, m["unemployment"]["v"]))
         m["confidence"]["v"] = min(140.0, max(50.0, m["confidence"]["v"]))
+        self._step_credit_liquidity()
         for k in m:
             self.macro_hist[k].append(m[k]["v"])
             if len(self.macro_hist[k]) > HIST_LEN:
                 self.macro_hist[k].pop(0)
+
+    def _step_credit_liquidity(self):
+        """Spreads de crédit IG/HY et liquidité de marché : dérivés (lissage
+        déterministe, sans tirage rng propre) de la croissance, du chômage et
+        du dernier choc de marché — s'élargissent/se réduisent quand la
+        croissance/l'emploi se dégradent ou après un choc baissier marqué (fuite
+        vers la qualité), cohérents avec un régime de stress plutôt qu'un
+        tirage isolé indépendant du contexte macro."""
+        m = self.macro
+        growth_stress = max(0.0, 1.0 - m["growth"]["v"])
+        unemp_stress = max(0.0, m["unemployment"]["v"] - 6.0)
+        shock_stress = max(0.0, -self.last_world) * 4000.0
+        target_ig = BASE_CREDIT_IG_BPS + growth_stress * 25.0 + unemp_stress * 9.0 \
+            + shock_stress * 0.25
+        target_hy = BASE_CREDIT_HY_BPS + growth_stress * 95.0 + unemp_stress * 35.0 \
+            + shock_stress
+        target_liq = 100.0 - (m["credit_hy"]["v"] - BASE_CREDIT_HY_BPS) * 0.05 \
+            - (8.0 if self.regime in ("Volatil", "Récession") else 0.0)
+        m["credit_ig"]["v"] += 0.06 * (target_ig - m["credit_ig"]["v"])
+        m["credit_hy"]["v"] += 0.08 * (target_hy - m["credit_hy"]["v"])
+        m["liquidity"]["v"] += 0.10 * (target_liq - m["liquidity"]["v"])
+        m["credit_ig"]["v"] = min(400.0, max(20.0, m["credit_ig"]["v"]))
+        m["credit_hy"]["v"] = min(1500.0, max(100.0, m["credit_hy"]["v"]))
+        m["liquidity"]["v"] = min(100.0, max(10.0, m["liquidity"]["v"]))
 
     def _step_regime(self):
         """Fait évoluer le régime de marché (chaîne de Markov déterministe)."""
@@ -402,6 +474,51 @@ class Market:
             self.last_earnings.append(rep)
             self.earnings_log[rep["ticker"]] = rep
         return shock
+
+    def curve_point(self, years):
+        """Rendement de la courbe (décimal) pour une maturité (en années) donnée.
+        À l'état neutre (régime Calme, croissance = mean macro de 2.0), équivaut
+        exactement à l'ancienne prime de terme fixe (taux court + 0.15%/an)."""
+        short = self.macro["rate"]["v"] / 100.0
+        growth_bias = (self.macro["growth"]["v"] - 2.0) * 0.0015
+        # poids 0 (très court terme) -> 1 (10 ans et plus) : la partie courte de
+        # la courbe suit surtout le taux directeur, la partie longue capte le
+        # cycle (pentification/inversion).
+        weight = min(years, 10.0) / 10.0
+        cycle_bias = (_REGIME_SLOPE_BIAS.get(self.regime, 0.0) + growth_bias) * weight
+        return max(0.0, short + CURVE_TERM_PREMIUM * years + cycle_bias)
+
+    def yield_curve(self):
+        """Courbe complète {tenor: rendement décimal} pour les maturités usuelles."""
+        return {tenor: self.curve_point(years) for tenor, years in CURVE_TENORS.items()}
+
+    def curve_slope(self):
+        """Pente 10 ans - 2 ans (en points de %) : lecture usuelle de la forme
+        de la courbe (positive = pentue/normale, négative = inversée)."""
+        return (self.curve_point(10.0) - self.curve_point(2.0)) * 100.0
+
+    def curve_inverted(self):
+        return self.curve_slope() < 0.0
+
+    def curve_phase(self):
+        """Étiquette qualitative de la forme courante de la courbe."""
+        slope = self.curve_slope()
+        if slope < -0.05:
+            return "Inversion"
+        if slope < 0.30:
+            return "Aplatissement"
+        if slope < 1.0:
+            return "Normale"
+        return "Pentification"
+
+    def credit_spread_multiplier(self, rating):
+        """Multiplicateur (autour de 1.0) à appliquer au spread de crédit de base
+        d'un rating, selon que les conditions de crédit IG/HY courantes sont plus
+        tendues ou plus détendues que leur niveau de référence. Lu par core.bonds
+        pour faire varier dynamiquement le coût d'emprunt des émetteurs notés."""
+        if rating in ("BB", "B"):
+            return max(0.4, self.macro["credit_hy"]["v"] / BASE_CREDIT_HY_BPS)
+        return max(0.4, self.macro["credit_ig"]["v"] / BASE_CREDIT_IG_BPS)
 
     def macro_change(self, key):
         """Variation de l'indicateur depuis ~1 an (20 pas) pour l'affichage."""

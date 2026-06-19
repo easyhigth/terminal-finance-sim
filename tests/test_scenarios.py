@@ -167,6 +167,51 @@ def test_maybe_trigger_with_default_rng_does_not_raise(monkeypatch):
     scenarios.maybe_trigger(m)   # ne doit pas lever, déclenché ou pas
 
 
+# ------------------------------------------------------------- stress macro
+def test_macro_stress_is_neutral_at_baseline():
+    m = _setup()
+    assert scenarios.macro_stress(m) == pytest.approx(1.0, abs=1e-6)
+
+
+def test_macro_stress_rises_with_credit_and_recession_conditions():
+    m = _setup()
+    m.macro["credit_hy"]["v"] = 760.0
+    m.macro["growth"]["v"] = -3.0
+    m.macro["unemployment"]["v"] = 9.0
+    assert scenarios.macro_stress(m) > 1.5
+
+
+def test_crisis_trigger_probability_scales_with_macro_stress():
+    """Conditions macro tendues -> davantage de crises déclenchées sur un même
+    nombre de tours, à graine identique (item 5 du brief : crises pilotées par
+    des seuils macro cohérents, pas un pur tirage indépendant)."""
+    m_calm = _setup()
+    m_stressed = _setup()
+    m_stressed.macro["credit_hy"]["v"] = 900.0
+    m_stressed.macro["growth"]["v"] = -3.0
+    m_stressed.macro["unemployment"]["v"] = 9.0
+
+    rng_calm, rng_stressed = random.Random(321), random.Random(321)
+    n_calm = sum(1 for _ in range(2000) if scenarios.maybe_trigger(m_calm, rng_calm))
+    n_stressed = sum(1 for _ in range(2000) if scenarios.maybe_trigger(m_stressed, rng_stressed))
+    assert n_stressed > n_calm
+
+
+def test_high_stress_biases_toward_bad_scenarios():
+    m = _setup()
+    m.macro["credit_hy"]["v"] = 900.0
+    m.macro["growth"]["v"] = -3.0
+    m.macro["unemployment"]["v"] = 9.0
+    rng = random.Random(7)
+    kinds = []
+    for _ in range(3000):
+        ev = scenarios.maybe_trigger(m, rng)
+        if ev:
+            kinds.append(ev["kind"])
+    assert kinds   # déclenché au moins une fois
+    assert kinds.count("bad") > kinds.count("good")
+
+
 # --------------------------------------------------------- crises ciblées (pures)
 _TARGETED_IDS = {
     "scandale_finance", "antitrust_tech", "immo_asie", "immo_europe",

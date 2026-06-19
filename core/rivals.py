@@ -201,8 +201,9 @@ def act(player, market, rng=None):
             _set_action(r, f"vous coiffe sur « {d['title']} »", "up")
             ev = {"type": "snipe", "rival": r["name"], "kind": "bad",
                   "deal": d, "title": d["title"],
-                  "text": f"{r['name']} vous coiffe au poteau sur « {d['title']} » "
-                          f"(−2 réputation)."}
+                  "text": f"{r['name']} vous coiffe au poteau sur « {d['title']} » : il ne "
+                          f"restait que {d['days_left']}j avant expiration et vous n'aviez pas "
+                          f"encore tranché (−2 réputation)."}
             events.append(ev)
             _log_rival_event(player, ev)
 
@@ -215,7 +216,8 @@ def act(player, market, rng=None):
         client = o.get("client", "un client")
         _set_action(r, f"décroche le mandat {client}", "up")
         ev = {"type": "poach", "rival": r["name"], "kind": "bad", "client": client,
-              "text": f"{r['name']} décroche le mandat de {client} que vous étudiiez."}
+              "text": f"{r['name']} décroche le mandat de {client} : l'offre traînait dans "
+                      f"votre file d'attente sans réponse, le temps a joué contre vous."}
         events.append(ev)
         _log_rival_event(player, ev)
 

@@ -242,21 +242,37 @@ class EvaluationScene(Scene):
                         p.flags["pending_tutorial"] = tid
         else:
             p.reputation = max(0, p.reputation - 5)
+            pct = int(ratio * 100)
+            req = int(self.pass_threshold * 100)
+            self.app.notify(_L(f"Évaluation échouée : {pct}% < {req}% requis (−5 réputation)",
+                                f"Evaluation failed: {pct}% < {req}% required (−5 reputation)"), "bad")
+            career.log(p, "promo", _L(
+                f"Évaluation de promotion échouée ({pct}% < seuil {req}%, −5 réputation)",
+                f"Promotion evaluation failed ({pct}% < threshold {req}%, −5 reputation)"))
         self.app.gs.save(config.AUTOSAVE_SLOT)
         self.state = "result"
 
     def _finish_cert(self, p):
         from core import badges
+        from core import career
         from core import certifications as C
         self.new_title = None
+        name = C.PROGRAMS[self.cert_program]["name"]
         if self.passed:
             res = C.pass_stage(p, self.cert_program)
             self.new_title = res.get("title") if res else None
-            self.app.notify(_L(f"{C.PROGRAMS[self.cert_program]['name']} : niveau réussi", f"{C.PROGRAMS[self.cert_program]['name']}: level passed"), "prestige")
+            self.app.notify(_L(f"{name} : niveau réussi", f"{name}: level passed"), "prestige")
             for b in badges.check_new(p, self.app.market):
                 self.app.notify(_L(f"✶ Badge : {b['name']}", f"✶ Badge: {b['name']}"), "prestige")
         else:
-            self.app.notify(_L("Examen de certification échoué","Certification exam failed"), "bad")
+            ratio = self.score / max(1, len(self.items))
+            pct = int(ratio * 100)
+            req = int(self.pass_threshold * 100)
+            self.app.notify(_L(f"{name} échouée : {pct}% < {req}% requis",
+                                f"{name} failed: {pct}% < {req}% required"), "bad")
+            career.log(p, "promo", _L(
+                f"Certification {name} échouée ({pct}% < seuil {req}%)",
+                f"Certification {name} failed ({pct}% < threshold {req}%)"))
 
     def update(self, dt):
         self.t += dt

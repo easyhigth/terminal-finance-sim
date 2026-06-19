@@ -271,7 +271,15 @@ def apply_choice(player, dilemma, option_index):
                                  "choice": opt["label"]})
     from core import career
     tag = "§" if dilemma["category"] in ("ethique", "reglementaire") else "✶"
-    career.log(player, "info", f"{tag} {dilemma['title']} → {opt['label']}")
+    bits = []
+    if opt["cash"]:
+        bits.append(f"{'+' if opt['cash'] >= 0 else ''}{opt['cash']:.0f}")
+    if opt["rep"]:
+        bits.append(f"rép. {opt['rep']:+d}")
+    if heat_delta:
+        bits.append(f"scrutin {heat_delta:+.0f}")
+    detail = f" ({', '.join(bits)})" if bits else ""
+    career.log(player, "info", f"{tag} {dilemma['title']} → {opt['label']}{detail}")
     return opt
 
 
@@ -286,6 +294,7 @@ def maybe_investigate(player, rng=None):
     prob = (player.heat - 45) / 120.0
     if rng.random() >= prob:
         return None
+    heat_before = player.heat
     scale = _scale(player.grade_index)
     fine = round(rng.uniform(40, 120) * 1000 * scale, 2)
     rep_loss = rng.randint(6, 12)
@@ -293,9 +302,13 @@ def maybe_investigate(player, rng=None):
     player.adjust_reputation(-rep_loss)
     player.heat = max(0, player.heat - 35)
     from core import career, inbox
-    career.log(player, "crisis", f"Enquête réglementaire : amende {fine/1000:.0f}K")
+    career.log(player, "crisis", f"Enquête réglementaire : scrutin {heat_before}/100 (seuil 55) "
+                                  f"a déclenché un contrôle. Amende {fine/1000:.0f}K, "
+                                  f"réputation -{rep_loss}.")
     inbox.push(player, "compliance", "Régulateur",
                "Enquête et sanction",
+               f"Votre scrutin réglementaire a atteint {heat_before}/100, au-delà du seuil "
+               f"de tolérance (55) — accumulé par vos décisions récentes les plus risquées. "
                f"Une enquête conclut à des manquements. Amende de {fine/1000:.0f}K et "
                f"atteinte à votre réputation (-{rep_loss}). Réduisez votre exposition au risque réglementaire.")
-    return {"fine": fine, "rep_loss": rep_loss}
+    return {"fine": fine, "rep_loss": rep_loss, "heat_before": heat_before}

@@ -823,6 +823,10 @@ class TerminalCommandsMixin:
         gs = self.app.gs
         p = gs.player
         m = self.market
+        # capturés pour le bilan du tour (boucle de jeu lisible : ce qu'on encaisse)
+        cash_before = p.cash
+        rep_before = p.reputation
+        events_before = len(self.recent_events)
         # crise/boom éventuel AVANT le pas (le choc s'applique dès ce tour)
         scenario = scenarios_mod.maybe_trigger(m)
         # pas de marché (déterministe)
@@ -1151,6 +1155,27 @@ class TerminalCommandsMixin:
         unread = inbox_mod.unread_count(p)
         if unread:
             self._log(_L(f"  @ {unread} message(s) non lu(s) — tapez INBOX.", f"  @ {unread} unread message(s) — type INBOX."))
+        # bilan du tour : encaisser la conséquence en un coup d'œil (cash + réputation
+        # cumulés sur TOUT le tour — salaire, dividendes, frais, rivaux, sanctions…),
+        # affiché en dernier pour rester visible juste avant le retour au terminal.
+        cash_delta = p.cash - cash_before
+        rep_delta = p.reputation - rep_before
+        new_events = len(self.recent_events) - events_before
+        cash_sign = "+" if cash_delta >= 0 else ""
+        rep_sign = "+" if rep_delta >= 0 else ""
+        bits = [f"{cash_sign}{widgets.format_money(cash_delta, cur)}"]
+        if rep_delta:
+            bits.append(f"{rep_sign}{rep_delta} rép.")
+        if new_events > 0:
+            bits.append(_L(f"{new_events} évènement(s)", f"{new_events} event(s)"))
+        self._log(_L(f"  ════ BILAN DU TOUR — jour {p.day} : {' · '.join(bits)} ════",
+                      f"  ════ TURN RECAP — day {p.day}: {' · '.join(bits)} ════"))
+        self.app.notify(
+            _L(f"Bilan du tour : {cash_sign}{widgets.format_money(cash_delta, cur)}"
+               + (f" · {rep_sign}{rep_delta} rép." if rep_delta else ""),
+               f"Turn recap: {cash_sign}{widgets.format_money(cash_delta, cur)}"
+               + (f" · {rep_sign}{rep_delta} rep." if rep_delta else "")),
+            "good" if cash_delta >= 0 else "warn")
         if not p.hardcore:
             gs.save(config.AUTOSAVE_SLOT)
         if summary["game_over"] or p.check_game_over():

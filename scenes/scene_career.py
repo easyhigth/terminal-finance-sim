@@ -23,6 +23,7 @@ _KIND_COLORS = {
 class CareerScene(Scene):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
+        self.app.gs.player.flags["onboarding_seen_career"] = True
         career.ensure_objectives(self.app.gs.player)
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)

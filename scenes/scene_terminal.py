@@ -15,6 +15,7 @@ import pygame
 from core import career as career_mod
 from core import config
 from core import news as news_mod
+from core import onboarding as onboarding_mod
 from core import rivals as rivals_mod
 from core import unlocks as unlocks_mod
 from core.i18n import get_lang
@@ -123,6 +124,7 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
         self._career_scroll = 0
         self._career_max_scroll = 0
         self._feed_header_rect = None    # panneau FLUX & ÉVÉNEMENTS → scène historique
+        self._onboarding_skip_rect = None  # bouton « passer » du bandeau d'intégration
         self.rail_w = 150         # largeur du rail latéral
         self._map_rect = None     # rect de la carte (pour le clic)
         # rail latéral : (libellé, commande), regroupé par usage
@@ -200,6 +202,9 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
                 return
         # 2) souris : boutons console + rail latéral + carte
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._onboarding_skip_rect and self._onboarding_skip_rect.collidepoint(event.pos):
+                onboarding_mod.skip(self.app.gs.player)
+                return
             if self._shortcuts_btn_rect and self._shortcuts_btn_rect.collidepoint(event.pos):
                 self._toggle_shortcuts_panel()
                 return
@@ -702,5 +707,6 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
     def update(self, dt):
         self.t += dt
         self.worldmap.update(dt)
+        onboarding_mod.progress(self.app.gs.player, self.app)
 
     # ----------------------------------------------------------------- draw

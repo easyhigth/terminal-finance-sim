@@ -23,6 +23,7 @@ FILTER_CHIPS = [(None, "TOUS")] + [(k, v[0]) for k, v in _KIND.items()]
 class InboxScene(Scene):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
+        self.app.gs.player.flags["onboarding_seen_inbox"] = True
         msgs = self.app.gs.player.inbox
         # plus récents en haut ; sélectionne le 1er par défaut
         self.order = list(reversed(range(len(msgs))))

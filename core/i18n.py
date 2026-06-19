@@ -103,7 +103,20 @@ TR = {
         "continent.hardcore_on": "MODE HARDCORE : ON",
         "continent.hardcore_off": "MODE HARDCORE : OFF",
         "continent.confirm": "CONFIRMER ET DÉMARRER",
+        "continent.next": "SUIVANT →",
         "continent.currency": "Devise",
+        # écran de configuration de la partie (scénario / archétype / hardcore)
+        "runsetup.title": "CONFIGUREZ VOTRE PARTIE",
+        "runsetup.subtitle": "Place financière : {continent}. Choisissez les conditions de départ.",
+        "runsetup.scenario": "Scénario de départ",
+        "runsetup.archetype": "Archétype de jeu",
+        "runsetup.hardcore_title": "MODE HARDCORE",
+        "runsetup.hardcore_on": "Permadeath activé : aucune reprise après une faillite, "
+                                "la sauvegarde est définitive.",
+        "runsetup.hardcore_off": "Mode normal : vous pouvez recharger une sauvegarde "
+                                 "après un échec.",
+        "runsetup.confirm": "CONFIRMER ET DÉMARRER",
+        "runsetup.back": "← RÉGION",
         # terminal : panneaux
         "term.commands": "Commandes",
         "term.indices": "Indices",
@@ -180,7 +193,19 @@ TR = {
         "continent.hardcore_on": "HARDCORE MODE: ON",
         "continent.hardcore_off": "HARDCORE MODE: OFF",
         "continent.confirm": "CONFIRM & START",
+        "continent.next": "NEXT →",
         "continent.currency": "Currency",
+        # run setup screen (scenario / archetype / hardcore)
+        "runsetup.title": "SET UP YOUR CAREER",
+        "runsetup.subtitle": "Financial hub: {continent}. Choose your starting conditions.",
+        "runsetup.scenario": "Starting scenario",
+        "runsetup.archetype": "Run archetype",
+        "runsetup.hardcore_title": "HARDCORE MODE",
+        "runsetup.hardcore_on": "Permadeath on: no recovery after bankruptcy, "
+                                "the save is final.",
+        "runsetup.hardcore_off": "Normal mode: you can reload a save after a setback.",
+        "runsetup.confirm": "CONFIRM & START",
+        "runsetup.back": "← REGION",
         # terminal panels
         "term.commands": "Commands",
         "term.indices": "Indices",

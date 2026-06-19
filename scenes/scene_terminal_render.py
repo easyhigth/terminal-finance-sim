@@ -73,6 +73,10 @@ class TerminalRenderMixin:
         if self.cheat_panel is not None:
             self.cheat_panel.draw(surf)
 
+        # overlay : panneau des raccourcis clavier
+        if self.shortcuts_panel is not None:
+            self.shortcuts_panel.draw(surf)
+
     def _draw_rail(self, surf, rect, p):
         inner = widgets.draw_panel(surf, rect, _t("term.commands"), config.COL_AMBER)
         self._rail_rects = {}
@@ -160,17 +164,19 @@ class TerminalRenderMixin:
         r = widgets.draw_text(surf, lev_txt, (r.right, y), fonts.small(bold=True), lev_col)
         if st["margin_call"]:
             widgets.draw_badge(surf, "⚠ MARGIN CALL", (r.right + 10, y - 2), config.COL_DOWN)
-        # badge messagerie (non-lus) — aligné à droite
+        x = r.right + 18
+        # devise
+        r = widgets.draw_text(surf, f"{info['currency']}", (x, y), fonts.body(bold=True), accent)
+        x = r.right + 14
+        # badge messagerie (non-lus)
         unread = inbox_mod.unread_count(p)
         if unread:
-            widgets.draw_badge(surf, f"@ {unread}", (config.SCREEN_WIDTH - 70, 9),
-                               config.COL_CYAN, align="right")
-        widgets.draw_text(surf, f"{info['currency']}", (config.SCREEN_WIDTH - 90, 10),
-                          fonts.body(bold=True), accent, align="right")
+            r = widgets.draw_badge(surf, f"@ {unread}", (x, y - 2), config.COL_CYAN)
+            x = r.right + 14
         # bouton triche (mode test uniquement, jamais en jeu normal)
         self._cheat_btn_rect = None
         if getattr(self.app, "cheats", False):
-            btn = pygame.Rect(config.SCREEN_WIDTH - 330, 6, 96, 22)
+            btn = pygame.Rect(x, 6, 96, 22)
             hover = btn.collidepoint(pygame.mouse.get_pos())
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL,
                              btn, border_radius=4)
@@ -178,6 +184,16 @@ class TerminalRenderMixin:
             widgets.draw_text(surf, "🛠 CHEAT", btn.center, fonts.tiny(bold=True),
                               config.COL_DOWN, align="center")
             self._cheat_btn_rect = btn
+        # bouton raccourcis clavier (toujours visible, coin haut-droit de la scène)
+        sw, sh = 168, 26
+        sbtn = pygame.Rect(config.SCREEN_WIDTH - 10 - sw, 4, sw, sh)
+        hover = sbtn.collidepoint(pygame.mouse.get_pos())
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL,
+                         sbtn, border_radius=5)
+        pygame.draw.rect(surf, config.COL_CYAN, sbtn, 1, border_radius=5)
+        widgets.draw_text(surf, "⌨ RACCOURCIS", sbtn.center, fonts.small(bold=True),
+                          config.COL_CYAN, align="center")
+        self._shortcuts_btn_rect = sbtn
 
     def _draw_ticker(self, surf):
         y = config.TOPBAR_H + 4

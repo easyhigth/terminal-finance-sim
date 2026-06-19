@@ -432,13 +432,39 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
         # verrou par grade : certaines actions se débloquent en progressant
         feat = unlocks_mod.CMD_FEATURE.get(cmd)
         if feat and not unlocks_mod.unlocked(p, feat):
-            g = unlocks_mod.required_grade(feat)
+            g = unlocks_mod.effective_required_grade(p, feat)
             self._log(_L(f"  ⊘ {unlocks_mod.feature_label(feat)}", f"  ⊘ {unlocks_mod.feature_label(feat)}"),
                       _L(f"     débloqué au grade {config.GRADES[g]} (vous : {p.grade}).",
                          f"     unlocked at grade {config.GRADES[g]} (you: {p.grade})."))
             return
 
         if cmd == "HELP":
+            # asymétrie novice/expert : un stagiaire (grade < 2, non vétéran) voit
+            # un HELP court, focalisé sur l'essentiel — pas la cinquantaine de
+            # commandes du catalogue complet, dont la plupart sont encore verrouillées.
+            novice = p.grade_index < 2 and not p.flags.get("veteran")
+            if novice:
+                if get_lang() == "en":
+                    self._log(
+                        "  ADV advance · COMMANDS full catalogue",
+                        "  MARKET indices · COMPANY <tk> · SEARCH · WATCHLIST",
+                        "  MISSION work · CAREER career · EVAL promotion",
+                        "  LEARN academy · GLOSSARY · DEFINE <term>",
+                        "  INBOX messages · STATUS · SAVE · MENU",
+                        "  → more commands (trading, derivatives, M&A...) unlock as you "
+                        "are promoted. Type COMMANDS to see everything.",
+                    )
+                else:
+                    self._log(
+                        "  ADV avancer · COMMANDS catalogue complet",
+                        "  MARKET indices · COMPANY <tk> · SEARCH · WATCHLIST",
+                        "  MISSION travailler · CAREER carrière · EVAL promotion",
+                        "  LEARN académie · GLOSSARY · DEFINE <terme>",
+                        "  INBOX messagerie · STATUS · SAVE · MENU",
+                        "  → d'autres commandes (trading, dérivés, M&A...) se débloquent "
+                        "en progressant. Tapez COMMANDS pour tout voir.",
+                    )
+                return
             if get_lang() == "en":
                 self._log(
                     "  ADV advance · COMMANDS full catalogue",

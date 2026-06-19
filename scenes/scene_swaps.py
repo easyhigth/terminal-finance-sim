@@ -99,7 +99,7 @@ class SwapsScene(Scene):
         widgets.draw_text(surf, "SWAPS DE DEVISES (CROSS-CURRENCY)", (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         if not self._can_trade():
-            g = unlocks.required_grade("trade")
+            g = unlocks.effective_required_grade(self.app.gs.player, "trade")
             widgets.draw_text(surf, f"⊘ Swaps débloqués au grade {config.GRADES[g]}.",
                               (42, 56), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)

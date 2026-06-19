@@ -120,7 +120,7 @@ class MandatesScene(Scene):
         widgets.draw_text(surf, "MANDATS CLIENTS", (40, 22), fonts.title(bold=True), config.COL_PRESTIGE)
         p = self.app.gs.player
         if not self._can():
-            g = unlocks.required_grade("mandates")
+            g = unlocks.effective_required_grade(self.app.gs.player, "mandates")
             widgets.draw_text(surf, f"⊘ Mandats débloqués au grade {config.GRADES[g]}.",
                               (42, 56), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)

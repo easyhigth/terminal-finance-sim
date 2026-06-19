@@ -139,7 +139,7 @@ class CalendarScene(Scene):
                           fonts.title(bold=True), config.COL_AMBER)
         p = self.app.gs.player
         if not self._can():
-            g = unlocks.required_grade("calendar")
+            g = unlocks.effective_required_grade(self.app.gs.player, "calendar")
             widgets.draw_text(surf, f"⊘ Calendrier macro débloqué au grade {config.GRADES[g]}.",
                               (42, 74), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)

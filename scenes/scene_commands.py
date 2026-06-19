@@ -146,7 +146,7 @@ def _label_lock_grade(label, player):
             continue
         feat = unlocks.CMD_FEATURE.get(words[0].upper())
         if feat and not unlocks.unlocked(player, feat):
-            g = unlocks.required_grade(feat)
+            g = unlocks.effective_required_grade(player, feat)
             best = g if best is None else max(best, g)
     return best
 

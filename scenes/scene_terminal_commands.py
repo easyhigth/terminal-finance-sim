@@ -15,6 +15,7 @@ from core import inbox as inbox_mod
 from core import ipo as ipo_mod
 from core import legacy as legacy_mod
 from core import macrocal as macrocal_mod
+from core import market as market_mod
 from core import mandates as mandates_mod
 from core import news as news_mod
 from core import politics as politics_mod
@@ -614,6 +615,32 @@ class TerminalCommandsMixin:
                           [("Effet", 280), ("Valeur", 110)],
                           rows, accent=config.COL_AMBER)
 
+    def _cmd_tension(self):
+        """Affiche l'arc de tension courant : phase qualitative (Calme/Préparation/
+        Tension/Panique/Accalmie), niveau 0-100, régime, et crises actives avec
+        leur temps restant — pour que le joueur lise le rythme de la partie plutôt
+        que de subir des chocs sans contexte."""
+        m = self.market
+        phase = m.tension_phase()
+        lvl = m.tension_level()
+        phase_col = {"Calme": config.COL_UP, "Préparation": config.COL_AMBER,
+                     "Tension": config.COL_DOWN, "Panique": config.COL_DOWN,
+                     "Accalmie": config.COL_UP}.get(phase, config.COL_TEXT)
+        self._log(_L(f"  Phase : {phase} (tension {lvl:.0f}/100) — régime {m.regime_label()}.",
+                      f"  Phase: {phase} (tension {lvl:.0f}/100) — regime {m.regime_label()}."))
+        rows = [((phase, phase_col), f"{lvl:.0f}/100", m.regime_label())]
+        for cr in m.crises:
+            rows.append((cr.name, f"{cr.steps_left}/{cr.total_steps}",
+                         (_L("majeure", "major") if cr.severity >= market_mod.CRISIS_SEVERE_SEVERITY
+                          else _L("modérée", "moderate"))))
+        if not m.crises:
+            rows.append((_L("(aucune crise active)", "(no active crisis)"), "", ""))
+        self._open_window(_L("TENSION DU MARCHÉ", "MARKET TENSION"),
+                          [(_L("Phase / crise", "Phase / crisis"), 220),
+                           (_L("Niveau / pas restants", "Level / steps left"), 140),
+                           (_L("Régime / sévérité", "Regime / severity"), 120)],
+                          rows, accent=config.COL_AMBER)
+
     def _check_alerts(self):
         """Vérifie les alertes ; notifie au franchissement et les retire."""
         p = self.app.gs.player
@@ -879,10 +906,25 @@ class TerminalCommandsMixin:
         events_before = len(self.recent_events)
         # crise/boom éventuel AVANT le pas (le choc s'applique dès ce tour)
         scenario = scenarios_mod.maybe_trigger(m)
+        if scenario and m.crises:
+            m.crises[-1].start_nw = pf_mod.net_worth(p, m)
         # pas de marché (déterministe)
         market_news = m.step()
         p.market_step = m.step_count
         self.worldmap.push_news(market_news)
+        # retombées visibles : postmortem des crises qui viennent de s'éteindre
+        for cr in m.ended_crises:
+            if cr.start_nw:
+                growth = (pf_mod.net_worth(p, m) / cr.start_nw - 1) * 100
+                sign = "+" if growth >= 0 else ""
+                self._log(_L(
+                    f"  ◇ Crise dissipée : {cr.name} — patrimoine net sur la période : {sign}{growth:.1f}%.",
+                    f"  ◇ Crisis subsided: {cr.name} — net worth over the period: {sign}{growth:.1f}%."))
+                career_mod.log(p, "crisis", _L(
+                    f"Crise {cr.name} dissipée ({sign}{growth:.1f}% de patrimoine net)",
+                    f"Crisis {cr.name} subsided ({sign}{growth:.1f}% net worth)"))
+                self.app.notify(_L(f"Crise dissipée : {cr.name}", f"Crisis subsided: {cr.name}"),
+                                 "good" if growth >= 0 else "warn")
         # fil d'actualités persistant du jour (carte + scène NEWS + historique 3 ans)
         today_news = [news_mod.make(news_mod.categorize_market(n), n.get("kind", "info"),
                                     n.get("text", ""), n.get("region"), "market")

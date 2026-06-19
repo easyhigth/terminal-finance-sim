@@ -77,15 +77,28 @@ EARN_PRICE_K = 0.9      # conversion surprise -> choc de cours du jour de public
 EARN_NEWS_THRESH = 0.06 # |surprise| au-delà de laquelle on génère une news
 
 
+CRISIS_SEVERE_SEVERITY = 1.35  # seuil au-delà duquel une crise est jugée "majeure"
+CRISIS_COOLDOWN_STEPS = 5      # accalmie forcée après une crise majeure (pas de nouveau choc)
+
+# tension ambiante de fond par régime (toile de fond lente, cf. _step_regime) —
+# base du niveau de tension affiché au joueur, avant prise en compte des crises actives.
+_REGIME_BASE_TENSION = {"Expansion": 8.0, "Calme": 4.0, "Volatil": 42.0, "Récession": 58.0}
+
+
 class Crisis:
     """Un scénario de crise actif : chocs additionnels sur des facteurs, sur N pas."""
-    def __init__(self, name, steps, world=0.0, regions=None, sectors=None, vol_mult=1.0):
+    def __init__(self, name, steps, world=0.0, regions=None, sectors=None, vol_mult=1.0,
+                 severity=1.0, kind="bad"):
         self.name = name
         self.steps_left = steps
+        self.total_steps = steps
         self.world = world                      # choc additif sur F_monde / pas
         self.regions = regions or {}            # {region_name: choc additif}
         self.sectors = sectors or {}            # {sector_name: choc additif}
         self.vol_mult = vol_mult                # amplificateur de volatilité
+        self.severity = severity                # intensité tirée à l'origine (cf. scenarios.py)
+        self.kind = kind                         # "bad"/"good" — pour la narration du postmortem
+        self.start_nw = None                    # snapshot patrimoine net, posé par l'appelant
 
 
 class Market:
@@ -152,6 +165,8 @@ class Market:
         self.prev_price = None      # prix avant le dernier pas (attribution P&L)
         self.last_ret = None        # rendements log du dernier pas (par société)
         self.crises = []
+        self.ended_crises = []   # crises qui viennent de s'éteindre CE pas (pour postmortem)
+        self.crisis_cooldown = 0  # pas restants d'accalmie forcée après une crise majeure
         self._last_news = []
         # bump de crédit RÉGIONAL transitoire (en décimal de rendement) injecté
         # par les événements politiques (core/politics.py) et lu par core/bonds.py :
@@ -248,10 +263,16 @@ class Market:
         if len(self.price_hist_all) > HIST_LEN:
             self.price_hist_all.pop(0)
 
-        # crises : décrément
+        # crises : décrément + détection de fin (pour le postmortem et l'accalmie)
         for cr in self.crises:
             cr.steps_left -= 1
+        self.ended_crises = [cr for cr in self.crises if cr.steps_left <= 0]
         self.crises = [cr for cr in self.crises if cr.steps_left > 0]
+        if self.crisis_cooldown > 0:
+            self.crisis_cooldown -= 1
+        for cr in self.ended_crises:
+            if cr.severity >= CRISIS_SEVERE_SEVERITY:
+                self.crisis_cooldown = max(self.crisis_cooldown, CRISIS_COOLDOWN_STEPS)
 
         # résorption progressive des bumps de crédit régionaux (politique) :
         # décroissance déterministe (aucun tirage RNG → prix inchangés).
@@ -316,6 +337,35 @@ class Market:
         donne au joueur une lecture de la maturité du cycle (utile pour le
         market timing et les mandats de gestion de risque)."""
         return max(0, self.step_count - self.regime_since)
+
+    def tension_level(self):
+        """Niveau de tension ambiant (0-100), lecture continue du rythme de la
+        partie : régime de fond + crises actives (sévérité × volatilité), avec
+        une décote pendant l'accalmie forcée qui suit une crise majeure. Donne
+        au joueur un indicateur PERSISTANT (pas juste une notif éphémère) pour
+        distinguer phase calme / préparation / panique."""
+        base = _REGIME_BASE_TENSION.get(self.regime, 20.0)
+        crisis_component = sum(
+            min(35.0, 14.0 * cr.vol_mult * cr.severity) for cr in self.crises)
+        level = base + crisis_component
+        if self.crisis_cooldown > 0:
+            level *= 0.5
+        return round(min(100.0, max(0.0, level)), 1)
+
+    def tension_phase(self):
+        """Étiquette qualitative du niveau de tension, pour donner un arc de
+        rythme lisible : Accalmie (post-crise) -> Calme -> Préparation ->
+        Tension -> Panique."""
+        if self.crisis_cooldown > 0:
+            return "Accalmie"
+        lvl = self.tension_level()
+        if lvl < 15.0:
+            return "Calme"
+        if lvl < 35.0:
+            return "Préparation"
+        if lvl < 60.0:
+            return "Tension"
+        return "Panique"
 
     def _step_earnings(self):
         """Saison de résultats échelonnée : ~1/EARN_PERIOD des sociétés publient

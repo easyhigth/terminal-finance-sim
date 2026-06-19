@@ -57,6 +57,7 @@ CATALOG = [
     ]),
     ("Marché & sociétés", [
         ("MARKET / WEI", "Indices mondiaux (C&D 500, KAK 40, NKX 225…)"),
+        ("TENSION", "Arc de tension du marché : phase, niveau, crises actives"),
         ("TOP [region] / RANKING", "Meilleures sociétés (USA / Europe / Asia…)"),
         ("MOVERS", "Plus fortes hausses / baisses du dernier pas"),
         ("COMPANY / DES <tk>", "Fiche société type Bloomberg. Ex : DES MVC"),

@@ -67,11 +67,11 @@ def check_fill(item, value):
     return abs(value - ans) <= max(1e-9, abs(ans) * item.get("tol", 0.05))
 
 
-def _bank_items(grade_index, rng, count):
+def _bank_items(grade_index, rng, count, track="General"):
     """Pioche `count` questions de la banque d'examens (déjà rng-aware, donc
     déterministe) et les adapte au format d'item de mission."""
     from core.i18n import get_lang
-    picked = question_bank.for_grade(grade_index, "General", count, rng=rng, lang=get_lang())
+    picked = question_bank.for_grade(grade_index, track, count, rng=rng, lang=get_lang())
     return [_mcq(q["q"], list(q["choices"]), q["answer"], q["expl"], rng) for q in picked]
 
 
@@ -99,14 +99,15 @@ _TIER_BRIEFS = {
 # ---------------------------------------------------------------------------
 # API
 # ---------------------------------------------------------------------------
-def generate(grade_index, market, rng=None, region=None):
+def generate(grade_index, market, rng=None, region=None, track="General"):
     """Génère une mission adaptée au grade courant : un tirage de questions
-    de la banque d'examens (jusqu'à MAX_ITEMS), thématisé par mission_tier()."""
+    de la banque d'examens (jusqu'à MAX_ITEMS), thématisé par mission_tier().
+    `track` inclut les questions de la voie du joueur en plus du tronc commun."""
     rng = rng or random
     tier = mission_tier(grade_index)
     title = _L(*_TIER_TITLES[tier])
     brief = _L(*_TIER_BRIEFS[tier])
-    items = _bank_items(grade_index, rng, MAX_ITEMS)
+    items = _bank_items(grade_index, rng, MAX_ITEMS, track=track)
     return {"grade": grade_index, "kind": tier, "title": title, "brief": brief,
             "items": items, "reward_rep": _rep_base(grade_index), "reward_cash": 0,
             "charts": {}}

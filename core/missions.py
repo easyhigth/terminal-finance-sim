@@ -17,6 +17,8 @@ Structures (dicts, transitoires — non sauvegardées) :
 import math
 import random
 
+from data import question_bank
+
 
 def _L(fr, en):
     """Renvoie la version FR ou EN selon la langue courante du jeu."""
@@ -67,6 +69,15 @@ def check_fill(item, value):
     if item.get("abstol") is not None:
         return abs(value - ans) <= item["abstol"]
     return abs(value - ans) <= max(1e-9, abs(ans) * item.get("tol", 0.05))
+
+
+def _bank_items(grade_index, rng, count):
+    """Pioche `count` questions de la banque d'examens (déjà rng-aware, donc
+    déterministe) et les adapte au format d'item de mission, pour casser la
+    répétitivité des mêmes templates de question."""
+    from core.i18n import get_lang
+    picked = question_bank.for_grade(grade_index, "General", count, rng=rng, lang=get_lang())
+    return [_mcq(q["q"], list(q["choices"]), q["answer"], q["expl"], rng) for q in picked]
 
 
 def _money(value_m, cur):
@@ -155,6 +166,7 @@ def _gen_report(market, rng, region, grade):
         [good] + distract, 0,
         _L(f"{c['name']} relève du secteur « {good} ».",
            f"{c['name']} belongs to the '{good}' sector."), rng))
+    items.extend(_bank_items(grade, rng, 2))
     return {"grade": grade, "kind": "report",
             "title": _L(f"Compte-rendu : {c['ticker']}", f"Report: {c['ticker']}"),
             "brief": _L(f"On vous transmet les données brutes de {c['name']} ({c['region']}). "
@@ -214,6 +226,7 @@ def _gen_graph(market, rng, region, grade):
              _L(["Titre A", "Titre B"], ["Stock A", "Stock B"]), 0 if retA > retB else 1,
              f"A : {retA:+.1f}%   B : {retB:+.1f}%.", rng, chart="AB"),
     ]
+    items.extend(_bank_items(grade, rng, 2))
     return {"grade": grade, "kind": "graph",
             "title": _L("Lecture de graphes", "Chart reading"),
             "brief": _L("Analysez les cours fournis : tendance, performance et risque. "
@@ -317,6 +330,7 @@ def _gen_portfolio(market, rng, region, grade):
     idxs = rng.sample(range(len(bank)), 4)
     chosen = [bank[i] for i in idxs]
     items = [_mcq(p, list(ch), idx, expl, rng) for (p, ch, idx, expl) in chosen]
+    items.extend(_bank_items(grade, rng, 1))
     return {"grade": grade, "kind": "portfolio",
             "title": _L("Construction & couverture de portefeuille",
                         "Portfolio construction & hedging"),

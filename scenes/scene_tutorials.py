@@ -27,6 +27,9 @@ class TutorialsScene(Scene):
         self.scroll = 0
         self._max_scroll = 0
         self._content_rect = None
+        self._list_scroll = 0       # défilement de la liste des tutoriels (gauche)
+        self._list_max_scroll = 0
+        self._list_rect = None
         self.cursor = 0  # curseur clavier dans la liste des tutoriels
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
@@ -48,6 +51,7 @@ class TutorialsScene(Scene):
             elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
                 self.cursor, activate = widgets.list_key_nav(
                     event, self.cursor, len(T.TUTORIALS))
+                self._scroll_to_cursor()
                 if activate:
                     self.sel = T.TUTORIALS[self.cursor]["id"]
                     self.scroll = 0
@@ -69,6 +73,24 @@ class TutorialsScene(Scene):
                     self.scroll = max(0, self.scroll - 30)
                 elif event.button == 5:
                     self.scroll = min(self._max_scroll, self.scroll + 30)
+            elif self._list_rect and self._list_rect.collidepoint(event.pos):
+                if event.button == 4:
+                    self._list_scroll = max(0, self._list_scroll - 30)
+                elif event.button == 5:
+                    self._list_scroll = min(self._list_max_scroll, self._list_scroll + 30)
+
+    def _scroll_to_cursor(self):
+        """Garde le tutoriel sélectionné au clavier visible dans la liste défilante."""
+        if not T.TUTORIALS:
+            return
+        rect = self._rows.get(T.TUTORIALS[self.cursor]["id"])
+        if not rect or not self._list_rect:
+            return
+        if rect.top < self._list_rect.top:
+            self._list_scroll = max(0, self._list_scroll - (self._list_rect.top - rect.top))
+        elif rect.bottom > self._list_rect.bottom:
+            self._list_scroll = min(self._list_max_scroll,
+                                    self._list_scroll + (rect.bottom - self._list_rect.bottom))
 
     def update(self, dt):
         self.back_btn.update(pygame.mouse.get_pos(), dt)
@@ -84,9 +106,12 @@ class TutorialsScene(Scene):
         # liste à gauche
         listp = pygame.Rect(40, 100, 320, ph)
         linner = widgets.draw_panel(surf, listp, "Guides", config.COL_CYAN)
+        self._list_rect = linner
         self._rows = {}
         self.cursor = min(self.cursor, len(T.TUTORIALS) - 1) if T.TUTORIALS else 0
-        y = linner.y
+        prev_list_clip = surf.get_clip()
+        surf.set_clip(linner)
+        y = linner.y - self._list_scroll
         for i, t in enumerate(T.TUTORIALS):
             rect = pygame.Rect(linner.x - 4, y - 2, linner.w + 8, 34)
             self._rows[t["id"]] = rect
@@ -99,6 +124,17 @@ class TutorialsScene(Scene):
                               (linner.x + 6, y + 6), fonts.small(bold=sel),
                               config.COL_WHITE if sel else config.COL_TEXT)
             y += 38
+        surf.set_clip(prev_list_clip)
+        list_content_h = (y + self._list_scroll) - linner.y
+        self._list_max_scroll = max(0, list_content_h - linner.h)
+        self._list_scroll = min(self._list_scroll, self._list_max_scroll)
+        if self._list_max_scroll > 0:
+            track = pygame.Rect(listp.right - 6, linner.y, 4, linner.h)
+            pygame.draw.rect(surf, config.COL_PANEL, track, border_radius=2)
+            frac = linner.h / (list_content_h or 1)
+            bar_h = max(16, int(linner.h * frac))
+            bar_y = linner.y + int((linner.h - bar_h) * (self._list_scroll / self._list_max_scroll))
+            pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 4, bar_h), border_radius=2)
 
         # contenu à droite (panneau scrollable)
         readp = pygame.Rect(380, 100, config.SCREEN_WIDTH - 420, ph)

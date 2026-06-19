@@ -371,7 +371,10 @@ class TerminalRenderMixin:
         hover = self._career_panel_rect.collidepoint(pygame.mouse.get_pos())
         inner = widgets.draw_panel(surf, rect, _t("term.career"),
                                    config.COL_CYAN if hover else config.COL_AMBER, prio=prio)
-        y = inner.y
+        self._career_content_rect = inner
+        prev_clip = surf.get_clip()
+        surf.set_clip(inner)
+        y = inner.y - self._career_scroll
         # 1) prochain objectif non atteint
         widgets.draw_text(surf, "OBJECTIF", (inner.x, y), fonts.tiny(bold=True), config.COL_CYAN)
         y += 18
@@ -438,6 +441,18 @@ class TerminalRenderMixin:
                               fonts.tiny(bold=True), config.COL_CYAN)
             widgets.draw_text_wrapped(surf, f"{nxt[0]} — grade {config.GRADES[nxt[1]]}",
                                       (inner.x, y + 16), fonts.tiny(), config.COL_PRESTIGE, inner.w)
+        y += 36
+        surf.set_clip(prev_clip)
+        content_h = (y + self._career_scroll) - inner.y
+        self._career_max_scroll = max(0, content_h - inner.h)
+        self._career_scroll = min(self._career_scroll, self._career_max_scroll)
+        if self._career_max_scroll > 0:
+            track = pygame.Rect(rect.right - 6, inner.y, 4, inner.h)
+            pygame.draw.rect(surf, config.COL_PANEL, track, border_radius=2)
+            frac = inner.h / (content_h or 1)
+            bar_h = max(16, int(inner.h * frac))
+            bar_y = inner.y + int((inner.h - bar_h) * (self._career_scroll / self._career_max_scroll))
+            pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 4, bar_h), border_radius=2)
 
     CONSOLE_LINE_H = 16
 

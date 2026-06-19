@@ -13,6 +13,7 @@ import pygame
 from core import config
 from core import finmath as fm
 from core import risk as risk_mod
+from core import risklimits
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
@@ -59,6 +60,8 @@ class RiskScene(Scene):
         self._exp_btns = {}
         self._scenario_btns = {}
         self._conf_btns = {}
+        self._reverse_btns = {}
+        self._reverse_target = None
 
     def _cov_matrix(self):
         """Matrice de covariance des P&L des facteurs (en M$)."""
@@ -145,6 +148,9 @@ class RiskScene(Scene):
                 if rect.collidepoint(event.pos):
                     self.confidence = conf
                     self._simulate()
+            for pct, rect in self._reverse_btns.items():
+                if rect.collidepoint(event.pos):
+                    self._reverse_target = None if self._reverse_target == pct else pct
 
     def update(self, dt):
         mp = pygame.mouse.get_pos()
@@ -165,8 +171,10 @@ class RiskScene(Scene):
 
         self._draw_exposures(surf)
         self._draw_histogram(surf)
+        self._draw_sensitivity(surf)
         self._draw_metrics(surf)
         self._draw_stress(surf)
+        self._draw_limits(surf)
         self.back_btn.draw(surf)
         self.mode_btn.draw(surf)
         self.tuto_btn.draw(surf)
@@ -333,3 +341,68 @@ class RiskScene(Scene):
         else:
             widgets.draw_text(surf, "Sélectionnez un scénario pour voir l'impact.",
                               (inner.x, inner.y+50), fonts.small(), config.COL_TEXT_DIM)
+
+    def _draw_sensitivity(self, surf):
+        panel = pygame.Rect(992, 110, 248, 280)
+        inner = widgets.draw_panel(surf, panel, "Sensibilité facteurs", config.COL_CYAN)
+        if not self.real:
+            widgets.draw_text(surf, "Disponible en mode portefeuille réel.",
+                              (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
+            return
+        sens = risk_mod.sensitivity(self.app.gs.player, self.app.market)
+        y = inner.y
+        for label, val in sens.items():
+            col = config.COL_DOWN if val < 0 else config.COL_UP
+            widgets.draw_text(surf, label, (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, f"{'+' if val >= 0 else ''}{val:.2f} M$",
+                              (inner.x, y + 14), fonts.small(bold=True), col)
+            y += 38
+
+    def _draw_limits(self, surf):
+        panel = pygame.Rect(992, 400, 248, config.footer_y() - 408)
+        inner = widgets.draw_panel(surf, panel, "Limites & reverse stress", config.COL_PRESTIGE)
+        self._reverse_btns = {}
+        if not self.real:
+            widgets.draw_text(surf, "Disponible en mode portefeuille réel.",
+                              (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
+            return
+        res = risklimits.check_limits(self.app.gs.player, self.app.market)
+        y = inner.y
+        if res["ok"]:
+            widgets.draw_badge(surf, "AUCUN DÉPASSEMENT", (inner.x, y), accent=config.COL_UP)
+            y += 28
+        else:
+            for b in res["breaches"][:3]:
+                widgets.draw_text(surf, f"{b['label']} : {b['value']:.1f} > {b['limit']:.1f}",
+                                  (inner.x, y), fonts.tiny(), config.COL_DOWN)
+                y += 16
+            y += 10
+
+        widgets.draw_text(surf, "Reverse stress (perte cible) :",
+                          (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+        y += 18
+        bx = inner.x
+        for pct in (10.0, 20.0, 30.0):
+            rect = pygame.Rect(bx, y, 70, 24)
+            self._reverse_btns[pct] = rect
+            sel = (self._reverse_target == pct)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect)
+            pygame.draw.rect(surf, config.COL_WARN if sel else config.COL_BORDER, rect, 1)
+            img = fonts.tiny(bold=sel).render(f"-{int(pct)}%", True,
+                                              config.COL_WARN if sel else config.COL_TEXT)
+            surf.blit(img, img.get_rect(center=rect.center))
+            bx += 76
+        y += 32
+        if self._reverse_target is not None:
+            scen = self.scenario or "Krach actions"
+            rs = risk_mod.reverse_stress(self.app.gs.player, self.app.market,
+                                         target_loss_pct=self._reverse_target, scenario=scen)
+            if rs["ok"]:
+                widgets.draw_text(surf, f"Scénario « {scen} »", (inner.x, y),
+                                  fonts.tiny(), config.COL_TEXT)
+                y += 16
+                widgets.draw_text(surf, f"à x{rs['scale']:.2f} pour -{self._reverse_target:.0f}%",
+                                  (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+            else:
+                widgets.draw_text(surf, "Pas d'exposition pour ce scénario.",
+                                  (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)

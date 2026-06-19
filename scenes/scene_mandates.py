@@ -14,6 +14,48 @@ from ui import fonts, widgets
 ROW_H = 26
 
 
+def _extra_constraints_text(m):
+    """Résumé compact des contraintes supplémentaires (item 18) d'un mandat,
+    propres à son type (item 17). Vide si aucune contrainte additionnelle."""
+    parts = []
+    if m.get("target_yield") is not None:
+        parts.append(f"Rendement cible {m['target_yield']:.1f}%")
+    if m.get("min_liquidity") is not None:
+        parts.append(f"Liquidité min {m['min_liquidity']:.1f}%")
+    if m.get("max_drawdown") is not None:
+        parts.append(f"Drawdown max {m['max_drawdown']:.1f}%")
+    if m.get("max_tracking_error") is not None:
+        parts.append(f"Tracking error max {m['max_tracking_error']:.1f}%")
+    if m.get("max_duration") is not None:
+        parts.append(f"Duration max {m['max_duration']:.1f}")
+    if m.get("excluded_sectors"):
+        parts.append("Exclut : " + ", ".join(m["excluded_sectors"]))
+    return "  ·  ".join(parts)
+
+
+def _extra_status(m, values):
+    """Texte + bool ok pour la 1re contrainte additionnelle active d'un
+    mandat (item 18), comparant la mesure courante (`values`, retourné par
+    `mandates.check_constraints`) à sa limite. None si aucune contrainte
+    additionnelle n'est définie sur ce mandat."""
+    if m.get("max_drawdown") is not None and values.get("drawdown") is not None:
+        v = values["drawdown"]
+        return f"Drawdown {v:.1f}% / max {m['max_drawdown']:.1f}%", v <= m["max_drawdown"]
+    if m.get("max_tracking_error") is not None and values.get("tracking_error") is not None:
+        v = values["tracking_error"]
+        return f"Tracking error {v:.1f}% / max {m['max_tracking_error']:.1f}%", v <= m["max_tracking_error"]
+    if m.get("max_duration") is not None and values.get("duration") is not None:
+        v = values["duration"]
+        return f"Duration {v:.1f} / max {m['max_duration']:.1f}", v <= m["max_duration"]
+    if m.get("target_yield") is not None and values.get("yield") is not None:
+        v = values["yield"]
+        return f"Rendement {v:.1f}% / cible {m['target_yield']:.1f}%", v >= m["target_yield"]
+    if m.get("min_liquidity") is not None and values.get("liquidity") is not None:
+        v = values["liquidity"]
+        return f"Liquidité {v:.1f}% / min {m['min_liquidity']:.1f}%", v >= m["min_liquidity"]
+    return None, True
+
+
 class MandatesScene(Scene):
     def __init__(self, app):
         super().__init__(app)
@@ -137,8 +179,8 @@ class MandatesScene(Scene):
 
         # ---- offres en attente ----
         offers = list(p.mandate_offers)
-        off_h = 50 + len(offers) * 64 if offers else 50
-        off_h = min(off_h, 230)
+        off_h = 50 + len(offers) * 78 if offers else 50
+        off_h = min(off_h, 245)
         off_panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, off_h)
         inner = widgets.draw_panel(surf, off_panel, f"Offres en attente ({len(offers)})", config.COL_CYAN)
         self.offer_cursor = min(self.offer_cursor, len(offers) - 1) if offers else 0
@@ -148,21 +190,28 @@ class MandatesScene(Scene):
         else:
             y = inner.y
             for i, o in enumerate(offers):
-                row = pygame.Rect(inner.x, y, inner.w, 58)
+                row = pygame.Rect(inner.x, y, inner.w, 72)
                 pygame.draw.rect(surf, config.COL_PANEL, row, border_radius=4)
                 pygame.draw.rect(surf, config.COL_CYAN, row, 1, border_radius=4)
                 widgets.draw_row_selection(surf, row, i == self.offer_cursor)
-                widgets.draw_text(surf, f"#{o['id']} {o['client']}", (row.x + 12, row.y + 6),
-                                  fonts.small(bold=True), config.COL_AMBER)
+                r = widgets.draw_text(surf, f"#{o['id']} {o['client']}", (row.x + 12, row.y + 6),
+                                      fonts.small(bold=True), config.COL_AMBER)
+                if o.get("type"):
+                    widgets.draw_badge(surf, MD.type_label(o["type"]), (r.right + 10, row.y + 4),
+                                       accent=config.COL_CYAN)
                 widgets.draw_text(surf, f"Capital : {widgets.format_money(o['capital'], cur)}  ·  "
                                         f"Horizon : {o['horizon']}T  ·  Objectif : {o['target_pct']:.1f}%  ·  "
                                         f"β max {o['max_beta']:.2f}",
                                   (row.x + 12, row.y + 26), fonts.tiny(), config.COL_TEXT)
+                extra = _extra_constraints_text(o)
+                if extra:
+                    widgets.draw_text(surf, extra, (row.x + 12, row.y + 42),
+                                      fonts.tiny(), config.COL_TEXT_DIM)
                 widgets.draw_text(surf, f"Commission si réussite : {widgets.format_money(o['reward_cash'], cur)}  "
                                         f"(+{o['reward_rep']} rép.)  ·  échec : -{o['penalty_rep']} rép.",
-                                  (row.x + 12, row.y + 42), fonts.tiny(), config.COL_TEXT_DIM)
-                acc = pygame.Rect(row.right - 196, row.y + 14, 90, 30)
-                dec = pygame.Rect(row.right - 100, row.y + 14, 90, 30)
+                                  (row.x + 12, row.y + 56), fonts.tiny(), config.COL_TEXT_DIM)
+                acc = pygame.Rect(row.right - 196, row.y + 21, 90, 30)
+                dec = pygame.Rect(row.right - 100, row.y + 21, 90, 30)
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, acc, border_radius=4)
                 pygame.draw.rect(surf, config.COL_UP, acc, 1, border_radius=4)
                 widgets.draw_text(surf, "ACCEPTER", acc.center, fonts.tiny(bold=True), config.COL_UP, align="center")
@@ -171,7 +220,7 @@ class MandatesScene(Scene):
                 widgets.draw_text(surf, "REFUSER", dec.center, fonts.tiny(bold=True), config.COL_DOWN, align="center")
                 self._accept_rects[o["id"]] = acc
                 self._decline_rects[o["id"]] = dec
-                y += 64
+                y += 78
 
         # ---- mandats actifs ----
         act_top = off_panel.bottom + 10
@@ -190,16 +239,20 @@ class MandatesScene(Scene):
         prev_clip = surf.get_clip()
         surf.set_clip(list_area)
         y = list_top - self.scroll
-        ROW = 120
+        ROW = 140
         for m in p.mandates:
             visible = (list_area.top - ROW) < y < list_area.bottom
             if visible:
                 growth, beta = MD.progress(p, market, m)
+                check = MD.check_constraints(p, market, m, growth, beta)
                 row = pygame.Rect(ainner.x, y, ainner.w, ROW - 8)
                 pygame.draw.rect(surf, config.COL_PANEL, row, border_radius=4)
                 pygame.draw.rect(surf, config.COL_BORDER, row, 1, border_radius=4)
-                widgets.draw_text(surf, f"#{m['id']} {m['client']}  ·  capital {widgets.format_money(m['capital'], cur)}",
-                                  (row.x + 12, row.y + 8), fonts.small(bold=True), config.COL_AMBER)
+                r = widgets.draw_text(surf, f"#{m['id']} {m['client']}  ·  capital {widgets.format_money(m['capital'], cur)}",
+                                      (row.x + 12, row.y + 8), fonts.small(bold=True), config.COL_AMBER)
+                if m.get("type"):
+                    widgets.draw_badge(surf, MD.type_label(m["type"]), (r.right + 10, row.y + 6),
+                                       accent=config.COL_CYAN)
                 qleft = max(0, m["deadline_q"] - p.quarter)
                 widgets.draw_text(surf, f"Échéance T{m['deadline_q']} ({qleft} trim. restants)",
                                   (row.right - 12, row.y + 8), fonts.tiny(), config.COL_TEXT_DIM, align="right")
@@ -231,7 +284,12 @@ class MandatesScene(Scene):
                 widgets.draw_text(surf, "Net worth (tendance)", (spark.x, spark.y - 14),
                                   fonts.tiny(), config.COL_TEXT_DIM)
 
-                feas = growth >= m["target_pct"] and beta <= m["max_beta"]
+                extra_text, extra_ok = _extra_status(m, check["values"])
+                if extra_text:
+                    widgets.draw_text(surf, extra_text, (row.x + 12, row.y + 78), fonts.tiny(),
+                                      config.COL_TEXT if extra_ok else config.COL_DOWN)
+
+                feas = check["ok"]
                 widgets.draw_badge(surf, "EN BONNE VOIE" if feas else "EN RISQUE",
                                    (row.x + 12, row.bottom - 22),
                                    accent=config.COL_UP if feas else config.COL_WARN)

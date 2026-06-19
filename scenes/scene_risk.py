@@ -10,11 +10,9 @@ Basé sur core.finmath (value_at_risk, conditional_var, parametric_var).
 import numpy as np
 import pygame
 
-from core import config
+from core import config, risklimits, unlocks
 from core import finmath as fm
 from core import risk as risk_mod
-from core import risklimits
-from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

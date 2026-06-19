@@ -14,12 +14,12 @@ from core import history as history_mod
 from core import inbox as inbox_mod
 from core import ipo as ipo_mod
 from core import journal as journal_mod
-from core import opportunities as opportunities_mod
 from core import legacy as legacy_mod
 from core import macrocal as macrocal_mod
-from core import market as market_mod
 from core import mandates as mandates_mod
+from core import market as market_mod
 from core import news as news_mod
+from core import opportunities as opportunities_mod
 from core import politics as politics_mod
 from core import portfolio as pf_mod
 from core import rivals as rivals_mod

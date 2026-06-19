@@ -35,8 +35,21 @@ class InboxScene(Scene):
         self.kind_filter = None
         self._kind_rects = {}
         self._t = 0.0
+        self.cursor = 0  # position clavier dans la liste visible (curseur ≠ sélection active)
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
+
+    def _visible_order(self):
+        msgs = self.app.gs.player.inbox
+        q = self.search.strip().lower()
+        order = self.order
+        if self.kind_filter:
+            order = [idx for idx in order if msgs[idx]["kind"] == self.kind_filter]
+        if q:
+            order = [idx for idx in order
+                     if q in f"{_KIND.get(msgs[idx]['kind'], ('', None))[0]} {msgs[idx].get('sender', '')} "
+                              f"{msgs[idx].get('subject', '')} {msgs[idx].get('body', '')}".lower()]
+        return order
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -48,6 +61,14 @@ class InboxScene(Scene):
                 return
             elif event.key == pygame.K_BACKSPACE:
                 self.search = self.search[:-1]
+                return
+            elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
+                visible = self._visible_order()
+                self.cursor, activate = widgets.list_key_nav(event, self.cursor, len(visible))
+                if activate:
+                    idx = visible[self.cursor]
+                    self.sel = idx
+                    self.app.gs.player.inbox[idx]["read"] = True
                 return
             elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
                 self.search += event.unicode
@@ -67,6 +88,9 @@ class InboxScene(Scene):
                 if rect.collidepoint(event.pos):
                     self.sel = idx
                     self.app.gs.player.inbox[idx]["read"] = True
+                    visible = self._visible_order()
+                    if idx in visible:
+                        self.cursor = visible.index(idx)
 
     def update(self, dt):
         self._t += dt
@@ -115,14 +139,8 @@ class InboxScene(Scene):
         list_top = chip_y + 28
         ph = config.footer_y() - 8 - list_top
         listp = pygame.Rect(40, list_top, 480, ph)
-        q = self.search.strip().lower()
-        order = self.order
-        if self.kind_filter:
-            order = [idx for idx in order if msgs[idx]["kind"] == self.kind_filter]
-        if q:
-            order = [idx for idx in order
-                     if q in f"{_KIND.get(msgs[idx]['kind'], ('', None))[0]} {msgs[idx].get('sender', '')} "
-                              f"{msgs[idx].get('subject', '')} {msgs[idx].get('body', '')}".lower()]
+        order = self._visible_order()
+        self.cursor = min(self.cursor, len(order) - 1) if order else 0
         linner = widgets.draw_panel(surf, listp, f"Reçus ({len(order)})", config.COL_CYAN)
         self.row_rects = {}
         if not msgs:
@@ -133,13 +151,14 @@ class InboxScene(Scene):
                               fonts.body(), config.COL_TEXT_DIM)
         else:
             y = linner.y
-            for idx in order:
+            for pos, idx in enumerate(order):
                 m = msgs[idx]
                 row = pygame.Rect(linner.x - 4, y - 2, linner.w + 8, 46)
                 self.row_rects[idx] = row
                 sel = (idx == self.sel)
                 if sel:
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, row)
+                widgets.draw_row_selection(surf, row, pos == self.cursor)
                 tag, tcol = _KIND.get(m["kind"], ("•", config.COL_TEXT))
                 bold = not m.get("read")
                 widgets.draw_text(surf, tag, (linner.x, y), fonts.tiny(bold=True), tcol)

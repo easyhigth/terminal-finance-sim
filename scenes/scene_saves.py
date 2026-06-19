@@ -31,6 +31,7 @@ class SavesScene(Scene):
         # rectangles de boutons recalculés au draw
         self._load_rects = {}
         self._del_rects = {}
+        self.slot_cursor = 0  # curseur clavier dans la liste des slots
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -38,6 +39,17 @@ class SavesScene(Scene):
             return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+            return
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_UP, pygame.K_DOWN,
+                                                            pygame.K_RETURN, pygame.K_KP_ENTER):
+            self.slot_cursor, activate = widgets.list_key_nav(event, self.slot_cursor, len(self.slots))
+            # ENTRÉE charge le slot sélectionné (action primaire) ; la suppression
+            # reste volontairement souris-uniquement, c'est une action destructive
+            # qu'on ne veut pas déclencher par accident via la navigation clavier.
+            if activate and 0 <= self.slot_cursor < len(self.slots):
+                slot = self.slots[self.slot_cursor]
+                if self.meta.get(slot):
+                    self._load(slot)
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for slot, rect in self._load_rects.items():
@@ -78,10 +90,11 @@ class SavesScene(Scene):
         mp = pygame.mouse.get_pos()
         x, y = 120, 130
         cw, ch, gap = config.SCREEN_WIDTH - 240, 110, 16
-        for slot in self.slots:
+        self.slot_cursor = min(self.slot_cursor, len(self.slots) - 1) if self.slots else 0
+        for i, slot in enumerate(self.slots):
             meta = self.meta.get(slot)
             rect = pygame.Rect(x, y, cw, ch)
-            self._draw_slot(surf, rect, slot, meta, mp)
+            self._draw_slot(surf, rect, slot, meta, mp, i == self.slot_cursor)
             y += ch + gap
 
         if self.message:
@@ -90,12 +103,13 @@ class SavesScene(Scene):
 
         self.back_btn.draw(surf)
 
-    def _draw_slot(self, surf, rect, slot, meta, mp):
+    def _draw_slot(self, surf, rect, slot, meta, mp, cursor=False):
         hover = rect.collidepoint(mp)
         is_auto = (slot == config.AUTOSAVE_SLOT)
         accent = config.COL_CYAN if is_auto else config.COL_AMBER
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL, rect)
         pygame.draw.rect(surf, accent if meta else config.COL_BORDER, rect, 1)
+        widgets.draw_row_selection(surf, rect, cursor)
 
         label = "AUTOSAVE" if is_auto else slot.upper()
         widgets.draw_text(surf, label, (rect.x + 16, rect.y + 12),

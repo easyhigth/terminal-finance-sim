@@ -27,11 +27,36 @@ class DealsScene(Scene):
         self._kind_rects = {}
         self._row_rects = {}
         self._t = 0.0
+        self.row_cursor = 0  # curseur clavier dans la liste filtrée/triée
+        self._row_list = []
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
     def _can(self):
         return unlocks.unlocked(self.app.gs.player, "deals")
+
+    def _filtered_sorted_deals(self):
+        p = self.app.gs.player
+        deals = list(p.deals)
+        q = self.search.strip().lower()
+        if q:
+            deals = [d for d in deals if q in f"{d['title']} {d['kind']} {d.get('desc','')}".lower()]
+        if self.kind_filter:
+            deals = [d for d in deals if d["kind"] == self.kind_filter]
+        deals.sort(key=lambda d: d["days_left"])
+        return deals
+
+    def _scroll_to_cursor(self):
+        """Ajuste le scroll pour garder la ligne sélectionnée au clavier visible."""
+        if not self._list_rect:
+            return
+        row_top = self.row_cursor * ROW_H
+        row_bottom = row_top + ROW_H
+        if row_top < self.scroll:
+            self.scroll = row_top
+        elif row_bottom > self.scroll + self._list_rect.h:
+            self.scroll = row_bottom - self._list_rect.h
+        self.scroll = max(0, min(self._max_scroll, self.scroll))
 
     # ------------------------------------------------------------- events
     def handle_event(self, event):
@@ -44,6 +69,15 @@ class DealsScene(Scene):
                 return
             elif event.key == pygame.K_BACKSPACE:
                 self.search = self.search[:-1]
+                return
+            elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
+                deals = self._filtered_sorted_deals()
+                self.row_cursor, activate = widgets.list_key_nav(event, self.row_cursor, len(deals))
+                if deals:
+                    self._scroll_to_cursor()
+                if activate and deals:
+                    d = deals[self.row_cursor]
+                    self.app.scenes.go("deal", deal_id=d["id"], return_to="deals")
                 return
             elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
                 self.search += event.unicode
@@ -127,13 +161,9 @@ class DealsScene(Scene):
                               config.COL_AMBER if sel else config.COL_TEXT_DIM, align="center")
             cx += w + 6
 
-        deals = list(p.deals)
-        q = self.search.strip().lower()
-        if q:
-            deals = [d for d in deals if q in f"{d['title']} {d['kind']} {d.get('desc','')}".lower()]
-        if self.kind_filter:
-            deals = [d for d in deals if d["kind"] == self.kind_filter]
-        deals.sort(key=lambda d: d["days_left"])
+        deals = self._filtered_sorted_deals()
+        self._row_list = deals
+        self.row_cursor = min(self.row_cursor, len(deals) - 1) if deals else 0
 
         panel_top = cy + 34
         panel = pygame.Rect(40, panel_top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - panel_top)
@@ -156,13 +186,14 @@ class DealsScene(Scene):
         prev_clip = surf.get_clip()
         surf.set_clip(list_area)
         y = list_top - self.scroll
-        for d in deals:
+        for i, d in enumerate(deals):
             visible = (list_area.top - ROW_H) < y < list_area.bottom
             if visible:
                 prob = D.success_probability(p, d)
                 row = pygame.Rect(inner.x, y, inner.w, ROW_H - 8)
                 pygame.draw.rect(surf, config.COL_PANEL, row, border_radius=4)
                 pygame.draw.rect(surf, config.COL_BORDER, row, 1, border_radius=4)
+                widgets.draw_row_selection(surf, row, i == self.row_cursor)
                 self._row_rects[d["id"]] = row
 
                 widgets.draw_text(surf, f"#{d['id']} {d['title']}", (row.x + 12, row.y + 6),

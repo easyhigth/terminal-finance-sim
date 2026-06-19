@@ -26,6 +26,9 @@ class TeamScene(Scene):
                                        "📘 TUTO", config.COL_CYAN)
         self.hire_rects = {}
         self.fire_rects = {}
+        self.hire_cursor = 0   # curseur clavier liste "profils disponibles"
+        self.fire_cursor = 0   # curseur clavier liste "équipe actuelle"
+        self.focus = "hire"    # "hire" ou "fire" — liste qui reçoit HAUT/BAS/ENTRÉE
 
     def _can(self):
         return unlocks.unlocked(self.app.gs.player, "team")
@@ -45,30 +48,54 @@ class TeamScene(Scene):
             return
         if not self._can():
             return
+        p = self.app.gs.player
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_TAB:
+            self.focus = "fire" if self.focus == "hire" else "hire"
+            return
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_UP, pygame.K_DOWN,
+                                                            pygame.K_RETURN, pygame.K_KP_ENTER):
+            if self.focus == "hire":
+                pids = list(TEAM.available_profiles().keys())
+                self.hire_cursor, activate = widgets.list_key_nav(event, self.hire_cursor, len(pids))
+                if activate and pids:
+                    self._do_hire(pids[self.hire_cursor])
+            else:
+                count = len(p.analysts)
+                self.fire_cursor, activate = widgets.list_key_nav(event, self.fire_cursor, count)
+                if activate and count:
+                    self._do_fire(self.fire_cursor)
+            return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            p = self.app.gs.player
             for pid, rect in self.hire_rects.items():
                 if rect.collidepoint(event.pos):
-                    r = TEAM.hire(p, pid)
-                    profile = TEAM.available_profiles().get(pid, {})
-                    if r["ok"]:
-                        self.msg = f"{profile.get('label', pid)} recruté(e)."
-                        if not p.hardcore:
-                            self.app.gs.save(config.AUTOSAVE_SLOT)
-                    else:
-                        reasons = {"grade": "grade insuffisant", "budget": "trésorerie insuffisante",
-                                   "unknown_profile": "profil inconnu"}
-                        self.msg = f"Refusé ({reasons.get(r['reason'], r['reason'])})."
+                    self._do_hire(pid)
                     return
             for idx, rect in self.fire_rects.items():
                 if rect.collidepoint(event.pos):
-                    r = TEAM.fire(p, idx)
-                    if r["ok"]:
-                        profile = TEAM.available_profiles().get(r["removed"]["profile_id"], {})
-                        self.msg = f"{profile.get('label', '?')} licencié(e)."
-                        if not p.hardcore:
-                            self.app.gs.save(config.AUTOSAVE_SLOT)
+                    self._do_fire(idx)
                     return
+
+    def _do_hire(self, pid):
+        p = self.app.gs.player
+        r = TEAM.hire(p, pid)
+        profile = TEAM.available_profiles().get(pid, {})
+        if r["ok"]:
+            self.msg = f"{profile.get('label', pid)} recruté(e)."
+            if not p.hardcore:
+                self.app.gs.save(config.AUTOSAVE_SLOT)
+        else:
+            reasons = {"grade": "grade insuffisant", "budget": "trésorerie insuffisante",
+                       "unknown_profile": "profil inconnu"}
+            self.msg = f"Refusé ({reasons.get(r['reason'], r['reason'])})."
+
+    def _do_fire(self, idx):
+        p = self.app.gs.player
+        r = TEAM.fire(p, idx)
+        if r["ok"]:
+            profile = TEAM.available_profiles().get(r["removed"]["profile_id"], {})
+            self.msg = f"{profile.get('label', '?')} licencié(e)."
+            if not p.hardcore:
+                self.app.gs.save(config.AUTOSAVE_SLOT)
 
     def update(self, dt):
         mp = pygame.mouse.get_pos()
@@ -98,10 +125,14 @@ class TeamScene(Scene):
         y = inner.y
         self.hire_rects = {}
         profiles = TEAM.available_profiles()
-        for pid, profile in profiles.items():
+        pids = list(profiles.keys())
+        self.hire_cursor = min(self.hire_cursor, len(pids) - 1) if pids else 0
+        for i, (pid, profile) in enumerate(profiles.items()):
             row = pygame.Rect(inner.x, y, inner.w, ROW_H - 8)
             pygame.draw.rect(surf, config.COL_PANEL, row, border_radius=4)
             pygame.draw.rect(surf, config.COL_BORDER, row, 1, border_radius=4)
+            if self.focus == "hire":
+                widgets.draw_row_selection(surf, row, i == self.hire_cursor)
             widgets.draw_text(surf, profile["label"], (row.x + 10, row.y + 6),
                               fonts.small(bold=True), config.COL_TEXT)
             widgets.draw_text(surf, f"{widgets.format_money(profile['cost_per_step'], cur)}/tour"
@@ -129,11 +160,14 @@ class TeamScene(Scene):
                               (tinner.x, ty), fonts.small(), config.COL_TEXT_DIM)
             ty += 26
         else:
+            self.fire_cursor = min(self.fire_cursor, len(p.analysts) - 1) if p.analysts else 0
             for idx, a in enumerate(p.analysts):
                 profile = profiles.get(a.get("profile_id"), {})
                 row = pygame.Rect(tinner.x, ty, tinner.w, ROW_H - 8)
                 pygame.draw.rect(surf, config.COL_PANEL, row, border_radius=4)
                 pygame.draw.rect(surf, config.COL_BORDER, row, 1, border_radius=4)
+                if self.focus == "fire":
+                    widgets.draw_row_selection(surf, row, idx == self.fire_cursor)
                 widgets.draw_text(surf, profile.get("label", a.get("profile_id", "?")),
                                   (row.x + 10, row.y + 6), fonts.small(bold=True), config.COL_TEXT)
                 widgets.draw_text(surf, f"Coût : {widgets.format_money(profile.get('cost_per_step', 0), cur)}/tour",

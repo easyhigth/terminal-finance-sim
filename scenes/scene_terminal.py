@@ -42,7 +42,7 @@ CMD_NAMES = [
     "STRUCT", "CREDIT", "ALM", "SWAP", "SWAPS",
     "ALLOCATE", "HEDGE", "PROTECT", "OPTIONS", "IPO", "FX", "AGENDA", "PRONOS", "REVIEW", "REBALANCE",
     "PITCH", "FRONTIER", "RISK", "QUANT", "MA", "SHEET", "GLOSSARY",
-    "SAVE", "SAVES", "NEWS", "MORE", "REG", "STATUS", "MENU",
+    "SAVE", "SAVES", "NEWS", "MORE", "SHORTCUTS", "REG", "STATUS", "MENU",
     "TEAM", "EQUIPE", "STRESS", "TIMELINE",
     "GP", "GPC", "GPO", "GPCH", "COMP", "HS", "HVOL", "BETA", "CORR",
     "GEG", "GC", "RV", "ECO", "DEFINE", "PA",
@@ -105,6 +105,8 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
         self.datawins = []        # fenêtres de données déplaçables (overlay)
         self.cheat_panel = None   # panneau de triche (overlay, mode test uniquement)
         self._cheat_btn_rect = None
+        self.shortcuts_panel = None   # panneau des raccourcis clavier (overlay)
+        self._shortcuts_btn_rect = None
         self._rail_rects = {}     # boutons du rail latéral (label -> Rect)
         self._topco_rects = {}    # sociétés cliquables (panneau top sociétés)
         self._topco_header_rect = None   # titre du panneau (clic → explorateur)
@@ -148,7 +150,13 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
 
     # --------------------------------------------------------------- events
     def handle_event(self, event):
-        # 0) panneau de triche (mode test uniquement) : priorité sur tout le reste
+        # 0) panneau des raccourcis clavier : priorité sur tout le reste
+        if self.shortcuts_panel is not None:
+            if self.shortcuts_panel.handle(event):
+                if self.shortcuts_panel.closed:
+                    self.shortcuts_panel = None
+                return
+        # 0bis) panneau de triche (mode test uniquement) : priorité sur tout le reste
         if self.cheat_panel is not None:
             if self.cheat_panel.handle(event):
                 if self.cheat_panel.closed:
@@ -185,6 +193,9 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
                 return
         # 2) souris : boutons console + rail latéral + carte
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._shortcuts_btn_rect and self._shortcuts_btn_rect.collidepoint(event.pos):
+                self._toggle_shortcuts_panel()
+                return
             if (getattr(self.app, "cheats", False) and self._cheat_btn_rect
                     and self._cheat_btn_rect.collidepoint(event.pos)):
                 if self.cheat_panel is None:
@@ -320,6 +331,14 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
         self.datawins.append(CompanyPopup(ticker, self.market, pos=pos))
         if len(self.datawins) > 5:
             self.datawins.pop(0)
+
+    def _toggle_shortcuts_panel(self):
+        """Ouvre/ferme le panneau listant tous les raccourcis clavier."""
+        if self.shortcuts_panel is None:
+            from ui.shortcutspanel import ShortcutsPanel
+            self.shortcuts_panel = ShortcutsPanel()
+        else:
+            self.shortcuts_panel = None
 
     def _open_quick_access(self):
         """Ouvre le gestionnaire « accès rapide » des favoris (watchlist)."""
@@ -656,8 +675,10 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
             self._cmd_cheat(cmd, parts[1:])
         elif cmd in ("NEWS", "ACTUS", "ACTUALITES", "EVENTS"):
             self.app.scenes.go("news", return_to="terminal")
-        elif cmd in ("MORE", "PLUS", "RACCOURCIS", "SHORTCUTS", "PAGES"):
+        elif cmd in ("MORE", "PLUS", "PAGES"):
             self.app.scenes.go("more", return_to="terminal")
+        elif cmd in ("SHORTCUTS", "RACCOURCIS", "KEYS", "TOUCHES"):
+            self._toggle_shortcuts_panel()
         elif cmd == "REG":
             info = config.CONTINENTS[p.continent]
             self._log(_L(f"  Régulateur : {info['regulator']}", f"  Regulator  : {info['regulator']}"),

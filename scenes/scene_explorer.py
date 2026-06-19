@@ -66,6 +66,7 @@ class MarketExplorerScene(Scene, PopupMixin):
         self.sort_dir = -1
         self.selected = set()
         self.last_idx = None
+        self.row_cursor = 0  # curseur clavier dans la liste filtrée/triée
         self.scroll = 0
         self._max_scroll = 0
         self._list_rect = None
@@ -263,6 +264,15 @@ class MarketExplorerScene(Scene, PopupMixin):
             elif event.key == pygame.K_PAGEDOWN:
                 self.scroll = min(self._max_scroll, self.scroll + 200)
                 return
+            elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
+                self.row_cursor, activate = widgets.list_key_nav(
+                    event, self.row_cursor, len(self._row_list))
+                if self._row_list:
+                    self._scroll_to_cursor()
+                if activate and self._row_list:
+                    r = self._row_list[self.row_cursor]
+                    self._handle_row_click((r["kind"], r["key"]), 1)
+                return
             elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
                 self.search += event.unicode
                 self.scroll = 0
@@ -313,6 +323,18 @@ class MarketExplorerScene(Scene, PopupMixin):
                 if rect.collidepoint(event.pos):
                     self._handle_row_click(ident, event.button)
                     return
+
+    def _scroll_to_cursor(self):
+        """Ajuste le scroll pour garder la ligne sélectionnée au clavier visible."""
+        if not self._list_rect:
+            return
+        row_top = self.row_cursor * ROW_H
+        row_bottom = row_top + ROW_H
+        if row_top < self.scroll:
+            self.scroll = row_top
+        elif row_bottom > self.scroll + self._list_rect.h:
+            self.scroll = row_bottom - self._list_rect.h
+        self.scroll = max(0, min(self._max_scroll, self.scroll))
 
     def _handle_row_click(self, ident, button):
         kind, key = ident
@@ -371,9 +393,9 @@ class MarketExplorerScene(Scene, PopupMixin):
         # ---- recherche ----
         search_rect = pygame.Rect(x0, top, 300, 24)
         pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
-        pygame.draw.rect(surf, config.COL_CYAN if self.search else config.COL_BORDER, search_rect, 1, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN, search_rect, 1, border_radius=4)
         cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        label = (self.search + cursor) if self.search else "Tapez pour rechercher (nom, ticker, secteur)…"
+        label = (self.search + cursor) if self.search else (cursor + "Tapez pour rechercher (nom, ticker, secteur)…")
         col = config.COL_TEXT if self.search else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
                           (search_rect.x + 8, search_rect.y + 4), fonts.small(), col)
@@ -439,14 +461,15 @@ class MarketExplorerScene(Scene, PopupMixin):
         self._list_rect = list_area
         self._row_list = filtered
         self._row_index = {(r["kind"], r["key"]): i for i, r in enumerate(filtered)}
+        self.row_cursor = min(self.row_cursor, len(filtered) - 1) if filtered else 0
         self._row_rects = {}
         prev_clip = surf.get_clip()
         surf.set_clip(list_area)
         ry = list_top - self.scroll
-        for r in filtered:
+        for i, r in enumerate(filtered):
             visible = (list_area.top - ROW_H) < ry < list_area.bottom
             if visible:
-                self._draw_row(surf, r, ry, inner, cols, cur, mp)
+                self._draw_row(surf, r, ry, inner, cols, cur, mp, i == self.row_cursor)
             ry += ROW_H
         surf.set_clip(prev_clip)
 
@@ -470,7 +493,7 @@ class MarketExplorerScene(Scene, PopupMixin):
         self.add_btn.draw(surf)
         self.popups_draw(surf)
 
-    def _draw_row(self, surf, r, y, inner, cols, cur, mp):
+    def _draw_row(self, surf, r, y, inner, cols, cur, mp, cursor=False):
         kind, key = r["kind"], r["key"]
         row_rect = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, ROW_H)
         self._row_rects[(kind, key)] = row_rect
@@ -480,6 +503,7 @@ class MarketExplorerScene(Scene, PopupMixin):
             pygame.draw.rect(surf, config.COL_UP, row_rect, 1, border_radius=3)
         elif row_rect.collidepoint(mp):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect, border_radius=3)
+        widgets.draw_row_selection(surf, row_rect, cursor)
         kcol = KIND_COLOR.get(kind, config.COL_TEXT)
         c0 = cols[0][1]
         widgets.draw_text(surf, widgets.fit_text(r["name"], fonts.small(bold=True), 260),

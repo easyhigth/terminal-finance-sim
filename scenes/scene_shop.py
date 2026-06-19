@@ -52,6 +52,8 @@ class ShopScene(Scene, PopupMixin):
         self.sort_dir = -1
         self.scroll = 0
         self._max_scroll = 0
+        self.row_cursor = 0  # curseur clavier dans la liste filtrée/triée
+        self._row_list = []
         self._list_rect = None
         self._name_rects = {}
         self._buy_rects = {}
@@ -247,6 +249,18 @@ class ShopScene(Scene, PopupMixin):
         else:
             self.msg = f"Achat refusé ({r['reason']})."
 
+    def _scroll_to_cursor(self):
+        """Ajuste le scroll pour garder la ligne sélectionnée au clavier visible."""
+        if not self._list_rect:
+            return
+        row_top = self.row_cursor * ROW_H
+        row_bottom = row_top + ROW_H
+        if row_top < self.scroll:
+            self.scroll = row_top
+        elif row_bottom > self.scroll + self._list_rect.h:
+            self.scroll = row_bottom - self._list_rect.h
+        self.scroll = max(0, min(self._max_scroll, self.scroll))
+
     # --------------------------------------------------------------- events
     def handle_event(self, event):
         if self.popups_handle_event(event):
@@ -274,6 +288,16 @@ class ShopScene(Scene, PopupMixin):
                 return
             elif event.key == pygame.K_PAGEDOWN:
                 self.scroll = min(self._max_scroll, self.scroll + 200)
+                return
+            elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER) \
+                    and self.text_focus != "qty":
+                self.row_cursor, activate = widgets.list_key_nav(
+                    event, self.row_cursor, len(self._row_list))
+                if self._row_list:
+                    self._scroll_to_cursor()
+                if activate and self._row_list:
+                    r = self._row_list[self.row_cursor]
+                    self._open_detail(r["kind"], r["key"])
                 return
             elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
                 if self.text_focus == "qty":
@@ -362,10 +386,10 @@ class ShopScene(Scene, PopupMixin):
         # ---- recherche ----
         search_rect = pygame.Rect(x0, top, 280, 24)
         pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
-        pygame.draw.rect(surf, config.COL_CYAN if self.search else config.COL_BORDER,
+        pygame.draw.rect(surf, config.COL_CYAN if self.text_focus == "search" else config.COL_BORDER,
                           search_rect, 1, border_radius=4)
-        cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        label = (self.search + cursor) if self.search else "Tapez pour rechercher (nom, ticker, secteur)…"
+        cursor = "_" if (self.text_focus == "search" and int(self._t * 2) % 2 == 0) else " "
+        label = (self.search + cursor) if self.search else (cursor + "Tapez pour rechercher (nom, ticker, secteur)…")
         scol = config.COL_TEXT if self.search else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
                           (search_rect.x + 8, search_rect.y + 4), fonts.small(), scol)
@@ -444,13 +468,15 @@ class ShopScene(Scene, PopupMixin):
         list_top = inner.y + 22
         list_area = pygame.Rect(inner.x - 6, list_top, inner.w + 12, inner.bottom - list_top - 22)
         self._list_rect = list_area
+        self._row_list = rows
+        self.row_cursor = min(self.row_cursor, len(rows) - 1) if rows else 0
         self._name_rects, self._buy_rects, self._sell_rects = {}, {}, {}
         prev_clip = surf.get_clip()
         surf.set_clip(list_area)
         ry = list_top - self.scroll
-        for r in rows:
+        for i, r in enumerate(rows):
             if (list_area.top - ROW_H) < ry < list_area.bottom:
-                self._draw_row(surf, r, ry, inner, cols, cur, mp)
+                self._draw_row(surf, r, ry, inner, cols, cur, mp, i == self.row_cursor)
             ry += ROW_H
         surf.set_clip(prev_clip)
 
@@ -466,12 +492,13 @@ class ShopScene(Scene, PopupMixin):
         self.back_btn.draw(surf)
         self.popups_draw(surf)
 
-    def _draw_row(self, surf, r, y, inner, cols, cur, mp):
+    def _draw_row(self, surf, r, y, inner, cols, cur, mp, cursor=False):
         kind, key = r["kind"], r["key"]
         ident = (kind, key)
         row_rect = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, ROW_H)
         if row_rect.collidepoint(mp):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect, border_radius=3)
+        widgets.draw_row_selection(surf, row_rect, cursor)
         kcol = KIND_COLOR.get(kind, config.COL_TEXT)
         name_w = min(290, fonts.small(bold=True).size(r["name"])[0])
         self._name_rects[ident] = pygame.Rect(inner.x - 2, y - 2, name_w + 4, ROW_H - 4)

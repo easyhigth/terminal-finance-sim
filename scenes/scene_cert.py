@@ -17,18 +17,30 @@ class CertScene(Scene):
         self.return_to = kwargs.get("return_to", "terminal")
         self.msg = ""
         self.btn_rects = {}
+        self.cursor = 0  # curseur clavier dans la liste des programmes
+        self._pid_list = list(C.PROGRAMS.keys())
         self.back_btn = widgets.Button(config.back_button_rect(200),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
     def handle_event(self, event):
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.app.scenes.go(self.return_to)
+                return
+            elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
+                self.cursor, activate = widgets.list_key_nav(
+                    event, self.cursor, len(self._pid_list))
+                if activate and self._pid_list:
+                    self._attempt(self._pid_list[self.cursor])
+                return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for pid, rect in self.btn_rects.items():
                 if rect.collidepoint(event.pos):
                     self._attempt(pid)
+                    if pid in self._pid_list:
+                        self.cursor = self._pid_list.index(pid)
 
     def _attempt(self, pid):
         p = self.app.gs.player
@@ -64,15 +76,18 @@ class CertScene(Scene):
                           (42, 72), fonts.small(), config.COL_TEXT_DIM)
 
         self.btn_rects = {}
+        self._pid_list = list(C.PROGRAMS.keys())
+        self.cursor = min(self.cursor, len(self._pid_list) - 1) if self._pid_list else 0
         mp = pygame.mouse.get_pos()
         y = 116
         cw = config.SCREEN_WIDTH - 80
-        for pid, prog in C.PROGRAMS.items():
+        for pos, (pid, prog) in enumerate(C.PROGRAMS.items()):
             rect = pygame.Rect(40, y, cw, 120)
             relevant = (prog["track"] == p.track)
             accent = config.COL_PRESTIGE if relevant else config.COL_BORDER
             pygame.draw.rect(surf, config.COL_PANEL, rect)
             pygame.draw.rect(surf, accent, rect, 2 if relevant else 1)
+            widgets.draw_row_selection(surf, rect, pos == self.cursor)
             if relevant:
                 pygame.draw.rect(surf, config.COL_PRESTIGE, (rect.x, rect.y, 3, rect.h))
             widgets.draw_text(surf, f"{prog['name']} — {prog['full']}", (rect.x+16, rect.y+12),

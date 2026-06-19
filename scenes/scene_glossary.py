@@ -19,6 +19,8 @@ class GlossaryScene(Scene):
         self.search = ""
         self.selected_term = None
         self.scroll = 0
+        self.cursor = 0  # curseur clavier dans la liste visible de termes
+        self._t = 0.0
         from core.i18n import t
         self.back_btn = widgets.Button(
             (40, config.SCREEN_HEIGHT-70, 180, 46), t("common.back"), config.COL_TEXT_DIM)
@@ -39,6 +41,18 @@ class GlossaryScene(Scene):
         if self.terms and self.selected_term not in self.terms:
             self.selected_term = self.terms[0]
 
+    def _visible_terms(self):
+        return self.terms[self.scroll:self.scroll + 18]
+
+    def _scroll_to_cursor(self):
+        """Ajuste le scroll pour garder le terme sélectionné au clavier visible."""
+        idx = self.scroll + self.cursor
+        if idx < self.scroll:
+            self.scroll = idx
+        elif idx >= self.scroll + 18:
+            self.scroll = idx - 17
+        self.scroll = max(0, min(max(0, len(self.terms) - 18), self.scroll))
+
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
@@ -46,6 +60,14 @@ class GlossaryScene(Scene):
             elif event.key == pygame.K_BACKSPACE:
                 self.search = self.search[:-1]
                 self._rebuild_list()
+            elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
+                visible = self._visible_terms()
+                self.cursor, activate = widgets.list_key_nav(event, self.cursor, len(visible))
+                if visible:
+                    self._scroll_to_cursor()
+                if activate and visible:
+                    self.selected_term = visible[self.cursor]
+                return
             elif event.unicode and event.unicode.isprintable():
                 self.search += event.unicode
                 self._rebuild_list()
@@ -65,11 +87,15 @@ class GlossaryScene(Scene):
             for term, rect in getattr(self, "_term_rects", {}).items():
                 if rect.collidepoint(event.pos):
                     self.selected_term = term
+                    visible = self._visible_terms()
+                    if term in visible:
+                        self.cursor = visible.index(term)
 
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
 
     def update(self, dt):
+        self._t += dt
         self.back_btn.update(pygame.mouse.get_pos())
 
     def draw(self, surf):
@@ -79,8 +105,9 @@ class GlossaryScene(Scene):
         gloss, CATEGORIES = glossary_data.localized(lang)
         widgets.draw_text(surf, t("gloss.title"), (40, 24),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, f"{t('gloss.search')} : {self.search}_",
-                          (42, 74), fonts.small(), config.COL_CYAN)
+        cursor = "_" if int(self._t * 2) % 2 == 0 else " "
+        search_label = f"{t('gloss.search')} : " + (self.search + cursor if self.search else cursor)
+        widgets.draw_text(surf, search_label, (42, 74), fonts.small(), config.COL_CYAN)
 
         # --- Colonne catégories ---
         cat_panel = pygame.Rect(40, 110, 220, 560)
@@ -109,12 +136,14 @@ class GlossaryScene(Scene):
         self._term_rects = {}
         y = inner2.y
         visible = self.terms[self.scroll:self.scroll+18]
-        for term in visible:
+        self.cursor = min(self.cursor, len(visible) - 1) if visible else 0
+        for pos, term in enumerate(visible):
             rect = pygame.Rect(inner2.x-4, y-2, inner2.w+8, 28)
             self._term_rects[term] = rect
             sel = (term == self.selected_term)
             if sel:
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect)
+            widgets.draw_row_selection(surf, rect, pos == self.cursor)
             col = config.COL_AMBER if sel else config.COL_TEXT
             font = fonts.small(bold=sel)
             widgets.draw_text(surf, widgets.fit_text(

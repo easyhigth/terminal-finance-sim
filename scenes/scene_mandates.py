@@ -32,6 +32,7 @@ class MandatesScene(Scene):
         self._accept_rects = {}
         self._decline_rects = {}
         self._t = 0.0
+        self.offer_cursor = 0  # curseur clavier dans la liste des offres en attente
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         # postmortem : popup affichant le dernier mandat résolu non encore vu
@@ -68,6 +69,25 @@ class MandatesScene(Scene):
             return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+            return
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_UP, pygame.K_DOWN,
+                                                            pygame.K_RETURN, pygame.K_KP_ENTER):
+            p = self.app.gs.player
+            offers = list(p.mandate_offers)
+            self.offer_cursor, activate = widgets.list_key_nav(event, self.offer_cursor, len(offers))
+            if activate and offers:
+                oid = offers[self.offer_cursor]["id"]
+                res = MD.accept(p, oid, self.app.ensure_market())
+                if res == "full":
+                    self.app.notify("Trop de mandats actifs en parallèle.", "warn")
+                elif res:
+                    self.app.notify(f"Mandat de {res['client']} accepté.", "info")
+            return
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_d:
+            p = self.app.gs.player
+            offers = list(p.mandate_offers)
+            if offers and 0 <= self.offer_cursor < len(offers):
+                MD.decline(p, offers[self.offer_cursor]["id"])
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
             if self._list_rect and self._list_rect.collidepoint(event.pos):
@@ -121,15 +141,17 @@ class MandatesScene(Scene):
         off_h = min(off_h, 230)
         off_panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, off_h)
         inner = widgets.draw_panel(surf, off_panel, f"Offres en attente ({len(offers)})", config.COL_CYAN)
+        self.offer_cursor = min(self.offer_cursor, len(offers) - 1) if offers else 0
         if not offers:
             widgets.draw_text(surf, "Aucune offre en attente. Avancez le temps (ADV) pour en recevoir.",
                               (inner.x, inner.y + 4), fonts.small(), config.COL_TEXT_DIM)
         else:
             y = inner.y
-            for o in offers:
+            for i, o in enumerate(offers):
                 row = pygame.Rect(inner.x, y, inner.w, 58)
                 pygame.draw.rect(surf, config.COL_PANEL, row, border_radius=4)
                 pygame.draw.rect(surf, config.COL_CYAN, row, 1, border_radius=4)
+                widgets.draw_row_selection(surf, row, i == self.offer_cursor)
                 widgets.draw_text(surf, f"#{o['id']} {o['client']}", (row.x + 12, row.y + 6),
                                   fonts.small(bold=True), config.COL_AMBER)
                 widgets.draw_text(surf, f"Capital : {widgets.format_money(o['capital'], cur)}  ·  "

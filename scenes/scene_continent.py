@@ -28,6 +28,7 @@ class ContinentScene(Scene):
         self.confirm_btn = widgets.Button(
             (config.SCREEN_WIDTH-300, fy, 260, 42),
             t("continent.confirm"), config.COL_UP, enabled=False)
+        self.card_cursor = 0  # curseur clavier dans la grille de cartes régionales
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -40,6 +41,14 @@ class ContinentScene(Scene):
                 if rect.collidepoint(event.pos):
                     self.selected = name
                     self.confirm_btn.enabled = True
+
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_UP, pygame.K_DOWN,
+                                                            pygame.K_RETURN, pygame.K_KP_ENTER):
+            names = list(config.CONTINENTS.keys())
+            self.card_cursor, activate = widgets.list_key_nav(event, self.card_cursor, len(names))
+            if activate and names:
+                self.selected = names[self.card_cursor]
+                self.confirm_btn.enabled = True
 
         if self.back_btn.handle(event):
             self.app.scenes.go("menu")
@@ -90,6 +99,8 @@ class ContinentScene(Scene):
 
         # cartes réglementaires à droite, en grille 2 colonnes (7 régions)
         self._card_rects = {}
+        names = list(config.CONTINENTS.keys())
+        self.card_cursor = min(self.card_cursor, len(names) - 1) if names else 0
         x0 = 700
         y0 = 120
         cw, ch, gx, gy = 280, 124, 16, 12
@@ -105,6 +116,7 @@ class ContinentScene(Scene):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if selected else config.COL_PANEL, rect)
             pygame.draw.rect(surf, accent if selected else config.COL_BORDER,
                              rect, 2 if selected else 1)
+            widgets.draw_row_selection(surf, rect, i == self.card_cursor)
             widgets.draw_text(surf, name.upper(), (x+12, y+8),
                               fonts.body(bold=True), accent)
             widgets.draw_text(surf, info["regulator"], (x+12, y+34),

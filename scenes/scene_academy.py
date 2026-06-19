@@ -33,6 +33,8 @@ class AcademyScene(Scene):
         self.row_rects = {}
         self.scroll = 0          # défilement de la liste de leçons (px)
         self._max_scroll = 0
+        self.cursor = 0          # curseur clavier dans la liste visible de leçons
+        self._lesson_id_list = []  # ordre des leçons affichées (pour la nav clavier)
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button(
@@ -49,9 +51,31 @@ class AcademyScene(Scene):
                 for b in badges.check_new(p, self.app.market):
                     self.app.notify(f"✶ Badge : {b['name']}", "prestige")
 
+    def _scroll_to_cursor(self):
+        """Ajuste le scroll pour garder la leçon sélectionnée au clavier visible."""
+        rect = self.row_rects.get(self._lesson_id_list[self.cursor]) if self._lesson_id_list else None
+        if not rect:
+            return
+        if rect.top < 100:
+            self.scroll = max(0, self.scroll - (100 - rect.top))
+        elif rect.bottom > config.footer_y() - 8:
+            self.scroll = min(self._max_scroll, self.scroll + (rect.bottom - (config.footer_y() - 8)))
+
     def handle_event(self, event):
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.app.scenes.go(self.return_to)
+                return
+            elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
+                self.cursor, activate = widgets.list_key_nav(
+                    event, self.cursor, len(self._lesson_id_list))
+                if self._lesson_id_list:
+                    self._scroll_to_cursor()
+                if activate and self._lesson_id_list:
+                    lid = self._lesson_id_list[self.cursor]
+                    self.sel = lid
+                    self._mark_read(lid)
+                return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
         if self.tuto_btn.handle(event):
@@ -65,6 +89,8 @@ class AcademyScene(Scene):
                 if rect.collidepoint(event.pos):
                     self.sel = lid
                     self._mark_read(lid)
+                    if lid in self._lesson_id_list:
+                        self.cursor = self._lesson_id_list.index(lid)
 
     def update(self, dt):
         mp = pygame.mouse.get_pos()
@@ -87,6 +113,7 @@ class AcademyScene(Scene):
         listp = pygame.Rect(40, 100, 360, ph)
         linner = widgets.draw_panel(surf, listp, t("academy.program"), config.COL_CYAN)
         self.row_rects = {}
+        self._lesson_id_list = []
         # liste défilante : on clippe au panneau et on décale de self.scroll
         prev_clip = surf.get_clip()
         surf.set_clip(linner)
@@ -101,10 +128,13 @@ class AcademyScene(Scene):
             for lesson in lessons_t:
                 rect = pygame.Rect(linner.x - 4, y - 2, linner.w + 8, 22)
                 self.row_rects[lesson["id"]] = rect
+                pos = len(self._lesson_id_list)
+                self._lesson_id_list.append(lesson["id"])
                 sel = (lesson["id"] == self.sel)
                 read = lesson["id"] in p.learned
                 if sel:
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect)
+                widgets.draw_row_selection(surf, rect, pos == self.cursor)
                 mark = "✓" if read else "•"
                 col = config.COL_UP if read else config.COL_TEXT
                 font = fonts.small(bold=sel)
@@ -114,6 +144,7 @@ class AcademyScene(Scene):
                 y += 22
             y += 6
         surf.set_clip(prev_clip)
+        self.cursor = min(self.cursor, len(self._lesson_id_list) - 1) if self._lesson_id_list else 0
         # hauteur totale du contenu -> borne de défilement
         content_h = (y + self.scroll) - linner.y
         self._max_scroll = max(0, content_h - linner.h)

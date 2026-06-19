@@ -27,6 +27,7 @@ class TutorialsScene(Scene):
         self.scroll = 0
         self._max_scroll = 0
         self._content_rect = None
+        self.cursor = 0  # curseur clavier dans la liste des tutoriels
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
@@ -40,8 +41,17 @@ class TutorialsScene(Scene):
         return self._img_cache[name]
 
     def handle_event(self, event):
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.app.scenes.go(self.return_to)
+                return
+            elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
+                self.cursor, activate = widgets.list_key_nav(
+                    event, self.cursor, len(T.TUTORIALS))
+                if activate:
+                    self.sel = T.TUTORIALS[self.cursor]["id"]
+                    self.scroll = 0
+                return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -49,6 +59,10 @@ class TutorialsScene(Scene):
                 if rect.collidepoint(event.pos):
                     self.sel = tid
                     self.scroll = 0
+                    for i, t in enumerate(T.TUTORIALS):
+                        if t["id"] == tid:
+                            self.cursor = i
+                            break
         if event.type == pygame.MOUSEBUTTONDOWN:
             if self._content_rect and self._content_rect.collidepoint(event.pos):
                 if event.button == 4:
@@ -71,14 +85,16 @@ class TutorialsScene(Scene):
         listp = pygame.Rect(40, 100, 320, ph)
         linner = widgets.draw_panel(surf, listp, "Guides", config.COL_CYAN)
         self._rows = {}
+        self.cursor = min(self.cursor, len(T.TUTORIALS) - 1) if T.TUTORIALS else 0
         y = linner.y
-        for t in T.TUTORIALS:
+        for i, t in enumerate(T.TUTORIALS):
             rect = pygame.Rect(linner.x - 4, y - 2, linner.w + 8, 34)
             self._rows[t["id"]] = rect
             sel = (t["id"] == self.sel)
             if sel:
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect)
                 pygame.draw.rect(surf, config.COL_AMBER, (linner.x - 4, y - 2, 3, 34))
+            widgets.draw_row_selection(surf, rect, i == self.cursor)
             widgets.draw_text(surf, widgets.fit_text(t["title"], fonts.small(bold=sel), linner.w),
                               (linner.x + 6, y + 6), fonts.small(bold=sel),
                               config.COL_WHITE if sel else config.COL_TEXT)

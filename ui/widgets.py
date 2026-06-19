@@ -10,6 +10,33 @@ from ui import fonts
 
 
 # ---------------------------------------------------------------------------
+# NAVIGATION CLAVIER (listes sélectionnables)
+# ---------------------------------------------------------------------------
+def list_key_nav(event, selected, count):
+    """Gère HAUT/BAS/ENTRÉE pour naviguer une liste de `count` items au clavier.
+    Retourne (nouvel_index, activer) où `activer` est True si ENTRÉE a été
+    pressée sur l'item sélectionné. `selected` peut être None (rien sélectionné
+    encore) : HAUT/BAS sélectionnent alors le premier item."""
+    if count <= 0 or event.type != pygame.KEYDOWN:
+        return selected, False
+    if event.key in (pygame.K_UP, pygame.K_DOWN):
+        if selected is None:
+            return 0, False
+        step = -1 if event.key == pygame.K_UP else 1
+        return (selected + step) % count, False
+    if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and selected is not None:
+        return selected, True
+    return selected, False
+
+
+def draw_row_selection(surf, rect, selected, accent=config.COL_AMBER):
+    """Surligne `rect` quand un item est navigué au clavier (sans le cliquer),
+    pour donner un retour visuel cohérent avec la sélection à la souris."""
+    if selected:
+        pygame.draw.rect(surf, accent, rect, 1, border_radius=3)
+
+
+# ---------------------------------------------------------------------------
 # TEXTE
 # ---------------------------------------------------------------------------
 def draw_text(surf, text, pos, font, color=config.COL_TEXT, align="left"):

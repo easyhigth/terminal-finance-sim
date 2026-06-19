@@ -17,6 +17,7 @@ _KIND = {
     "hr": ("RH", config.COL_UP),
     "country": ("PAYS", config.COL_PRESTIGE),
 }
+FILTER_CHIPS = [(None, "TOUS")] + [(k, v[0]) for k, v in _KIND.items()]
 
 
 class InboxScene(Scene):
@@ -31,6 +32,8 @@ class InboxScene(Scene):
         self.row_rects = {}
         self.search = ""
         self._search_clear_rect = None
+        self.kind_filter = None
+        self._kind_rects = {}
         self._t = 0.0
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
@@ -56,6 +59,10 @@ class InboxScene(Scene):
             if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
                 self.search = ""
                 return
+            for kind, rect in self._kind_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.kind_filter = kind
+                    return
             for idx, rect in self.row_rects.items():
                 if rect.collidepoint(event.pos):
                     self.sel = idx
@@ -88,14 +95,32 @@ class InboxScene(Scene):
             widgets.draw_text(surf, "✕", self._search_clear_rect.center, fonts.small(bold=True),
                               config.COL_TEXT_DIM, align="center")
 
+        # ---- chips de filtre par type ----
+        chip_y = search_rect.bottom + 8
+        self._kind_rects = {}
+        cx = 40
+        for kind, label in FILTER_CHIPS:
+            w = fonts.tiny(bold=True).size(label)[0] + 14
+            rect = pygame.Rect(cx, chip_y, w, 20)
+            self._kind_rects[kind] = rect
+            sel = (kind == self.kind_filter)
+            _, kcol = _KIND.get(kind, ("", config.COL_AMBER)) if kind else ("", config.COL_AMBER)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect, border_radius=3)
+            pygame.draw.rect(surf, kcol if sel else config.COL_BORDER, rect, 1, border_radius=3)
+            widgets.draw_text(surf, label, rect.center, fonts.tiny(bold=sel),
+                              kcol if sel else config.COL_TEXT_DIM, align="center")
+            cx += w + 6
+
         # liste à gauche
-        list_top = 134
+        list_top = chip_y + 28
         ph = config.footer_y() - 8 - list_top
         listp = pygame.Rect(40, list_top, 480, ph)
         q = self.search.strip().lower()
         order = self.order
+        if self.kind_filter:
+            order = [idx for idx in order if msgs[idx]["kind"] == self.kind_filter]
         if q:
-            order = [idx for idx in self.order
+            order = [idx for idx in order
                      if q in f"{_KIND.get(msgs[idx]['kind'], ('', None))[0]} {msgs[idx].get('sender', '')} "
                               f"{msgs[idx].get('subject', '')} {msgs[idx].get('body', '')}".lower()]
         linner = widgets.draw_panel(surf, listp, f"Reçus ({len(order)})", config.COL_CYAN)
@@ -104,7 +129,7 @@ class InboxScene(Scene):
             widgets.draw_text(surf, "Aucun message pour l'instant.", (linner.x, linner.y),
                               fonts.body(), config.COL_TEXT_DIM)
         elif not order:
-            widgets.draw_text(surf, "Aucun message ne correspond à la recherche.", (linner.x, linner.y),
+            widgets.draw_text(surf, "Aucun message ne correspond au filtre.", (linner.x, linner.y),
                               fonts.body(), config.COL_TEXT_DIM)
         else:
             y = linner.y

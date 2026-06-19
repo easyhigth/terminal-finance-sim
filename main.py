@@ -13,6 +13,7 @@ from core.game_state import GameState
 from core.market import Market
 from core.scene_manager import SceneManager
 from scenes.scene_academy import AcademyScene
+from scenes.scene_alerts import AlertsScene
 from scenes.scene_alm import AlmScene
 from scenes.scene_analytics import AnalyticsScene
 from scenes.scene_bonds import BondsScene
@@ -144,6 +145,7 @@ class App:
         self.scenes.register("analytics", AnalyticsScene(self))
         self.scenes.register("explorer", MarketExplorerScene(self))
         self.scenes.register("tutorials", TutorialsScene(self))
+        self.scenes.register("alerts", AlertsScene(self))
         self.scenes.register("splash", SplashScene(self))
         self.scenes.register("markethub", MarketHubScene(self))
         self.scenes.register("shop", ShopScene(self))

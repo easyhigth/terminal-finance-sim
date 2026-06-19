@@ -627,9 +627,12 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
         elif cmd in ("RESEARCH", "RECHERCHE"):
             self._cmd_research(arg)
         elif cmd in ("ALERT", "ALERTE"):
-            self._cmd_alert(parts[1:])
+            if len(parts) >= 3:
+                self._cmd_alert(parts[1:])
+            else:
+                self.app.scenes.go("alerts", return_to="terminal")
         elif cmd in ("ALERTS", "ALERTES"):
-            self._cmd_alerts()
+            self.app.scenes.go("alerts", return_to="terminal")
         elif cmd in ("WATCHLIST", "WATCH", "WL"):
             self._cmd_watchlist(parts[1:])
         elif cmd in ("COMPARE", "CMP"):

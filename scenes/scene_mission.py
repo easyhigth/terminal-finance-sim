@@ -336,8 +336,14 @@ class MissionScene(Scene):
         msg = [
             f"Réputation : +{self.rep_gain}  (désormais {p.reputation}/100)",
             f"Honoraire  : +{widgets.format_money(self.cash_gain, cur)}",
-            "",
         ]
+        if self.score < total:
+            best_rep, best_cash = M.compute_rewards(self.mission, total, total)
+            miss_rep, miss_cash = best_rep - self.rep_gain, best_cash - self.cash_gain
+            if miss_rep > 0 or miss_cash > 0:
+                msg.append(f"Avec un score parfait : +{miss_rep} réputation et "
+                           f"+{widgets.format_money(miss_cash, cur)} de plus.")
+        msg.append("")
         thr = M.reputation_threshold(p.grade_index)
         if p.reputation >= thr and p.can_promote():
             msg.append(f"Réputation ≥ {thr} : vous pouvez tenter l'examen (EVAL).")

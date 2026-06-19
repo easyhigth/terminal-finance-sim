@@ -137,27 +137,52 @@ class DilemmaScene(Scene):
                 x = r.right + 20
             y += 82
 
+    def _effect_parts(self, o, cur):
+        parts = []
+        if o.get("cash"):
+            parts.append(("cash " + ("+" if o["cash"] >= 0 else "") + widgets.format_money(o["cash"], cur),
+                          config.COL_UP if o["cash"] >= 0 else config.COL_DOWN))
+        if o.get("rep"):
+            parts.append((f"réputation {o['rep']:+d}", config.COL_UP if o["rep"] >= 0 else config.COL_DOWN))
+        if o.get("heat"):
+            parts.append((f"scrutin {o['heat']:+d}", config.COL_DOWN if o["heat"] > 0 else config.COL_UP))
+        return parts
+
     def _draw_outcome(self, surf, d, cur):
         o = self.applied
         p = self.app.gs.player
-        panel = pygame.Rect(120, 290, config.SCREEN_WIDTH - 240, 230)
+        others = [opt for i, opt in enumerate(d["options"]) if i != self.chosen]
+        panel = pygame.Rect(120, 290, config.SCREEN_WIDTH - 240, 230 + 22 * len(others))
         inner = widgets.draw_panel(surf, panel, "Conséquence", config.COL_CYAN)
         widgets.draw_text(surf, o["label"], (inner.x, inner.y), fonts.head(bold=True), config.COL_WHITE)
         widgets.draw_text_wrapped(surf, o["outcome"], (inner.x, inner.y + 36),
                                   fonts.body(), config.COL_TEXT, inner.w, line_gap=6)
-        # récap des effets appliqués + état courant
-        eff = []
-        if o["cash"]:
-            eff.append(("cash " + ("+" if o["cash"] >= 0 else "") + widgets.format_money(o["cash"], cur),
-                        config.COL_UP if o["cash"] >= 0 else config.COL_DOWN))
-        if o["rep"]:
-            eff.append((f"réputation {o['rep']:+d}", config.COL_UP if o["rep"] >= 0 else config.COL_DOWN))
-        if o["heat"]:
-            eff.append((f"scrutin {o['heat']:+d}", config.COL_DOWN if o["heat"] > 0 else config.COL_UP))
+        # récap des effets appliqués
+        eff = self._effect_parts(o, cur)
+        y = inner.y + 96
         x = inner.x
         for text, c in eff:
-            r = widgets.draw_text(surf, text, (x, inner.bottom - 54), fonts.small(bold=True), c)
+            r = widgets.draw_text(surf, text, (x, y), fonts.small(bold=True), c)
             x = r.right + 18
+        y += 28
+        # ce que vous avez écarté : comparaison avec les options non choisies, pour
+        # que la décision raconte une mini-histoire ("j'ai préféré X plutôt que Y").
+        if others:
+            widgets.draw_text(surf, "Vous avez écarté :", (inner.x, y), fonts.small(bold=True),
+                              config.COL_TEXT_DIM)
+            y += 20
+            for opt in others:
+                x = inner.x
+                r = widgets.draw_text(surf, f"· {opt['label']}", (x, y), fonts.small(), config.COL_TEXT_DIM)
+                x = r.right + 14
+                parts = self._effect_parts(opt, cur)
+                if not parts:
+                    widgets.draw_text(surf, "(aucun effet immédiat)", (x, y), fonts.tiny(), config.COL_TEXT_DIM)
+                else:
+                    for text, c in parts:
+                        r = widgets.draw_text(surf, text, (x, y), fonts.tiny(), c)
+                        x = r.right + 14
+                y += 20
         widgets.draw_text(surf, f"Scrutin réglementaire actuel : {p.heat}/100",
                           (inner.x, inner.bottom - 28), fonts.small(),
                           config.COL_DOWN if p.heat >= 55 else config.COL_TEXT_DIM)

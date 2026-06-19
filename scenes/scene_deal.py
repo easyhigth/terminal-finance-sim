@@ -110,6 +110,14 @@ class DealScene(Scene):
             pygame.draw.rect(surf, border, rect, 2, border_radius=4)
             widgets.draw_text(surf, f"{chr(65+i)}. {ch['text']}", (rect.x + 14, rect.y + 13),
                               fonts.small(bold=True), config.COL_TEXT)
+            # en résultat : ce que les options écartées auraient donné, pour comparer
+            # avec le choix retenu plutôt que se demander "et si j'avais pris l'autre".
+            if self.state == "result" and i != self.chosen:
+                qlabel = {"good": "aurait donné : succès plein", "ok": "aurait donné : succès partiel",
+                         "bad": "aurait donné : échec"}[ch["quality"]]
+                qcol = {"good": config.COL_UP, "ok": config.COL_WARN, "bad": config.COL_DOWN}[ch["quality"]]
+                widgets.draw_text(surf, qlabel, (rect.right - 12, rect.y + 13), fonts.tiny(),
+                                  qcol, align="right")
             y += 56
 
         if self.state == "result" and self.result:

@@ -97,9 +97,11 @@ def check_text(item, raw):
     n = _norm(raw)
     if not n:
         return False
+    if any(n == _norm(a) or _norm(a) in n for a in item["answers"]):
+        return True
     if item.get("keywords"):
         return all(_norm(k) in n for k in item["keywords"])
-    return any(n == _norm(a) or _norm(a) in n for a in item["answers"])
+    return False
 
 
 def _money(rng, lo, hi, step=1):

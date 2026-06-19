@@ -714,6 +714,74 @@ class Market:
         out.sort(key=lambda s: s["change_pct"], reverse=True)
         return out
 
+    def returns_over(self, n_steps):
+        """Variation en % sur les `n_steps` derniers pas pour chaque société
+        (vectorisé, basé sur l'historique de prix déjà conservé)."""
+        hist = self.price_hist_all
+        cur = hist[-1]
+        idx = max(0, len(hist) - 1 - max(0, int(n_steps)))
+        past = hist[idx]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            return np.where(past > 0, (cur / past - 1.0) * 100.0, 0.0)
+
+    def top_movers(self, period_steps, region=None, sector=None, by="gain", n=10):
+        """Plus fortes hausses/baisses sur une période donnée (en pas de
+        marché), au lieu du seul dernier pas (cf. top_companies)."""
+        chg = self.returns_over(period_steps)
+        idx = [i for i in range(self.n)
+               if (region is None or self.companies[i]["region"] == region)
+               and (sector is None or self.companies[i]["sector"] == sector)]
+        idx.sort(key=lambda i: chg[i], reverse=(by == "gain"))
+        out = []
+        for i in idx[:n]:
+            c = self.companies[i]
+            out.append({"ticker": c["ticker"], "name": c["name"], "sector": c["sector"],
+                        "region": c["region"], "price": float(self.price[i]),
+                        "change_pct": float(chg[i])})
+        return out
+
+    def breadth(self, period_steps=1, ma_window=20, lookback_steps=None):
+        """Largeur de marché : hausses/baisses, % au-dessus de la moyenne
+        mobile, plus hauts/bas sur la fenêtre `lookback_steps` (1 an par
+        défaut)."""
+        chg = self.returns_over(period_steps)
+        advancers = int((chg > 0).sum())
+        decliners = int((chg < 0).sum())
+        unchanged = self.n - advancers - decliners
+        hist = self.price_hist_all
+        window = hist[-ma_window:] if len(hist) >= ma_window else hist
+        ma = np.mean(np.array(window), axis=0)
+        above_ma = int((self.price > ma).sum())
+        lb = lookback_steps or STEPS_PER_YEAR
+        look = hist[-lb:] if len(hist) >= lb else hist
+        arr = np.array(look)
+        new_highs = int((self.price >= arr.max(axis=0)).sum())
+        new_lows = int((self.price <= arr.min(axis=0)).sum())
+        return {
+            "advancers": advancers, "decliners": decliners, "unchanged": unchanged,
+            "pct_above_ma": (above_ma / self.n * 100.0) if self.n else 0.0,
+            "new_highs": new_highs, "new_lows": new_lows,
+            "advance_decline_ratio": (advancers / decliners) if decliners else float(advancers),
+        }
+
+    def heatmap(self):
+        """Grille de performance secteur × région (dernier pas, pondérée par
+        capitalisation), pour une vue thermique du marché."""
+        ret = (self.beta * self.last_world
+               + self.b_sector * self.last_sector[self.sec_id]
+               + self.b_region * self.last_region[self.reg_id])
+        cap = self.price * self.shares
+        grid = []
+        for sector in self.sectors:
+            row = {"sector": sector, "regions": {}}
+            sec_mask = (self.sec_id == self._sector_idx[sector])
+            for region in self.regions:
+                mask = sec_mask & (self.reg_id == self._region_idx[region])
+                w = cap[mask]
+                row["regions"][region] = float((ret[mask] * w).sum() / w.sum() * 100.0) if w.sum() > 0 else None
+            grid.append(row)
+        return grid
+
     def search(self, query, limit=12):
         """Recherche par ticker ou nom (insensible à la casse)."""
         q = query.strip().lower()

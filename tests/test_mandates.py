@@ -145,3 +145,60 @@ def test_mandate_history_capped_at_max_history():
         p.mandates = [_due_mandate(p, m)]
         mandates.evaluate_due(p, m)
     assert len(p.mandate_history) == mandates.MAX_HISTORY
+
+
+def test_maybe_offer_attaches_type_and_extra_constraints():
+    p, _ = _mk()
+    rng = random.Random(2)
+    offer = None
+    for _ in range(80):
+        offer = mandates.maybe_offer(p, rng)
+        if offer:
+            break
+    assert offer is not None
+    assert offer["type"] in mandates.MANDATE_TYPES
+    if offer["type"] == "income":
+        assert "target_yield" in offer and "min_liquidity" in offer
+    elif offer["type"] in ("low_vol", "absolute_return"):
+        assert "max_drawdown" in offer
+    elif offer["type"] == "esg":
+        assert offer["excluded_sectors"] == mandates.ESG_EXCLUDED_SECTORS
+
+
+def test_check_constraints_ok_when_extra_fields_absent():
+    p, m = _mk()
+    bare = {"target_pct": -100.0, "max_beta": 10.0}
+    check = mandates.check_constraints(p, m, bare, growth=5.0, beta=1.0)
+    assert check["ok"] is True
+    assert check["breaches"] == []
+    assert check["values"]["drawdown"] is None
+
+
+def test_check_constraints_flags_drawdown_breach():
+    p, m = _mk()
+    mandate = {"target_pct": -100.0, "max_beta": 10.0, "max_drawdown": 5.0}
+    p.cash_history = [100, 60]   # 40% drawdown > limite de 5%
+    check = mandates.check_constraints(p, m, mandate, growth=5.0, beta=1.0)
+    assert check["ok"] is False
+    assert "drawdown" in check["breaches"]
+
+
+def test_check_constraints_flags_liquidity_breach():
+    p, m = _mk()
+    mandate = {"target_pct": -100.0, "max_beta": 10.0, "min_liquidity": 150.0}
+    check = mandates.check_constraints(p, m, mandate, growth=5.0, beta=1.0)
+    assert check["ok"] is False
+    assert "liquidity" in check["breaches"]
+
+
+def test_failure_reason_with_extra_breach():
+    mandate = {"target_pct": -100.0, "max_beta": 10.0, "max_drawdown": 5.0}
+    extra = {"drawdown": 40.0}
+    reason = mandates.failure_reason(mandate, growth=5.0, beta=1.0, extra=extra)
+    assert "Drawdown excessif" in reason
+
+
+def test_failure_reason_extra_none_keeps_legacy_behaviour():
+    m = {"target_pct": 5.0, "max_beta": 1.5}
+    reason = mandates.failure_reason(m, growth=1.0, beta=0.5)
+    assert "Rendement cible non atteint" in reason

@@ -34,6 +34,59 @@ CLIENTS = [
     "Fondation Maray", "Hedge Fund Cyrl", "Trésorerie Ostia", "Dotation Veles",
 ]
 
+# Types de mandat (item 17) : chacun ajoute, en plus de l'objectif de
+# rendement et du bêta max (toujours présents), une ou des contraintes
+# RÉALISTES SUPPLÉMENTAIRES (item 18) générées dans `maybe_offer` et
+# vérifiées en continu/à l'échéance par `check_constraints`. Une contrainte
+# absente d'un mandat (clé non présente) n'est jamais vérifiée — ce qui rend
+# l'ajout de nouveaux types rétrocompatible avec les mandats déjà acceptés
+# (saves existantes) et les mandats minimalistes utilisés en test.
+MANDATE_TYPES = ["income", "low_vol", "inflation_hedge", "esg", "growth",
+                  "value", "capital_preservation", "absolute_return"]
+
+_TYPE_LABELS = {
+    "income": ("Revenu", "Income"),
+    "low_vol": ("Faible volatilité", "Low volatility"),
+    "inflation_hedge": ("Couverture inflation", "Inflation hedge"),
+    "esg": ("ESG", "ESG"),
+    "growth": ("Croissance", "Growth"),
+    "value": ("Valeur", "Value"),
+    "capital_preservation": ("Préservation du capital", "Capital preservation"),
+    "absolute_return": ("Performance absolue", "Absolute return"),
+}
+
+# Secteurs exclus pour un mandat ESG (cohérent avec la construction des ETF
+# ESG existants, cf. core/etfs.py).
+ESG_EXCLUDED_SECTORS = ["Energie"]
+
+
+def type_label(mandate_type):
+    return _L(*_TYPE_LABELS.get(mandate_type, (mandate_type, mandate_type)))
+
+
+def _extra_constraints(mandate_type, rng):
+    """Génère les contraintes supplémentaires (item 18) propres à un type de
+    mandat. Retourne un dict de champs à fusionner dans l'offre."""
+    if mandate_type == "income":
+        return {"target_yield": round(rng.uniform(2.5, 5.0), 2),
+                "min_liquidity": round(rng.uniform(5.0, 15.0), 1)}
+    if mandate_type == "low_vol":
+        return {"max_drawdown": round(rng.uniform(8.0, 15.0), 1)}
+    if mandate_type == "inflation_hedge":
+        return {"max_duration": round(rng.uniform(3.0, 6.0), 1)}
+    if mandate_type == "esg":
+        return {"excluded_sectors": list(ESG_EXCLUDED_SECTORS)}
+    if mandate_type == "growth":
+        return {"max_tracking_error": round(rng.uniform(12.0, 18.0), 1)}
+    if mandate_type == "value":
+        return {"max_tracking_error": round(rng.uniform(5.0, 10.0), 1)}
+    if mandate_type == "capital_preservation":
+        return {"max_drawdown": round(rng.uniform(3.0, 6.0), 1),
+                "min_liquidity": round(rng.uniform(20.0, 35.0), 1)}
+    if mandate_type == "absolute_return":
+        return {"max_drawdown": round(rng.uniform(10.0, 18.0), 1)}
+    return {}
+
 
 def _scale(grade):
     return 1.0 + 0.6 * grade
@@ -89,6 +142,7 @@ def maybe_offer(player, rng=None, market=None):
                      and rng.random() < TRANSFORMANT_PROB)
     if transformant:
         capital = round(capital * TRANSFORMANT_SCALE, -3)
+    mandate_type = rng.choice(MANDATE_TYPES)
     offer = {
         "id": player.next_mandate_id,
         "client": rng.choice(CLIENTS),
@@ -101,7 +155,9 @@ def maybe_offer(player, rng=None, market=None):
         "reward_rep": rng.randint(6, 11) * (3 if transformant else 1),
         "penalty_rep": rng.randint(4, 8),
         "transformant": transformant,
+        "type": mandate_type,
     }
+    offer.update(_extra_constraints(mandate_type, rng))
     player.next_mandate_id += 1
     player.mandate_offers.append(offer)
     return offer
@@ -146,9 +202,114 @@ def _L(fr, en):
     return en if get_lang() == "en" else fr
 
 
-def failure_reason(m, growth, beta):
+def _avg_duration(player, market):
+    """Duration modifiée moyenne (pondérée par la valeur) du book obligataire."""
+    if not getattr(player, "bonds", None):
+        return 0.0
+    from core import bonds as bonds_mod
+    hold = bonds_mod.holdings(player, market)
+    total = sum(h["value"] for h in hold)
+    return (sum(h["value"] * h["mod_duration"] for h in hold) / total) if total > 0 else 0.0
+
+
+def _portfolio_yield(player, market):
+    """Rendement courant du book (%) : moyenne pondérée du dividend yield des
+    actions longues et du YTM des obligations."""
+    comp = {c["ticker"]: c for c in market.companies}
+    total_value, total_yield = 0.0, 0.0
+    for t, pos in player.portfolio.items():
+        if pos["shares"] <= 0:
+            continue
+        price = market.price_of(t)
+        c = comp.get(t)
+        if price is None or not c:
+            continue
+        val = price * pos["shares"]
+        total_value += val
+        total_yield += val * c.get("div_yield", 0.0) * 100.0
+    if getattr(player, "bonds", None):
+        from core import bonds as bonds_mod
+        for h in bonds_mod.holdings(player, market):
+            total_value += h["value"]
+            total_yield += h["value"] * h["ytm"] * 100.0
+    return (total_yield / total_value) if total_value > 0 else 0.0
+
+
+def _liquidity_pct(player, market):
+    """Part de cash dans la valeur nette (%)."""
+    from core import portfolio
+    nw = portfolio.net_worth(player, market)
+    return (player.cash / nw * 100.0) if nw > 0 else 0.0
+
+
+def check_constraints(player, market, m, growth=None, beta=None):
+    """Vérifie TOUTES les contraintes d'un mandat (item 18) : l'objectif de
+    rendement et le bêta max sont toujours vérifiés ; les contraintes
+    supplémentaires (drawdown max, tracking error max, duration max,
+    rendement cible, liquidité minimale) ne sont vérifiées QUE si la clé
+    correspondante est présente sur le mandat — ce qui rend la fonction
+    rétrocompatible avec les mandats antérieurs à cette extension (saves) et
+    les mandats minimalistes utilisés en test. Retourne
+    {ok, breaches: [clés en échec], values: {...mesures courantes...}}."""
+    if growth is None or beta is None:
+        growth, beta = progress(player, market, m)
+    breaches = []
+    if growth < m["target_pct"]:
+        breaches.append("target")
+    if beta > m["max_beta"] + 0.01:
+        breaches.append("beta")
+
+    dd = te = avg_dur = yld = liq = None
+    if m.get("max_drawdown") is not None:
+        from core import risk as risk_mod
+        dd = risk_mod.net_worth_drawdown(player) * 100.0
+        if dd > m["max_drawdown"]:
+            breaches.append("drawdown")
+    if m.get("max_tracking_error") is not None:
+        from core import analytics
+        te = analytics.tracking_error(player, market)
+        if te > m["max_tracking_error"]:
+            breaches.append("tracking_error")
+    if m.get("max_duration") is not None:
+        avg_dur = _avg_duration(player, market)
+        if avg_dur > m["max_duration"]:
+            breaches.append("duration")
+    if m.get("target_yield") is not None:
+        yld = _portfolio_yield(player, market)
+        if yld < m["target_yield"]:
+            breaches.append("yield")
+    if m.get("min_liquidity") is not None:
+        liq = _liquidity_pct(player, market)
+        if liq < m["min_liquidity"]:
+            breaches.append("liquidity")
+
+    return {"ok": not breaches, "breaches": breaches,
+            "values": {"growth": growth, "beta": beta, "drawdown": dd,
+                       "tracking_error": te, "duration": avg_dur,
+                       "yield": yld, "liquidity": liq}}
+
+
+_BREACH_MESSAGES = {
+    "drawdown": lambda m, v: _L(f"Drawdown excessif : {v:.1f}% vs limite {m['max_drawdown']:.1f}%",
+                                 f"Excess drawdown: {v:.1f}% vs limit {m['max_drawdown']:.1f}%"),
+    "tracking_error": lambda m, v: _L(
+        f"Tracking error excessive : {v:.1f}% vs limite {m['max_tracking_error']:.1f}%",
+        f"Excess tracking error: {v:.1f}% vs limit {m['max_tracking_error']:.1f}%"),
+    "duration": lambda m, v: _L(f"Duration trop élevée : {v:.1f} vs limite {m['max_duration']:.1f}",
+                                 f"Duration too high: {v:.1f} vs limit {m['max_duration']:.1f}"),
+    "yield": lambda m, v: _L(f"Rendement du book insuffisant : {v:.1f}% vs cible {m['target_yield']:.1f}%",
+                              f"Portfolio yield too low: {v:.1f}% vs target {m['target_yield']:.1f}%"),
+    "liquidity": lambda m, v: _L(f"Liquidité insuffisante : {v:.1f}% vs minimum {m['min_liquidity']:.1f}%",
+                                  f"Liquidity too low: {v:.1f}% vs minimum {m['min_liquidity']:.1f}%"),
+}
+
+
+def failure_reason(m, growth, beta, extra=None):
     """Construit un message d'échec SPÉCIFIQUE (chiffré) plutôt qu'un « Échoué » générique.
-    Un mandat peut échouer sur l'un des deux critères, ou les deux à la fois."""
+    Un mandat peut échouer sur plusieurs critères à la fois. `extra`, si fourni,
+    est le dict `values` retourné par `check_constraints` (contraintes
+    supplémentaires du type de mandat, item 18) — optionnel et rétrocompatible
+    avec les appels historiques à 3 arguments."""
     miss_target = growth < m["target_pct"]
     miss_risk = beta > m["max_beta"] + 0.01
     parts = []
@@ -160,6 +321,17 @@ def failure_reason(m, growth, beta):
     if miss_risk:
         parts.append(_L(f"Risque dépassé : bêta {beta:.2f} vs limite {m['max_beta']:.2f}",
                          f"Risk limit exceeded: beta {beta:.2f} vs limit {m['max_beta']:.2f}"))
+    if extra:
+        for key, fmt in _BREACH_MESSAGES.items():
+            val = extra.get(key)
+            limit_key = {"drawdown": "max_drawdown", "tracking_error": "max_tracking_error",
+                         "duration": "max_duration", "yield": "target_yield",
+                         "liquidity": "min_liquidity"}[key]
+            if val is None or m.get(limit_key) is None:
+                continue
+            breached = (val < m[limit_key]) if key in ("yield", "liquidity") else (val > m[limit_key])
+            if breached:
+                parts.append(fmt(m, val))
     if not parts:
         parts.append(_L("Échoué", "Failed"))
     return " · ".join(parts)
@@ -177,7 +349,8 @@ def evaluate_due(player, market):
             still.append(m)
             continue
         growth, beta = progress(player, market, m)
-        ok = growth >= m["target_pct"] and beta <= m["max_beta"] + 0.01
+        check = check_constraints(player, market, m, growth, beta)
+        ok = check["ok"]
         if ok:
             player.adjust_cash(m["reward_cash"])
             player.adjust_reputation(m["reward_rep"])
@@ -193,7 +366,7 @@ def evaluate_due(player, market):
                                           f"Mandate {m['client']} succeeded (+{growth:.1f}%)"))
         else:
             player.adjust_reputation(-m["penalty_rep"])
-            reason = failure_reason(m, growth, beta)
+            reason = failure_reason(m, growth, beta, check["values"])
             career.log(player, "crisis", _L(f"Mandat {m['client']} échoué ({reason})",
                                             f"Mandate {m['client']} failed ({reason})"))
         result = {"mandate": m, "ok": ok, "growth": growth, "beta": beta, "reason": reason,

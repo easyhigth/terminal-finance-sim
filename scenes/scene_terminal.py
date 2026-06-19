@@ -687,7 +687,7 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
         elif cmd in ("REGION", "REGIONS"):
             self._cmd_region(arg)
         elif cmd in ("SCREEN", "SCREENER", "EQS"):
-            self._cmd_screen()
+            self._cmd_screen(parts[1:])
         elif cmd in ("RANKING", "RANK"):
             self._cmd_top(arg)
         elif cmd in ("BENCHMARK", "BENCH"):

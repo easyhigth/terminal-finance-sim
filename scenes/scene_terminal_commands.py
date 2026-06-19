@@ -22,6 +22,7 @@ from core import politics as politics_mod
 from core import portfolio as pf_mod
 from core import rivals as rivals_mod
 from core import scenarios as scenarios_mod
+from core import screener as screener_mod
 from core import stresstest as stresstest_mod
 from core import unlocks as unlocks_mod
 from core.i18n import get_lang
@@ -381,43 +382,47 @@ class TerminalCommandsMixin:
 
     def _cmd_compare(self, args):
         if len(args) < 2:
-            self._log(_L("  Usage : COMPARE <ticker1> <ticker2>","  Usage: COMPARE <ticker1> <ticker2>"))
+            self._log(_L("  Usage : COMPARE <t1> <t2> [t3] [t4]  (actions OU ETF, jusqu'à 4)",
+                          "  Usage: COMPARE <t1> <t2> [t3] [t4]  (stocks OR ETFs, up to 4)"))
             return
-        # comparaison d'ETF (panier vs panier) si les deux termes sont des ETF
-        ea, eb = args[0].upper(), args[1].upper()
-        if etfs_mod.exists(ea) and etfs_mod.exists(eb):
-            qa, qb = etfs_mod.quote(self.market, ea), etfs_mod.quote(self.market, eb)
-            rows = [
-                ("NAV", f"{qa['price']:.2f}", f"{qb['price']:.2f}"),
-                ("Catégorie", qa["category_label"], qb["category_label"]),
-                ("Var 1 an", f"{qa['change_1y']:+.1f}%", f"{qb['change_1y']:+.1f}%"),
-                ("Rendement", f"{qa['yield']*100:.1f}%", f"{qb['yield']*100:.1f}%"),
-                ("Frais", f"{qa['expense']*100:.2f}%", f"{qb['expense']*100:.2f}%"),
-                ("Bêta monde", f"{qa['beta']:+.2f}", f"{qb['beta']:+.2f}"),
-                ("Risque", "●" * qa["risk"], "●" * qb["risk"]),
+        terms = [a.upper() for a in args[:4]]
+        # comparaison d'ETF (paniers) si tous les termes sont des ETF
+        if all(etfs_mod.exists(t) for t in terms):
+            quotes = screener_mod.compare_etfs(self.market, terms)
+            if len(quotes) < 2:
+                self._log(_L("  Au moins un ETF est introuvable.", "  At least one ETF has no match."))
+                return
+            fields = [
+                ("NAV", "price", lambda v: f"{v:.2f}"),
+                ("Catégorie", "category_label", lambda v: str(v)),
+                ("Var 1 an", "change_1y", lambda v: f"{v:+.1f}%"),
+                ("Rendement", "yield", lambda v: f"{v*100:.1f}%"),
+                ("Frais", "expense", lambda v: f"{v*100:.2f}%"),
+                ("Bêta monde", "beta", lambda v: f"{v:+.2f}"),
+                ("Risque", "risk", lambda v: "●" * v),
             ]
-            self._open_window(f"COMPARER {ea} / {eb}",
-                              [("Métrique", 110), (ea, 100), (eb, 100)], rows)
+            cols = [("Métrique", 110)] + [(q["id"], 100) for q in quotes]
+            rows = [tuple([lbl] + [fmt(q[key]) for q in quotes]) for lbl, key, fmt in fields]
+            self._open_window("COMPARER " + " / ".join(q["id"] for q in quotes), cols, rows)
             return
-        a, b = self.market.resolve(args[0]), self.market.resolve(args[1])
-        ma = self.market.metrics(a) if a else None
-        mb = self.market.metrics(b) if b else None
-        if not ma or not mb:
-            self._log(_L("  Un des termes est introuvable.","  One of the terms has no match."))
+        tickers = [self.market.resolve(t) or t for t in terms]
+        metrics = screener_mod.compare_stocks(self.market, tickers)
+        if len(metrics) < 2:
+            self._log(_L("  Au moins un terme est introuvable.", "  At least one term has no match."))
             return
-        def fmt(m, key, f):
-            v = m[key]
+        def fmt(v, f):
             return f(v) if v is not None else "n.m."
-        rows = [
-            ("Prix", fmt(ma, "price", lambda v: f"{v:.2f}"), fmt(mb, "price", lambda v: f"{v:.2f}")),
-            ("Capi(M)", fmt(ma, "mktcap", lambda v: f"{v:,.0f}"), fmt(mb, "mktcap", lambda v: f"{v:,.0f}")),
-            ("P/E", fmt(ma, "pe", lambda v: f"{v:.1f}"), fmt(mb, "pe", lambda v: f"{v:.1f}")),
-            ("EV/EBITDA", fmt(ma, "ev_ebitda", lambda v: f"{v:.1f}"), fmt(mb, "ev_ebitda", lambda v: f"{v:.1f}")),
-            ("Marge nette", fmt(ma, "net_margin", lambda v: f"{v*100:.0f}%"), fmt(mb, "net_margin", lambda v: f"{v*100:.0f}%")),
-            ("Bêta", fmt(ma, "beta", lambda v: f"{v:.2f}"), fmt(mb, "beta", lambda v: f"{v:.2f}")),
+        fields = [
+            ("Prix", "price", lambda v: f"{v:.2f}"),
+            ("Capi(M)", "mktcap", lambda v: f"{v:,.0f}"),
+            ("P/E", "pe", lambda v: f"{v:.1f}"),
+            ("EV/EBITDA", "ev_ebitda", lambda v: f"{v:.1f}"),
+            ("Marge nette", "net_margin", lambda v: f"{v*100:.0f}%"),
+            ("Bêta", "beta", lambda v: f"{v:.2f}"),
         ]
-        self._open_window(f"COMPARER {a} / {b}",
-                          [("Métrique", 110), (a, 90), (b, 90)], rows)
+        cols = [("Métrique", 110)] + [(m["ticker"], 90) for m in metrics]
+        rows = [tuple([lbl] + [fmt(m[key], f) for m in metrics]) for lbl, key, f in fields]
+        self._open_window("COMPARER " + " / ".join(m["ticker"] for m in metrics), cols, rows)
 
     def _cmd_sector(self, name):
         if not name:
@@ -448,20 +453,61 @@ class TerminalCommandsMixin:
         for n in idxs:
             self._log(f"   {n:9s} {self.market.index_value(n):>12,.0f}  {self.market.index_change_pct(n):+.2f}%")
 
-    def _cmd_screen(self):
-        # filtre simple : value (P/E bas) parmi les grandes capis
-        found = []
-        for c in self.market.companies:
-            mt = self.market.metrics(c["ticker"])
-            if mt and mt["pe"] and 0 < mt["pe"] < 12 and mt["mktcap"] > 50000:
-                found.append((mt["pe"], c["ticker"], c["name"], c["sector"]))
-        found.sort()
-        rows = [((tk, config.COL_AMBER), f"{pe:.1f}", nm[:16], sec)
-                for pe, tk, nm, sec in found[:16]]
+    _SCREEN_NUM_KEYS = {"cap_min", "cap_max", "pe_max", "margin_min", "growth_min", "growth_max",
+                        "beta_max", "momentum_min", "duration_min", "duration_max",
+                        "dividend_min", "expense_max"}
+
+    def _parse_screen_args(self, args):
+        """Transforme une liste de tokens `clé=valeur` en kwargs pour
+        `core.screener`, en convertissant les clés numériques connues."""
+        kwargs = {}
+        for tok in args:
+            if "=" not in tok:
+                continue
+            key, val = tok.split("=", 1)
+            key = key.strip().lower()
+            val = val.strip()
+            if key in self._SCREEN_NUM_KEYS:
+                try:
+                    kwargs[key] = float(val)
+                except ValueError:
+                    continue
+            elif key == "region":
+                kwargs[key] = self._match_region(val) if val else None
+            elif key == "sector":
+                for s in self.market.sectors:
+                    if s.lower() == val.lower():
+                        kwargs[key] = s
+                        break
+            elif key in ("category", "style", "theme", "rating_min"):
+                kwargs[key] = val.upper() if key == "rating_min" else val.lower()
+        return kwargs
+
+    def _cmd_screen(self, args):
+        if args and args[0].lower() in ("etf", "etfs"):
+            kwargs = self._parse_screen_args(args[1:])
+            quotes = screener_mod.screen_etfs(self.market, limit=18, **kwargs)
+            rows = [((q["id"], config.COL_AMBER), q["name"][:18], q["category_label"],
+                     f"{q['price']:.2f}", f"{q['change_1y']:+.1f}%", f"{q['expense']*100:.2f}%")
+                    for q in quotes]
+            if not rows:
+                rows = [("—", "aucun fonds", "—", "—", "—", "—")]
+            self._open_window(_L(f"SCREEN ETF ({len(quotes)})", f"SCREEN ETF ({len(quotes)})"),
+                              [("Tk", 55), ("Nom", 150), ("Catégorie", 110),
+                               ("NAV", 60), ("1AN", 60), ("Frais", 55)], rows)
+            return
+        kwargs = self._parse_screen_args(args)
+        if not kwargs:
+            # filtre par défaut : value (P/E bas) parmi les grandes capis
+            kwargs = {"pe_max": 12.0, "cap_min": 50000.0}
+        found = screener_mod.screen_stocks(self.market, limit=18, **kwargs)
+        rows = [((c["ticker"], config.COL_AMBER), c["name"][:16], c["sector"],
+                 f"{c['pe']:.1f}" if c["pe"] is not None else "n.m.", f"{c['change_pct']:+.1f}%")
+                for c in found]
         if not rows:
-            rows = [("—", "—", "aucune valeur", "—")]
-        self._open_window("SCREEN — value (P/E < 12, grandes capis)",
-                          [("Tk", 60), ("P/E", 50), ("Nom", 140), ("Secteur", 90)], rows)
+            rows = [("—", "aucune valeur", "—", "—", "—")]
+        self._open_window(_L(f"SCREEN ACTIONS ({len(found)})", f"SCREEN STOCKS ({len(found)})"),
+                          [("Tk", 60), ("Nom", 140), ("Secteur", 90), ("P/E", 50), ("Var 1an", 60)], rows)
 
     def _cmd_benchmark(self):
         p = self.app.gs.player

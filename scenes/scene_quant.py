@@ -11,9 +11,8 @@ Basé sur core.finmath (black_scholes, bs_greeks).
 import numpy as np
 import pygame
 
-from core import config
+from core import config, unlocks
 from core import finmath as fm
-from core import unlocks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

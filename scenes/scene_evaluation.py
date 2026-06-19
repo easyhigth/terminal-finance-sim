@@ -255,8 +255,7 @@ class EvaluationScene(Scene):
         self.state = "result"
 
     def _finish_cert(self, p):
-        from core import badges
-        from core import career
+        from core import badges, career
         from core import certifications as C
         self.new_title = None
         name = C.PROGRAMS[self.cert_program]["name"]

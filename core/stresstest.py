@@ -29,8 +29,7 @@ Logique pure, sans pygame — testable headless. Aléa via `random` (non seedé)
 import random
 
 from core import portfolio as pf
-from core import risk
-from core import tracks
+from core import risk, tracks
 
 STRESSTEST_PERIOD_QUARTERS = 2   # un stress test tous les 2 trimestres (~semestriel)
 

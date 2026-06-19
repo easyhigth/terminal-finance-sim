@@ -404,7 +404,6 @@ class MarketHubScene(Scene, PopupMixin):
                                    config.COL_PRESTIGE)
         grid = self.market.heatmap()
         regions = self.market.regions
-        mp = pygame.mouse.get_pos()
 
         label_w = 110
         col_w = max(70, (inner.w - label_w) // max(1, len(regions)))

@@ -13,7 +13,7 @@ from core import securitisation as SEC
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
-LOT = 50_000.0
+LOT = SEC.LOT
 
 
 class CreditScene(Scene):
@@ -24,6 +24,7 @@ class CreditScene(Scene):
         self._search_clear_rect = None
         self._t = 0.0
         self.invest_rects = {}
+        self.sell_rects = {}
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
@@ -61,6 +62,15 @@ class CreditScene(Scene):
                 self.search = ""
                 return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self._can_trade():
+            for tid, rect in self.sell_rects.items():
+                if rect.collidepoint(event.pos):
+                    r = SEC.sell(self.app.gs.player, self.app.market, tid,
+                                 min(LOT, SEC.held_notional(self.app.gs.player, tid)))
+                    self.msg = (f"Vendu {tid} (P&L {r['realized']:+.0f})." if r["ok"]
+                                else f"Vente refusée ({r['reason']}).")
+                    if r["ok"] and not self.app.gs.player.hardcore:
+                        self.app.gs.save(config.AUTOSAVE_SLOT)
+                    return
             for tid, rect in self.invest_rects.items():
                 if rect.collidepoint(event.pos):
                     r = SEC.invest(self.app.gs.player, self.app.market, tid, LOT)
@@ -113,6 +123,7 @@ class CreditScene(Scene):
         for label, x in cols:
             widgets.draw_text(surf, label, (x, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         self.invest_rects = {}
+        self.sell_rects = {}
         y = inner.y + 26
         q_filter = self.search.strip().lower()
         quotes = [q for q in SEC.all_quotes(m)
@@ -134,6 +145,13 @@ class CreditScene(Scene):
                 pygame.draw.rect(surf, config.COL_UP, rect, 1, border_radius=4)
                 widgets.draw_text(surf, f"INVESTIR {LOT/1000:.0f}k", (rect.x + 8, y),
                                   fonts.tiny(bold=True), config.COL_UP)
+                if SEC.held_notional(p, q["id"]) > 0:
+                    srect = pygame.Rect(rect.right + 8, y - 3, 90, 24)
+                    self.sell_rects[q["id"]] = srect
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, srect, border_radius=4)
+                    pygame.draw.rect(surf, config.COL_DOWN, srect, 1, border_radius=4)
+                    widgets.draw_text(surf, "VENDRE", srect.center, fonts.tiny(bold=True),
+                                      config.COL_DOWN, align="center")
             y += 36
 
         hv = SEC.holdings_value(p, m)

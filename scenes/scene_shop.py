@@ -15,6 +15,8 @@ from core import config, unlocks
 from core import crypto as K
 from core import etfs as ETF
 from core import portfolio as PF
+from core import securitisation as SEC
+from core import structured as S
 from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.popups import PopupMixin
@@ -24,12 +26,14 @@ SORT_FIELDS = [("name", "NOM"), ("price", "COURS"), ("value", "VALEUR"),
                ("yield_pct", "RENDEMENT"), ("change_pct", "VAR %")]
 TYPE_CHIPS = [(None, "TOUTES"), ("Action", "ACTIONS"), ("ETF", "ETF"),
               ("Obligation", "OBLIGATIONS"), ("Commodity", "COMMODITIES"),
-              ("Crypto", "CRYPTO"), ("Structuré", "STRUCTURÉS")]
+              ("Crypto", "CRYPTO"), ("Structuré", "STRUCTURÉS"), ("Crédit", "CRÉDIT")]
 KIND_COLOR = {"Action": config.COL_AMBER, "ETF": config.COL_PRESTIGE,
               "Obligation": config.COL_CYAN, "Commodity": config.COL_WARN,
-              "Crypto": config.COL_DOWN, "Structuré": config.COL_PRESTIGE}
+              "Crypto": config.COL_DOWN, "Structuré": config.COL_PRESTIGE,
+              "Crédit": config.COL_PRESTIGE}
 KIND_LABEL = {"Action": "Action", "ETF": "ETF", "Obligation": "Oblig.",
-              "Commodity": "Cmdty", "Crypto": "Crypto", "Structuré": "Struct."}
+              "Commodity": "Cmdty", "Crypto": "Crypto", "Structuré": "Struct.",
+              "Crédit": "Crédit"}
 QTY_PRESETS = [1, 5, 10, 25, 100]
 
 
@@ -105,14 +109,17 @@ class ShopScene(Scene, PopupMixin):
                          "sub": "Stablecoin" if q["stable"] else ("CBDC" if q["cbdc"] else "Volatil"),
                          "price": q["spot"], "value": q["spot"], "yield_pct": q["yield"] * 100.0,
                          "change_pct": None})
-        rows.append({"kind": "Structuré", "key": "structured",
-                     "name": "Produits structurés (notes, capital garanti, autocallable…)",
-                     "sub": "Sur mesure", "price": None, "value": None,
-                     "yield_pct": None, "change_pct": None})
-        rows.append({"kind": "Structuré", "key": "credit",
-                     "name": "Titrisation / ABS (tranches de crédit & waterfall)",
-                     "sub": "Sur mesure", "price": None, "value": None,
-                     "yield_pct": None, "change_pct": None})
+        for tpl in S.all_templates():
+            coupon = tpl.get("coupon") or tpl.get("vol_strike")
+            rows.append({"kind": "Structuré", "key": tpl["id"], "name": tpl["name"],
+                         "sub": f"{tpl['family']} · {tpl['years']} ans", "price": S.LOT,
+                         "value": S.LOT, "yield_pct": coupon * 100.0 if coupon is not None else None,
+                         "change_pct": None})
+        for q in SEC.all_quotes(m):
+            rows.append({"kind": "Crédit", "key": q["id"], "name": q["name"],
+                         "sub": f"{q['attach']*100:.0f}-{q['detach']*100:.0f}% · {q['rating']}",
+                         "price": SEC.LOT, "value": SEC.LOT,
+                         "yield_pct": q["coupon"] * 100.0, "change_pct": None})
         return rows
 
     def _filtered_sorted(self):
@@ -148,7 +155,9 @@ class ShopScene(Scene, PopupMixin):
         elif kind == "Crypto":
             self.app.scenes.go("crypto", return_to="shop")
         elif kind == "Structuré":
-            self.app.scenes.go(key, return_to="shop")
+            self.app.scenes.go("structured", return_to="shop")
+        elif kind == "Crédit":
+            self.app.scenes.go("credit", return_to="shop")
 
     def _held_qty(self, kind, key):
         p = self.app.gs.player
@@ -167,6 +176,10 @@ class ShopScene(Scene, PopupMixin):
         if kind == "Crypto":
             pos = p.crypto.get(key)
             return pos["qty"] if pos else 0.0
+        if kind == "Structuré":
+            return S.held_notional(p, key) / S.LOT
+        if kind == "Crédit":
+            return SEC.held_notional(p, key) / SEC.LOT
         return 0.0
 
     def _do_sell(self, kind, key):
@@ -190,6 +203,10 @@ class ShopScene(Scene, PopupMixin):
             r = CM.sell(p, m, key, qty)
         elif kind == "Crypto":
             r = K.sell(p, m, key, qty)
+        elif kind == "Structuré":
+            r = S.sell_by_type(p, m, key, qty * S.LOT)
+        elif kind == "Crédit":
+            r = SEC.sell(p, m, key, qty * SEC.LOT)
         else:
             return
         if r["ok"]:
@@ -200,9 +217,6 @@ class ShopScene(Scene, PopupMixin):
             self.msg = f"Vente refusée ({r['reason']})."
 
     def _do_buy(self, kind, key):
-        if kind == "Structuré":
-            self.app.scenes.go(key, return_to="shop")
-            return
         if not self._can_trade():
             return
         qty = self._qty()
@@ -220,6 +234,10 @@ class ShopScene(Scene, PopupMixin):
             r = CM.buy(p, m, key, qty)
         elif kind == "Crypto":
             r = K.buy(p, m, key, qty)
+        elif kind == "Structuré":
+            r = S.invest(p, m, key, qty * S.LOT)
+        elif kind == "Crédit":
+            r = SEC.invest(p, m, key, qty * SEC.LOT)
         else:
             return
         if r["ok"]:
@@ -331,7 +349,7 @@ class ShopScene(Scene, PopupMixin):
         cur = config.CONTINENTS[p.continent]["currency"]
         widgets.draw_text(surf, "BOUTIQUE — TOUS LES ACTIFS", (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Actions · ETF · obligations · commodities · crypto · structurés — "
+        widgets.draw_text(surf, "Actions · ETF · obligations · commodities · crypto · structurés · crédit — "
                                 "clic sur le nom = fiche d'analyse · choisissez une quantité puis ACHETER "
                                 "ou VENDRE (positions détenues). "
                                 + (self.msg if self.msg else ""),
@@ -442,7 +460,7 @@ class ShopScene(Scene, PopupMixin):
         widgets.draw_scrollbar(surf, panel, list_area, self.scroll, self._max_scroll, content_h)
 
         if not self._can_trade():
-            widgets.draw_text(surf, "⊘ Trading débloqué au grade Associate (sauf consultation/structurés).",
+            widgets.draw_text(surf, "⊘ Trading débloqué au grade Associate.",
                               (inner.x, inner.bottom - 4), fonts.tiny(), config.COL_TEXT_DIM)
 
         self.back_btn.draw(surf)
@@ -477,12 +495,7 @@ class ShopScene(Scene, PopupMixin):
             widgets.draw_text(surf, f"{r['change_pct']:+.1f}%", (inner.x + cols[6][1], y), fonts.small(bold=True), vcol)
         else:
             widgets.draw_text(surf, "—", (inner.x + cols[6][1], y), fonts.small(), config.COL_TEXT_DIM)
-        if kind == "Structuré":
-            br = pygame.Rect(inner.x + 1075, y - 2, 80, 20)
-            self._buy_rects[ident] = br
-            pygame.draw.rect(surf, config.COL_PANEL_HEAD, br, border_radius=3)
-            widgets.draw_text(surf, "OUVRIR", br.center, fonts.tiny(bold=True), config.COL_CYAN, align="center")
-        elif self._can_trade():
+        if self._can_trade():
             held = self._held_qty(kind, key)
             if held > 0:
                 sr = pygame.Rect(inner.x + 995, y - 2, 72, 20)

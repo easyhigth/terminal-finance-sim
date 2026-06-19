@@ -12,7 +12,9 @@ from core import structured as S
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
-LOT = 50_000.0     # notionnel souscrit par clic
+LOT = S.LOT     # notionnel souscrit par clic
+FAMILY_CHIPS = [(None, "TOUTES"), ("Classique", "CLASSIQUE"),
+                ("Exotique", "EXOTIQUE"), ("Volatilité", "VOLATILITÉ")]
 
 
 class StructuredScene(Scene):
@@ -23,6 +25,9 @@ class StructuredScene(Scene):
         self._search_clear_rect = None
         self._t = 0.0
         self.invest_rects = {}
+        self.sell_rects = {}
+        self._family_rects = {}
+        self.family_filter = None
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
@@ -59,10 +64,23 @@ class StructuredScene(Scene):
             if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
                 self.search = ""
                 return
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self._can_trade():
-            for ti, rect in self.invest_rects.items():
+            for fam, rect in self._family_rects.items():
                 if rect.collidepoint(event.pos):
-                    r = S.invest(self.app.gs.player, self.app.market, ti, LOT)
+                    self.family_filter = fam
+                    return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self._can_trade():
+            for tid, rect in self.sell_rects.items():
+                if rect.collidepoint(event.pos):
+                    r = S.sell_by_type(self.app.gs.player, self.app.market, tid,
+                                       min(LOT, S.held_notional(self.app.gs.player, tid)))
+                    self.msg = (f"Vendu (P&L {r['realized']:+.0f})." if r["ok"]
+                                else f"Vente refusée ({r['reason']}).")
+                    if r["ok"] and not self.app.gs.player.hardcore:
+                        self.app.gs.save(config.AUTOSAVE_SLOT)
+                    return
+            for tid, rect in self.invest_rects.items():
+                if rect.collidepoint(event.pos):
+                    r = S.invest(self.app.gs.player, self.app.market, tid, LOT)
                     self.msg = ("Souscrit pour " + widgets.format_money(LOT, self._cur())
                                 if r["ok"] else f"Refusé ({r['reason']}).")
                     if r["ok"] and not self.app.gs.player.hardcore:
@@ -101,30 +119,54 @@ class StructuredScene(Scene):
             widgets.draw_text(surf, "✕", self._search_clear_rect.center, fonts.small(bold=True),
                               config.COL_TEXT_DIM, align="center")
 
-        top = search_rect.bottom + 8
+        # ---- chips FAMILLE ----
+        fy = search_rect.bottom + 8
+        self._family_rects = {}
+        fx = 40
+        for fam, label in FAMILY_CHIPS:
+            w = fonts.tiny(bold=True).size(label)[0] + 14
+            rect = pygame.Rect(fx, fy, w, 20)
+            self._family_rects[fam] = rect
+            sel = (fam == self.family_filter)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect, border_radius=3)
+            pygame.draw.rect(surf, config.COL_AMBER if sel else config.COL_BORDER, rect, 1, border_radius=3)
+            widgets.draw_text(surf, label, rect.center, fonts.tiny(bold=sel),
+                              config.COL_AMBER if sel else config.COL_TEXT_DIM, align="center")
+            fx += w + 6
+
+        top = fy + 28
         ph = config.footer_y() - 8 - top
         # catalogue (gauche)
         cat = pygame.Rect(40, top, 700, ph)
         inner = widgets.draw_panel(surf, cat, "Catalogue", config.COL_CYAN)
         self.invest_rects = {}
+        self.sell_rects = {}
         y = inner.y
         q_filter = self.search.strip().lower()
-        templates = [(ti, tpl) for ti, tpl in enumerate(S.TEMPLATES)
-                     if not q_filter or q_filter in tpl["name"].lower() or q_filter in tpl["desc"].lower()]
-        for ti, tpl in templates:
+        templates = [tpl for tpl in S.all_templates()
+                     if (not self.family_filter or tpl["family"] == self.family_filter)
+                     and (not q_filter or q_filter in tpl["name"].lower() or q_filter in tpl["desc"].lower())]
+        for tpl in templates:
             widgets.draw_text(surf, tpl["name"], (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
-            widgets.draw_text(surf, f"maturité {tpl['years']} ans", (inner.right - 120, y),
+            widgets.draw_text(surf, f"{tpl['family']} · {tpl['years']} ans", (inner.right - 160, y),
                               fonts.tiny(), config.COL_TEXT_DIM)
             y += 20
             y += widgets.draw_text_wrapped(surf, tpl["desc"], (inner.x, y),
                                            fonts.small(), config.COL_TEXT, inner.w - 130, line_gap=3) + 4
             if self._can_trade():
                 rect = pygame.Rect(inner.right - 150, y, 140, 26)
-                self.invest_rects[ti] = rect
+                self.invest_rects[tpl["id"]] = rect
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect, border_radius=4)
                 pygame.draw.rect(surf, config.COL_UP, rect, 1, border_radius=4)
                 widgets.draw_text(surf, f"SOUSCRIRE {LOT/1000:.0f}k", (rect.x + 12, y + 4),
                                   fonts.tiny(bold=True), config.COL_UP)
+                if S.held_notional(p, tpl["id"]) > 0:
+                    srect = pygame.Rect(rect.left - 96, y, 88, 26)
+                    self.sell_rects[tpl["id"]] = srect
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, srect, border_radius=4)
+                    pygame.draw.rect(surf, config.COL_DOWN, srect, 1, border_radius=4)
+                    widgets.draw_text(surf, "VENDRE", srect.center, fonts.tiny(bold=True),
+                                      config.COL_DOWN, align="center")
             y += 40
 
         # positions en cours (droite)

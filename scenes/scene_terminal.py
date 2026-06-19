@@ -121,7 +121,7 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
         # rail latéral : (libellé, commande), regroupé par usage
         self.rail = [
             ("ADV ▸", "ADV"),
-            ("PORTEF.", "PORTFOLIO"), ("MARCHÉ", "MARKETHUB"), ("ETF", "ETF"),
+            ("PORTEF.", "PORTFOLIO"), ("MARCHÉ", "MARKETHUB"), ("BOUTIQUE", "SHOP"),
             ("MISSION", "MISSION"), ("EXAM/CERTIF", "EXAMCERT"),
             ("MANDATS", "MANDATES"), ("DEALS", "DEALS"), ("M&A", "MA"),
             ("INBOX", "INBOX"), ("NEWS", "NEWS"), ("DÉCIDE", "DECIDE"),

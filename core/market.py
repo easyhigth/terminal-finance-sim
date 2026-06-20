@@ -250,6 +250,55 @@ SURPRISE_VOL = 0.05     # écart-type de la surprise de résultats (en % de croi
 EARN_PRICE_K = 0.9      # conversion surprise -> choc de cours du jour de publication
 EARN_NEWS_THRESH = 0.06 # |surprise| au-delà de laquelle on génère une news
 
+# ---- anticipation / pré-positionnement (chantier 13) -----------------------
+# Le marché ne devine jamais parfaitement les résultats, mais une fraction des
+# acteurs ("smart money") se positionne par anticipation à mesure que la date
+# de publication approche, créant un léger drift directionnel AVANT le print —
+# phénomène documenté empiriquement ("pre-earnings announcement drift"). La
+# PROCHAINE surprise et la PROCHAINE guidance de chaque société sont donc
+# déterminées À L'AVANCE, au pas même où le print précédent tombe (un seul
+# tirage rng par société par cycle, jamais une fraction de tirage -> aucun
+# risque de désynchronisation de la séquence rng). Un petit drift, croissant
+# à mesure qu'on approche de la date, est appliqué CHAQUE PAS dans la fenêtre
+# d'anticipation, dans le sens de cette surprise déjà tirée (+ un biais issu
+# de la guidance du cycle précédent, cf. plus bas). Magnitude volontairement
+# modeste : c'est de la couleur de marché (le joueur ne peut pas en déduire le
+# print à coup sûr), pas un oracle.
+EARN_ANTICIPATION_WINDOW = 4     # pas avant la publication où le drift démarre
+EARN_ANTICIPATION_K = 0.10       # fraction de la surprise "pricée" par pas d'anticipation
+                                  # (cumulé sur la fenêtre, reste modeste vs le gap du print)
+
+# ---- guidance (prévisions données par l'entreprise) -------------------------
+# Composante indépendante (en bonne partie) de la surprise du trimestre écoulé :
+# un beat peut s'accompagner d'une guidance prudente et inversement (réalisme,
+# crée des dilemmes de lecture). Tirage rng propre, impact prix propre (plus
+# petit que le gap de surprise), et vient biaiser le drift d'anticipation du
+# PROCHAIN cycle (la guidance d'aujourd'hui nourrit les attentes de demain).
+GUIDANCE_VOL = 0.045              # écart-type du signal de guidance
+GUIDANCE_SURPRISE_CORR = 0.35     # corrélation partielle avec la surprise du trimestre
+GUIDANCE_PRICE_K = 0.35           # impact prix de la guidance (< EARN_PRICE_K du gap)
+GUIDANCE_TO_ANTICIPATION_K = 0.6  # poids de la guidance dans le biais d'anticipation suivant
+GUIDANCE_RAISE_THRESH = 0.012     # |guidance| au-delà de laquelle on parle de relevée/abaissée
+GUIDANCE_LABELS = {"up": "relevée", "flat": "maintenue", "down": "abaissée"}
+
+# ---- révisions d'analystes entre deux publications --------------------------
+# Petits évènements de révision, déterministes (seed-derived), entre deux
+# trimestres : nudge modeste des attentes + petit choc de cours, distinct
+# d'un vrai print de résultats (pas de mise à jour du CA/marges sous-jacents).
+REVISION_PROBA = 0.05            # probabilité par pas, par société (hors fenêtre d'annonce)
+REVISION_VOL = 0.012             # écart-type du choc de révision
+REVISION_PRICE_K = 0.5           # conversion révision -> choc de cours
+
+# ---- drift post-annonce (PEAD) ----------------------------------------------
+# Les marchés réels sous-réagissent à l'annonce : le cours continue de dériver
+# dans le sens de la surprise pendant plusieurs semaines après le print (« Post
+# Earnings Announcement Drift », phénomène documenté). Modélisé comme un état
+# persistant par société, injecté en plus du gap du jour J, qui décroît
+# géométriquement vers 0.
+PEAD_HORIZON_STEPS = 8            # ~2 mois (8 semaines) avant extinction quasi totale
+PEAD_DECAY = 0.75                 # décroissance multiplicative par pas (^8 pas -> proche 0)
+PEAD_K = 0.16                     # fraction de la surprise injectée en drift cumulé PEAD
+
 
 CRISIS_SEVERE_SEVERITY = 1.35  # seuil au-delà duquel une crise est jugée "majeure"
 CRISIS_COOLDOWN_STEPS = 5      # accalmie forcée après une crise majeure (pas de nouveau choc)
@@ -395,7 +444,19 @@ class Market:
         self._base_net_margin = self.net_margin.copy()
         self._base_ebitda_margin = self.ebitda_margin.copy()
         self.last_earnings = []      # rapports publiés au dernier pas
-        self.earnings_log = {}       # ticker -> dernier rapport {surprise, growth, beat, step}
+        self.earnings_log = {}       # ticker -> dernier rapport {surprise, growth, beat, step, guidance...}
+        # ---- anticipation/guidance/PEAD (chantier 13) : état par société ----
+        # surprise et guidance du PROCHAIN print, déjà tirées (cf. _prepare_next_earnings)
+        # pour permettre le drift d'anticipation dans les pas qui précèdent l'annonce.
+        self.next_surprise = np.zeros(self.n)
+        self.next_guidance = np.zeros(self.n)
+        # biais d'anticipation hérité de la guidance du cycle précédent (0 au 1er cycle)
+        self.guidance_bias = np.zeros(self.n)
+        # état de drift post-annonce (PEAD), décroissant géométriquement vers 0
+        self.pead_state = np.zeros(self.n)
+        # dernière guidance publiée (pour lecture UI / earnings_log), par société
+        self.last_guidance = {}      # ticker -> {"value", "label", "step"}
+        self._prepare_next_earnings(np.arange(self.n))
         self.regime = "Calme"        # régime de marché courant (toile de fond lente)
         self.regime_changed = False  # vrai au pas où le régime vient de basculer
         self.regime_since = 0        # step_count au moment où le régime courant a démarré
@@ -628,7 +689,12 @@ class Market:
         else:
             nonworld_corr = 1.0
 
-        # saison de résultats : choc de cours sur les sociétés qui publient ce pas
+        # saison de résultats : anticipation/révisions/PEAD lus sur l'état D'AVANT
+        # le print de ce pas, puis le print lui-même (gap + guidance) qui met à
+        # jour cet état pour les pas suivants (cf. docstrings des helpers).
+        anticipation_shock = self._step_anticipation()
+        revision_shock = self._step_revisions()
+        pead_shock = self._step_pead()
         earnings_shock = self._step_earnings()
 
         ret = (self.drift
@@ -636,7 +702,7 @@ class Market:
                + nonworld_corr * (self.b_sector * F_sector[self.sec_id]
                                    + self.b_region * F_region[self.reg_id]
                                    + self.sigma * eps)
-               + earnings_shock)
+               + earnings_shock + anticipation_shock + revision_shock + pead_shock)
         # borne les rendements par pas pour éviter les valeurs aberrantes
         np.clip(ret, -0.35, 0.35, out=ret)
         self.prev_price = self.price.copy()   # mémorise pour l'attribution du P&L
@@ -834,11 +900,97 @@ class Market:
             return "Tension"
         return "Panique"
 
+    def _prepare_next_earnings(self, idx):
+        """Tire À L'AVANCE la surprise et la guidance du PROCHAIN print pour les
+        sociétés d'indice `idx` (appelé à l'initialisation pour le tout 1er
+        cycle de chacune, puis une fois par société à chaque fois qu'elle vient
+        de publier — jamais une fraction de tirage : la séquence rng consommée
+        reste totalement déterminée par (seed, step_count)). C'est ce tirage
+        anticipé qui permet le drift de pré-positionnement (cf. _step_anticipation) :
+        sans lui, l'anticipation ne pourrait pas être orientée avant le print.
+
+        La guidance est PARTIELLEMENT corrélée à la surprise (GUIDANCE_SURPRISE_CORR)
+        mais comporte sa part propre (réalisme : un beat peut suivre une guidance
+        prudente et inversement) — combinaison à variance unitaire pour ne pas
+        changer l'échelle de GUIDANCE_VOL.
+        """
+        idx = np.asarray(idx, dtype=int)
+        if len(idx) == 0:
+            return
+        surprise = self.rng.normal(0.0, SURPRISE_VOL, size=len(idx))
+        guidance_own = self.rng.normal(0.0, 1.0, size=len(idx))
+        rho = GUIDANCE_SURPRISE_CORR
+        guidance = GUIDANCE_VOL * (rho * (surprise / SURPRISE_VOL)
+                                    + np.sqrt(max(0.0, 1.0 - rho * rho)) * guidance_own)
+        self.next_surprise[idx] = surprise
+        self.next_guidance[idx] = guidance
+
+    def _step_anticipation(self):
+        """Drift de pré-positionnement ("smart money") dans la fenêtre qui
+        précède la date de publication CONNUE de chaque société, orienté selon
+        la surprise (et la guidance du cycle précédent) déjà tirées à l'avance
+        (cf. _prepare_next_earnings). Aucun tirage rng ICI (déterminisme : pas
+        de nouveau hasard, seulement une relecture d'état déjà fixé) -> ce
+        helper peut être appelé sans risque de désynchroniser la séquence rng.
+        Retourne le vecteur de chocs de cours (log) à ajouter au rendement du pas.
+        """
+        shock = np.zeros(self.n)
+        idx = np.arange(self.n)
+        steps_to_report = (idx - self.step_count) % EARN_PERIOD
+        # strictement AVANT le print (steps_to_report == 0 == jour du print
+        # lui-même, déjà couvert par le gap de _step_earnings -> exclu ici).
+        in_window = (steps_to_report >= 1) & (steps_to_report <= EARN_ANTICIPATION_WINDOW)
+        if not np.any(in_window):
+            return shock
+        # plus proche du print -> drift plus marqué (rampe linéaire 1/W .. W/W)
+        ramp = (EARN_ANTICIPATION_WINDOW - steps_to_report + 1) / float(EARN_ANTICIPATION_WINDOW + 1)
+        signal = (self.next_surprise
+                  + GUIDANCE_TO_ANTICIPATION_K * self.guidance_bias)
+        shock[in_window] = (EARN_ANTICIPATION_K * ramp[in_window] / EARN_ANTICIPATION_WINDOW
+                            * signal[in_window])
+        return shock
+
+    def _step_revisions(self):
+        """Petites révisions d'analystes entre deux trimestres : un tirage de
+        Bernoulli (probabilité REVISION_PROBA) PAR SOCIÉTÉ ET PAR PAS, consommé
+        systématiquement (même hors fenêtre d'annonce -> jamais de tirage
+        sauté), distinct d'un vrai print (pas de mise à jour CA/marges). N'a
+        lieu que pour les sociétés qui ne publient pas ce pas-ci (sinon le gap
+        de surprise domine déjà). Choc petit et borné, dans le sens du
+        signal de révision tiré (indépendant des autres tirages)."""
+        shock = np.zeros(self.n)
+        idx = np.arange(self.n)
+        not_reporting = (idx % EARN_PERIOD) != (self.step_count % EARN_PERIOD)
+        roll = self.rng.random_sample(self.n)
+        magnitude = self.rng.normal(0.0, REVISION_VOL, size=self.n)
+        hit = not_reporting & (roll < REVISION_PROBA)
+        if np.any(hit):
+            shock[hit] = REVISION_PRICE_K * magnitude[hit]
+            # la révision nourrit aussi (modestement) le biais d'anticipation du
+            # prochain print, comme une mise à jour d'attentes du marché.
+            self.guidance_bias[hit] += 0.3 * magnitude[hit]
+        return shock
+
+    def _step_pead(self):
+        """Post Earnings Announcement Drift : applique le drift persistant
+        accumulé (cf. pead_state, alimenté au moment du print dans
+        _step_earnings) puis le fait décroître géométriquement vers 0. Aucun
+        tirage rng (pur état déterministe déjà fixé au print)."""
+        shock = self.pead_state.copy()
+        self.pead_state *= PEAD_DECAY
+        return shock
+
     def _step_earnings(self):
         """Saison de résultats échelonnée : ~1/EARN_PERIOD des sociétés publient
-        chaque pas (donc chacune une fois par trimestre). Une SURPRISE (beat/miss)
-        fait dériver le CA et les marges et injecte un choc de cours déterministe.
-        Retourne le vecteur de chocs de cours (log) à ajouter au rendement du pas.
+        chaque pas (donc chacune une fois par trimestre). La surprise (beat/miss)
+        ÉTAIT DÉJÀ CONNUE à l'avance (cf. _prepare_next_earnings, consommée par le
+        drift d'anticipation des pas précédents) : elle fait dériver le CA/les
+        marges et injecte un GAP de cours discret (proportionnel à son ampleur,
+        au-delà du bruit lissé du pas). La société émet aussi une GUIDANCE
+        (composante distincte, impact prix propre plus petit) qui biaise
+        l'anticipation du cycle SUIVANT, puis un drift post-annonce (PEAD) est
+        amorcé pour les pas suivants. Retourne le vecteur de chocs de cours
+        (log) à ajouter au rendement du pas (gap de surprise + impact guidance).
         """
         shock = np.zeros(self.n)
         self.last_earnings = []
@@ -848,9 +1000,10 @@ class Market:
             return shock
         # croissance trimestrielle « attendue » (déjà dans les cours), liée à la macro
         base_growth = 0.005 + (self.macro["growth"]["v"] - 2.0) * 0.0025
-        surprises = self.rng.normal(0.0, SURPRISE_VOL, size=len(due))
-        for k, i in enumerate(due):
-            surprise = float(surprises[k])
+        for i in due:
+            i = int(i)
+            surprise = float(self.next_surprise[i])
+            guidance = float(self.next_guidance[i])
             growth = base_growth + surprise
             self.revenue[i] *= max(0.5, 1.0 + growth)
             # marges : petite dérive bornée autour du profil de base du secteur
@@ -860,14 +1013,37 @@ class Market:
             self.ebitda_margin[i] = float(np.clip(
                 self.ebitda_margin[i] + self.rng.normal(0, 0.004),
                 0.4 * self._base_ebitda_margin[i], 1.6 * self._base_ebitda_margin[i]))
-            # le marché ne réagit qu'à la SURPRISE (la part attendue est déjà priced-in)
-            shock[i] = EARN_PRICE_K * surprise
+            # ---- gap d'annonce : choc DISCRET (au-delà du bruit lissé du pas) ----
+            # le marché ne réagit qu'à la SURPRISE (la part attendue est déjà
+            # priced-in, en partie via l'anticipation des pas précédents) + un
+            # impact de guidance distinct, plus petit, dans son propre sens.
+            gap = EARN_PRICE_K * surprise
+            guidance_impact = GUIDANCE_PRICE_K * guidance
+            shock[i] = gap + guidance_impact
+            # ---- amorce le drift post-annonce (PEAD), dans le sens de la surprise --
+            self.pead_state[i] = PEAD_K * surprise
+            # la guidance de CE cycle devient le biais d'anticipation du PROCHAIN
+            # (remplace l'ancien biais — pas de cumul indéfini d'un cycle à l'autre)
+            self.guidance_bias[i] = guidance
+            if guidance > GUIDANCE_RAISE_THRESH:
+                g_label = GUIDANCE_LABELS["up"]
+            elif guidance < -GUIDANCE_RAISE_THRESH:
+                g_label = GUIDANCE_LABELS["down"]
+            else:
+                g_label = GUIDANCE_LABELS["flat"]
             rep = {"ticker": self.companies[i]["ticker"],
                    "name": self.companies[i]["name"],
                    "surprise": surprise, "growth": growth,
-                   "beat": surprise >= 0, "step": self.step_count + 1}
+                   "beat": surprise >= 0, "step": self.step_count + 1,
+                   "guidance": guidance, "guidance_label": g_label}
             self.last_earnings.append(rep)
             self.earnings_log[rep["ticker"]] = rep
+            self.last_guidance[rep["ticker"]] = {
+                "value": guidance, "label": g_label, "step": self.step_count + 1}
+        # tire dès maintenant la surprise/guidance du PROCHAIN cycle de ces
+        # mêmes sociétés (dans EARN_PERIOD pas), pour alimenter l'anticipation
+        # à venir -- un seul tirage par société par cycle (cf. docstring ci-dessus).
+        self._prepare_next_earnings(due)
         return shock
 
     def curve_point(self, years, smoothed=False):
@@ -1038,7 +1214,11 @@ class Market:
         div_per_share = price * c["div_yield"]
         payout = (div_per_share / eps * 100) if eps > 0 else None
         last_earn = self.earnings_log.get(ticker)
+        last_guid = self.last_guidance.get(ticker)
         credit_rating = credit.rating_for(nd_ebitda, float(self.sigma[i]))
+        steps_to_report = int((i - self.step_count) % EARN_PERIOD)
+        in_anticipation = 1 <= steps_to_report <= EARN_ANTICIPATION_WINDOW
+        pead_remaining = float(self.pead_state[i])
         return {
             "ticker": ticker, "name": c["name"], "region": c["region"],
             "sector": c["sector"], "price": price, "shares": shares,
@@ -1050,6 +1230,9 @@ class Market:
             "ps": ps, "fcf_yield": fcf_yield, "nd_ebitda": nd_ebitda,
             "payout": payout, "change_pct": chg, "last_earnings": last_earn,
             "credit_rating": credit_rating,
+            "last_guidance": last_guid, "steps_to_earnings": steps_to_report,
+            "earnings_anticipation": in_anticipation,
+            "pead_drift_remaining": pead_remaining,
         }
 
     def sector_medians(self, sector):
@@ -1260,8 +1443,13 @@ class Market:
             region = next((c["region"] for c in self.companies
                            if c["ticker"] == r["ticker"]), None)
             verb = "dépasse les attentes" if r["beat"] else "déçoit"
-            news.append({"region": region, "kind": "good" if r["beat"] else "bad",
-                         "text": f"Résultats : {r['ticker']} {verb} ({r['surprise']*100:+.0f}%)"})
+            text = f"Résultats : {r['ticker']} {verb} ({r['surprise']*100:+.0f}%)"
+            g_label = r.get("guidance_label")
+            # guidance en désaccord avec la surprise -> info notable pour le joueur
+            if g_label and ((r["beat"] and g_label == GUIDANCE_LABELS["down"])
+                             or (not r["beat"] and g_label == GUIDANCE_LABELS["up"])):
+                text += f", guidance {g_label}"
+            news.append({"region": region, "kind": "good" if r["beat"] else "bad", "text": text})
         return news
 
     def latest_news(self):

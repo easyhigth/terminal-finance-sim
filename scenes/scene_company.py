@@ -87,15 +87,31 @@ class CompanyScene(Scene):
                               (config.SCREEN_WIDTH - 40, 120), fonts.small(),
                               config.COL_TEXT_DIM, align="right")
 
-        # derniers résultats trimestriels (surprise beat/miss)
+        # derniers résultats trimestriels (surprise beat/miss + guidance)
         le = mt.get("last_earnings")
         if le:
             ecol = config.COL_UP if le["beat"] else config.COL_DOWN
             verb = "BEAT" if le["beat"] else "MISS"
+            g_label = le.get("guidance_label")
+            g_txt = f"  ·  guidance {g_label}" if g_label else ""
             widgets.draw_text(surf, f"RÉSULTATS : {verb}  surprise {le['surprise']*100:+.0f}%  "
-                                    f"·  croissance CA {le['growth']*100:+.1f}%",
+                                    f"·  croissance CA {le['growth']*100:+.1f}%{g_txt}",
                               (config.SCREEN_WIDTH - 40, 150), fonts.small(bold=True),
                               ecol, align="right")
+
+        # indicateurs d'anticipation / drift post-annonce (PEAD), si actifs
+        badge_y = 176
+        if mt.get("earnings_anticipation"):
+            widgets.draw_text(surf, f"⏳ Publication dans {mt['steps_to_earnings']} pas",
+                              (config.SCREEN_WIDTH - 40, badge_y), fonts.small(),
+                              config.COL_WARN, align="right")
+            badge_y += 22
+        pead = mt.get("pead_drift_remaining") or 0.0
+        if abs(pead) > 1e-4:
+            pcol = config.COL_UP if pead > 0 else config.COL_DOWN
+            widgets.draw_text(surf, f"↗ Drift post-résultats résiduel : {pead*100:+.2f}%",
+                              (config.SCREEN_WIDTH - 40, badge_y), fonts.small(),
+                              pcol, align="right")
 
         # panneau fondamentaux (2 sous-colonnes : valorisation / rentabilité-risque)
         ph = config.footer_y() - 8 - 190

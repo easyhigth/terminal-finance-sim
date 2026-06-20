@@ -112,6 +112,13 @@ def test_correlation_matrix_diagonal_is_one():
 def test_yield_curve_is_increasing_with_maturity():
     m = market.Market(seed=5)
     m.sync_to(market.WARMUP_STEPS)
+    # régime forcé à "Calme" (hors Récession/Volatil, dont la pente peut
+    # s'aplatir/s'inverser par construction, cf. tests/test_yieldcurve.py) :
+    # l'invariant testé ici (prime de terme -> courbe croissante) ne vaut que
+    # pour une toile de fond cyclique neutre, indépendamment du régime atteint
+    # par tel ou tel chemin de tirages rng à cette étape (cf. déterminisme,
+    # ajouter un tirage dans Market.step() décale la trajectoire des régimes).
+    m.regime = "Calme"
     curve = charts.yield_curve(m, "AAA")
     ys = [y for _, y in curve]
     assert ys == sorted(ys)        # prime de terme -> courbe croissante

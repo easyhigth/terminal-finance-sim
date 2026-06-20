@@ -196,6 +196,9 @@ class MandatesScene(Scene):
                 widgets.draw_row_selection(surf, row, i == self.offer_cursor)
                 r = widgets.draw_text(surf, f"#{o['id']} {o['client']}", (row.x + 12, row.y + 6),
                                       fonts.small(bold=True), config.COL_AMBER)
+                if o.get("client_profile"):
+                    r = widgets.draw_badge(surf, MD.profile_label(o["client_profile"]),
+                                           (r.right + 10, row.y + 4), accent=config.COL_PRESTIGE)
                 if o.get("type"):
                     widgets.draw_badge(surf, MD.type_label(o["type"]), (r.right + 10, row.y + 4),
                                        accent=config.COL_CYAN)
@@ -204,6 +207,9 @@ class MandatesScene(Scene):
                                         f"β max {o['max_beta']:.2f}",
                                   (row.x + 12, row.y + 26), fonts.tiny(), config.COL_TEXT)
                 extra = _extra_constraints_text(o)
+                if o.get("client_profile"):
+                    desc = MD.profile_desc(o["client_profile"])
+                    extra = f"{desc}  ·  {extra}" if extra else desc
                 if extra:
                     widgets.draw_text(surf, extra, (row.x + 12, row.y + 42),
                                       fonts.tiny(), config.COL_TEXT_DIM)
@@ -250,6 +256,9 @@ class MandatesScene(Scene):
                 pygame.draw.rect(surf, config.COL_BORDER, row, 1, border_radius=4)
                 r = widgets.draw_text(surf, f"#{m['id']} {m['client']}  ·  capital {widgets.format_money(m['capital'], cur)}",
                                       (row.x + 12, row.y + 8), fonts.small(bold=True), config.COL_AMBER)
+                if m.get("client_profile"):
+                    r = widgets.draw_badge(surf, MD.profile_label(m["client_profile"]),
+                                           (r.right + 10, row.y + 6), accent=config.COL_PRESTIGE)
                 if m.get("type"):
                     widgets.draw_badge(surf, MD.type_label(m["type"]), (r.right + 10, row.y + 6),
                                        accent=config.COL_CYAN)
@@ -318,8 +327,13 @@ class MandatesScene(Scene):
         w, h = 560, 280
         rect = pygame.Rect((config.SCREEN_WIDTH - w) // 2, (config.SCREEN_HEIGHT - h) // 2, w, h)
         accent = config.COL_UP if res["ok"] else config.COL_DOWN
-        inner = widgets.draw_panel(surf, rect,
-                                   "MANDAT RÉUSSI" if res["ok"] else "MANDAT ÉCHOUÉ", accent)
+        if res["ok"]:
+            title = "MANDAT RÉUSSI"
+        elif res.get("early_terminated"):
+            title = "MANDAT RÉSILIÉ"
+        else:
+            title = "MANDAT ÉCHOUÉ"
+        inner = widgets.draw_panel(surf, rect, title, accent)
 
         widgets.draw_text(surf, res["client"], (inner.x, inner.y), fonts.body(bold=True), config.COL_AMBER)
         y = inner.y + 30

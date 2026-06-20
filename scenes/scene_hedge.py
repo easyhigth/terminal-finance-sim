@@ -149,16 +149,16 @@ class HedgeScene(Scene):
                           config.COL_UP, align="center")
 
         # ---- contexte risque (milieu) ----
-        risk_rect = pygame.Rect(500, 110, 320, 130)
+        risk_rect = pygame.Rect(500, 110, 320, 150)
         rinner = widgets.draw_panel(surf, risk_rect, "Exposition", config.COL_AMBER)
         from core import portfolio as pf
         beta = pf.portfolio_beta(p, m)
         coverage = H.coverage_ratio(p, m)
         widgets.draw_text(surf, f"Bêta net du portefeuille : {beta:.2f}",
                           (rinner.x, rinner.y), fonts.small(bold=True), config.COL_TEXT)
-        widgets.draw_text(surf, f"Couverture en cours : {coverage*100:.0f}% de l'exposition brute",
+        widgets.draw_text_wrapped(surf, f"Couverture en cours : {coverage*100:.0f}% de l'exposition brute",
                           (rinner.x, rinner.y + 26), fonts.small(),
-                          config.COL_UP if coverage > 0 else config.COL_TEXT_DIM)
+                          config.COL_UP if coverage > 0 else config.COL_TEXT_DIM, rinner.w)
 
         # ---- positions en cours (droite) ----
         pos_rect = pygame.Rect(840, 110, config.SCREEN_WIDTH - 880, 280)

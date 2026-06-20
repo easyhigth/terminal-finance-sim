@@ -96,6 +96,7 @@ def buy(player, market, ticker, qty):
         return {"ok": False, "reason": "leverage",
                 "max_leverage": _max_leverage(player)}
     player.cash -= (cost + fee)
+    player.total_fees_paid = getattr(player, "total_fees_paid", 0.0) + fee
     if pos:
         n = pos["shares"] + qty
         pos["avg"] = (pos["shares"] * pos["avg"] + cost) / n
@@ -126,6 +127,7 @@ def sell(player, market, ticker, qty):
     realized = (fill - pos["avg"]) * qty - fee
     player.cash += net
     player.realized_pnl = getattr(player, "realized_pnl", 0.0) + realized
+    player.total_fees_paid = getattr(player, "total_fees_paid", 0.0) + fee
     pos["shares"] -= qty
     if abs(pos["shares"]) <= 1e-9:
         del player.portfolio[ticker]
@@ -156,6 +158,7 @@ def short(player, market, ticker, qty):
         return {"ok": False, "reason": "leverage",
                 "max_leverage": _max_leverage(player)}
     player.cash += (proceeds - fee)
+    player.total_fees_paid = getattr(player, "total_fees_paid", 0.0) + fee
     if pos:
         n = pos["shares"] - qty                       # plus négatif
         pos["avg"] = (abs(pos["shares"]) * pos["avg"] + proceeds) / abs(n)
@@ -185,6 +188,7 @@ def cover(player, market, ticker, qty):
     realized = (pos["avg"] - fill) * qty - fee        # short gagne quand le prix baisse
     player.cash -= (cost + fee)
     player.realized_pnl = getattr(player, "realized_pnl", 0.0) + realized
+    player.total_fees_paid = getattr(player, "total_fees_paid", 0.0) + fee
     pos["shares"] += qty
     if abs(pos["shares"]) <= 1e-9:
         del player.portfolio[ticker]
@@ -229,6 +233,7 @@ def check_margin_call(player, market):
     penalty = liquidated * LIQUIDATION_FEE * archetypes.perk(player, "margin_call_penalty_mult")
     player.cash -= penalty
     player.flags["margin_call_count"] = player.flags.get("margin_call_count", 0) + 1
+    player.total_margin_penalty = getattr(player, "total_margin_penalty", 0.0) + penalty
     leverage_after = leverage(player, market)
     return {"triggered": True, "liquidated": liquidated, "penalty": penalty,
             "equity": eq, "threshold": threshold, "gross_before": gross,

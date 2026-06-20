@@ -57,6 +57,10 @@ class FinancialsScene(Scene):
                                         "FICHE COMPLÈTE (DES)", config.COL_CYAN)
         self.graph_btn = widgets.Button((440, config.SCREEN_HEIGHT - 70, 160, 46),
                                         "GRAPHE (GP)", config.COL_AMBER)
+        self.sheet_inc_btn = widgets.Button((610, config.SCREEN_HEIGHT - 70, 200, 46),
+                                            "→ TABLEUR (CR)", config.COL_UP)
+        self.sheet_bal_btn = widgets.Button((820, config.SCREEN_HEIGHT - 70, 200, 46),
+                                            "→ TABLEUR (BILAN)", config.COL_UP)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -67,12 +71,40 @@ class FinancialsScene(Scene):
             self.app.scenes.go("company", ticker=self.ticker, return_to=self.return_to)
         if self.graph_btn.handle(event):
             self.app.scenes.go("graph", kind="line", tickers=[self.ticker], return_to=self.return_to)
+        if not self.error:
+            if self.sheet_inc_btn.handle(event):
+                self._open_spreadsheet("income")
+            if self.sheet_bal_btn.handle(event):
+                self._open_spreadsheet("balance")
+
+    def _open_spreadsheet(self, which):
+        years = [b["year"] for b in self.block]
+        if which == "income":
+            title = f"{self.ticker} — Compte de résultat"
+            lines = self.block[0]["income"]["lines"]
+            rows = [(line["label"], [b["income"]["lines"][r]["value"] for b in self.block])
+                    for r, line in enumerate(lines)]
+        else:
+            title = f"{self.ticker} — Bilan"
+            rows = []
+            n_assets = len(self.block[0]["balance"]["assets_lines"])
+            for r in range(n_assets):
+                rows.append((self.block[0]["balance"]["assets_lines"][r]["label"],
+                             [b["balance"]["assets_lines"][r]["value"] for b in self.block]))
+            for r in range(len(self.block[0]["balance"]["liab_lines"])):
+                rows.append((self.block[0]["balance"]["liab_lines"][r]["label"],
+                             [b["balance"]["liab_lines"][r]["value"] for b in self.block]))
+        self.app.scenes.go("spreadsheet", return_to="financials",
+                           return_kwargs={"ticker": self.ticker, "return_to": self.return_to},
+                           import_data={"title": title, "years": years, "rows": rows})
 
     def update(self, dt):
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp, dt)
         self.fiche_btn.update(mp, dt)
         self.graph_btn.update(mp, dt)
+        self.sheet_inc_btn.update(mp, dt)
+        self.sheet_bal_btn.update(mp, dt)
 
     # ------------------------------------------------------------- draw
     def _draw_table(self, surf, rect, title, rows_by_year, accent):
@@ -82,6 +114,7 @@ class FinancialsScene(Scene):
         colw = 84
         x_label = inner.x
         xs = [inner.right - colw * (len(years) - k) for k in range(len(years))]
+        label_w = max(10, xs[0] - x_label - 10)   # marge avant la 1ère colonne de chiffres
         # en-tête années
         for k, yr in enumerate(years):
             tag = "N" if k == 0 else f"N-{k}"
@@ -91,8 +124,8 @@ class FinancialsScene(Scene):
         for label, vals in rows_by_year:
             emph = label in _EMPH
             lab_col = config.COL_AMBER if emph else config.COL_TEXT_DIM
-            widgets.draw_text(surf, label, (x_label, y),
-                              fonts.small(bold=emph), lab_col)
+            widgets.draw_text_fit(surf, label, (x_label, y),
+                                  fonts.small(bold=emph), lab_col, max_width=label_w)
             for k, v in enumerate(vals):
                 col = config.COL_WHITE if emph else config.COL_TEXT
                 if v < -0.5 and not emph:
@@ -148,6 +181,8 @@ class FinancialsScene(Scene):
         self.back_btn.draw(surf)
         self.fiche_btn.draw(surf)
         self.graph_btn.draw(surf)
+        self.sheet_inc_btn.draw(surf)
+        self.sheet_bal_btn.draw(surf)
 
     def _draw_overview(self, surf, rect):
         """Statistiques clés (mêmes que la fiche) + graphe de cours sur 5 ans."""

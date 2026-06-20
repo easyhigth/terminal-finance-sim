@@ -646,3 +646,133 @@ def test_long_run_world_volatility_stays_near_baseline_with_asymmetry():
     # temporelle change -> clustering après les mauvaises nouvelles).
     assert 0.85 < states.mean() < 1.25, (
         f"l'état d'asymétrie dérive de sa moyenne neutre attendue (~1.0): {states.mean():.3f}")
+
+
+# --------------------------------------------------- corrélations dynamiques
+def _run_window_forcing_stress(seed, world_vol_mult_state, regime, window):
+    """Avance le marché de `window` pas, en RE-FORÇANT à chaque pas l'état de
+    stress (world_vol_mult_state, regime) AVANT l'appel à step() — ceci isole
+    l'effet du mécanisme de corrélation dynamique sur une fenêtre de longueur
+    donnée, avec la MÊME séquence de tirages rng (même seed, même nombre de
+    pas) que la fenêtre « calme » comparée, donc seul stress_level diffère
+    entre les deux runs."""
+    m = Market(seed=seed)
+    m.fast_forward(50)
+    rets = []
+    for _ in range(window):
+        m.world_vol_mult_state = world_vol_mult_state
+        m.regime = regime
+        m.step()
+        rets.append(m.last_ret.copy())
+    return np.array(rets), m
+
+
+def test_correlation_rises_with_stress_between_two_companies():
+    """Propriété centrale du chantier : la corrélation réalisée entre deux
+    sociétés de secteurs ET régions différents (MIRC, Tech/USA, et TOTE,
+    Energie/Europe — donc sans lien structurel direct via b_secteur/b_region)
+    doit être nettement plus élevée sur une fenêtre de stress élevé que sur
+    une fenêtre calme de même longueur, même seed (même séquence de tirages
+    rng), seul l'état de stress forcé diffère."""
+    i_a, i_b = 1, 15  # MIRC (Tech, USA) / TOTE (Energie, Europe), cf. data/companies.py
+    window = 250
+    seed = 99
+
+    calm_rets, calm_m = _run_window_forcing_stress(seed, 1.0, "Calme", window)
+    stress_rets, stress_m = _run_window_forcing_stress(seed, 2.5, "Récession", window)
+
+    assert calm_m.companies[i_a]["sector"] != calm_m.companies[i_b]["sector"]
+    assert calm_m.companies[i_a]["region"] != calm_m.companies[i_b]["region"]
+
+    calm_corr = np.corrcoef(calm_rets[:, i_a], calm_rets[:, i_b])[0, 1]
+    stress_corr = np.corrcoef(stress_rets[:, i_a], stress_rets[:, i_b])[0, 1]
+
+    assert stress_corr > calm_corr + 0.15, (
+        f"la corrélation devrait nettement augmenter en stress : "
+        f"calme={calm_corr:.3f} stress={stress_corr:.3f}")
+
+
+def test_correlation_rises_with_stress_across_many_pairs():
+    """Même propriété que ci-dessus, mais agrégée sur de nombreuses paires
+    aléatoires (sociétés de secteurs/régions différents) pour vérifier que
+    l'effet n'est pas un artefact d'une paire particulière : la corrélation
+    moyenne absolue inter-sociétés (hors lien structurel direct) doit monter
+    en stress."""
+    seed = 4321
+    window = 200
+    rng = np.random.RandomState(0)
+    calm_rets, calm_m = _run_window_forcing_stress(seed, 1.0, "Calme", window)
+    stress_rets, _ = _run_window_forcing_stress(seed, 2.5, "Récession", window)
+
+    n = calm_m.n
+    pairs = []
+    while len(pairs) < 40:
+        a, b = rng.randint(0, n), rng.randint(0, n)
+        if a == b:
+            continue
+        ca, cb = calm_m.companies[a], calm_m.companies[b]
+        if ca["sector"] == cb["sector"] or ca["region"] == cb["region"]:
+            continue
+        pairs.append((a, b))
+
+    calm_corrs = [np.corrcoef(calm_rets[:, a], calm_rets[:, b])[0, 1] for a, b in pairs]
+    stress_corrs = [np.corrcoef(stress_rets[:, a], stress_rets[:, b])[0, 1] for a, b in pairs]
+
+    assert np.mean(stress_corrs) > np.mean(calm_corrs) + 0.10, (
+        f"corrélation moyenne hors lien structurel direct devrait monter en stress : "
+        f"calme={np.mean(calm_corrs):.3f} stress={np.mean(stress_corrs):.3f}")
+
+
+def test_dynamic_correlation_preserves_determinism():
+    """Le mécanisme de corrélations dynamiques ne doit introduire AUCUN
+    nouveau tirage rng : (seed, nb de pas) doit toujours reconstruire l'état
+    exact, comme avant ce chantier."""
+    a = Market(seed=606); a.fast_forward(400)
+    b = Market(seed=606); b.sync_to(400)
+    assert np.allclose(a.price, b.price)
+    assert a.world_vol_mult_state == pytest.approx(b.world_vol_mult_state)
+    assert a.last_stress_level == pytest.approx(b.last_stress_level)
+
+
+def _run_window_forcing_stress_level(seed, stress_level, window):
+    """Comme _run_window_forcing_stress, mais force DIRECTEMENT stress_level
+    (en monkeypatchant core.market._stress_level) plutôt que de passer par
+    world_vol_mult_state/regime — ceux-ci ont eux-mêmes un effet sur la vol de
+    BASE (chantier 5/6 : vol_mult de régime, multiplicateur de levier
+    asymétrique), qu'on ne veut pas mélanger avec l'effet propre du mécanisme
+    de corrélation dynamique de ce chantier. Isole ainsi PUREMENT l'effet de
+    la repondération (_blend_toward_world) sur la variance par société."""
+    import core.market as market_mod
+    m = Market(seed=seed)
+    m.fast_forward(50)
+    original = market_mod._stress_level
+    market_mod._stress_level = lambda *_a, **_k: stress_level
+    try:
+        rets = []
+        for _ in range(window):
+            m.step()
+            rets.append(m.last_ret.copy())
+    finally:
+        market_mod._stress_level = original
+    return np.array(rets), m
+
+
+def test_dynamic_correlation_preserves_each_company_own_variance():
+    """Le mélange vers le facteur monde doit reformer la STRUCTURE de
+    corrélation (qui co-bouge avec qui), pas le niveau de risque TOTAL : en
+    isolant purement l'effet de _blend_toward_world (stress_level forcé à 0
+    vs proche de 1, à régime/world_vol_mult_state identiques par ailleurs),
+    la variance non-conditionnelle de chaque société sur une longue fenêtre
+    doit rester du même ordre de grandeur."""
+    window = 1500
+    seed = 808
+
+    calm_rets, _ = _run_window_forcing_stress_level(seed, 0.0, window)
+    stress_rets, _ = _run_window_forcing_stress_level(seed, 0.95, window)
+
+    calm_var = calm_rets.var(axis=0)
+    stress_var = stress_rets.var(axis=0)
+    ratio = stress_var.mean() / calm_var.mean()
+    assert 0.6 < ratio < 1.7, (
+        f"la variance moyenne par société ne devrait pas dériver fortement avec le "
+        f"mélange de corrélation dynamique (ratio stress/calme={ratio:.2f})")

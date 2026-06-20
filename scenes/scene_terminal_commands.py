@@ -1121,6 +1121,12 @@ class TerminalCommandsMixin:
 
     # ------------------------------------------------------- temps & deals
     def _advance_time(self):
+        """Avance d'un pas de marché (config.DAYS_PER_STEP jours).
+        Retourne un dict décrivant le tour, utilisé par _advance_to_quarter
+        pour savoir si elle doit s'arrêter (évènement bloquant) ou continuer.
+        Ne pas confondre avec le nombre de pas restants avant le trimestre :
+        ce retour ne fait que rapporter ce qui s'est produit CE tour-ci.
+        """
         import random
         gs = self.app.gs
         p = gs.player
@@ -1129,6 +1135,7 @@ class TerminalCommandsMixin:
         cash_before = p.cash
         rep_before = p.reputation
         events_before = len(self.recent_events)
+        mandate_offers_before = len(p.mandate_offers)
         # crise/boom éventuel AVANT le pas (le choc s'applique dès ce tour)
         scenario = scenarios_mod.maybe_trigger(m)
         if scenario and m.crises:
@@ -1522,10 +1529,82 @@ class TerminalCommandsMixin:
             "good" if cash_delta >= 0 else "warn")
         if not p.hardcore:
             gs.save(config.AUTOSAVE_SLOT)
-        if summary["game_over"] or p.check_game_over():
+        game_over = bool(summary["game_over"] or p.check_game_over())
+        new_mandate_offer = len(p.mandate_offers) > mandate_offers_before
+        # motif d'arrêt prématuré pour ADV Q : tout évènement qui mérite l'attention
+        # immédiate du joueur avant de poursuivre l'avance automatique (on ne saute
+        # jamais par-dessus une décision, une crise ou une convocation).
+        stop_reason = None
+        if game_over:
+            stop_reason = "game_over"
+        elif dil:
+            stop_reason = "dilemma"
+        elif stress_test:
+            stop_reason = "stress_test"
+        elif summary.get("review_offer"):
+            stop_reason = "review"
+        elif inv:
+            stop_reason = "investigation"
+        elif new_mandate_offer:
+            stop_reason = "mandate_offer"
+        elif scenario:
+            stop_reason = "scenario"
+        elif mc:
+            stop_reason = "margin_call"
+        if game_over:
             self.app.scenes.go("gameover")
         elif dil:
             self.app.scenes.go("dilemma", return_to="terminal")
+        return {
+            "stop": stop_reason is not None,
+            "reason": stop_reason,
+            "quarter_changed": bool(summary.get("quarter_changed")),
+            "game_over": game_over,
+        }
+
+    # libellés courts affichés quand ADV Q s'interrompt avant la fin du trimestre
+    # (fonctions et non valeurs figées : la langue peut changer en cours de partie)
+    _ADV_STOP_LABELS = {
+        "game_over": lambda: _L("fin de partie", "game over"),
+        "dilemma": lambda: _L("décision requise", "decision required"),
+        "stress_test": lambda: _L("stress test réglementaire", "regulatory stress test"),
+        "review": lambda: _L("revue de performance", "performance review"),
+        "investigation": lambda: _L("enquête réglementaire", "regulatory investigation"),
+        "mandate_offer": lambda: _L("nouvelle offre de mandat", "new mandate offer"),
+        "scenario": lambda: _L("évènement de marché", "market event"),
+        "margin_call": lambda: _L("appel de marge", "margin call"),
+    }
+
+    def _advance_to_quarter(self):
+        """ADV Q : avance jusqu'au changement de trimestre, en répétant les pas
+        de _advance_time(), MAIS s'arrête immédiatement dès qu'un évènement
+        bloquant survient (dilemme, crise, mandat offert, appel de marge,
+        convocation, game over...) — on ne saute jamais par-dessus un évènement,
+        on évite juste au joueur de spammer ADV ~18 fois sans rien d'autre à faire.
+        """
+        p = self.app.gs.player
+        start_quarter = p.quarter
+        steps = 0
+        # garde-fou anti-boucle infinie : largement au-dessus du nombre de pas
+        # attendu pour un trimestre (config.DAYS_PER_QUARTER / DAYS_PER_STEP).
+        max_steps = (config.DAYS_PER_QUARTER // config.DAYS_PER_STEP) + 4
+        while steps < max_steps:
+            result = self._advance_time()
+            steps += 1
+            if result.get("game_over"):
+                return
+            if result["stop"]:
+                label_fn = self._ADV_STOP_LABELS.get(result["reason"])
+                label = label_fn() if label_fn else result["reason"]
+                self._log(_L(f"  ⏸ ADV Q interrompu après {steps} pas : {label}.",
+                              f"  ⏸ ADV Q stopped after {steps} step(s): {label}."))
+                return
+            if p.quarter != start_quarter:
+                self._log(_L(f"  ⏩ ADV Q : nouveau trimestre atteint en {steps} pas.",
+                              f"  ⏩ ADV Q: reached next quarter in {steps} step(s)."))
+                return
+        self._log(_L(f"  ⏸ ADV Q interrompu après {steps} pas (limite de sécurité).",
+                      f"  ⏸ ADV Q stopped after {steps} step(s) (safety limit)."))
 
     def _cmd_deals(self):
         self.app.scenes.go("deals", return_to="terminal")

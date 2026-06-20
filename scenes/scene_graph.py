@@ -78,6 +78,9 @@ class GraphScene(Scene):
         self._type_rects = {}
         self._period_rects = {}
         self._suggest_rects = []
+        self._chip_rects = []
+        self._quickadd_rects = []
+        self._controls_bottom = 168
         self.back_btn = widgets.Button(
             config.back_button_rect(180), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.mode_btn = widgets.Button(
@@ -109,6 +112,15 @@ class GraphScene(Scene):
                 self.input += event.unicode.upper()
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for rr, tk in self._suggest_rects:
+                if rr.collidepoint(event.pos):
+                    self._commit_input(ticker=tk)
+                    return
+            for rr, tk in self._chip_rects:
+                if rr.collidepoint(event.pos):
+                    if tk in self.tickers:
+                        self.tickers.remove(tk)
+                    return
+            for rr, tk in self._quickadd_rects:
                 if rr.collidepoint(event.pos):
                     self._commit_input(ticker=tk)
                     return
@@ -186,7 +198,7 @@ class GraphScene(Scene):
         self._draw_type_tabs(surf)
         self._draw_controls(surf)
 
-        canvas_top = 198 if self.kind == "line" else 168
+        canvas_top = self._controls_bottom + 10
         canvas_bottom = config.footer_y() - 10
         rsi_h = 110 if (self.kind == "line" and self.show_rsi) else 0
         main_h = canvas_bottom - canvas_top - (rsi_h + 12 if rsi_h else 0)
@@ -245,17 +257,85 @@ class GraphScene(Scene):
             pygame.draw.rect(surf, config.COL_CYAN if self.input else config.COL_BORDER, box, 1)
             widgets.draw_text(surf, f"{hint} ▸ {self.input}_", (box.x + 8, box.y + 5),
                               fonts.small(), config.COL_TEXT)
-            widgets.draw_text(surf, "tapez un nom, ex. « mavric » → MVC",
+            widgets.draw_text(surf, "ou cliquez ci-dessous",
                               (box.right + 12, box.y + 5), fonts.tiny(), config.COL_TEXT_DIM)
         else:
             self._input_box = None
+        y += 34
+        if self.kind not in _NO_ASSET:
+            y = self._draw_asset_picker(surf, y)
         if self.kind == "line":
-            self._draw_indicator_toggles(surf)
+            y = self._draw_indicator_toggles(surf, y)
+        self._controls_bottom = y
 
-    def _draw_indicator_toggles(self, surf):
+    def _quick_candidates(self, limit=8):
+        """Actifs cliquables proposés sans avoir à taper : watchlist puis
+        portefeuille du joueur, complétés par les plus grosses capitalisations —
+        pour faciliter le choix de 2+ actifs (comparaison, spread, corrélation)."""
+        p = self.app.gs.player
+        seen = set(self.tickers)
+        out = []
+        for tk in list(p.watchlist) + list(p.portfolio.keys()):
+            if tk not in seen and _asset_exists(self.market, tk):
+                seen.add(tk)
+                out.append(tk)
+        if len(out) < limit:
+            for c in self.market.top_companies(n=limit):
+                tk = c["ticker"]
+                if tk not in seen:
+                    seen.add(tk)
+                    out.append(tk)
+                if len(out) >= limit:
+                    break
+        return out[:limit]
+
+    def _draw_asset_picker(self, surf, y):
+        """Puces cliquables : actifs sélectionnés (retirables d'un clic) puis
+        suggestions rapides (watchlist/portefeuille/plus grosses capis) — pour
+        choisir sans taper, surtout utile dès qu'il faut 2+ actifs (COMP/HS/CORR)."""
+        self._chip_rects = []
+        self._quickadd_rects = []
+        x = 40
+        lbl_font = fonts.tiny()
+        if self.tickers:
+            img = lbl_font.render("Sélection :", True, config.COL_TEXT_DIM)
+            surf.blit(img, (x, y + 5))
+            x += img.get_width() + 8
+            for tk in self.tickers:
+                label = f"{tk}  ✕"
+                w = fonts.tiny(bold=True).size(label)[0] + 16
+                rect = pygame.Rect(x, y, w, 24)
+                self._chip_rects.append((rect, tk))
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect, border_radius=4)
+                pygame.draw.rect(surf, config.COL_AMBER, rect, 1, border_radius=4)
+                widgets.draw_text(surf, label, rect.center, fonts.tiny(bold=True),
+                                  config.COL_AMBER, align="center")
+                x += w + 6
+            x += 14
+
+        candidates = self._quick_candidates()
+        if candidates:
+            label = "Ajout rapide :" if self.kind in _MULTI else "Suggestions :"
+            img = lbl_font.render(label, True, config.COL_TEXT_DIM)
+            surf.blit(img, (x, y + 5))
+            x += img.get_width() + 8
+            for tk in candidates:
+                w = fonts.tiny(bold=True).size(tk)[0] + 16
+                if x + w > config.SCREEN_WIDTH - 40:
+                    break
+                rect = pygame.Rect(x, y, w, 24)
+                self._quickadd_rects.append((rect, tk))
+                pygame.draw.rect(surf, config.COL_PANEL, rect, border_radius=4)
+                pygame.draw.rect(surf, config.COL_CYAN, rect, 1, border_radius=4)
+                widgets.draw_text(surf, tk, rect.center, fonts.tiny(bold=True),
+                                  config.COL_CYAN, align="center")
+                x += w + 6
+        return y + 32
+
+    def _draw_indicator_toggles(self, surf, y):
         """Rangée de boutons toggle pour les indicateurs techniques superposables
         (SMA20, Bollinger, RSI) — purement analytique, aucun impact gameplay."""
-        x, y = 40, 130 + 34
+        x = 40
         for attr, btn, accent in self._indicator_btns:
             btn.rect.topleft = (x, y)
             active = getattr(self, attr)
@@ -264,6 +344,7 @@ class GraphScene(Scene):
             if active:
                 pygame.draw.rect(surf, accent, btn.rect, 2, border_radius=6)
             x += btn.rect.w + 8
+        return y + 34
 
     def _draw_suggestions(self, surf):
         """Menu déroulant de recherche intelligente (dessiné EN DERNIER, au-dessus

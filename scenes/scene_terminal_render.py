@@ -207,6 +207,11 @@ class TerminalRenderMixin:
         if unread:
             r = widgets.draw_badge(surf, f"@ {unread}", (x, y - 2), config.COL_CYAN)
             x = r.right + 14
+        # badge bac à sable : rappel visuel constant que ce run est jetable
+        # (jamais sauvegardé, cf. GameState.save() en mode sandbox).
+        if getattr(p, "sandbox", False):
+            r = widgets.draw_badge(surf, _t("sandbox.badge"), (x, y - 2), config.COL_NEUTRAL)
+            x = r.right + 14
         # bouton triche (mode test uniquement, jamais en jeu normal)
         self._cheat_btn_rect = None
         if getattr(self.app, "cheats", False):

@@ -73,6 +73,7 @@ TR = {
         "menu.continue": "CONTINUER",
         "menu.new": "NOUVELLE CARRIÈRE",
         "menu.load": "CHARGER / SAUVEGARDES",
+        "menu.sandbox": "BAC À SABLE",
         "menu.quit": "QUITTER",
         "menu.last_run": "DERNIÈRE PARTIE",
         "menu.lang": "LANGUE : FR",
@@ -117,6 +118,20 @@ TR = {
                                  "après un échec.",
         "runsetup.confirm": "CONFIRMER ET DÉMARRER",
         "runsetup.back": "← RÉGION",
+        # écran de configuration du mode bac à sable (run jetable, non sauvegardé)
+        "sandbox.title": "BAC À SABLE",
+        "sandbox.subtitle": "Run libre pour tester portefeuilles, paramètres de marché et "
+                            "scénarios de crise — jamais sauvegardé.",
+        "sandbox.continent": "Place financière",
+        "sandbox.cash": "Capital de départ",
+        "sandbox.regime": "Régime de marché",
+        "sandbox.unlock_label": "Déblocage",
+        "sandbox.unlock_all": "TOUT DÉBLOQUER",
+        "sandbox.launch": "LANCER",
+        "sandbox.hint": "Aucune sauvegarde n'est créée ni écrasée en mode bac à sable. "
+                        "Utilisez la commande CRISIS au terminal pour déclencher un "
+                        "scénario de stress test à la demande.",
+        "sandbox.badge": "BAC À SABLE",
         # terminal : panneaux
         "term.commands": "Commandes",
         "term.indices": "Indices",
@@ -163,6 +178,7 @@ TR = {
         "menu.continue": "CONTINUE",
         "menu.new": "NEW CAREER",
         "menu.load": "LOAD / SAVES",
+        "menu.sandbox": "SANDBOX",
         "menu.quit": "QUIT",
         "menu.last_run": "LAST RUN",
         "menu.lang": "LANGUAGE: EN",
@@ -206,6 +222,20 @@ TR = {
         "runsetup.hardcore_off": "Normal mode: you can reload a save after a setback.",
         "runsetup.confirm": "CONFIRM & START",
         "runsetup.back": "← REGION",
+        # sandbox mode setup screen (free-play run, never saved)
+        "sandbox.title": "SANDBOX MODE",
+        "sandbox.subtitle": "Free-play run to test portfolios, market parameters and "
+                            "crisis scenarios — never saved.",
+        "sandbox.continent": "Financial hub",
+        "sandbox.cash": "Starting cash",
+        "sandbox.regime": "Market regime",
+        "sandbox.unlock_label": "Unlocks",
+        "sandbox.unlock_all": "UNLOCK ALL",
+        "sandbox.launch": "LAUNCH",
+        "sandbox.hint": "No save is created or overwritten in sandbox mode. Use the "
+                        "CRISIS command in the terminal to trigger a stress test "
+                        "scenario on demand.",
+        "sandbox.badge": "SANDBOX",
         # terminal panels
         "term.commands": "Commands",
         "term.indices": "Indices",

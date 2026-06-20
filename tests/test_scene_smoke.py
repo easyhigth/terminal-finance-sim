@@ -26,7 +26,7 @@ _SPECIAL_KWARGS = {
 }
 
 # Scènes qui ne dépendent pas du joueur/marché en cours (écrans hors run).
-_NO_PLAYER_SCENES = {"menu", "splash", "intro", "continent", "runsetup", "saves"}
+_NO_PLAYER_SCENES = {"menu", "splash", "intro", "continent", "runsetup", "saves", "sandbox"}
 
 
 @pytest.fixture(scope="module")
@@ -70,7 +70,7 @@ def _visit(app, name):
 # Un test par scène enregistrée dans main.py, afin que l'échec pointe
 # directement sur la scène fautive plutôt qu'un test générique.
 _KNOWN_SCENES = [
-    "menu", "continent", "runsetup", "terminal", "glossary", "evaluation", "portfolio",
+    "menu", "continent", "runsetup", "sandbox", "terminal", "glossary", "evaluation", "portfolio",
     "ma", "ma_target", "mandates", "deals", "track", "risk", "quant",
     "spreadsheet", "saves", "gameover", "company", "commands", "mission",
     "career", "book", "inbox", "dilemma", "intro", "academy", "cert", "deal",

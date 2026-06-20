@@ -260,3 +260,63 @@ def maybe_trigger(market, rng=None):
 
     return {"id": s["id"], "name": s["name"], "kind": s["kind"], "story": story,
             "severity": severity, "region": region}
+
+
+def trigger_by_id(market, scenario_id, severity=1.0):
+    """Déclenche un scénario précis, de façon déterministe (sans rng) : utilisé
+    par le mode bac à sable (commande CRISIS) pour tester des stress tests
+    ad hoc, reproductibles à coup sûr pour une sévérité donnée.
+
+    Mirroir de maybe_trigger() (même mise à l'échelle world/sectors/regions/vol)
+    mais sans tirage probabiliste : la région (si le scénario est "regional")
+    est la première du pool plutôt qu'un tirage rng.choice, et la sévérité est
+    l'argument fourni (clampée à [sev_min, sev_max] du scénario), pas un
+    rng.uniform. Retourne le dict narratif (mêmes clés que maybe_trigger), ou
+    None si l'id est inconnu.
+    """
+    from core.i18n import get_lang
+    lang = get_lang()
+    pool = localized(lang)
+    s = next((x for x in pool if x["id"] == scenario_id), None)
+    if s is None:
+        return None
+
+    sev_min = s.get("sev_min", 1.0)
+    sev_max = s.get("sev_max", 1.0)
+    severity = max(sev_min, min(sev_max, severity)) if sev_max > sev_min else sev_min
+
+    regions = dict(s.get("regions") or {})
+    region = None
+    if s.get("regional"):
+        region_pool = [r for r in s.get("region_pool", _DEFAULT_REGION_POOL)
+                       if r in getattr(market, "regions", _DEFAULT_REGION_POOL)] \
+            or _DEFAULT_REGION_POOL
+        region = region_pool[0]   # déterministe : pas de rng.choice
+        regions[region] = regions.get(region, 0.0) + s.get("region_extra", 0.0) * severity
+
+    world = s.get("world", 0.0) * severity
+    sectors = _scale_dict(s.get("sectors"), severity)
+    regions = _scale_dict(regions, severity) if regions else None
+    vol = min(4.0, max(1.0, s.get("vol", 1.0) * (0.5 + 0.5 * severity)))
+
+    crisis = Crisis(
+        s["name"], steps=s["steps"], world=world,
+        regions=regions, sectors=sectors, vol_mult=vol,
+        severity=severity, kind=s["kind"])
+    market.add_crisis(crisis)
+
+    sev_word = _severity_label(severity, lang)
+    story = s["story"]
+    if lang == "en":
+        if region:
+            story = f"{story} (region affected: {region}, severity {sev_word})"
+        else:
+            story = f"{story} (severity {sev_word})"
+    else:
+        if region:
+            story = f"{story} (région touchée : {region}, sévérité {sev_word})"
+        else:
+            story = f"{story} (sévérité {sev_word})"
+
+    return {"id": s["id"], "name": s["name"], "kind": s["kind"], "story": story,
+            "severity": severity, "region": region, "crisis": crisis}

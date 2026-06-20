@@ -61,6 +61,7 @@ from scenes.scene_review import ReviewScene
 from scenes.scene_risk import RiskScene
 from scenes.scene_rivals import RivalsScene
 from scenes.scene_runsetup import RunSetupScene
+from scenes.scene_sandbox import SandboxScene
 from scenes.scene_saves import SavesScene
 from scenes.scene_shop import ShopScene
 from scenes.scene_splash import SplashScene
@@ -100,6 +101,7 @@ class App:
         self.scenes.register("menu", MenuScene(self))
         self.scenes.register("continent", ContinentScene(self))
         self.scenes.register("runsetup", RunSetupScene(self))
+        self.scenes.register("sandbox", SandboxScene(self))
         self.scenes.register("terminal", TerminalScene(self))
         self.scenes.register("glossary", GlossaryScene(self))
         self.scenes.register("evaluation", EvaluationScene(self))

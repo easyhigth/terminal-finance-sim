@@ -346,6 +346,37 @@ class TerminalCommandsMixin:
             self._log(_L(f"  ⊕ Grade max ({config.GRADES[-1]}) : toutes les actions débloquées.", f"  ⊕ Top grade ({config.GRADES[-1]}): all actions unlocked."))
             self._check_badges()
 
+    def _cmd_crisis(self, args):
+        """Déclenche un scénario de crise/stress test ad hoc — mode bac à sable
+        uniquement (sandbox=True), pour ne jamais perturber une partie normale."""
+        p = self.app.gs.player
+        if not getattr(p, "sandbox", False):
+            self._log(_L("  CRISIS n'est disponible qu'en mode bac à sable.",
+                         "  CRISIS is only available in sandbox mode."))
+            return
+        if not args:
+            self._log(_L("  Usage : CRISIS <id> [sévérité]  — scénarios disponibles :",
+                         "  Usage: CRISIS <id> [severity]  — available scenarios:"))
+            for s in scenarios_mod.SCENARIOS:
+                self._log(f"   {s['id']:<18} {s['name']}")
+            return
+        scenario_id = args[0].lower()
+        severity = 1.0
+        if len(args) > 1:
+            try:
+                severity = float(args[1])
+            except ValueError:
+                self._log(_L(f"  Sévérité invalide : {args[1]}.", f"  Invalid severity: {args[1]}."))
+                return
+        result = scenarios_mod.trigger_by_id(self.market, scenario_id, severity)
+        if result is None:
+            self._log(_L(f"  Scénario inconnu : {scenario_id}. Tapez CRISIS sans argument pour la liste.",
+                         f"  Unknown scenario: {scenario_id}. Type CRISIS with no argument for the list."))
+            return
+        self._log(_L(f"  ⊕ Crise déclenchée : {result['name']} (sévérité {result['severity']:.2f}).",
+                     f"  ⊕ Crisis triggered: {result['name']} (severity {result['severity']:.2f})."))
+        self._log("  " + result["story"])
+
     def _cmd_eval(self):
         """Ouvre l'examen si TOUS les critères de promotion sont remplis."""
         p = self.app.gs.player

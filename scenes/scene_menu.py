@@ -22,13 +22,14 @@ class MenuScene(Scene):
     def on_enter(self, **kwargs):
         cx = config.SCREEN_WIDTH // 2
         bw, bh, gap = 320, 50, 14
-        y0 = 422
+        y0 = 388
         self.auto = GameState.slot_meta(config.AUTOSAVE_SLOT)
         self.buttons = {
             "continue": widgets.Button((cx-bw//2, y0,              bw, bh), t("menu.continue"), config.COL_UP),
             "new":      widgets.Button((cx-bw//2, y0+(bh+gap),     bw, bh), t("menu.new"), config.COL_AMBER),
             "load":     widgets.Button((cx-bw//2, y0+(bh+gap)*2,   bw, bh), t("menu.load"), config.COL_CYAN),
-            "quit":     widgets.Button((cx-bw//2, y0+(bh+gap)*3,   bw, bh), t("menu.quit"), config.COL_DOWN),
+            "sandbox":  widgets.Button((cx-bw//2, y0+(bh+gap)*3,   bw, bh), t("menu.sandbox"), config.COL_NEUTRAL),
+            "quit":     widgets.Button((cx-bw//2, y0+(bh+gap)*4,   bw, bh), t("menu.quit"), config.COL_DOWN),
         }
         # bouton de langue (en haut à droite)
         self.lang_btn = widgets.Button((config.SCREEN_WIDTH-150, 40, 110, 34),
@@ -58,6 +59,8 @@ class MenuScene(Scene):
                     self.app.scenes.go("continent")
                 elif key == "load" and btn.enabled:
                     self.app.scenes.go("saves", return_to="menu")
+                elif key == "sandbox":
+                    self.app.scenes.go("sandbox")
                 elif key == "quit":
                     self.app.running = False
 

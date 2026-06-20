@@ -18,6 +18,7 @@ class PlayerState:
     continent: str = "Europe"
     track: str = "General"          # spécialisation (après Analyst)
     archetype: str = ""             # philosophie de run choisie au départ (core/archetypes.py)
+    firm: str = ""                  # ADN de la firme de départ (core/firms.py)
     grade_index: int = 0            # index dans config.GRADES
     reputation: int = 50            # 0–100
     cash: float = 0.0               # capital personnel / de la firme

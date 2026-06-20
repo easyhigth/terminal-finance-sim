@@ -4,6 +4,7 @@ positions, P&L latent, allocation, dividendes, bêta net). Lecture pure, sans
 exécuter d'ordres ni modifier l'état du joueur (sauf, indirectement, aucune
 modification du tout — ce module ne fait que lire).
 """
+from core import firms
 from core.portfolio_margin import net_worth
 
 
@@ -66,7 +67,9 @@ def dividends(player, market, days):
 
 
 def portfolio_beta(player, market):
-    """Bêta NET du portefeuille (les shorts réduisent l'exposition au marché)."""
+    """Bêta NET du portefeuille (les shorts réduisent l'exposition au marché),
+    modulé par la sensibilité de marché de l'ADN de la firme (hedge fund plus
+    exposé, desk obligataire/gestionnaire d'actifs plus prudents)."""
     comp = {c["ticker"]: c for c in market.companies}
     eq = net_worth(player, market)
     if eq <= 0:
@@ -78,4 +81,4 @@ def portfolio_beta(player, market):
         if price is None or not c:
             continue
         b += (price * p["shares"] / eq) * c["beta"]
-    return b
+    return b * firms.perk(player, "beta_exposure_mult")

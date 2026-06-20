@@ -1,14 +1,19 @@
 """
 scene_runsetup.py — Réglages de la partie : scénario de départ, archétype de
-run, mode hardcore. Étape intermédiaire entre le choix de région (continent)
-et le lancement (intro), pour ne pas entasser tous ces réglages sur l'écran
-de sélection de région.
+run, firme de départ, mode hardcore. Étape intermédiaire entre le choix de
+région (continent) et le lancement (intro), pour ne pas entasser tous ces
+réglages sur l'écran de sélection de région.
+
+Deux pages dans la même scène (au lieu de deux scènes séparées) : page 1 =
+scénario + archétype + hardcore (comme avant), page 2 = firme de départ
+(core/firms.py — troisième dimension orthogonale, cf. son docstring). Le
+choix de firme est additif : il ne remplace ni le scénario ni l'archétype.
 """
 import random
 
 import pygame
 
-from core import archetypes, config
+from core import archetypes, config, firms
 from core import profile as profile_mod
 from core import startscenarios as scen
 from core.game_state import GameState, PlayerState
@@ -25,36 +30,59 @@ class RunSetupScene(Scene):
         self.continent = kwargs.get("continent") or next(iter(config.CONTINENTS))
         self.scen_idx = 0
         self.arch_idx = 0
+        self.firm_idx = 0
         self.hardcore = False
+        self.page = 1
         self._scen_rects = {}
         self._arch_rects = {}
+        self._firm_rects = {}
         self._hardcore_rect = None
         fy = config.SCREEN_HEIGHT - 50
         self.back_btn = widgets.Button((40, fy, 200, 42), t("runsetup.back"), config.COL_TEXT_DIM)
+        self.next_btn = widgets.Button(
+            (config.SCREEN_WIDTH-300, fy, 260, 42), t("runsetup.next"), config.COL_UP)
+        self.prev_btn = widgets.Button(
+            (config.SCREEN_WIDTH-300, fy, 260, 42), t("runsetup.prev"), config.COL_TEXT_DIM)
         self.confirm_btn = widgets.Button(
             (config.SCREEN_WIDTH-300, fy, 260, 42), t("runsetup.confirm"), config.COL_UP)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go("continent", preselect=self.continent)
+            if self.page == 2:
+                self.page = 1
+            else:
+                self.app.scenes.go("continent", preselect=self.continent)
             return
-        if self.back_btn.handle(event):
-            self.app.scenes.go("continent", preselect=self.continent)
-            return
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            for idx, rect in self._scen_rects.items():
-                if rect.collidepoint(event.pos):
-                    self.scen_idx = idx
-                    return
-            for idx, rect in self._arch_rects.items():
-                if rect.collidepoint(event.pos):
-                    self.arch_idx = idx
-                    return
-            if self._hardcore_rect and self._hardcore_rect.collidepoint(event.pos):
-                self.hardcore = not self.hardcore
+        if self.page == 1:
+            if self.back_btn.handle(event):
+                self.app.scenes.go("continent", preselect=self.continent)
                 return
-        if self.confirm_btn.handle(event):
-            self._start_run()
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                for idx, rect in self._scen_rects.items():
+                    if rect.collidepoint(event.pos):
+                        self.scen_idx = idx
+                        return
+                for idx, rect in self._arch_rects.items():
+                    if rect.collidepoint(event.pos):
+                        self.arch_idx = idx
+                        return
+                if self._hardcore_rect and self._hardcore_rect.collidepoint(event.pos):
+                    self.hardcore = not self.hardcore
+                    return
+            if self.next_btn.handle(event):
+                self.page = 2
+                return
+        else:
+            if self.prev_btn.handle(event):
+                self.page = 1
+                return
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                for idx, rect in self._firm_rects.items():
+                    if rect.collidepoint(event.pos):
+                        self.firm_idx = idx
+                        return
+            if self.confirm_btn.handle(event):
+                self._start_run()
 
     def _start_run(self):
         gs = GameState()
@@ -65,6 +93,7 @@ class RunSetupScene(Scene):
         )
         scen.apply(gs.player, scen.SCENARIOS[self.scen_idx]["id"])  # conditions de départ
         archetypes.apply(gs.player, archetypes.ARCHETYPES[self.arch_idx]["id"])  # philosophie de run
+        firms.apply(gs.player, firms.FIRMS[self.firm_idx]["id"])  # ADN de la firme employeuse
         # asymétrie novice/expert : un profil qui a déjà prouvé sa maîtrise dans
         # une partie antérieure démarre "vétéran" — complexité ouverte plus vite,
         # onboarding écourté (cf. CLAUDE.md, brief stratégique point 4).
@@ -82,35 +111,50 @@ class RunSetupScene(Scene):
 
     def update(self, dt):
         mp = pygame.mouse.get_pos()
-        self.back_btn.update(mp, dt)
-        self.confirm_btn.update(mp, dt)
+        if self.page == 1:
+            self.back_btn.update(mp, dt)
+            self.next_btn.update(mp, dt)
+        else:
+            self.prev_btn.update(mp, dt)
+            self.confirm_btn.update(mp, dt)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
         widgets.draw_text(surf, t("runsetup.title"), (40, 24), fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, t("runsetup.subtitle").format(continent=self.continent),
+        step_key = "runsetup.step1" if self.page == 1 else "runsetup.step2"
+        widgets.draw_text(surf, t("runsetup.subtitle").format(continent=self.continent) + "  ·  " + t(step_key),
                           (42, 70), fonts.small(), config.COL_TEXT_DIM)
 
         fy = config.SCREEN_HEIGHT - 50
         hardcore_top = fy - 8 - 60
         top = 104
-        bottom = hardcore_top - 12
-        col_w = (config.SCREEN_WIDTH - 80 - 20) // 2
 
-        scen_rect = pygame.Rect(40, top, col_w, bottom - top)
-        arch_rect = pygame.Rect(40 + col_w + 20, top, col_w, bottom - top)
+        if self.page == 1:
+            bottom = hardcore_top - 12
+            col_w = (config.SCREEN_WIDTH - 80 - 20) // 2
 
-        self._scen_rects = self._draw_choice_list(
-            surf, scen_rect, t("runsetup.scenario"), config.COL_CYAN,
-            [(s["name"], self._scen_meta(s)) for s in scen.SCENARIOS], self.scen_idx)
-        self._arch_rects = self._draw_choice_list(
-            surf, arch_rect, t("runsetup.archetype"), config.COL_AMBER,
-            [(a["name"], a["tagline"] + "  " + a["desc"]) for a in archetypes.ARCHETYPES], self.arch_idx)
+            scen_rect = pygame.Rect(40, top, col_w, bottom - top)
+            arch_rect = pygame.Rect(40 + col_w + 20, top, col_w, bottom - top)
 
-        self._draw_hardcore_bar(surf, pygame.Rect(40, hardcore_top, config.SCREEN_WIDTH - 80, 60))
+            self._scen_rects = self._draw_choice_list(
+                surf, scen_rect, t("runsetup.scenario"), config.COL_CYAN,
+                [(s["name"], self._scen_meta(s)) for s in scen.SCENARIOS], self.scen_idx)
+            self._arch_rects = self._draw_choice_list(
+                surf, arch_rect, t("runsetup.archetype"), config.COL_AMBER,
+                [(a["name"], a["tagline"] + "  " + a["desc"]) for a in archetypes.ARCHETYPES], self.arch_idx)
 
-        self.back_btn.draw(surf)
-        self.confirm_btn.draw(surf)
+            self._draw_hardcore_bar(surf, pygame.Rect(40, hardcore_top, config.SCREEN_WIDTH - 80, 60))
+            self.back_btn.draw(surf)
+            self.next_btn.draw(surf)
+        else:
+            bottom = fy - 12
+            firm_rect = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, bottom - top)
+            self._firm_rects = self._draw_choice_list(
+                surf, firm_rect, t("runsetup.firm"), config.COL_CYAN,
+                [(f["name"], f["tagline"] + "  " + f["desc"]) for f in firms.FIRMS], self.firm_idx,
+                card_h=68, card_gap=6)
+            self.prev_btn.draw(surf)
+            self.confirm_btn.draw(surf)
 
     @staticmethod
     def _scen_meta(s):
@@ -118,12 +162,13 @@ class RunSetupScene(Scene):
                 f"grade {config.GRADES[s['grade_index']]} · réputation {s['reputation']}.  "
                 + s["desc"])
 
-    def _draw_choice_list(self, surf, panel_rect, title, accent, items, selected_idx):
+    def _draw_choice_list(self, surf, panel_rect, title, accent, items, selected_idx,
+                          card_h=CARD_H, card_gap=CARD_GAP):
         inner = widgets.draw_panel(surf, panel_rect, title, accent)
         rects = {}
         y = inner.y
         for i, (name, desc) in enumerate(items):
-            rect = pygame.Rect(inner.x, y, inner.w, CARD_H)
+            rect = pygame.Rect(inner.x, y, inner.w, card_h)
             if rect.bottom > inner.bottom:
                 break
             rects[i] = rect
@@ -134,7 +179,7 @@ class RunSetupScene(Scene):
                               fonts.small(bold=True), accent if selected else config.COL_TEXT)
             widgets.draw_text_wrapped(surf, desc, (rect.x+12, rect.y+30),
                                       fonts.tiny(), config.COL_TEXT_DIM, rect.w-24, line_gap=2)
-            y += CARD_H + CARD_GAP
+            y += card_h + card_gap
         return rects
 
     def _draw_hardcore_bar(self, surf, rect):

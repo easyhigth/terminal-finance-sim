@@ -15,7 +15,7 @@ Structures (PlayerState) :
 """
 import random
 
-from core import archetypes, tracks
+from core import archetypes, firms, tracks
 
 MIN_GRADE = 6              # Vice President et au-delà (cf. unlocks)
 MAX_ACTIVE = 2            # mandats simultanés
@@ -119,7 +119,8 @@ def maybe_offer(player, rng=None, market=None):
         return None
     if len(player.mandates) + len(player.mandate_offers) >= MAX_ACTIVE + 1:
         return None
-    offer_mult = tracks.perk(player, "mandate_offer_mult") * archetypes.perk(player, "mandate_offer_mult")
+    offer_mult = (tracks.perk(player, "mandate_offer_mult") * archetypes.perk(player, "mandate_offer_mult")
+                  * firms.perk(player, "mandate_offer_mult"))
     if rng.random() > OFFER_PROB * offer_mult:
         return None
     capital = round(rng.uniform(300_000, 1_200_000) * _scale(player.grade_index), -3)
@@ -151,7 +152,8 @@ def maybe_offer(player, rng=None, market=None):
         "horizon": horizon,
         "max_beta": max_beta,
         "reward_cash": round(capital * fee_pct * tracks.perk(player, "mandate_reward_mult")
-                             * archetypes.perk(player, "mandate_reward_mult"), 2),
+                             * archetypes.perk(player, "mandate_reward_mult")
+                             * firms.perk(player, "mandate_reward_mult"), 2),
         "reward_rep": rng.randint(6, 11) * (3 if transformant else 1),
         "penalty_rep": rng.randint(4, 8),
         "transformant": transformant,

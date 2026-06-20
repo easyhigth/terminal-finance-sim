@@ -37,12 +37,13 @@ class RunSetupScene(Scene):
         self._arch_rects = {}
         self._firm_rects = {}
         self._hardcore_rect = None
+        self._scrolls = {}
         fy = config.SCREEN_HEIGHT - 50
         self.back_btn = widgets.Button((40, fy, 200, 42), t("runsetup.back"), config.COL_TEXT_DIM)
         self.next_btn = widgets.Button(
             (config.SCREEN_WIDTH-300, fy, 260, 42), t("runsetup.next"), config.COL_UP)
         self.prev_btn = widgets.Button(
-            (config.SCREEN_WIDTH-300, fy, 260, 42), t("runsetup.prev"), config.COL_TEXT_DIM)
+            (40, fy, 200, 42), t("runsetup.prev"), config.COL_TEXT_DIM)
         self.confirm_btn = widgets.Button(
             (config.SCREEN_WIDTH-300, fy, 260, 42), t("runsetup.confirm"), config.COL_UP)
 
@@ -57,6 +58,10 @@ class RunSetupScene(Scene):
             if self.back_btn.handle(event):
                 self.app.scenes.go("continent", preselect=self.continent)
                 return
+            for key in ("scen", "arch"):
+                st = self._scrolls.get(key)
+                if st and st.handle_wheel(event):
+                    return
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 for idx, rect in self._scen_rects.items():
                     if rect.collidepoint(event.pos):
@@ -73,8 +78,8 @@ class RunSetupScene(Scene):
                 self.page = 2
                 return
         else:
-            if self.prev_btn.handle(event):
-                self.page = 1
+            st = self._scrolls.get("firm")
+            if st and st.handle_wheel(event):
                 return
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 for idx, rect in self._firm_rects.items():
@@ -83,6 +88,10 @@ class RunSetupScene(Scene):
                         return
             if self.confirm_btn.handle(event):
                 self._start_run()
+                return
+            if self.prev_btn.handle(event):
+                self.page = 1
+                return
 
     def _start_run(self):
         gs = GameState()
@@ -138,10 +147,10 @@ class RunSetupScene(Scene):
 
             self._scen_rects = self._draw_choice_list(
                 surf, scen_rect, t("runsetup.scenario"), config.COL_CYAN,
-                [(s["name"], self._scen_meta(s)) for s in scen.SCENARIOS], self.scen_idx)
+                [(s["name"], self._scen_meta(s)) for s in scen.SCENARIOS], self.scen_idx, "scen")
             self._arch_rects = self._draw_choice_list(
                 surf, arch_rect, t("runsetup.archetype"), config.COL_AMBER,
-                [(a["name"], a["tagline"] + "  " + a["desc"]) for a in archetypes.ARCHETYPES], self.arch_idx)
+                [(a["name"], a["tagline"] + "  " + a["desc"]) for a in archetypes.ARCHETYPES], self.arch_idx, "arch")
 
             self._draw_hardcore_bar(surf, pygame.Rect(40, hardcore_top, config.SCREEN_WIDTH - 80, 60))
             self.back_btn.draw(surf)
@@ -152,7 +161,7 @@ class RunSetupScene(Scene):
             self._firm_rects = self._draw_choice_list(
                 surf, firm_rect, t("runsetup.firm"), config.COL_CYAN,
                 [(f["name"], f["tagline"] + "  " + f["desc"]) for f in firms.FIRMS], self.firm_idx,
-                card_h=68, card_gap=6)
+                "firm", card_gap=6)
             self.prev_btn.draw(surf)
             self.confirm_btn.draw(surf)
 
@@ -163,23 +172,44 @@ class RunSetupScene(Scene):
                 + s["desc"])
 
     def _draw_choice_list(self, surf, panel_rect, title, accent, items, selected_idx,
-                          card_h=CARD_H, card_gap=CARD_GAP):
+                          scroll_key, card_gap=CARD_GAP):
+        """Liste de cartes à hauteur dynamique (selon le texte réellement
+        retourné à la ligne, pour ne jamais déborder d'une carte sur la
+        suivante) et défilante à la molette dès que le contenu dépasse la
+        hauteur du panneau (cf. `widgets.ScrollState`, déjà utilisé par
+        scene_markethub.py pour le même besoin)."""
         inner = widgets.draw_panel(surf, panel_rect, title, accent)
+        desc_font = fonts.tiny()
+        line_h = desc_font.get_height() + 2
+        text_w = inner.w - 24
+        heights = [max(CARD_H, 30 + len(widgets.wrap_text_lines(desc, desc_font, text_w)) * line_h + 12)
+                   for _, desc in items]
+        content_h = sum(heights) + card_gap * max(0, len(items) - 1)
+
+        st = self._scrolls.setdefault(scroll_key, widgets.ScrollState())
+        list_area = pygame.Rect(inner.x, inner.y, inner.w, inner.h)
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
         rects = {}
-        y = inner.y
-        for i, (name, desc) in enumerate(items):
-            rect = pygame.Rect(inner.x, y, inner.w, card_h)
-            if rect.bottom > inner.bottom:
-                break
-            rects[i] = rect
-            selected = (i == selected_idx)
-            pygame.draw.rect(surf, config.COL_PANEL_HEAD if selected else config.COL_PANEL, rect)
-            pygame.draw.rect(surf, accent if selected else config.COL_BORDER, rect, 2 if selected else 1)
-            widgets.draw_text(surf, name, (rect.x+12, rect.y+8),
-                              fonts.small(bold=True), accent if selected else config.COL_TEXT)
-            widgets.draw_text_wrapped(surf, desc, (rect.x+12, rect.y+30),
-                                      fonts.tiny(), config.COL_TEXT_DIM, rect.w-24, line_gap=2)
-            y += card_h + card_gap
+        y = inner.y - st.scroll
+        for i, ((name, desc), h) in enumerate(zip(items, heights)):
+            rect = pygame.Rect(inner.x, y, inner.w, h)
+            if rect.bottom > list_area.top and rect.top < list_area.bottom:
+                # clic-test borné à la zone visible (clippée) : une carte
+                # partiellement masquée en haut/bas du panneau ne doit pas
+                # rester cliquable au-delà de ce qui est réellement dessiné.
+                rects[i] = rect.clip(list_area)
+                selected = (i == selected_idx)
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD if selected else config.COL_PANEL, rect)
+                pygame.draw.rect(surf, accent if selected else config.COL_BORDER, rect, 2 if selected else 1)
+                widgets.draw_text(surf, name, (rect.x+12, rect.y+8),
+                                  fonts.small(bold=True), accent if selected else config.COL_TEXT)
+                widgets.draw_text_wrapped(surf, desc, (rect.x+12, rect.y+30),
+                                          desc_font, config.COL_TEXT_DIM, text_w, line_gap=2)
+            y += h + card_gap
+        surf.set_clip(prev_clip)
+        st.set_bounds(list_area, content_h)
+        widgets.draw_scrollbar(surf, panel_rect, list_area, st.scroll, st.max_scroll, content_h)
         return rects
 
     def _draw_hardcore_bar(self, surf, rect):

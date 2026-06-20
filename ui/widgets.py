@@ -88,22 +88,32 @@ def draw_text_scaled(surf, text, pos, font, color, max_width, align="left"):
     return rect
 
 
-def draw_text_wrapped(surf, text, pos, font, color, max_width, line_gap=4):
-    """Dessine un paragraphe en gérant le retour à la ligne. Retourne la hauteur."""
+def wrap_text_lines(text, font, max_width):
+    """Découpe `text` en lignes ne dépassant pas `max_width`, sans rien
+    dessiner (même règle de coupe que `draw_text_wrapped`). Utile pour
+    mesurer la hauteur d'un paragraphe avant de le rendre, par ex. pour
+    dimensionner dynamiquement une carte selon son contenu."""
     words = text.split(" ")
-    x, y = pos
+    lines = []
     line = ""
-    line_h = font.get_height() + line_gap
-    start_y = y
     for word in words:
         test = (line + " " + word).strip()
         if font.size(test)[0] <= max_width:
             line = test
         else:
-            draw_text(surf, line, (x, y), font, color)
-            y += line_h
+            lines.append(line)
             line = word
     if line:
+        lines.append(line)
+    return lines
+
+
+def draw_text_wrapped(surf, text, pos, font, color, max_width, line_gap=4):
+    """Dessine un paragraphe en gérant le retour à la ligne. Retourne la hauteur."""
+    x, y = pos
+    line_h = font.get_height() + line_gap
+    start_y = y
+    for line in wrap_text_lines(text, font, max_width):
         draw_text(surf, line, (x, y), font, color)
         y += line_h
     return y - start_y

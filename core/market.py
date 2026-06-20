@@ -122,6 +122,105 @@ ASYM_VOL_MIN_MULT = 0.5         # plancher du multiplicateur de vol
 # deux gains à elle seule biaiserait la moyenne stationnaire de l'état.
 _ASYM_VOL_GAIN_AVG = (ASYM_VOL_DOWN_GAIN + ASYM_VOL_UP_GAIN) / 2.0
 
+# ---- corrélations dynamiques (diversification dégradée en stress) --------
+# Dans la réalité, la diversification (sectorielle/régionale/spécifique)
+# fonctionne bien en période calme mais s'effondre en stress : « les
+# corrélations vont à 1 en crise ». Le modèle de facteurs actuel ne produit
+# QUE de la corrélation structurelle figée (mêmes beta/b_secteur/b_région en
+# permanence) ; on la rend ici DYNAMIQUE en faisant varier, à chaque pas, le
+# poids relatif du facteur MONDE (partagé par toutes les sociétés) face aux
+# facteurs secteur/région/idiosyncratique (propres à un sous-ensemble), en
+# fonction d'un niveau de stress courant.
+#
+# stress_level (0=calme, 1=stress max) est dérivé de signaux déjà calculés,
+# PAS d'une métrique inventée séparément :
+#   - world_vol_mult_state (chantier 6) : proxy de stress déjà lissé/persistant
+#     (clustering de volatilité du facteur monde) -> normalisé sur sa plage
+#     [1.0 (neutre), ASYM_VOL_MAX_MULT] ;
+#   - le régime courant (Volatil/Récession) qui ajoute un plancher de stress
+#     cohérent avec la toile de fond lente (même hors pic ponctuel de vol).
+#
+# Mélange : pour les facteurs secteur/région/idio, on injecte une fraction w
+# (croissante avec le stress) d'une version du facteur monde RE-NORMALISÉE à
+# l'écart-type de chacun, EN PLUS du tirage propre (pas à sa place) :
+#   F_X_blend = sqrt(1-w²)·F_X + w·F_world_scaled_to_var(F_X)
+# Ce choix précis (plutôt qu'une simple moyenne pondérée (1-w)/w) préserve
+# EXACTEMENT la variance MARGINALE de chaque facteur F_X pour tout w (les
+# deux termes sont indépendants par construction et de variance respective
+# (1-w²)·v_X et w²·v_X -> somme v_X). Mais cela introduit nécessairement de
+# la covariance entre F_secteur_blend/F_région_blend/eps_blend (ils partagent
+# tous le même w·F_monde) : LE RISQUE TOTAL d'une société (somme des 4 jambes
+# du rendement) augmenterait donc mécaniquement avec w si on s'arrêtait là —
+# alors que seule la STRUCTURE de corrélation doit changer (cf. brief), pas
+# le risque total. On corrige donc la jambe non-monde (secteur+région+idio)
+# par un facteur multiplicatif c(w) — calculé par société, en clos, à partir
+# des variances/poids propres à CHAQUE société (beta_i, b_secteur_i,
+# b_région_i, sigma_i) — qui annule EXACTEMENT cette inflation de variance
+# (résolution d'une équation du second degré en c, cf. tests). Au global,
+# pour CHAQUE société : Var(rendement total) reste égale à sa valeur à w=0,
+# pour tout w — seule la corrélation CROISÉE entre sociétés (via le terme
+# partagé w·F_monde, lui non corrigé) augmente avec le stress.
+STRESS_VOLMULT_NEUTRAL = 1.0
+STRESS_REGIME_FLOOR = {"Expansion": 0.0, "Calme": 0.0, "Volatil": 0.35, "Récession": 0.55}
+STRESS_BLEND_W_MAX = 0.85   # poids max du monde dans le mélange (jamais 1.0 -> il
+                            # reste toujours un résidu de diversification, même
+                            # en stress extrême, comme dans la réalité)
+
+
+def _stress_level(world_vol_mult_state, regime):
+    """Niveau de stress courant (0..1), combinaison continue de l'état
+    d'asymétrie de volatilité (chantier 6, déjà lissé/persistant) et d'un
+    plancher dépendant du régime de fond courant."""
+    vol_excess = max(0.0, world_vol_mult_state - STRESS_VOLMULT_NEUTRAL)
+    vol_span = max(1e-9, ASYM_VOL_MAX_MULT - STRESS_VOLMULT_NEUTRAL)
+    vol_stress = min(1.0, vol_excess / vol_span)
+    regime_floor = STRESS_REGIME_FLOOR.get(regime, 0.0)
+    return min(1.0, max(vol_stress, regime_floor))
+
+
+def _blend_factor_toward_world(own, world_centered, w, own_std, world_std, eps=1e-12):
+    """F_X_blend = sqrt(1-w²)·own + w·world_centered_rescalé_à_std(own).
+
+    `own` : array (secteurs, régions, ou sociétés pour eps) déjà à son
+    échelle calibrée habituelle. `world_centered` : scalaire, partie centrée
+    (bruit+saut, hors dérive) du facteur monde du pas. `own_std`/`world_std` :
+    écarts-types THÉORIQUES calibrés (pas mesurés sur l'échantillon du pas :
+    plus stable, et permet le calcul EXACT du facteur de correction c(w) en
+    aval, qui suppose ces variances connues a priori). Préserve exactement la
+    variance THÉORIQUE de own (les deux termes sont d'écarts-types
+    sqrt(1-w²)·own_std et w·own_std, donc de variance totale own_std² — la
+    corrélation introduite avec le monde, elle, ne s'annule pas)."""
+    if w <= 0.0:
+        return np.asarray(own, dtype=np.float64)
+    if world_std < eps:
+        return np.asarray(own, dtype=np.float64)
+    world_scaled = world_centered * (own_std / world_std)
+    return np.sqrt(max(0.0, 1.0 - w * w)) * own + w * world_scaled
+
+
+def nonworld_variance_correction(w, v_nonworld0, s_cross, t_cross, beta, world_std):
+    """Facteur multiplicatif c(w) appliqué à la jambe non-monde (secteur +
+    région + idio) du rendement, qui annule EXACTEMENT l'inflation de
+    variance introduite par `_blend_factor_toward_world` sur cette jambe (cf.
+    commentaire ci-dessus pour la dérivation). `v_nonworld0`, `s_cross`,
+    `t_cross` sont des constantes PAR SOCIÉTÉ (calculées une fois, cf.
+    Market.__init__), `beta` le beta de la société, `world_std` l'écart-type
+    calibré du facteur monde au pas (VOL_WORLD*vol_mult*world_vol_mult_state).
+
+    Dérivation : avec L = b_sec·F_sec_blend + b_reg·F_reg_blend + sigma·eps_blend,
+    Var(L) = v_nonworld0 + w²·s_cross, Cov(F_monde, L) = w·world_std·t_cross.
+    On cherche c tel que Var(beta·F_monde + c·L) == Var(beta·F_monde + L)|w=0
+    == beta²·world_std² + v_nonworld0, ce qui donne l'équation du second degré
+    c²·(v_nonworld0 + w²·s_cross) + 2·c·beta·w·world_std·t_cross - v_nonworld0 = 0,
+    dont la racine positive (c(0)=1) est retenue."""
+    denom = v_nonworld0 + w * w * s_cross
+    safe_denom = np.where(denom < 1e-15, 1.0, denom)
+    b_term = beta * w * world_std * t_cross
+    disc = b_term * b_term + denom * v_nonworld0
+    c = (-b_term + np.sqrt(np.maximum(0.0, disc))) / safe_denom
+    return np.where(denom < 1e-15, 1.0, c)
+
+
 # Régimes de marché — toile de fond lente (déterministe) par-dessus les crises.
 # Chaque régime module la dérive et la volatilité du facteur MONDE. Les écarts
 # entre régimes sont volontairement marqués (et leur persistance élevée, cf.
@@ -264,6 +363,9 @@ class Market:
         # poussé à la hausse plus fortement après un choc négatif que positif.
         self.world_vol_mult_state = 1.0
         self._last_world_noise = 0.0   # bruit Student-t (hors shock/jump) du dernier pas
+        # corrélations dynamiques (cf. _stress_level/_blend_toward_world) : niveau
+        # de stress du dernier pas (0..1), conservé pour lecture/diagnostic.
+        self.last_stress_level = 0.0
         self.crises = []
         self.ended_crises = []   # crises qui viennent de s'éteindre CE pas (pour postmortem)
         self.crisis_cooldown = 0  # pas restants d'accalmie forcée après une crise majeure
@@ -402,14 +504,56 @@ class Market:
             if "Immobilier" in self._sector_idx:
                 F_sector[self._sector_idx["Immobilier"]] += world_jump * 0.4
 
+        # ---- corrélations dynamiques : mélange secteur/région/idio -> monde --
+        # Le stress du pas est évalué AVANT la mise à jour de world_vol_mult_state
+        # (cf. plus bas) : on utilise l'état entrant (déjà connu en début de pas,
+        # reflet du clustering de volatilité accumulé jusqu'ici), pas une valeur
+        # qui dépendrait du tirage de CE pas (déterminisme : aucun tirage rng
+        # supplémentaire n'est introduit par ce mécanisme, on ne fait que
+        # repondérer des réalisations déjà tirées ci-dessus).
+        stress = _stress_level(self.world_vol_mult_state, self.regime)
+        w_blend = STRESS_BLEND_W_MAX * stress
+        self.last_stress_level = stress
+        # écarts-types calibrés du pas (mêmes multiplicateurs vol_mult/world_vol_mult_state
+        # que ceux utilisés ci-dessus pour les tirages) -- nécessaires au calcul exact
+        # du facteur de correction de variance c(w) (cf. nonworld_variance_correction).
+        world_std = VOL_WORLD * vol_mult * self.world_vol_mult_state
+        sector_std = VOL_SECTOR * vol_mult
+        region_std = VOL_REGION * vol_mult
+        eps_std = 1.0
+        if w_blend > 0.0:
+            # partie centrée du monde (bruit + saut, hors dérive régime/macro/crise) :
+            # cible de mélange, pour ne pas injecter de biais de niveau supplémentaire.
+            world_centered = F_world - (MU_WORLD + reg["drift"] + world_shock)
+            F_sector = _blend_factor_toward_world(F_sector, world_centered, w_blend, sector_std, world_std)
+            F_region = _blend_factor_toward_world(F_region, world_centered, w_blend, region_std, world_std)
+            eps = _blend_factor_toward_world(eps, world_centered, w_blend, eps_std, world_std)
+            # facteur de correction PAR SOCIÉTÉ qui annule l'inflation de variance
+            # introduite sur la jambe non-monde par le mélange ci-dessus (le mélange
+            # préserve la variance MARGINALE de chaque facteur secteur/région/idio,
+            # mais les rend mutuellement corrélés via le terme partagé w·F_monde,
+            # ce qui gonflerait Var(secteur+région+idio) si on ne corrigeait pas).
+            v_nonworld0 = (self.b_sector ** 2 * sector_std ** 2
+                           + self.b_region ** 2 * region_std ** 2
+                           + self.sigma ** 2 * eps_std ** 2)
+            s_cross = 2.0 * (self.b_sector * self.b_region * sector_std * region_std
+                              + self.b_sector * self.sigma * sector_std * eps_std
+                              + self.b_region * self.sigma * region_std * eps_std)
+            t_cross = (self.b_sector * sector_std + self.b_region * region_std
+                       + self.sigma * eps_std)
+            nonworld_corr = nonworld_variance_correction(
+                w_blend, v_nonworld0, s_cross, t_cross, self.beta, world_std)
+        else:
+            nonworld_corr = 1.0
+
         # saison de résultats : choc de cours sur les sociétés qui publient ce pas
         earnings_shock = self._step_earnings()
 
         ret = (self.drift
                + self.beta * F_world
-               + self.b_sector * F_sector[self.sec_id]
-               + self.b_region * F_region[self.reg_id]
-               + self.sigma * eps
+               + nonworld_corr * (self.b_sector * F_sector[self.sec_id]
+                                   + self.b_region * F_region[self.reg_id]
+                                   + self.sigma * eps)
                + earnings_shock)
         # borne les rendements par pas pour éviter les valeurs aberrantes
         np.clip(ret, -0.35, 0.35, out=ret)

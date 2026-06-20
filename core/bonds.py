@@ -21,7 +21,7 @@ sont versés à chaque tour.
 Holdings : PlayerState.bonds = { bond_id : {"qty": nb d'obligations, "avg": prix moyen} }.
 Nominal (face) = 1000 par obligation.
 """
-from core import finmath
+from core import finmath, firms
 from core import governments as gov_mod
 from core import liquidity as liq_mod
 from data import companies as comp_data
@@ -252,7 +252,7 @@ def buy_bond(player, market, bond_id, qty):
         return {"ok": False, "reason": "qty"}
     fill = fill_price(market, bond_id, qty, "buy")
     cost = fill * qty
-    fee = cost * COMMISSION
+    fee = cost * COMMISSION * firms.perk(player, "bond_commission_mult")
     total = cost + fee
     if total > player.cash:
         return {"ok": False, "reason": "cash", "need": total}
@@ -277,7 +277,7 @@ def sell_bond(player, market, bond_id, qty):
         return {"ok": False, "reason": "qty"}
     fill = fill_price(market, bond_id, qty, "sell")
     proceeds = fill * qty
-    fee = proceeds * COMMISSION
+    fee = proceeds * COMMISSION * firms.perk(player, "bond_commission_mult")
     net = proceeds - fee
     realized = (fill - pos["avg"]) * qty - fee
     player.cash += net

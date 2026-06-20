@@ -10,7 +10,7 @@ Conventions :
   exposition brute      = Σ |shares|·prix
   levier                = exposition brute / equity
 """
-from core import tracks
+from core import firms, tracks
 
 MAINT_MARGIN = 0.25       # equity/exposition mini avant appel de marge
 MARGIN_SPREAD = 0.03      # surcoût annuel sur le taux directeur (emprunt sur marge)
@@ -23,14 +23,17 @@ def max_leverage(grade_index):
 
 
 def _max_leverage(player):
-    """Levier maximal effectif (bonus de voie Risk inclus)."""
-    return max_leverage(player.grade_index) + tracks.perk(player, "max_leverage_add")
+    """Levier maximal effectif (bonus de voie Risk + ADN de firme inclus)."""
+    return (max_leverage(player.grade_index) + tracks.perk(player, "max_leverage_add")
+            + firms.perk(player, "max_leverage_add"))
 
 
 def _maint_margin(player):
-    """Marge de maintenance effective (plus clémente pour la voie Risk)."""
+    """Marge de maintenance effective (plus clémente pour la voie Risk,
+    modulée par l'ADN de la firme — hedge fund plus stricte, etc.)."""
     m = tracks.perk(player, "maint_margin")
-    return MAINT_MARGIN if m is None else m
+    base = MAINT_MARGIN if m is None else m
+    return base * firms.perk(player, "maint_margin_mult")
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +150,8 @@ def accrue_financing(player, market, days):
     yr = days / 365.0
     rate = market.macro["rate"]["v"] / 100.0 if hasattr(market, "macro") else 0.03
     borrowed = max(0.0, -player.cash)
-    interest = borrowed * (rate + MARGIN_SPREAD * tracks.perk(player, "margin_spread_mult")) * yr
+    spread_mult = tracks.perk(player, "margin_spread_mult") * firms.perk(player, "margin_spread_mult")
+    interest = borrowed * (rate + MARGIN_SPREAD * spread_mult) * yr
     short_notional = sum(abs(p["shares"]) * (market.price_of(t) or 0.0)
                          for t, p in player.portfolio.items() if p["shares"] < 0)
     borrow_fee = short_notional * SHORT_FEE_ANNUAL * yr

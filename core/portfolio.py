@@ -21,7 +21,7 @@ reporting (détail des positions, allocation, dividendes...) dans
 core/portfolio_views.py — réexportés ici pour que l'API publique (`pf.xxx`)
 reste un point d'entrée unique.
 """
-from core import tracks
+from core import firms, tracks
 from core.portfolio_margin import (  # noqa: F401 (réexporté, API publique de pf.)
     MAINT_MARGIN,
     MARGIN_SPREAD,
@@ -78,12 +78,17 @@ def fill_price(market, ticker, qty, side):
 # ---------------------------------------------------------------------------
 def buy(player, market, ticker, qty):
     """Ouvre/renforce une position LONGUE (achat sur marge autorisé selon levier).
-    Refuse si une position courte est ouverte (utiliser COVER d'abord)."""
+    Refuse si une position courte est ouverte (utiliser COVER d'abord), ou si
+    le secteur est exclu par l'ADN de la firme (ex. maison ESG vs Énergie)."""
     price = market.price_of(ticker)
     if price is None:
         return {"ok": False, "reason": "ticker"}
     if qty <= 0:
         return {"ok": False, "reason": "qty"}
+    i = market.ticker_idx.get(ticker)
+    sector = market.companies[i]["sector"] if i is not None else None
+    if sector is not None and not firms.sector_allowed(player, sector):
+        return {"ok": False, "reason": "sector_excluded", "sector": sector}
     pos = player.portfolio.get(ticker)
     if pos and pos["shares"] < 0:
         return {"ok": False, "reason": "isshort"}
@@ -229,8 +234,9 @@ def check_margin_call(player, market):
             sell(player, market, t, qty)
         else:
             cover(player, market, t, qty)
-    from core import archetypes
-    penalty = liquidated * LIQUIDATION_FEE * archetypes.perk(player, "margin_call_penalty_mult")
+    from core import archetypes, firms
+    penalty = (liquidated * LIQUIDATION_FEE * archetypes.perk(player, "margin_call_penalty_mult")
+               * firms.perk(player, "margin_call_penalty_mult"))
     player.cash -= penalty
     player.flags["margin_call_count"] = player.flags.get("margin_call_count", 0) + 1
     player.total_margin_penalty = getattr(player, "total_margin_penalty", 0.0) + penalty

@@ -111,6 +111,7 @@ TR = {
         "runsetup.subtitle": "Place financière : {continent}. Choisissez les conditions de départ.",
         "runsetup.scenario": "Scénario de départ",
         "runsetup.archetype": "Archétype de jeu",
+        "runsetup.firm": "Firme de départ",
         "runsetup.hardcore_title": "MODE HARDCORE",
         "runsetup.hardcore_on": "Permadeath activé : aucune reprise après une faillite, "
                                 "la sauvegarde est définitive.",
@@ -118,6 +119,10 @@ TR = {
                                  "après un échec.",
         "runsetup.confirm": "CONFIRMER ET DÉMARRER",
         "runsetup.back": "← RÉGION",
+        "runsetup.next": "SUIVANT →",
+        "runsetup.prev": "← PRÉCÉDENT",
+        "runsetup.step1": "Étape 1/2 : scénario et archétype",
+        "runsetup.step2": "Étape 2/2 : firme de départ",
         # écran de configuration du mode bac à sable (run jetable, non sauvegardé)
         "sandbox.title": "BAC À SABLE",
         "sandbox.subtitle": "Run libre pour tester portefeuilles, paramètres de marché et "
@@ -216,12 +221,17 @@ TR = {
         "runsetup.subtitle": "Financial hub: {continent}. Choose your starting conditions.",
         "runsetup.scenario": "Starting scenario",
         "runsetup.archetype": "Run archetype",
+        "runsetup.firm": "Starting firm",
         "runsetup.hardcore_title": "HARDCORE MODE",
         "runsetup.hardcore_on": "Permadeath on: no recovery after bankruptcy, "
                                 "the save is final.",
         "runsetup.hardcore_off": "Normal mode: you can reload a save after a setback.",
         "runsetup.confirm": "CONFIRM & START",
         "runsetup.back": "← REGION",
+        "runsetup.next": "NEXT →",
+        "runsetup.prev": "← BACK",
+        "runsetup.step1": "Step 1/2: scenario and archetype",
+        "runsetup.step2": "Step 2/2: starting firm",
         # sandbox mode setup screen (free-play run, never saved)
         "sandbox.title": "SANDBOX MODE",
         "sandbox.subtitle": "Free-play run to test portfolios, market parameters and "

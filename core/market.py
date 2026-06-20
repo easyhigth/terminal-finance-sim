@@ -87,6 +87,41 @@ JUMP_MAGNITUDE_MEAN = 0.045  # ampleur moyenne (log-rendement) du saut sur F_mon
 JUMP_MAGNITUDE_VOL = 0.02    # dispersion de l'ampleur autour de la moyenne
 JUMP_DOWN_BIAS = 0.8         # probabilité qu'un saut soit baissier (krachs > booms)
 
+# ---- effet de levier asymétrique (vol clustering, type GJR-GARCH) ----------
+# Dans les marchés réels, une mauvaise nouvelle (rendement négatif) augmente la
+# volatilité FUTURE plus qu'une bonne nouvelle de même ampleur (« leverage
+# effect » : une baisse de cours augmente le levier financier des entreprises,
+# ce qui les rend plus risquées ; + effets de panique/liquidité asymétriques).
+# On modélise ceci par un état d'« écart de volatilité » du facteur MONDE,
+# multiplicatif autour de 1.0, qui :
+#   - revient vers 1.0 (sa valeur neutre = volatilité de base VOL_WORLD) à
+#     chaque pas avec une vitesse ASYM_VOL_MEAN_REV (mean reversion, persiste
+#     sur plusieurs pas -> clustering, pas un effet d'un seul pas) ;
+#   - est poussé À LA HAUSSE par le carré du dernier choc MONDE non-régime
+#     (la part "bruit", hors dérive/régime/crise scénarisée), avec un gain
+#     ASYM_VOL_DOWN_GAIN si ce choc était négatif, ASYM_VOL_UP_GAIN (plus
+#     faible) s'il était positif -> asymétrie du "levier".
+# Le facteur world_shock (Crisis scénarisées) et le saut structurel (jump) ne
+# sont PAS inclus dans le choc qui alimente cette mise à jour : ce sont déjà
+# des chocs explicitement pilotés (vol_mult / scénario), on ne veut pas une
+# double comptabilisation, seulement capturer la réaction du marché au BRUIT
+# courant (Student-t) du facteur monde.
+# Calibration conservatrice : la variance stationnaire de ce processus reste
+# proche de 1.0 (voir tests/test_market.py) pour ne pas faire dériver la
+# volatilité longue-terme — seule sa DISTRIBUTION DANS LE TEMPS change
+# (clustering après une mauvaise nouvelle), pas sa moyenne.
+ASYM_VOL_MEAN_REV = 0.12        # vitesse de retour vers 1.0 par pas (~8 pas de demi-vie)
+ASYM_VOL_DOWN_GAIN = 1.8        # gain de réaction après un choc monde négatif
+ASYM_VOL_UP_GAIN = 0.9          # gain de réaction après un choc monde positif (< down)
+ASYM_VOL_MAX_MULT = 2.5         # plafond du multiplicateur de vol (anti-explosion)
+ASYM_VOL_MIN_MULT = 0.5         # plancher du multiplicateur de vol
+# Les gains DOWN/UP sont ensuite divisés par leur moyenne (cf. step()) pour
+# que l'impact moyen attendu (sur un choc symétrique en signe) reste 1.0 :
+# seule l'ASYMÉTRIE down/up (leur ratio) influence la volatilité de long
+# terme, pas leur niveau moyen — sans cette normalisation, la moyenne des
+# deux gains à elle seule biaiserait la moyenne stationnaire de l'état.
+_ASYM_VOL_GAIN_AVG = (ASYM_VOL_DOWN_GAIN + ASYM_VOL_UP_GAIN) / 2.0
+
 # Régimes de marché — toile de fond lente (déterministe) par-dessus les crises.
 # Chaque régime module la dérive et la volatilité du facteur MONDE. Les écarts
 # entre régimes sont volontairement marqués (et leur persistance élevée, cf.
@@ -224,6 +259,11 @@ class Market:
         self.last_region = np.zeros(len(self.regions))
         self.prev_price = None      # prix avant le dernier pas (attribution P&L)
         self.last_ret = None        # rendements log du dernier pas (par société)
+        # effet de levier asymétrique (cf. ASYM_VOL_*) : multiplicateur d'écart-type
+        # du facteur MONDE, état persistant qui mean-reverte vers 1.0 mais est
+        # poussé à la hausse plus fortement après un choc négatif que positif.
+        self.world_vol_mult_state = 1.0
+        self._last_world_noise = 0.0   # bruit Student-t (hors shock/jump) du dernier pas
         self.crises = []
         self.ended_crises = []   # crises qui viennent de s'éteindre CE pas (pour postmortem)
         self.crisis_cooldown = 0  # pas restants d'accalmie forcée après une crise majeure
@@ -329,9 +369,12 @@ class Market:
         # facteurs à queues épaisses (Student-t re-normalisée, cf. _t_scale) au
         # lieu d'une gaussienne pure : même volatilité par pas, mouvements
         # extrêmes plus fréquents qu'une gaussienne ne le permettrait.
-        F_world = (MU_WORLD + reg["drift"]
-                   + VOL_WORLD * vol_mult * _T_SCALE_WORLD * self.rng.standard_t(T_DF_WORLD)
-                   + world_shock)
+        # Le facteur MONDE est en outre modulé par l'état d'asymétrie de levier
+        # (cf. ASYM_VOL_*, mis à jour en fin de pas) : sa vol effective monte
+        # plus après une mauvaise nouvelle que symétriquement après une bonne.
+        world_noise_draw = self.rng.standard_t(T_DF_WORLD)
+        world_noise = VOL_WORLD * vol_mult * self.world_vol_mult_state * _T_SCALE_WORLD * world_noise_draw
+        F_world = MU_WORLD + reg["drift"] + world_noise + world_shock
         F_sector = (VOL_SECTOR * vol_mult * _T_SCALE_SECTOR
                     * self.rng.standard_t(T_DF_SECTOR, size=len(self.sectors)) + sec_shock)
         F_region = (VOL_REGION * vol_mult * _T_SCALE_REGION
@@ -378,6 +421,26 @@ class Market:
         self.last_sector = F_sector
         self.last_region = F_region
         self.last_ret = ret.copy()
+
+        # ---- mise à jour de l'état d'asymétrie de levier (GJR-GARCH-like) --
+        # On ne réagit qu'au BRUIT Student-t du facteur monde (hors dérive de
+        # régime/macro, hors choc de crise scénarisé, hors saut structurel) :
+        # c'est la part "nouvelle imprévue" du pas, celle qui doit déclencher
+        # le clustering de volatilité. Le carré normalise l'ampleur (peu
+        # importe le signe pour la TAILLE du choc) ; le gain appliqué diffère
+        # selon le signe (asymétrie). Mean-reversion vers 1.0 en parallèle.
+        raw_gain = ASYM_VOL_DOWN_GAIN if world_noise_draw < 0.0 else ASYM_VOL_UP_GAIN
+        gain = raw_gain / _ASYM_VOL_GAIN_AVG    # cf. constantes : E[gain] == 1
+        # normalisé à variance unitaire (cf. _t_scale) : sous stationnarité,
+        # E[shock_sq] = 1, donc le terme (shock_sq - 1.0) est bien centré et
+        # ne fait PAS dériver la moyenne de l'état (seule sa distribution
+        # temporelle bouge -> clustering, pas d'inflation de la moyenne).
+        normed_draw = world_noise_draw * _T_SCALE_WORLD
+        shock_sq = normed_draw * normed_draw
+        new_state = (self.world_vol_mult_state
+                     + ASYM_VOL_MEAN_REV * (1.0 - self.world_vol_mult_state)
+                     + ASYM_VOL_MEAN_REV * gain * (shock_sq - 1.0))
+        self.world_vol_mult_state = min(ASYM_VOL_MAX_MULT, max(ASYM_VOL_MIN_MULT, new_state))
         self.step_count += 1
 
         # historiques

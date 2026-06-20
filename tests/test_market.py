@@ -537,3 +537,112 @@ def test_heatmap_covers_all_sectors_with_region_breakdown():
     assert {row["sector"] for row in grid} == set(m.sectors)
     for row in grid:
         assert set(row["regions"].keys()) == set(m.regions)
+
+
+# ----------------------------------------------------- effet de levier asymétrique
+# (cf. ASYM_VOL_* dans core/market.py) : une mauvaise nouvelle (choc négatif du
+# facteur MONDE) doit faire monter la volatilité FUTURE davantage qu'une bonne
+# nouvelle de même ampleur (vol clustering asymétrique, type GJR-GARCH).
+class _ForcingRNG:
+    """Wrapper autour du RandomState du marché qui force le PREMIER tirage
+    standard_t(T_DF_WORLD) (le bruit du facteur monde) à une valeur donnée,
+    puis redevient transparent pour tous les tirages suivants (mêmes méthodes,
+    déléguées au RandomState d'origine) — permet de forcer un choc monde
+    contrôlé sans rien désynchroniser d'autre dans la séquence de tirages."""
+    def __init__(self, rng, forced_draw):
+        self._rng = rng
+        self._forced = forced_draw
+        self._used = False
+
+    def standard_t(self, df, size=None):
+        from core.market import T_DF_WORLD
+        if not self._used and size is None and df == T_DF_WORLD:
+            self._used = True
+            return self._forced
+        return self._rng.standard_t(df) if size is None else self._rng.standard_t(df, size)
+
+    def __getattr__(self, name):
+        return getattr(self._rng, name)
+
+
+def _realized_world_vol_after_forced_shock(seed, forced_draw, window=20):
+    m = Market(seed=seed)
+    m.fast_forward(50)
+    m.rng = _ForcingRNG(m.rng, forced_draw)
+    m.step()   # pas où le choc forcé est appliqué au facteur monde
+    worlds = []
+    for _ in range(window):
+        m.step()
+        worlds.append(m.last_world)
+    return float(np.std(worlds))
+
+
+def test_asymmetric_vol_state_deterministic_same_seed_same_state():
+    """L'état d'asymétrie de levier (world_vol_mult_state) doit rester
+    parfaitement déterministe et reproductible, comme le reste du moteur."""
+    a = Market(seed=321); a.fast_forward(300)
+    b = Market(seed=321); b.fast_forward(300)
+    assert a.world_vol_mult_state == pytest.approx(b.world_vol_mult_state)
+    assert np.allclose(a.price, b.price)
+
+
+def test_negative_world_shock_raises_vol_more_than_positive_of_same_size():
+    """Propriété centrale du levier asymétrique : sur une fenêtre de pas qui
+    suit un choc, la volatilité réalisée du facteur monde doit être nettement
+    plus élevée après un choc NÉGATIF que symétriquement après un choc POSITIF
+    de même ampleur (même |valeur| du tirage Student-t forcé)."""
+    magnitude = 5.0
+    trials = 250
+    neg_vols = [_realized_world_vol_after_forced_shock(2000 + i, -magnitude) for i in range(trials)]
+    pos_vols = [_realized_world_vol_after_forced_shock(2000 + i, +magnitude) for i in range(trials)]
+    neg_avg, pos_avg = float(np.mean(neg_vols)), float(np.mean(pos_vols))
+    assert neg_avg > pos_avg * 1.05, (
+        f"vol après choc négatif ({neg_avg:.5f}) pas assez supérieure à celle "
+        f"après choc positif de même ampleur ({pos_avg:.5f})")
+
+
+def test_asymmetric_vol_state_mean_reverts_after_shock():
+    """Le clustering de volatilité doit être un effet PERSISTANT mais qui
+    décroît (mean-reversion), pas un simple effet d'un seul pas : l'état
+    d'asymétrie doit redescendre progressivement vers son niveau neutre dans
+    les pas qui suivent un grand choc, sans y revenir instantanément."""
+    m = Market(seed=55)
+    m.fast_forward(50)
+    m.rng = _ForcingRNG(m.rng, -6.0)
+    m.step()
+    state_right_after = m.world_vol_mult_state
+    assert state_right_after > 1.2, "l'état devrait monter nettement après un gros choc négatif"
+    states = []
+    for _ in range(15):
+        m.step()
+        states.append(m.world_vol_mult_state)
+    # décroissance progressive : pas un retour instantané à 1.0, mais une
+    # tendance baissière sur la fenêtre observée.
+    assert states[0] < state_right_after or states[0] == pytest.approx(state_right_after, abs=0.05)
+    assert min(states[-5:]) < state_right_after
+
+
+def test_long_run_world_volatility_stays_near_baseline_with_asymmetry():
+    """L'effet de levier asymétrique doit REDISTRIBUER la volatilité dans le
+    temps (clustering), pas faire dériver sa moyenne de long terme : sur un
+    horizon long, l'écart-type réalisé du facteur monde doit rester dans une
+    bande raisonnable autour de VOL_WORLD (déjà élargie par les queues
+    épaisses du chantier précédent, cf. test_normal_time_volatility_stays_in_
+    band_with_fat_tails)."""
+    from core.market import VOL_WORLD
+    m = Market(seed=4242)
+    worlds = []
+    states = []
+    for _ in range(6000):
+        m.step()
+        worlds.append(m.last_world)
+        states.append(m.world_vol_mult_state)
+    worlds = np.array(worlds)
+    states = np.array(states)
+    assert 0.5 * VOL_WORLD < worlds.std() < 2.5 * VOL_WORLD, (
+        f"volatilité du facteur monde hors bande raisonnable avec asymétrie: {worlds.std():.4f}")
+    # l'état d'asymétrie lui-même doit rester centré près de 1.0 en moyenne sur
+    # un long historique (pas de dérive de la moyenne, seule la distribution
+    # temporelle change -> clustering après les mauvaises nouvelles).
+    assert 0.85 < states.mean() < 1.25, (
+        f"l'état d'asymétrie dérive de sa moyenne neutre attendue (~1.0): {states.mean():.3f}")

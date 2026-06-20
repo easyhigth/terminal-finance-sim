@@ -48,10 +48,10 @@ class TrackScene(Scene):
         self.return_to = kwargs.get("return_to", "terminal")
         self.selected = None
         self.confirm = widgets.Button(
-            (config.SCREEN_WIDTH//2-150, config.SCREEN_HEIGHT-80, 300, 50),
+            (config.SCREEN_WIDTH//2-150, config.SCREEN_HEIGHT-58, 300, 44),
             "CONFIRMER LA VOIE", config.COL_UP, enabled=False)
         self.back = widgets.Button(
-            (40, config.SCREEN_HEIGHT-80, 160, 50), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
+            (40, config.SCREEN_HEIGHT-58, 160, 44), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self._cards = {}
         self._names = list(TRACK_INFO.keys())
         self.focus = 0   # index de la carte ayant le focus clavier
@@ -78,18 +78,10 @@ class TrackScene(Scene):
             if event.key == pygame.K_ESCAPE:
                 self.app.scenes.go(self.return_to)
                 return
-            cols = 3
             if event.key in (pygame.K_TAB, pygame.K_RIGHT, pygame.K_LEFT,
                              pygame.K_UP, pygame.K_DOWN):
                 n = len(self._names)
-                if event.key in (pygame.K_LEFT,):
-                    step = -1
-                elif event.key in (pygame.K_RIGHT, pygame.K_TAB):
-                    step = 1
-                elif event.key == pygame.K_UP:
-                    step = -cols
-                else:
-                    step = cols
+                step = -1 if event.key in (pygame.K_LEFT, pygame.K_UP) else 1
                 self.focus = (self.focus + step) % n
             elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                 self._select(self._names[self.focus])
@@ -112,15 +104,17 @@ class TrackScene(Scene):
                           (42, 76), fonts.small(), config.COL_TEXT_DIM)
 
         self._cards = {}
-        cols = 3
-        cw, ch, gap = 380, 290, 20
-        x0 = 40
-        y0 = 112
+        n = len(TRACK_INFO)
+        margin, gap = 20, 12
+        cw = (config.SCREEN_WIDTH - 2 * margin - (n - 1) * gap) // n
+        x0 = margin
+        y0 = 108
+        ch = config.SCREEN_HEIGHT - y0 - 70   # laisse la place au footer de boutons
+        pad = 14
+        text_w = cw - 2 * pad
         for i, (name, info) in enumerate(TRACK_INFO.items()):
-            col = i % cols
-            row = i // cols
-            x = x0 + col * (cw + gap)
-            y = y0 + row * (ch + gap)
+            x = x0 + i * (cw + gap)
+            y = y0
             rect = pygame.Rect(x, y, cw, ch)
             self._cards[name] = rect
             sel = (self.selected == name)
@@ -129,19 +123,29 @@ class TrackScene(Scene):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect)
             border_col = config.COL_CYAN if focused else (accent if sel else config.COL_BORDER)
             pygame.draw.rect(surf, border_col, rect, 2 if (sel or focused) else 1)
-            widgets.draw_text(surf, name.upper(), (x+16, y+14),
+
+            ty = y + pad
+            widgets.draw_text(surf, name.upper(), (x + pad, ty),
                               fonts.head(bold=True), accent)
-            widgets.draw_text_wrapped(surf, info["desc"], (x+16, y+50),
-                                      fonts.small(), config.COL_TEXT, cw-32, line_gap=4)
-            # avantage mécanique de jeu (perk)
-            widgets.draw_text(surf, "AVANTAGE DE JEU :", (x+16, y+132),
+            ty += fonts.head().get_height() + 8
+
+            desc_h = widgets.draw_text_wrapped(surf, info["desc"], (x + pad, ty),
+                                               fonts.small(), config.COL_TEXT, text_w, line_gap=3)
+            ty += desc_h + 10
+
+            widgets.draw_text(surf, "AVANTAGE DE JEU :", (x + pad, ty),
                               fonts.tiny(bold=True), accent)
-            widgets.draw_text_wrapped(surf, tracks.label(name), (x+16, y+148),
-                                      fonts.tiny(), config.COL_WHITE, cw-32, line_gap=2)
-            widgets.draw_text(surf, "Concepts clés :", (x+16, y+184),
+            ty += fonts.tiny(bold=True).get_height() + 4
+            perk_h = widgets.draw_text_wrapped(surf, tracks.label(name), (x + pad, ty),
+                                               fonts.tiny(), config.COL_WHITE, text_w, line_gap=2)
+            ty += perk_h + 10
+
+            widgets.draw_text(surf, "CONCEPTS CLÉS :", (x + pad, ty),
                               fonts.tiny(bold=True), config.COL_TEXT_DIM)
-            widgets.draw_text_wrapped(surf, info["concepts"], (x+16, y+200),
-                                      fonts.tiny(), config.COL_NEUTRAL, cw-32, line_gap=2)
+            ty += fonts.tiny(bold=True).get_height() + 4
+            widgets.draw_text_wrapped(surf, info["concepts"], (x + pad, ty),
+                                      fonts.tiny(), config.COL_NEUTRAL, text_w, line_gap=2)
+
             footer_label = "VOIE SÉLECTIONNÉE ✓" if sel else "SÉLECTIONNER CETTE VOIE"
             widgets.draw_card_footer(surf, rect, footer_label, accent,
                                      hover=rect.collidepoint(pygame.mouse.get_pos()))

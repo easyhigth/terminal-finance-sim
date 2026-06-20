@@ -31,11 +31,18 @@ class ReviewScene(Scene):
         self.continue_btn = widgets.Button(
             (config.SCREEN_WIDTH // 2 - 130, config.SCREEN_HEIGHT - 78, 260, 48),
             "RETOUR AU TERMINAL", config.COL_UP)
+        self.back_btn = widgets.Button(config.back_button_rect(),
+                                       f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
     def handle_event(self, event):
         if self.offer is None:
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 self.app.scenes.go(self.return_to)
+            if self.back_btn.handle(event):
+                self.app.scenes.go(self.return_to)
+            return
+        if self.state == "decide" and self.back_btn.handle(event):
+            self.app.scenes.go(self.return_to)
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.state == "decide":
@@ -75,6 +82,7 @@ class ReviewScene(Scene):
 
     def update(self, dt):
         self.continue_btn.update(pygame.mouse.get_pos(), dt)
+        self.back_btn.update(pygame.mouse.get_pos(), dt)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -83,6 +91,7 @@ class ReviewScene(Scene):
                               (40, 40), fonts.head(bold=True), config.COL_TEXT_DIM)
             widgets.draw_text(surf, "ESC pour revenir.", (40, 90), fonts.small(),
                               config.COL_TEXT_DIM)
+            self.back_btn.draw(surf)
             return
         widgets.draw_text(surf, "REVUE DE PERFORMANCE", (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
@@ -124,6 +133,7 @@ class ReviewScene(Scene):
             widgets.draw_text(surf, f"{chr(65+i)}. {label}", (rect.x + 16, rect.y + 18),
                               fonts.body(bold=True), config.COL_WHITE)
             y += 70
+        self.back_btn.draw(surf)
 
     def _draw_outcome(self, surf, cur):
         r = self.result

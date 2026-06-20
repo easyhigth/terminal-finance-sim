@@ -12,7 +12,8 @@ from core import team as TEAM
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
-ROW_H = 70
+ROW_H = 70        # hauteur de ligne "équipe actuelle" (pas de description longue)
+CAT_ROW_H = 92    # hauteur de ligne "profils disponibles" (laisse la place à la description)
 
 
 class TeamScene(Scene):
@@ -116,8 +117,9 @@ class TeamScene(Scene):
 
         p = self.app.gs.player
         cur = self._cur()
-        widgets.draw_text(surf, "Recrutez des analystes juniors : bonus passif récurrent contre un salaire par tour. "
-                          + self.msg, (42, 74), fonts.small(), config.COL_TEXT_DIM)
+        intro = "Recrutez des analystes juniors : bonus passif récurrent contre un salaire par tour. " + self.msg
+        widgets.draw_text_wrapped(surf, intro, (42, 74), fonts.small(), config.COL_TEXT_DIM,
+                                  config.SCREEN_WIDTH - 84, line_gap=4)
 
         # ---- catalogue (gauche) ----
         cat_rect = pygame.Rect(40, 110, 460, 420)
@@ -128,25 +130,25 @@ class TeamScene(Scene):
         pids = list(profiles.keys())
         self.hire_cursor = min(self.hire_cursor, len(pids) - 1) if pids else 0
         for i, (pid, profile) in enumerate(profiles.items()):
-            row = pygame.Rect(inner.x, y, inner.w, ROW_H - 8)
+            row = pygame.Rect(inner.x, y, inner.w, CAT_ROW_H - 8)
             pygame.draw.rect(surf, config.COL_PANEL, row, border_radius=4)
             pygame.draw.rect(surf, config.COL_BORDER, row, 1, border_radius=4)
             if self.focus == "hire":
                 widgets.draw_row_selection(surf, row, i == self.hire_cursor)
+            hire_btn = pygame.Rect(row.right - 90, row.y + 8, 80, 26)
             widgets.draw_text(surf, profile["label"], (row.x + 10, row.y + 6),
                               fonts.small(bold=True), config.COL_TEXT)
             widgets.draw_text(surf, f"{widgets.format_money(profile['cost_per_step'], cur)}/tour"
                               f"  ·  embauche {widgets.format_money(TEAM.HIRE_COST, cur)}",
                               (row.x + 10, row.y + 26), fonts.tiny(), config.COL_TEXT_DIM)
-            widgets.draw_text(surf, profile["desc"], (row.x + 10, row.y + 42),
-                              fonts.tiny(), config.COL_TEXT_DIM)
-            hire_btn = pygame.Rect(row.right - 90, row.y + 16, 80, 30)
+            widgets.draw_text_wrapped(surf, profile["desc"], (row.x + 10, row.y + 44),
+                                      fonts.tiny(), config.COL_TEXT_DIM, row.w - 20, line_gap=2)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, hire_btn, border_radius=4)
             pygame.draw.rect(surf, config.COL_UP, hire_btn, 1, border_radius=4)
             widgets.draw_text(surf, "EMBAUCHER", hire_btn.center, fonts.tiny(bold=True),
                               config.COL_UP, align="center")
             self.hire_rects[pid] = hire_btn
-            y += ROW_H
+            y += CAT_ROW_H
 
         # ---- équipe actuelle (droite) ----
         team_rect = pygame.Rect(540, 110, config.SCREEN_WIDTH - 580, 420)

@@ -21,8 +21,10 @@ _TICKER = ("MVC +1.2%   LWNH -0.4%   C&D500 +0.7%   KAK40 +0.3%   MIRC +0.9%   "
 class MenuScene(Scene):
     def on_enter(self, **kwargs):
         cx = config.SCREEN_WIDTH // 2
-        bw, bh, gap = 320, 50, 14
-        y0 = 388
+        bw, bh, gap = 320, 46, 10
+        # y0 démarre sous le panneau "dernière partie" (cf. _draw_last_run, qui
+        # se termine à panel.bottom = 413) pour éviter le chevauchement bouton/panneau.
+        y0 = 427
         self.auto = GameState.slot_meta(config.AUTOSAVE_SLOT)
         self.buttons = {
             "continue": widgets.Button((cx-bw//2, y0,              bw, bh), t("menu.continue"), config.COL_UP),

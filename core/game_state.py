@@ -25,6 +25,7 @@ class PlayerState:
     day: int = 1                    # temps de jeu en jours
     quarter: int = 1                # trimestre courant
     hardcore: bool = False          # désactive les sauvegardes manuelles
+    sandbox: bool = False           # mode bac à sable : aucune sauvegarde, run jetable
     competencies: dict = field(default_factory=dict)  # compétence -> niveau 0-100
     flags: dict = field(default_factory=dict)         # événements/déblocages
     deals: list = field(default_factory=list)         # deals actifs (dicts)
@@ -201,6 +202,11 @@ class GameState:
 
     # ----- Fichiers ------------------------------------------------------
     def save(self, slot="manual"):
+        if self.player.sandbox:
+            # mode bac à sable : run jetable, ne touche jamais aux sauvegardes
+            # réelles. Chokepoint unique plutôt que de patcher chaque call site.
+            logger.info("save: ignoré (mode sandbox, slot=%s)", slot)
+            return None
         logger.info("save: début (slot=%s)", slot)
         os.makedirs(config.SAVE_DIR, exist_ok=True)
         self.last_saved = time.time()

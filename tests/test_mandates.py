@@ -128,6 +128,32 @@ def test_evaluate_due_success_records_history_and_rewards():
     assert p.mandate_history == [res]
 
 
+def test_evaluate_due_failure_logs_reputation_reason():
+    """La pénalité de réputation d'un mandat échoué doit être journalisée
+    dans rep_log avec le nom du client, pour expliquer au joueur la baisse."""
+    p, m = _mk()
+    mandate = _due_mandate(p, m)
+    p.mandates = [mandate]
+    p.rep_log = []
+    results = mandates.evaluate_due(p, m)
+    assert len(p.rep_log) == 1
+    reason, delta = p.rep_log[0]
+    assert delta == -results[0]["penalty_rep"]
+    assert mandate["client"] in reason
+
+
+def test_evaluate_due_success_logs_reputation_reason():
+    p, m = _mk()
+    mandate = _due_mandate(p, m, target_pct=-1_000_000.0, max_beta=1000.0)
+    p.mandates = [mandate]
+    p.rep_log = []
+    results = mandates.evaluate_due(p, m)
+    assert len(p.rep_log) == 1
+    reason, delta = p.rep_log[0]
+    assert delta == results[0]["reward_rep"]
+    assert mandate["client"] in reason
+
+
 def test_evaluate_due_keeps_mandate_not_yet_due():
     p, m = _mk()
     future = _due_mandate(p, m)

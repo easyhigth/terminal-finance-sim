@@ -150,7 +150,7 @@ def acknowledge(player, action):
     else:
         return {"ok": False, "reason": "invalid_action"}
 
-    player.adjust_reputation(rep_delta)
+    player.adjust_reputation(rep_delta, reason=f"Stress test réglementaire ({scenario})")
     if action != "hedge_now":
         cash_delta = 0.0
 

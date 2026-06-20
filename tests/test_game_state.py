@@ -190,6 +190,79 @@ def test_adjust_cash_and_reputation_clamping():
     assert p.reputation == 0
 
 
+# ---------------------------------------------------------------------------
+# Traçabilité des variations de réputation (rep_log) — un joueur doit pouvoir
+# comprendre IMMÉDIATEMENT pourquoi sa réputation a bougé à chaque tour. Ces
+# tests vérifient que adjust_reputation(..., reason=...) journalise bien le
+# delta RÉELLEMENT appliqué (après bornage 0-100), sans changer le calcul.
+# ---------------------------------------------------------------------------
+def test_adjust_reputation_logs_reason_with_applied_delta():
+    p = PlayerState(reputation=50)
+    p.adjust_reputation(5, reason="Deal conclu")
+    assert p.rep_log == [("Deal conclu", 5)]
+    assert p.reputation == 55
+
+
+def test_adjust_reputation_logs_negative_delta():
+    p = PlayerState(reputation=50)
+    p.adjust_reputation(-3, reason="Mandat échoué")
+    assert p.rep_log == [("Mandat échoué", -3)]
+    assert p.reputation == 47
+
+
+def test_adjust_reputation_without_reason_does_not_log():
+    p = PlayerState(reputation=50)
+    p.adjust_reputation(5)
+    assert p.rep_log == []
+
+
+def test_adjust_reputation_zero_delta_not_logged_even_with_reason():
+    p = PlayerState(reputation=50)
+    p.adjust_reputation(0, reason="Rien ne se passe")
+    assert p.rep_log == []
+
+
+def test_adjust_reputation_logs_clamped_delta_not_requested_delta():
+    """Si la réputation est déjà à 98 et qu'on demande +10, seul le delta
+    RÉELLEMENT appliqué (+2, borné à 100) doit apparaître dans le journal —
+    pas le delta brut demandé, pour que la somme du rep_log corresponde
+    toujours exactement à reputation_apres - reputation_avant."""
+    p = PlayerState(reputation=98)
+    p.adjust_reputation(10, reason="Trimestre parfait")
+    assert p.reputation == 100
+    assert p.rep_log == [("Trimestre parfait", 2)]
+
+
+def test_adjust_reputation_log_accumulates_across_calls():
+    p = PlayerState(reputation=50)
+    p.adjust_reputation(3, reason="Deal A")
+    p.adjust_reputation(-1, reason="Pitch raté")
+    p.adjust_reputation(2, reason="Deal B")
+    assert p.rep_log == [("Deal A", 3), ("Pitch raté", -1), ("Deal B", 2)]
+    total = sum(delta for _, delta in p.rep_log)
+    assert p.reputation == 50 + total
+
+
+def test_advance_step_resets_rep_log_and_reports_team_bonus_reason():
+    """advance_step() doit vider rep_log en début de tour (pas de fuite d'un
+    tour à l'autre) puis le repeupler ; le résumé retourné expose une copie
+    de ce journal sous la clé 'rep_log'. Le bonus de réputation de l'équipe
+    d'analystes (team_rep_accum) doit y apparaître avec sa propre raison dès
+    qu'un point entier de réputation est franchi."""
+    gs = GameState()
+    p = gs.player
+    p.rep_log = [("Tour précédent", 7)]   # résidu d'un tour antérieur
+    p.analysts = [{"profile_id": "equity_junior", "hired_step": 0}]
+    p.team_rep_accum = 0.99   # à un cheveu du palier entier -> déclenche +1 ce tour
+    summary = gs.advance_step()
+    # le résidu de l'ancien tour a bien été purgé
+    assert ("Tour précédent", 7) not in p.rep_log
+    assert ("Tour précédent", 7) not in summary["rep_log"]
+    team_entries = [d for r, d in p.rep_log if "équipe" in r.lower()]
+    assert team_entries == [1]
+    assert summary["rep_log"] == p.rep_log
+
+
 def test_check_game_over_on_bankruptcy():
     p = PlayerState(cash=config.BANKRUPTCY_CASH - 1, reputation=50)
     assert p.check_game_over() is True

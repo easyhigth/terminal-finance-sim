@@ -537,7 +537,8 @@ def evaluate_due(player, market):
         ok = check["ok"] and due
         if ok:
             player.adjust_cash(m["reward_cash"])
-            player.adjust_reputation(m["reward_rep"])
+            player.adjust_reputation(m["reward_rep"], reason=_L(
+                f"Mandat réussi : {m['client']}", f"Mandate succeeded: {m['client']}"))
             player.flags["mandates_won"] = player.flags.get("mandates_won", 0) + 1
             if m.get("transformant"):
                 player.flags["mandates_transformant_won"] = (
@@ -549,7 +550,8 @@ def evaluate_due(player, market):
             career.log(player, "deal", _L(f"Mandat {m['client']} réussi (+{growth:.1f}%)",
                                           f"Mandate {m['client']} succeeded (+{growth:.1f}%)"))
         else:
-            player.adjust_reputation(-m["penalty_rep"])
+            player.adjust_reputation(-m["penalty_rep"], reason=_L(
+                f"Mandat échoué : {m['client']}", f"Mandate failed: {m['client']}"))
             reason = failure_reason(m, growth, beta, check["values"])
             if early_break:
                 reason = _L(f"Mandat résilié avant échéance par le client ({reason})",

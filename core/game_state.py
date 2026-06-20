@@ -103,6 +103,10 @@ class PlayerState:
     salary_bonus_per_step: float = 0.0  # supplément de salaire fixe négocié (revues)
     analysts: list = field(default_factory=list)  # équipe d'analystes juniors : [{profile_id, hired_step}]
     team_rep_accum: float = 0.0  # accumulateur fractionnaire du bonus de réputation de l'équipe
+    rep_log: list = field(default_factory=list, repr=False, compare=False)  # journal transitoire
+    # (raison, delta) des variations de réputation du tour en cours — non
+    # sérialisé (pas de save) : vidé et repeuplé à chaque advance_step(), lu
+    # par le terminal pour expliquer au joueur le « bilan du tour ».
     # ----- calendrier macro (paris directionnels sur évènements programmés) -----
     macro_events: list = field(default_factory=list)    # évènements programmés (annoncés, pas encore résolus)
     macro_bets: list = field(default_factory=list)       # paris placés en attente de résolution
@@ -141,8 +145,18 @@ class PlayerState:
     def adjust_cash(self, delta):
         self.cash += delta
 
-    def adjust_reputation(self, delta):
-        self.reputation = max(0, min(100, self.reputation + delta))
+    def adjust_reputation(self, delta, reason=None):
+        """Modifie la réputation (bornée 0-100). Si `reason` est fourni et que le
+        delta réellement appliqué (après bornage) est non nul, l'enregistre dans
+        `rep_log` (liste transitoire de (raison, delta) consommée par
+        `advance_step` pour expliquer au joueur la variation du tour — cf.
+        `scenes/scene_terminal_commands.py::_advance_time`). Pure traçabilité :
+        ne change aucune formule de calcul de réputation."""
+        before = self.reputation
+        self.reputation = max(0, min(100, before + delta))
+        applied = self.reputation - before
+        if reason and applied:
+            self.rep_log.append((reason, applied))
 
     def quarter_of_day(self, day=None):
         d = self.day if day is None else day
@@ -302,6 +316,11 @@ class GameState:
             return {"events": [], "expired": [], "new_deals": [],
                     "net": 0.0, "game_over": True, "quarter_report": None}
 
+        # journal transitoire des raisons de variation de réputation de CE tour :
+        # vidé ici, repeuplé par adjust_reputation(..., reason=...) au fil du
+        # tour, lu en fin de fonction pour le résumé puis exposé au terminal.
+        p.rep_log = []
+
         prev_quarter = p.quarter
         p.day += config.DAYS_PER_STEP
         p.quarter = p.quarter_of_day()
@@ -315,7 +334,10 @@ class GameState:
             p.team_rep_accum = getattr(p, "team_rep_accum", 0.0) + _team.team_bonus_rep_per_step(p)
             whole = int(p.team_rep_accum)
             if whole:
-                p.adjust_reputation(whole)
+                from core.i18n import get_lang
+                reason = ("Analyst team reputation bonus" if get_lang() == "en"
+                          else "Bonus de réputation de l'équipe d'analystes")
+                p.adjust_reputation(whole, reason=reason)
                 p.team_rep_accum -= whole
         net = (p.salary_per_step() - p.costs_per_step()
                + getattr(p, "salary_bonus_per_step", 0.0) - team_cost)
@@ -468,4 +490,9 @@ class GameState:
             "ma_events": ma_events,
             "review_offer": review_offer,
             "game_over": p.game_over,
+            # copie du journal de variations de réputation du tour (raison, delta) —
+            # rep_log lui-même continuera d'être enrichi après ce point par des
+            # actions hors advance_step (PITCH, deals résolus...) ; le terminal lit
+            # cette copie pour le bilan du tour, indépendamment de ce qui suit.
+            "rep_log": list(p.rep_log),
         }

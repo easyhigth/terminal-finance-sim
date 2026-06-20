@@ -52,3 +52,18 @@ def test_roll_events_no_duplicate_ids_in_one_roll():
     out = events.roll_events(p, rng=random.Random(3), max_events=5)
     ids = [e["id"] for e in out]
     assert len(ids) == len(set(ids))
+
+
+def test_roll_events_logs_reputation_reason_matching_title():
+    """Chaque événement qui modifie la réputation doit être journalisé dans
+    rep_log avec son titre, pour que le joueur comprenne d'où vient le
+    delta (et pas seulement un nombre agrégé sans explication)."""
+    p = _player(grade=8)
+    p.rep_log = []
+    out = events.roll_events(p, rng=random.Random(7))
+    rep_events = [e for e in out if e["rep"]]
+    assert len(p.rep_log) == len(rep_events)
+    logged_reasons = [r for r, _ in p.rep_log]
+    for e in rep_events:
+        assert e["title"] in logged_reasons
+    assert sum(d for _, d in p.rep_log) == sum(e["rep"] for e in rep_events)

@@ -215,13 +215,17 @@ def age_deals(player):
     Fait vieillir les deals d'un tour. Les deals échus non traités sont retirés
     et infligent leur pénalité. Retourne la liste des deals expirés.
     """
+    from core.i18n import get_lang
+    en = get_lang() == "en"
     expired = []
     still_active = []
     for d in player.deals:
         d["days_left"] -= config.DAYS_PER_STEP
         if d["days_left"] <= 0:
             player.adjust_cash(-d["penalty_cash"])
-            player.adjust_reputation(-d["penalty_rep"])
+            reason = (f"Deal expired: {d['title']}" if en
+                      else f"Deal expiré : {d['title']}")
+            player.adjust_reputation(-d["penalty_rep"], reason=reason)
             expired.append(d)
         else:
             still_active.append(d)
@@ -253,30 +257,36 @@ def apply_outcome(player, deal_id, quality):
     """Applique le résultat d'un mini-jeu de deal selon la QUALITÉ du choix :
       good → succès plein · ok → succès partiel · bad → échec.
     Retourne un dict résultat, ou {ok: False} si le deal n'existe pas."""
+    from core.i18n import get_lang
+    en = get_lang() == "en"
     deal = find_deal(player, deal_id)
     if deal is None:
         return {"ok": False}
     if quality == "good":
         cash_delta = deal["reward_cash"]
         rep_delta = deal["reward_rep"]
+        reason = (f"Deal closed: {deal['title']}" if en else f"Deal conclu : {deal['title']}")
         player.adjust_cash(cash_delta)
-        player.adjust_reputation(rep_delta)
+        player.adjust_reputation(rep_delta, reason=reason)
         player.deals_won += 1
         player.grade_deals += 1
         outcome = "success"
     elif quality == "ok":
         cash_delta = round(deal["reward_cash"] * 0.5, 2)
         rep_delta = max(1, deal["reward_rep"] // 2)
+        reason = (f"Deal partially closed: {deal['title']}" if en
+                  else f"Deal partiellement conclu : {deal['title']}")
         player.adjust_cash(cash_delta)
-        player.adjust_reputation(rep_delta)
+        player.adjust_reputation(rep_delta, reason=reason)
         player.deals_won += 1
         player.grade_deals += 1
         outcome = "partial"
     else:  # bad
         cash_delta = -deal["penalty_cash"]
         rep_delta = -round(deal["penalty_rep"] * archetypes.perk(player, "rep_loss_mult"))
+        reason = (f"Deal failed: {deal['title']}" if en else f"Deal échoué : {deal['title']}")
         player.adjust_cash(cash_delta)
-        player.adjust_reputation(rep_delta)
+        player.adjust_reputation(rep_delta, reason=reason)
         outcome = "fail"
     player.deals = [d for d in player.deals if d["id"] != deal_id]
     return {"ok": True, "outcome": outcome, "deal": deal, "quality": quality,
@@ -289,6 +299,8 @@ def resolve_deal(player, deal_id, rng=None):
       {ok: bool, success: bool, deal: ..., prob: float}
     ok=False si le deal n'existe pas.
     """
+    from core.i18n import get_lang
+    en = get_lang() == "en"
     rng = rng or random
     deal = find_deal(player, deal_id)
     if deal is None:
@@ -296,12 +308,14 @@ def resolve_deal(player, deal_id, rng=None):
     prob = success_probability(player, deal)
     success = rng.random() < prob
     if success:
+        reason = (f"Deal closed: {deal['title']}" if en else f"Deal conclu : {deal['title']}")
         player.adjust_cash(deal["reward_cash"])
-        player.adjust_reputation(deal["reward_rep"])
+        player.adjust_reputation(deal["reward_rep"], reason=reason)
         player.deals_won += 1
         player.grade_deals += 1
     else:
+        reason = (f"Deal failed: {deal['title']}" if en else f"Deal échoué : {deal['title']}")
         player.adjust_cash(-deal["penalty_cash"])
-        player.adjust_reputation(-round(deal["penalty_rep"] * archetypes.perk(player, "rep_loss_mult")))
+        player.adjust_reputation(-round(deal["penalty_rep"] * archetypes.perk(player, "rep_loss_mult")), reason=reason)
     player.deals = [d for d in player.deals if d["id"] != deal_id]
     return {"ok": True, "success": success, "deal": deal, "prob": prob}

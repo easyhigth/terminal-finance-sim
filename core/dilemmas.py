@@ -258,7 +258,7 @@ def apply_choice(player, dilemma, option_index):
     from core import archetypes, firms
     opt = dilemma["options"][option_index]
     player.adjust_cash(opt["cash"])
-    player.adjust_reputation(opt["rep"])
+    player.adjust_reputation(opt["rep"], reason=f"Décision : {dilemma['title']} → {opt['label']}")
     heat_delta = opt["heat"]
     if heat_delta > 0:
         heat_delta *= archetypes.perk(player, "heat_gain_mult") * firms.perk(player, "heat_gain_mult")
@@ -299,7 +299,7 @@ def maybe_investigate(player, rng=None):
     fine = round(rng.uniform(40, 120) * 1000 * scale, 2)
     rep_loss = rng.randint(6, 12)
     player.adjust_cash(-fine)
-    player.adjust_reputation(-rep_loss)
+    player.adjust_reputation(-rep_loss, reason="Enquête réglementaire (scrutin élevé)")
     player.heat = max(0, player.heat - 35)
     player.investigations_count = getattr(player, "investigations_count", 0) + 1
     from core import career, inbox

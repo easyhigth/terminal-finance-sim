@@ -50,7 +50,7 @@ def progress(p, app=None):
     if step is None or not step["check"](p):
         return None
     p.onboarding_step = getattr(p, "onboarding_step", 0) + 1
-    p.adjust_reputation(2)
+    p.adjust_reputation(2, reason=f"Intégration : {step['title']}")
     finished = p.onboarding_step >= len(STEPS)
     if finished:
         p.onboarding_done = True

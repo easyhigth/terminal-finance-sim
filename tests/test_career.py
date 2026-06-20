@@ -224,3 +224,33 @@ def test_close_quarter_no_objectives_is_noop():
     summary = career.close_quarter(p)
     assert summary == {"done": 0, "total": 0, "rep": 0, "cash": 0.0}
     assert p.reputation == 50
+
+
+def test_close_quarter_logs_partial_completion_reason():
+    p = _player(grade_index=2)
+    p.objectives = [
+        {"kind": "cash", "target": 100.0, "done": False, "reward_rep": 3, "reward_cash": 1000.0},
+        {"kind": "reputation", "target": 999, "done": False, "reward_rep": 3, "reward_cash": 500.0},
+    ]
+    p.cash = 200.0
+    p.reputation = 50
+    p.rep_log = []
+    career.close_quarter(p)
+    assert len(p.rep_log) == 1
+    reason, delta = p.rep_log[0]
+    assert delta == 3
+    assert "1/2" in reason
+
+
+def test_close_quarter_logs_perfect_quarter_reason():
+    p = _player(grade_index=1)
+    p.objectives = [
+        {"kind": "cash", "target": 0.0, "done": False, "reward_rep": 3, "reward_cash": 1000.0},
+    ]
+    p.cash = 10.0
+    p.rep_log = []
+    career.close_quarter(p)
+    assert len(p.rep_log) == 1
+    reason, delta = p.rep_log[0]
+    assert delta == 3 + 4
+    assert "parfait" in reason.lower()

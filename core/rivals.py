@@ -197,7 +197,7 @@ def act(player, market, rng=None):
             r = _rival_of_track(player, d.get("kind"), rng)
             player.deals = [x for x in player.deals if x["id"] != d["id"]]
             r["score"] += d.get("reward_cash", 0) * 0.3
-            player.adjust_reputation(-2)
+            player.adjust_reputation(-2, reason=f"Deal raflé par {r['name']} : « {d['title']} »")
             _set_action(r, f"vous coiffe sur « {d['title']} »", "up")
             ev = {"type": "snipe", "rival": r["name"], "kind": "bad",
                   "deal": d, "title": d["title"],

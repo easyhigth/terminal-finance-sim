@@ -127,7 +127,11 @@ class CareerScene(Scene):
             widgets.draw_text(surf, f"{int(r['current'])}/{int(r['target'])}",
                               (inner.right, y), fonts.small(bold=True),
                               col, align="right")
-            y += 26
+            y += 20
+            ratio = 1.0 if r["met"] else (max(0.0, r["current"]) / r["target"] if r["target"] else 1.0)
+            widgets.draw_progress(surf, (inner.x, y, inner.w, 6), ratio,
+                                  config.COL_UP if r["met"] else config.COL_WARN)
+            y += 18
         y += 6
         if ready:
             widgets.draw_text(surf, "✓ Critères remplis — tapez EVAL pour l'examen.",

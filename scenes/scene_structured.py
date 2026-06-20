@@ -28,6 +28,9 @@ class StructuredScene(Scene):
         self.sell_rects = {}
         self._family_rects = {}
         self.family_filter = None
+        self.scroll = 0
+        self._max_scroll = 0
+        self._list_rect = None
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
@@ -50,9 +53,11 @@ class StructuredScene(Scene):
                 return
             elif event.key == pygame.K_BACKSPACE:
                 self.search = self.search[:-1]
+                self.scroll = 0
                 return
             elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
                 self.search += event.unicode
+                self.scroll = 0
                 return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
@@ -60,13 +65,20 @@ class StructuredScene(Scene):
         if self.tuto_btn.handle(event):
             self.app.scenes.go("tutorials", tid="structured", return_to="structured")
             return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            if self._list_rect and self._list_rect.collidepoint(event.pos):
+                self.scroll = max(0, min(self._max_scroll,
+                                         self.scroll + (-48 if event.button == 4 else 48)))
+            return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
                 self.search = ""
+                self.scroll = 0
                 return
             for fam, rect in self._family_rects.items():
                 if rect.collidepoint(event.pos):
                     self.family_filter = fam
+                    self.scroll = 0
                     return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self._can_trade():
             for tid, rect in self.sell_rects.items():
@@ -138,14 +150,19 @@ class StructuredScene(Scene):
         # catalogue (gauche)
         cat = pygame.Rect(40, top, 700, ph)
         inner = widgets.draw_panel(surf, cat, "Catalogue", config.COL_CYAN)
+        list_area = pygame.Rect(inner.x - 6, inner.y, inner.w + 12, inner.h)
+        self._list_rect = list_area
         self.invest_rects = {}
         self.sell_rects = {}
-        y = inner.y
         q_filter = self.search.strip().lower()
         templates = [tpl for tpl in S.all_templates()
                      if (not self.family_filter or tpl["family"] == self.family_filter)
                      and (not q_filter or q_filter in tpl["name"].lower() or q_filter in tpl["desc"].lower())]
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        y = inner.y - self.scroll
         for tpl in templates:
+            visible = (list_area.top - 100) < y < list_area.bottom
             widgets.draw_text(surf, tpl["name"], (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
             widgets.draw_text(surf, f"{tpl['family']} · {tpl['years']} ans", (inner.right - 160, y),
                               fonts.tiny(), config.COL_TEXT_DIM)
@@ -154,19 +171,27 @@ class StructuredScene(Scene):
                                            fonts.small(), config.COL_TEXT, inner.w - 130, line_gap=3) + 4
             if self._can_trade():
                 rect = pygame.Rect(inner.right - 150, y, 140, 26)
-                self.invest_rects[tpl["id"]] = rect
+                if visible:
+                    self.invest_rects[tpl["id"]] = rect
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect, border_radius=4)
                 pygame.draw.rect(surf, config.COL_UP, rect, 1, border_radius=4)
                 widgets.draw_text(surf, f"SOUSCRIRE {LOT/1000:.0f}k", (rect.x + 12, y + 4),
                                   fonts.tiny(bold=True), config.COL_UP)
                 if S.held_notional(p, tpl["id"]) > 0:
                     srect = pygame.Rect(rect.left - 96, y, 88, 26)
-                    self.sell_rects[tpl["id"]] = srect
+                    if visible:
+                        self.sell_rects[tpl["id"]] = srect
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, srect, border_radius=4)
                     pygame.draw.rect(surf, config.COL_DOWN, srect, 1, border_radius=4)
                     widgets.draw_text(surf, "VENDRE", srect.center, fonts.tiny(bold=True),
                                       config.COL_DOWN, align="center")
             y += 40
+        surf.set_clip(prev_clip)
+
+        content_h = (y + self.scroll) - inner.y
+        self._max_scroll = max(0, content_h - list_area.h)
+        self.scroll = min(self.scroll, self._max_scroll)
+        widgets.draw_scrollbar(surf, cat, list_area, self.scroll, self._max_scroll, content_h)
 
         # positions en cours (droite)
         posp = pygame.Rect(760, top, config.SCREEN_WIDTH - 800, ph)

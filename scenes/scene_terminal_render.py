@@ -438,13 +438,23 @@ class TerminalRenderMixin:
             if career_mod.promotion_ready(p):
                 widgets.draw_text(surf, "Prêt — tapez EVAL", (inner.x, y),
                                   fonts.small(bold=True), config.COL_UP)
+                y += 22
             else:
-                miss = career_mod.missing_criteria(p)
-                widgets.draw_text(surf, "Manque : " + ", ".join(miss)[:34], (inner.x, y),
-                                  fonts.tiny(), config.COL_WARN)
+                for r in career_mod.promotion_requirements(p):
+                    if r["met"]:
+                        continue
+                    col = config.COL_WARN
+                    widgets.draw_text(surf, r["label"], (inner.x, y), fonts.tiny(), col)
+                    widgets.draw_text(surf, f"{int(r['current'])}/{int(r['target'])}",
+                                      (inner.right, y), fonts.tiny(bold=True), col, align="right")
+                    y += 14
+                    ratio = max(0.0, r["current"]) / r["target"] if r["target"] else 1.0
+                    widgets.draw_progress(surf, (inner.x, y, inner.w, 5), ratio, col)
+                    y += 12
         else:
             widgets.draw_text(surf, "Grade maximal", (inner.x, y), fonts.small(), config.COL_TEXT_DIM)
-        y += 34
+            y += 22
+        y += 12
         # 3) risque
         widgets.draw_text(surf, "RISQUE", (inner.x, y), fonts.tiny(bold=True), config.COL_CYAN)
         y += 18

@@ -40,6 +40,18 @@ def test_promotion_requirements_basic_fields():
     assert "Ancienneté (trimestres)" not in labels
 
 
+def test_promotion_requirements_targets_always_positive():
+    """Le panneau carrière (scene_career, scene_terminal) calcule un ratio
+    current/target pour afficher une barre de progression : un `target` à 0
+    provoquerait une division par zéro côté UI. Vérifie sur tout grade/
+    réputation/quarter qu'aucun critère retourné n'a une cible nulle."""
+    for gi in range(len(career.config.GRADES)):
+        for quarter in (1, 2, 5, 10):
+            p = _player(grade_index=gi, reputation=0, quarter=quarter)
+            for r in career.promotion_requirements(p):
+                assert r["target"] > 0, f"target nul pour {r['label']} (grade {gi})"
+
+
 def test_promotion_requirements_adds_deals_and_tenure_at_higher_grade():
     p = _player(grade_index=4, quarter=5)
     reqs = career.promotion_requirements(p)

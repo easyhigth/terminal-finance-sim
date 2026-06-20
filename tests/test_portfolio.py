@@ -147,6 +147,58 @@ def test_slippage_capped():
     assert huge <= m.price_of(tk) * (1 + pf.HALF_SPREAD + pf.MAX_SLIPPAGE) + 1e-6
 
 
+# --------------------------------------------------------------- impact non-linéaire
+def test_market_impact_is_sublinear_in_order_size():
+    """Doubler la taille de l'ordre ne doit PAS doubler l'impact (courbe convexe en
+    valeur absolue mais sous-linéaire par unité, alpha < 1 — pas un modèle linéaire)."""
+    liquidity = 50_000_000_000.0
+    small = pf.market_impact(1_000_000.0, liquidity, stress_level=0.0)
+    big = pf.market_impact(2_000_000.0, liquidity, stress_level=0.0)
+    assert big > small
+    assert big < 2.0 * small      # sous-linéaire : pas de doublement de l'impact
+
+
+def test_market_impact_higher_for_smaller_market_cap():
+    """À valeur d'ordre égale, une société moins liquide (capi plus faible) doit
+    subir un impact plus élevé que la même valeur d'ordre sur une grosse capi."""
+    order_value = 5_000_000.0
+    small_cap = pf.market_impact(order_value, 500_000_000.0, stress_level=0.1)
+    large_cap = pf.market_impact(order_value, 50_000_000_000.0, stress_level=0.1)
+    assert small_cap > large_cap
+
+
+def test_market_impact_higher_under_stress():
+    """Le même ordre doit produire un impact plus élevé en plein stress de marché
+    (last_stress_level proche de 1.0) qu'en marché calme (proche de 0)."""
+    order_value = 5_000_000.0
+    liquidity = 5_000_000_000.0
+    calm = pf.market_impact(order_value, liquidity, stress_level=0.0)
+    crisis = pf.market_impact(order_value, liquidity, stress_level=1.0)
+    assert crisis > calm
+    assert crisis >= calm * 2.0   # le multiplicateur de stress doit se faire sentir
+
+
+def test_market_impact_respects_safety_cap_even_under_max_stress():
+    """Même pour un ordre pathologiquement gros en pleine panique, l'impact reste
+    borné par MAX_SLIPPAGE (plafond de sécurité, pas de fill absurde)."""
+    impact = pf.market_impact(10 ** 18, 1.0, stress_level=1.0)
+    assert impact == pytest.approx(pf.MAX_SLIPPAGE)
+
+
+def test_fill_price_uses_market_stress_level():
+    """fill_price() doit lire market.last_stress_level (signal de stress existant,
+    0..1, calculé chaque step() à partir de l'asymétrie de volatilité et du régime)
+    plutôt qu'ignorer le stress courant du marché."""
+    p, m = _setup()
+    tk = m.companies[0]["ticker"]
+    order_qty = 100
+    m.last_stress_level = 0.0
+    calm_fill = pf.fill_price(m, tk, order_qty, "buy")
+    m.last_stress_level = 1.0
+    stressed_fill = pf.fill_price(m, tk, order_qty, "buy")
+    assert stressed_fill > calm_fill
+
+
 def test_short_pays_dividends():
     p, m = _setup()
     # trouve une société qui verse un dividende

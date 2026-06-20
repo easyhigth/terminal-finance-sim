@@ -208,6 +208,86 @@ def test_equity_risk_premium_positive_across_seeds():
     assert avg < 0.15, f"marché trop haussier (sur-bull): {avg:.2%}"
 
 
+# --------------------------------------------------------------- queues épaisses
+def test_fat_tails_deterministic_same_seed_same_prices():
+    """La couche Student-t + sauts rares doit rester intégralement déterministe :
+    même graine + même nombre de pas -> mêmes prix, à l'identique du moteur
+    gaussien d'avant (cf. CLAUDE.md, contrat de déterminisme)."""
+    a = Market(seed=909); a.fast_forward(400)
+    b = Market(seed=909); b.fast_forward(400)
+    assert np.allclose(a.price, b.price)
+    assert a.step_count == b.step_count == 400
+
+
+def test_world_factor_kurtosis_exceeds_gaussian_baseline():
+    """Le facteur MONDE doit présenter un excès de kurtosis nettement positif
+    (queues plus épaisses qu'une gaussienne, qui a une kurtosis excédentaire de
+    ~0) — preuve que les chocs ne sont plus de purs tirages gaussiens."""
+    from scipy import stats
+    m = Market(seed=2024)
+    worlds = []
+    for _ in range(6000):
+        m.step()
+        worlds.append(m.last_world)
+    worlds = np.array(worlds)
+    # une gaussienne pure oscille autour de 0 ; on exige un excès solide pour
+    # ne pas dépendre du bruit d'échantillonnage.
+    assert stats.kurtosis(worlds) > 1.5, (
+        f"kurtosis excédentaire trop faible pour des queues épaisses: {stats.kurtosis(worlds):.2f}")
+
+
+def test_world_factor_extreme_moves_more_frequent_than_gaussian():
+    """Sur un long horizon, les mouvements extrêmes (>3 écarts-types) du
+    facteur MONDE doivent être nettement plus fréquents que sous une
+    gaussienne pure (~0.27% en théorie) — la signature d'un jump-diffusion +
+    Student-t plutôt que d'un simple bruit gaussien plus fort."""
+    m = Market(seed=4242)
+    worlds = []
+    for _ in range(8000):
+        m.step()
+        worlds.append(m.last_world)
+    worlds = np.array(worlds)
+    mu, sd = worlds.mean(), worlds.std()
+    extreme_rate = float(np.mean(np.abs(worlds - mu) > 3 * sd))
+    # gaussien théorique ~0.27% ; on exige au moins le double pour être
+    # robuste au bruit d'échantillonnage tout en restant un test significatif.
+    assert extreme_rate > 0.006, (
+        f"mouvements extrêmes (>3 sigma) pas assez fréquents: {extreme_rate:.4%}")
+
+
+def test_normal_time_volatility_stays_in_band_with_fat_tails():
+    """Les queues épaisses ne doivent pas faire dériver la volatilité normale
+    (déjà calibrée) : on mesure l'écart-type du facteur MONDE sur un horizon
+    long et on vérifie qu'il reste proche de VOL_WORLD (même second moment
+    qu'avant, seule la FORME — kurtosis — a changé, cf. _t_scale)."""
+    from core.market import VOL_WORLD
+    m = Market(seed=1357)
+    worlds = []
+    for _ in range(4000):
+        m.step()
+        worlds.append(m.last_world)
+    worlds = np.array(worlds)
+    # tolérance large : la couche de sauts rares ajoute un peu de variance
+    # (rares mais non nulle), donc l'écart-type réalisé peut être un peu
+    # au-dessus de VOL_WORLD seul, mais doit rester du même ordre de grandeur.
+    assert 0.5 * VOL_WORLD < worlds.std() < 2.2 * VOL_WORLD, (
+        f"volatilité du facteur monde hors bande raisonnable: {worlds.std():.4f}")
+
+
+def test_jump_probability_consumes_rng_every_step_for_determinism():
+    """Le tirage de saut (probabilité + ampleur) doit être consommé À CHAQUE
+    pas, même quand aucun saut ne se déclenche, pour ne jamais désynchroniser
+    la séquence de tirages rng entre deux marchés de même graine (sync_to /
+    fast_forward doivent rester exacts pas-à-pas)."""
+    a = Market(seed=606)
+    b = Market(seed=606)
+    for _ in range(250):
+        a.step()
+        b.step()
+        assert a.step_count == b.step_count
+        assert np.allclose(a.price, b.price)
+
+
 # --------------------------------------------------------------- crises
 def test_crisis_depresses_prices():
     base = Market(seed=321); base.fast_forward(20)

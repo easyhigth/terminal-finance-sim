@@ -455,6 +455,48 @@ def draw_scrollbar(surf, panel_rect, list_area, scroll, max_scroll, content_h):
     pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 6, bar_h), border_radius=3)
 
 
+class ScrollState:
+    """État de défilement minimal pour un panneau-liste, réutilisable quand un
+    même écran a PLUSIEURS zones défilantes indépendantes (contrairement au
+    pattern `self.scroll`/`self._max_scroll` à un seul champ déjà utilisé par
+    scene_structured.py/scene_bonds.py pour un écran à une seule liste).
+
+    Usage par panneau :
+        st = self._scrolls.setdefault("indices", widgets.ScrollState())
+        ... molette : st.handle_wheel(event) dans handle_event
+        ... dessin  : surf.set_clip(list_area) ; y = inner.y - st.scroll ; ... dessiner ...
+                      surf.set_clip(prev_clip) ; st.set_bounds(list_area, content_h)
+                      widgets.draw_scrollbar(surf, panel_rect, list_area, st.scroll, st.max_scroll, content_h)
+    """
+
+    def __init__(self):
+        self.scroll = 0
+        self.max_scroll = 0
+        self.rect = None   # dernier rect de zone défilante (pour le hit-test molette)
+
+    def scroll_by(self, dy):
+        self.scroll = max(0, min(self.max_scroll, self.scroll + dy))
+
+    def set_bounds(self, list_area, content_h):
+        """À appeler après le dessin du contenu : enregistre la zone (pour le
+        hit-test molette) et reclamp `scroll` à la hauteur de contenu réelle
+        (gère le cas où le contenu est plus court que la zone -> max_scroll=0)."""
+        self.rect = pygame.Rect(list_area)
+        self.max_scroll = max(0, content_h - self.rect.h)
+        self.scroll = min(self.scroll, self.max_scroll)
+
+    def handle_wheel(self, event, step=48):
+        """Si `event` est un clic-molette (bouton 4/5) sur `self.rect`, ajuste
+        le défilement et renvoie True. Sinon renvoie False sans rien faire —
+        appelant : `for st in self._scrolls.values(): if st.handle_wheel(event): return`."""
+        if event.type != pygame.MOUSEBUTTONDOWN or event.button not in (4, 5):
+            return False
+        if not self.rect or not self.rect.collidepoint(event.pos):
+            return False
+        self.scroll_by(-step if event.button == 4 else step)
+        return True
+
+
 def draw_chart_axes(surf, rect, lo, hi, y_fmt=lambda v: f"{v:.0f}", rows=5):
     """Dessine la grille horizontale + libellés d'axe Y d'un graphe en lignes
     (style atelier de graphes / option / quant). Commun à plusieurs écrans à

@@ -17,10 +17,6 @@ STEPS_PER_YEAR = _market.STEPS_PER_YEAR
 _HIST = 120          # fenêtre d'historique pour vol / corrélation / frontière
 
 
-_CRYPTO_TIER = {"USDX": "Liquide", "CBDC": "Liquide", "BITC": "Peu liquide",
-                "ETHR": "Peu liquide", "SOLR": "Illiquide", "DOGY": "Illiquide"}
-
-
 def _equity_ann_vol(market, i):
     """Vol annualisée implicite par le propre modèle à facteurs du marché
     (cohérent avec core/risk.py) : sqrt(beta²·VOL_MONDE² + b_secteur²·VOL_SECTEUR²
@@ -86,7 +82,7 @@ def holdings_table(player, market):
                          "price": h.get("price", 0), "value": h["value"],
                          "pnl": h.get("pnl", 0.0),
                          "pnl_pct": (h.get("pnl", 0) / base * 100) if base else 0.0,
-                         "short": False, "liquidity": _CRYPTO_TIER.get(cid, "Peu liquide"),
+                         "short": False, "liquidity": liq.crypto_tier(cid),
                          "ann_vol": float(cc[4]) if cc else 0.0})
     gross = sum(abs(r["value"]) for r in rows) or 1.0
     risk_base = sum(abs(r["value"]) * r["ann_vol"] for r in rows) or 1.0

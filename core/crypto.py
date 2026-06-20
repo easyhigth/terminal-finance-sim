@@ -15,6 +15,8 @@ Holdings : PlayerState.crypto = { id : {"qty","avg"} }.
 """
 import numpy as np
 
+from core import liquidity as liq_mod
+
 # (id, nom, prix de base, dérive annuelle, vol annuelle, stablecoin ?)
 COINS = [
     ("BITC", "Bitcorn", 60000.0, 0.10, 0.80, False),
@@ -174,7 +176,8 @@ def quote(market, cid):
         return None
     sp = spot(market, cid)
     return {"id": cid, "name": c[1], "spot": sp, "vol": c[4], "stable": c[5],
-            "cbdc": is_cbdc(cid), "yield": policy_rate(market) if is_cbdc(cid) else 0.0}
+            "cbdc": is_cbdc(cid), "yield": policy_rate(market) if is_cbdc(cid) else 0.0,
+            "liquidity": liq_mod.crypto_tier(cid)}
 
 
 def all_quotes(market):
@@ -182,12 +185,32 @@ def all_quotes(market):
 
 
 # ---------------------------------------------------------------- trading
+def fill_price(market, cid, qty, side):
+    """Prix d'exécution réel = spot ± (demi-spread + impact), calibrés par tier de
+    liquidité (cf. core/liquidity.py) et par le stress de marché courant
+    (market.last_stress_level, 0..1) — même mécanique que les actions/obligations/
+    matières premières. La CBDC (monnaie banque centrale, garantie, rémunérée) est
+    exécutée au pair sans spread ni impact : ce n'est pas un actif de marché, c'est
+    un dépôt. Le stablecoin et les crypto-actifs volatils, eux, ont un carnet bien
+    plus mince que les grandes capi actions ou les souverains notés (cf.
+    core/liquidity.crypto_tier) : un même ordre y coûte plus cher."""
+    if is_cbdc(cid):
+        return spot(market, cid)
+    mid = spot(market, cid)
+    if mid is None:
+        return None
+    order_value = mid * abs(qty)
+    stress_level = getattr(market, "last_stress_level", 0.0)
+    return liq_mod.fill_price(mid, order_value, liq_mod.crypto_depth(cid),
+                               liq_mod.crypto_tier(cid), side, stress_level)
+
+
 def buy(player, market, cid, qty):
     if cid not in _BY_ID:
         return {"ok": False, "reason": "id"}
     if qty <= 0:
         return {"ok": False, "reason": "qty"}
-    price = spot(market, cid)
+    price = fill_price(market, cid, qty, "buy")
     cost = price * qty
     fee = cost * COMMISSION
     if cost + fee > player.cash:
@@ -207,11 +230,11 @@ def sell(player, market, cid, qty):
     pos = player.crypto.get(cid)
     if not pos:
         return {"ok": False, "reason": "noposition"}
-    price = spot(market, cid)
     if qty == "ALL" or qty >= pos["qty"]:
         qty = pos["qty"]
     if qty <= 0:
         return {"ok": False, "reason": "qty"}
+    price = fill_price(market, cid, qty, "sell")
     proceeds = price * qty
     fee = proceeds * COMMISSION
     realized = (price - pos["avg"]) * qty - fee

@@ -295,3 +295,25 @@ def test_holdings_view_empty_when_no_positions():
     p = _player()
     m = Market(seed=10)
     assert commodities.holdings(p, m) == []
+
+
+def test_fill_price_costs_more_under_market_stress():
+    """Pour un même ordre, un marché en plein stress (last_stress_level proche de
+    1.0) doit coûter plus cher à l'exécution qu'un marché calme — sur une matière
+    première liquide comme sur une illiquide (item 9/15)."""
+    m = Market(seed=10)
+    for cid in ("GOLD", "REE"):
+        m.last_stress_level = 0.0
+        calm = commodities.fill_price(m, cid, 5, "buy")
+        m.last_stress_level = 1.0
+        stressed = commodities.fill_price(m, cid, 5, "buy")
+        assert stressed > calm
+
+
+def test_fill_price_deterministic_for_same_market_state():
+    """Même état de marché (même stress) -> même prix d'exécution, à chaque appel."""
+    m = Market(seed=10)
+    m.last_stress_level = 0.35
+    a = commodities.fill_price(m, "OIL", 10, "sell")
+    b = commodities.fill_price(m, "OIL", 10, "sell")
+    assert a == b

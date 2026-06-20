@@ -27,14 +27,20 @@ def test_buy_then_sell_realizes_pnl():
     p, m = _setup()
     tk = m.companies[0]["ticker"]
     _set_price(m, tk, 100.0)
-    pf.buy(p, m, tk, 100)
+    buy_res = pf.buy(p, m, tk, 100)
     assert p.portfolio[tk]["shares"] == 100
     _set_price(m, tk, 120.0)
     res = pf.sell(p, m, tk, "ALL")
     assert res["ok"]
-    # gain brut ~ (120-100)*100 = 2000, moins commissions
-    assert res["realized"] == pytest.approx(2000 - 120*100*pf.COMMISSION - 100*100*pf.COMMISSION, rel=1e-6) \
-        or res["realized"] > 1800
+    # Le réalisé net dépend du spread/impact effectifs aux deux fills (variables
+    # selon tier de liquidité du ticker et stress de marché, cf. core/liquidity.py
+    # et core/portfolio.fill_price) — on retrouve le résultat exact à partir des
+    # prix d'exécution réels plutôt que d'une approximation à spread fixe.
+    expected = (res["price"] - buy_res["price"]) * 100 - res["fee"]
+    assert res["realized"] == pytest.approx(expected, rel=1e-6)
+    # le prix a monté de 20 %, largement au-dessus de tout spread/impact réaliste
+    # sur un seul lot de 100 actions : le réalisé doit rester nettement positif.
+    assert res["realized"] > 1000
     assert tk not in p.portfolio
 
 
@@ -144,7 +150,11 @@ def test_slippage_capped():
     p, m = _setup()
     tk = m.companies[0]["ticker"]
     huge = pf.fill_price(m, tk, 10 ** 15, "buy")
-    assert huge <= m.price_of(tk) * (1 + pf.HALF_SPREAD + pf.MAX_SLIPPAGE) + 1e-6
+    # demi-spread maximal possible (pire tier de liquidité + stress maximal) + impact
+    # plafonné : borne large mais déterministe, indépendante du tier réel du ticker.
+    max_half_spread = pf.HALF_SPREAD * max(pf.SPREAD_TIER_MULT.values()) \
+        * (1.0 + pf.SPREAD_STRESS_MAX_MULT)
+    assert huge <= m.price_of(tk) * (1 + max_half_spread + pf.MAX_SLIPPAGE) + 1e-6
 
 
 # --------------------------------------------------------------- impact non-linéaire
@@ -197,6 +207,56 @@ def test_fill_price_uses_market_stress_level():
     m.last_stress_level = 1.0
     stressed_fill = pf.fill_price(m, tk, order_qty, "buy")
     assert stressed_fill > calm_fill
+
+
+def test_fill_price_spread_widens_under_stress_even_for_tiny_order():
+    """Même pour un ordre négligeable (impact de taille quasi nul), le DEMI-SPREAD
+    lui-même doit s'élargir sous stress de marché — pas seulement l'impact lié à
+    la taille (item 9/15 : coût d'exécution/spread varient avec le régime)."""
+    p, m = _setup()
+    tk = m.companies[0]["ticker"]
+    m.last_stress_level = 0.0
+    calm = pf.fill_price(m, tk, 1, "buy")
+    m.last_stress_level = 1.0
+    stressed = pf.fill_price(m, tk, 1, "buy")
+    assert stressed > calm
+
+
+def test_fill_price_spread_wider_for_illiquid_small_cap():
+    """À taille d'ordre et stress égaux, une action peu liquide (petite capi,
+    tier 'Illiquide') doit avoir un demi-spread plus large qu'une grosse capi
+    (tier 'Liquide') — la liquidité de l'actif influence directement le spread,
+    pas seulement l'impact de taille."""
+    p, m = _setup()
+    tk = m.companies[0]["ticker"]
+    i = m.ticker_idx[tk]
+    qty = 1   # ordre minuscule : isole l'effet de spread de l'effet d'impact
+    m.last_stress_level = 0.0
+
+    m.price[i] = 100.0
+    m.shares[i] = 1e7          # capi ~1e9 -> "Illiquide" (cf. liquidity.equity_tier_for_cap)
+    illiquid_fill = pf.fill_price(m, tk, qty, "buy")
+    illiquid_mid = m.price_of(tk)
+
+    m.shares[i] = 5e8          # capi ~5e10 -> "Liquide"
+    liquid_fill = pf.fill_price(m, tk, qty, "buy")
+    liquid_mid = m.price_of(tk)
+
+    illiquid_frac = illiquid_fill / illiquid_mid - 1
+    liquid_frac = liquid_fill / liquid_mid - 1
+    assert illiquid_frac > liquid_frac
+
+
+def test_fill_price_deterministic_for_same_market_state():
+    """Même état de marché (mêmes prix, même stress) -> même prix d'exécution,
+    à chaque appel : la sensibilité au régime/à la liquidité ne doit introduire
+    aucun aléa non reproductible (contrat de déterminisme du projet)."""
+    p, m = _setup()
+    tk = m.companies[0]["ticker"]
+    m.last_stress_level = 0.7
+    a = pf.fill_price(m, tk, 250, "sell")
+    b = pf.fill_price(m, tk, 250, "sell")
+    assert a == b
 
 
 def test_short_pays_dividends():

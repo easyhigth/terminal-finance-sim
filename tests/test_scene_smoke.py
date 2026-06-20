@@ -142,6 +142,44 @@ def test_financials_open_spreadsheet_balance_fits_grid(app):
     assert sheet.sheet.get_raw(f"A{last_row}") != ""
 
 
+def test_financials_overview_exposes_earnings_and_relative_value(app):
+    """L'écran FA enrichi expose désormais : médianes sectorielles
+    (m.sector_medians, réutilisées de la commande RV) et l'attribution
+    factorielle du dernier pas (m.factor_attribution, réutilisée du desk
+    risque) pour le ticker consulté, en plus des stats déjà existantes."""
+    # avance le marché pour qu'au moins un résultat trimestriel soit publié
+    for _ in range(20):
+        app.market.step()
+    ticker = app.market.companies[0]["ticker"]
+    app.scenes.go("financials", ticker=ticker, return_to="terminal")
+    scene = app.scenes.current
+    scene.update(0.016)
+    scene.draw(app.screen)
+    assert scene.sector_med is not None
+    assert scene.sector_med["n"] >= 1
+    assert scene.attribution is not None
+    assert set(scene.attribution) == {"world", "sector", "region", "specific", "drift", "total"}
+    # les métriques sous-jacentes (earnings_log) doivent être cohérentes avec
+    # ce que la fiche société affiche déjà (réutilisation, pas de duplication)
+    mt = app.market.metrics(ticker)
+    assert scene.metrics["last_earnings"] == mt["last_earnings"]
+
+
+def test_financials_overview_handles_no_earnings_yet(app):
+    """Au tout début d'une partie (aucun résultat publié), l'écran ne doit
+    pas planter : last_earnings/last_guidance sont None et l'historique de
+    cours est court (< 2 points). Couvre la branche 'Aucun résultat publié'
+    et 'Historique en constitution'."""
+    a2 = main.App()
+    a2.ensure_market()
+    ticker = a2.market.companies[3]["ticker"]
+    a2.scenes.go("financials", ticker=ticker, return_to="terminal")
+    scene = a2.scenes.current
+    scene.update(0.016)
+    scene.draw(a2.screen)   # ne doit pas lever d'exception
+    assert scene.metrics["last_earnings"] is None
+
+
 def test_ma_target_open_spreadsheet_roundtrip(app):
     from data.ma_targets import all_targets
     target = all_targets()[0]

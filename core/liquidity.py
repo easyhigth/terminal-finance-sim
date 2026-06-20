@@ -23,17 +23,35 @@ _PARAMS = {
 }
 MAX_SLIPPAGE = 0.08
 
+# Sous stress de marché (stress_level 0..1, cf. Market.last_stress_level —
+# même signal que core/portfolio.fill_price, dérivé déterministement de
+# l'asymétrie de volatilité et du régime de fond courant), le demi-spread et
+# le coefficient d'impact sont tous deux élargis : à stress_level=1.0, le
+# demi-spread est multiplié par (1+STRESS_SPREAD_MAX_MULT) et le coefficient
+# d'impact par (1+STRESS_IMPACT_MAX_MULT). L'impact réagit plus fort que le
+# spread (c'est surtout la PROFONDEUR du carnet qui s'évapore en crise, pas
+# seulement la cotation) — cohérent avec IMPACT_STRESS_MAX_MULT=3.0 utilisé
+# pour les actions dans core/portfolio.py.
+STRESS_SPREAD_MAX_MULT = 1.5
+STRESS_IMPACT_MAX_MULT = 3.0
+
 
 def params(tier):
     """(demi-spread, coefficient d'impact) du tier (replié sur 'Peu liquide')."""
     return _PARAMS.get(tier, _PARAMS["Peu liquide"])
 
 
-def fill_price(mid, order_value, depth, tier, side):
+def fill_price(mid, order_value, depth, tier, side, stress_level=0.0):
     """Prix d'exécution = mid ± (demi-spread + impact), l'impact croissant avec
     order_value/depth et étant plafonné — même mécanique que les actions
-    (core/portfolio.fill_price), paramétrée par tier de liquidité."""
+    (core/portfolio.fill_price), paramétrée par tier de liquidité ET par le
+    stress de marché courant (`stress_level`, 0..1, cf. Market.last_stress_level) :
+    pour un même ordre, le coût d'exécution est plus élevé en régime
+    volatil/récession qu'en marché calme, quelle que soit la classe d'actif."""
     half_spread, impact_k = params(tier)
+    stress_frac = min(1.0, max(0.0, stress_level))
+    half_spread *= (1.0 + STRESS_SPREAD_MAX_MULT * stress_frac)
+    impact_k *= (1.0 + STRESS_IMPACT_MAX_MULT * stress_frac)
     impact = min(MAX_SLIPPAGE, impact_k * (order_value / depth)) if depth > 0 else 0.0
     cost_frac = half_spread + impact
     return mid * (1 + cost_frac) if side == "buy" else mid * (1 - cost_frac)
@@ -102,3 +120,33 @@ def commodity_tier(category):
 
 def commodity_depth(category):
     return _COMMODITY_DEPTH.get(category, 150_000_000.0)
+
+
+# ------------------------------------------------------------ crypto-actifs
+# Carnet bien plus mince que les grandes capi actions ou les souverains notés :
+# même les plus grosses crypto-actifs (BITC/ETHR) restent "Peu liquide" ; les
+# petites caps spéculatives (SOLR/DOGY) sont "Illiquide". Le stablecoin et la
+# CBDC sont arrimés et très profonds (cotation quasi 1:1, peu de slippage).
+_LIQUID_CRYPTO_IDS = {"USDX", "CBDC"}
+_ILLIQUID_CRYPTO_IDS = {"SOLR", "DOGY"}
+
+_CRYPTO_DEPTH = {
+    "BITC": 800_000_000.0,
+    "ETHR": 400_000_000.0,
+    "SOLR": 60_000_000.0,
+    "DOGY": 20_000_000.0,
+    "USDX": 2_000_000_000.0,
+    "CBDC": 5_000_000_000.0,
+}
+
+
+def crypto_tier(cid):
+    if cid in _LIQUID_CRYPTO_IDS:
+        return "Liquide"
+    if cid in _ILLIQUID_CRYPTO_IDS:
+        return "Illiquide"
+    return "Peu liquide"
+
+
+def crypto_depth(cid):
+    return _CRYPTO_DEPTH.get(cid, 50_000_000.0)

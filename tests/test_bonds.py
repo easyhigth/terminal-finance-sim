@@ -109,3 +109,25 @@ def test_bond_yield_curve_term_premium_matches_market_curve():
     long_premium = B.term_premium(m, 10.0)
     short_premium = B.term_premium(m, 2.0)
     assert long_premium < short_premium   # courbe inversée
+
+
+def test_bond_fill_price_costs_more_under_market_stress():
+    """Pour un même ordre obligataire, un marché en plein stress (last_stress_level
+    proche de 1.0 — régime volatil/récession) doit coûter plus cher à l'exécution
+    qu'un marché calme (item 9/15 : coût d'exécution varie avec le régime)."""
+    _, m = _setup()
+    m.last_stress_level = 0.0
+    calm = B.fill_price(m, "CORP_HY", 50, "buy")
+    m.last_stress_level = 1.0
+    stressed = B.fill_price(m, "CORP_HY", 50, "buy")
+    assert stressed > calm
+
+
+def test_bond_fill_price_deterministic_for_same_market_state():
+    """Même état de marché (même stress, mêmes taux/spreads) -> même prix
+    d'exécution, à chaque appel (aucun aléa non reproductible)."""
+    _, m = _setup()
+    m.last_stress_level = 0.42
+    a = B.fill_price(m, "UST10", 30, "sell")
+    b = B.fill_price(m, "UST10", 30, "sell")
+    assert a == b

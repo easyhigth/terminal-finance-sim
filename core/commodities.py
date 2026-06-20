@@ -236,16 +236,19 @@ def _contract_value(market, cid, qty):
 def fill_price(market, cid, qty, side):
     """Prix d'exécution réel (spread + impact de marché, calibrés par tier de
     liquidité — métaux précieux/énergie liquides vs. minéraux stratégiques et
-    exotiques illiquides, cf. core/liquidity.py). Le prix coté (`quote()["front"]`)
-    reste le mid utilisé pour la valorisation."""
+    exotiques illiquides, cf. core/liquidity.py) ET par le stress de marché courant
+    (market.last_stress_level, 0..1) : un même ordre coûte plus cher en régime
+    volatil/récession qu'en marché calme, comme pour les actions et obligations.
+    Le prix coté (`quote()["front"]`) reste le mid utilisé pour la valorisation."""
     c = _BY_ID.get(cid)
     if not c:
         return None
     mid = futures_price(market, cid, 1)
     order_value = mid * MULTIPLIER * abs(qty)
     category = c[6]
+    stress_level = getattr(market, "last_stress_level", 0.0)
     return liq_mod.fill_price(mid, order_value, liq_mod.commodity_depth(category),
-                               liq_mod.commodity_tier(category), side)
+                               liq_mod.commodity_tier(category), side, stress_level)
 
 
 def buy(player, market, cid, qty):

@@ -1,4 +1,6 @@
 """Tests du modèle de liquidité partagé (core/liquidity.py)."""
+import pytest
+
 from core import liquidity as liq
 
 
@@ -55,3 +57,57 @@ def test_commodity_tier_energy_vs_strategic_minerals():
     assert liq.commodity_tier("Énergie") == "Liquide"
     assert liq.commodity_tier("Minéraux stratégiques") == "Illiquide"
     assert liq.commodity_depth("Énergie") > liq.commodity_depth("Minéraux stratégiques")
+
+
+# --------------------------------------------------------- stress (régime de marché)
+def test_fill_price_stress_widens_spread_and_impact():
+    """Même ordre, même tier de liquidité : un marché en plein stress (stress_level=1.0,
+    cf. Market.last_stress_level) doit produire un coût d'exécution strictement plus
+    élevé qu'un marché calme (stress_level=0.0) — sur chaque tier de liquidité."""
+    mid, order_value, depth = 100.0, 1_000_000.0, 50_000_000.0
+    for tier in liq.TIERS:
+        calm = liq.fill_price(mid, order_value, depth, tier, "buy", stress_level=0.0)
+        crisis = liq.fill_price(mid, order_value, depth, tier, "buy", stress_level=1.0)
+        assert crisis > calm > mid
+
+
+def test_fill_price_stress_level_is_clamped():
+    """Un stress_level hors [0,1] (donnée corrompue/extrapolée) ne doit pas produire
+    un coût négatif ou explosif au-delà du calibrage à stress maximal."""
+    mid, order_value, depth = 100.0, 1_000_000.0, 50_000_000.0
+    at_one = liq.fill_price(mid, order_value, depth, "Liquide", "buy", stress_level=1.0)
+    above_one = liq.fill_price(mid, order_value, depth, "Liquide", "buy", stress_level=5.0)
+    below_zero = liq.fill_price(mid, order_value, depth, "Liquide", "buy", stress_level=-2.0)
+    at_zero = liq.fill_price(mid, order_value, depth, "Liquide", "buy", stress_level=0.0)
+    assert above_one == pytest.approx(at_one)
+    assert below_zero == pytest.approx(at_zero)
+
+
+def test_fill_price_deterministic_given_same_inputs():
+    """Même (mid, order_value, depth, tier, side, stress_level) -> même prix de fill,
+    à chaque appel : aucun aléa non reproductible introduit par la sensibilité au
+    régime/au stress (conforme au contrat de déterminisme du projet)."""
+    args = (100.0, 250_000.0, 30_000_000.0, "Peu liquide", "sell", 0.6)
+    assert liq.fill_price(*args) == liq.fill_price(*args)
+
+
+def test_crypto_tier_liquid_stable_vs_illiquid_altcoin():
+    assert liq.crypto_tier("USDX") == "Liquide"
+    assert liq.crypto_tier("CBDC") == "Liquide"
+    assert liq.crypto_tier("SOLR") == "Illiquide"
+    assert liq.crypto_tier("DOGY") == "Illiquide"
+    assert liq.crypto_depth("USDX") > liq.crypto_depth("DOGY")
+
+
+def test_stress_effect_differs_by_asset_type_via_tier():
+    """À stress de marché égal, un actif moins liquide (tier 'Illiquide', ex. crypto
+    spéculative ou corporate high yield) doit rester plus coûteux à l'exécution
+    qu'un actif liquide (tier 'Liquide', ex. souverain noté ou grande capi), et
+    l'écart entre les deux doit se creuser sous stress plutôt que de se résorber."""
+    mid, order_value, depth = 100.0, 1_000_000.0, 50_000_000.0
+    calm_gap = (liq.fill_price(mid, order_value, depth, "Illiquide", "buy", 0.0)
+                - liq.fill_price(mid, order_value, depth, "Liquide", "buy", 0.0))
+    crisis_gap = (liq.fill_price(mid, order_value, depth, "Illiquide", "buy", 1.0)
+                  - liq.fill_price(mid, order_value, depth, "Liquide", "buy", 1.0))
+    assert calm_gap > 0
+    assert crisis_gap > calm_gap

@@ -80,3 +80,52 @@ def test_buy_and_sell_roundtrip_updates_cash_and_holdings():
     r2 = crypto.sell(p, m, "BITC", 1.0)
     assert r2["ok"] is True
     assert "BITC" not in p.crypto
+
+
+# --------------------------------------------------------- exécution réaliste
+def test_fill_price_costs_more_under_market_stress():
+    """Pour un même ordre crypto, un marché en plein stress (last_stress_level
+    proche de 1.0) doit coûter plus cher à l'exécution qu'un marché calme
+    (item 9/15 : le coût d'exécution varie avec le régime de marché)."""
+    m = _mk()
+    m.last_stress_level = 0.0
+    calm = crypto.fill_price(m, "BITC", 1.0, "buy")
+    m.last_stress_level = 1.0
+    stressed = crypto.fill_price(m, "BITC", 1.0, "buy")
+    assert stressed > calm > 0
+
+
+def test_fill_price_more_expensive_for_illiquid_altcoin_than_major():
+    """Une petite crypto spéculative (DOGY, tier Illiquide) doit coûter plus cher
+    à l'exécution qu'un Bitcorn (BITC, tier Peu liquide), pour un même ordre
+    notionnel équivalent — la profondeur de marché diffère par actif."""
+    m = _mk()
+    bitc_mid = crypto.spot(m, "BITC")
+    dogy_mid = crypto.spot(m, "DOGY")
+    bitc_fill = crypto.fill_price(m, "BITC", 1.0, "buy")
+    dogy_fill = crypto.fill_price(m, "DOGY", 1_000_000.0, "buy")
+    bitc_cost_frac = bitc_fill / bitc_mid - 1
+    dogy_cost_frac = dogy_fill / dogy_mid - 1
+    assert dogy_cost_frac > bitc_cost_frac
+    assert crypto.quote(m, "BITC")["liquidity"] == "Peu liquide"
+    assert crypto.quote(m, "DOGY")["liquidity"] == "Illiquide"
+
+
+def test_cbdc_fill_price_has_no_spread_or_impact():
+    """La CBDC est un dépôt garanti banque centrale, pas un actif de marché : son
+    prix d'exécution doit rester exactement au pair, quelle que soit la taille
+    de l'ordre ou le stress de marché."""
+    m = _mk()
+    m.last_stress_level = 1.0
+    assert crypto.fill_price(m, "CBDC", 10 ** 9, "buy") == 1.0
+    assert crypto.fill_price(m, "CBDC", 10 ** 9, "sell") == 1.0
+
+
+def test_fill_price_deterministic_for_same_market_state():
+    """Même état de marché (même seed, même step, même stress) -> même prix
+    d'exécution, à chaque appel (aucun aléa non reproductible introduit)."""
+    m = _mk()
+    m.last_stress_level = 0.5
+    a = crypto.fill_price(m, "ETHR", 2.0, "sell")
+    b = crypto.fill_price(m, "ETHR", 2.0, "sell")
+    assert a == b

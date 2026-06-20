@@ -219,16 +219,20 @@ def price_history(market, bond_id, n=None):
 
 def fill_price(market, bond_id, qty, side):
     """Prix d'exécution réel (spread + impact de marché, calibrés par tier de
-    liquidité — souverain noté vs. corporate high yield, cf. core/liquidity.py).
-    Le prix coté (`quote()["price"]`) reste le mid utilisé pour la valorisation."""
+    liquidité — souverain noté vs. corporate high yield, cf. core/liquidity.py) ET
+    par le stress de marché courant (market.last_stress_level, 0..1) : un même
+    ordre coûte plus cher en régime volatil/récession qu'en marché calme, comme
+    pour les actions (core/portfolio.fill_price). Le prix coté (`quote()["price"]`)
+    reste le mid utilisé pour la valorisation."""
     b = _BY_ID.get(bond_id)
     q = quote(market, bond_id)
     if not b or not q:
         return None
     mid = q["price"]
     order_value = mid * qty
+    stress_level = getattr(market, "last_stress_level", 0.0)
     return liq_mod.fill_price(mid, order_value, liq_mod.bond_depth(b),
-                               liq_mod.bond_tier(b), side)
+                               liq_mod.bond_tier(b), side, stress_level)
 
 
 def all_quotes(market):

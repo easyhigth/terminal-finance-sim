@@ -21,7 +21,7 @@ reporting (détail des positions, allocation, dividendes...) dans
 core/portfolio_views.py — réexportés ici pour que l'API publique (`pf.xxx`)
 reste un point d'entrée unique.
 """
-from core import firms, tracks
+from core import firms, liquidity, tracks
 from core.portfolio_margin import (  # noqa: F401 (réexporté, API publique de pf.)
     MAINT_MARGIN,
     MARGIN_SPREAD,
@@ -47,7 +47,16 @@ from core.portfolio_views import (  # noqa: F401 (réexporté, API publique de p
 )
 
 COMMISSION = 0.001        # 10 points de base par transaction
-HALF_SPREAD = 0.0008      # demi-spread bid/ask de base (8 bps)
+HALF_SPREAD = 0.0008      # demi-spread bid/ask de base (8 bps, grosse capi, marché calme)
+SPREAD_TIER_MULT = {      # multiplicateur de demi-spread par tier de liquidité actions
+    "Liquide": 1.0,       # (cf. core/liquidity.equity_tier_for_cap, dérivé de la capi —
+    "Peu liquide": 1.6,   # même logique que pour obligations/matières premières/crypto :
+    "Illiquide": 2.6,     # une petite capi cote avec un spread plus large qu'une
+}                          # grosse capi, indépendamment de la taille de l'ordre passé)
+SPREAD_STRESS_MAX_MULT = 1.5  # à stress maximal, le demi-spread est multiplié par
+                               # (1 + ce facteur) — même calibrage que
+                               # core/liquidity.STRESS_SPREAD_MAX_MULT, pour que toutes
+                               # les classes d'actifs réagissent de façon cohérente
 IMPACT_K = 0.12           # coefficient d'impact de marché de base (à tension nulle)
 IMPACT_ALPHA = 0.6        # exposant sous-linéaire (style Almgren-Chriss, typiquement
                           # 0.5-0.7) : l'impact croît avec (taille/liquidité)**alpha,
@@ -92,21 +101,31 @@ def market_impact(order_value, liquidity, stress_level=0.0):
 
 def fill_price(market, ticker, qty, side):
     """Prix d'exécution réel (microstructure) = mid ± demi-spread ± impact de marché.
-    L'impact croît de façon NON-LINÉAIRE avec la taille de l'ordre rapportée à la
-    liquidité (capi, proxy de profondeur) et avec le stress de marché courant
-    (market.last_stress_level, 0..1, cf. core/market.py chantier sur l'asymétrie de
-    volatilité) : un gros ordre « mange » le carnet, et le carnet est plus mince en
-    pleine crise — pour un même order_value, le slippage est donc plus élevé sur une
-    petite capi que sur une grosse, et plus élevé en stress qu'en marché calme."""
+
+    Le demi-spread ET l'impact varient désormais tous les deux selon trois axes :
+      - LIQUIDITÉ de l'action (tier dérivé de la capi, cf. core/liquidity.equity_tier) :
+        une petite capi cote avec un spread plus large qu'une grosse capi, indépendamment
+        de la taille de l'ordre passé (SPREAD_TIER_MULT) ;
+      - RÉGIME / STRESS de marché courant (market.last_stress_level, 0..1, déjà calculé
+        par Market._stress_level() à partir de l'asymétrie de volatilité et du régime
+        de fond) : spread et impact s'élargissent tous deux en marché volatil/récession ;
+      - TAILLE de l'ordre rapportée à la liquidité (capi, proxy de profondeur) — modèle
+        d'impact non-linéaire (Almgren-Chriss) inchangé depuis le chantier précédent.
+    Un gros ordre « mange » le carnet, et le carnet est plus mince en pleine crise ou
+    sur une petite capi — ces trois effets se combinent (spread élargi + impact accru)."""
     i = market.ticker_idx.get(ticker)
     mid = market.price_of(ticker)
     if i is None or mid is None:
         return mid
-    liquidity = float(market.price[i] * market.shares[i])      # capi (proxy de profondeur)
+    cap = float(market.price[i] * market.shares[i])            # capi (proxy de profondeur)
     order_value = abs(qty) * mid
     stress_level = getattr(market, "last_stress_level", 0.0)
-    impact = market_impact(order_value, liquidity, stress_level)
-    cost_frac = HALF_SPREAD + impact
+    stress_frac = min(1.0, max(0.0, stress_level))
+    tier = liquidity.equity_tier_for_cap(cap)
+    tier_mult = SPREAD_TIER_MULT.get(tier, 1.0)
+    half_spread = HALF_SPREAD * tier_mult * (1.0 + SPREAD_STRESS_MAX_MULT * stress_frac)
+    impact = market_impact(order_value, cap, stress_level)
+    cost_frac = half_spread + impact
     return mid * (1 + cost_frac) if side == "buy" else mid * (1 - cost_frac)
 
 

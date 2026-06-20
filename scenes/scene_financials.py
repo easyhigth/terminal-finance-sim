@@ -41,6 +41,13 @@ class FinancialsScene(Scene):
         m = self.app.market
         self.block = F.statements(m, self.ticker, self.fy, n_years=N_YEARS) if m else []
         self.metrics = m.metrics(self.ticker) if m else None
+        self.sector_med = (m.sector_medians(self.metrics["sector"])
+                           if m and self.metrics else None)
+        # décomposition factorielle du dernier pas, pour 1 action détenue
+        # (réutilise m.factor_attribution ; donne la part world/secteur/région/
+        # spécifique/dérive du rendement du jour, en devise par action)
+        self.attribution = (m.factor_attribution({self.ticker: 1.0})
+                            if m and self.metrics else None)
         self.error = None if self.block else f"Société introuvable : {self.ticker}"
         self.name = ""
         self.cur = "$"
@@ -108,7 +115,12 @@ class FinancialsScene(Scene):
 
     # ------------------------------------------------------------- draw
     def _draw_table(self, surf, rect, title, rows_by_year, accent):
-        """rows_by_year : liste de (label, [valeurs par exercice])."""
+        """rows_by_year : liste de (label, [valeurs par exercice]).
+
+        La hauteur de ligne s'adapte à l'espace disponible (au lieu d'une
+        valeur fixe) pour absorber les écarts de hauteur du bandeau supérieur
+        sans faire déborder le tableau le plus long (bilan, ~14 lignes) sur
+        le footer."""
         inner = widgets.draw_panel(surf, rect, title, accent)
         years = [b["year"] for b in self.block]
         colw = 84
@@ -120,7 +132,10 @@ class FinancialsScene(Scene):
             tag = "N" if k == 0 else f"N-{k}"
             widgets.draw_text(surf, f"{yr} ({tag})", (xs[k] + colw - 8, inner.y),
                               fonts.tiny(bold=True), config.COL_TEXT_DIM, align="right")
-        y = inner.y + 22
+        head_h = 22
+        n_rows = max(1, len(rows_by_year))
+        row_h = max(16, min(23, (inner.h - head_h) // n_rows))
+        y = inner.y + head_h
         for label, vals in rows_by_year:
             emph = label in _EMPH
             lab_col = config.COL_AMBER if emph else config.COL_TEXT_DIM
@@ -133,9 +148,9 @@ class FinancialsScene(Scene):
                 widgets.draw_text(surf, _fm(v), (xs[k] + colw - 8, y),
                                   fonts.small(bold=emph), col, align="right")
             if emph:
-                pygame.draw.line(surf, config.COL_BORDER, (x_label, y + 18),
-                                 (inner.right, y + 18), 1)
-            y += 23
+                pygame.draw.line(surf, config.COL_BORDER, (x_label, y + row_h - 5),
+                                 (inner.right, y + row_h - 5), 1)
+            y += row_h
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -147,11 +162,12 @@ class FinancialsScene(Scene):
             self.back_btn.draw(surf)
             return
         widgets.draw_text(surf, f"{self.name} · montants en M {self.cur} · analyse complète "
-                                f"(stats, graphe 5 ans, {N_YEARS} exercices)",
+                                f"(stats, résultats, valeur relative, attribution, "
+                                f"{N_YEARS} exercices)",
                           (42, 74), fonts.small(), config.COL_TEXT_DIM)
 
-        # ---- bandeau supérieur : statistiques clés + graphe de cours 5 ans ----
-        top = pygame.Rect(40, 100, config.SCREEN_WIDTH - 80, 150)
+        # ---- bandeau supérieur : stats clés, résultats/valeur relative, cours+attribution ----
+        top = pygame.Rect(40, 100, config.SCREEN_WIDTH - 80, 198)
         self._draw_overview(surf, top)
 
         ty = top.bottom + 10
@@ -185,48 +201,163 @@ class FinancialsScene(Scene):
         self.sheet_bal_btn.draw(surf)
 
     def _draw_overview(self, surf, rect):
-        """Statistiques clés (mêmes que la fiche) + graphe de cours sur 5 ans."""
+        """Trois panneaux : (1) statistiques clés, (2) résultats/guidance +
+        valeur relative vs secteur, (3) graphe de cours 5 ans + attribution
+        factorielle du dernier pas. Tout est calculé à partir de m.metrics(),
+        m.sector_medians() et m.factor_attribution(), déjà utilisés ailleurs
+        (fiche société, commande RV, desk risque) — aucune nouvelle donnée
+        fictive n'est introduite ici."""
         mt = self.metrics
-        half = (rect.w - 20) // 2
-        stats = pygame.Rect(rect.x, rect.y, half, rect.h)
-        inner = widgets.draw_panel(surf, stats, "Statistiques clés", self.accent)
-        if mt:
-            f2 = lambda v, s="", d=2: ("n.m." if v is None else f"{v:.{d}f}{s}")
-            chg = mt["change_pct"]
-            ccol = config.COL_UP if chg >= 0 else config.COL_DOWN
-            widgets.draw_text(surf, f"{mt['price']:,.2f} {self.cur}", (inner.x, inner.y),
-                              fonts.head(bold=True), config.COL_WHITE)
-            widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.1f}% (1 an)",
-                              (inner.right, inner.y), fonts.small(bold=True), ccol, align="right")
-            cols = [
-                [("Capitalisation", widgets.format_money(mt["mktcap"] * 1e6, self.cur)),
-                 ("P/E", f2(mt["pe"], "x", 1)), ("EV/EBITDA", f2(mt["ev_ebitda"], "x", 1)),
-                 ("P/Sales", f2(mt["ps"], "x", 1))],
-                [("Marge nette", f2(mt["net_margin"] * 100, "%", 1)),
-                 ("Dette/EBITDA", f2(mt["nd_ebitda"], "x", 1)),
-                 ("Rendement div.", f2(mt["div_yield"] * 100, "%", 2)),
-                 ("Bêta", f2(mt["beta"], "", 2))],
-            ]
-            cw = inner.w // 2
-            for ci, col in enumerate(cols):
-                x = inner.x + ci * cw
-                y = inner.y + 30
-                for label, val in col:
-                    widgets.draw_text(surf, label, (x, y), fonts.tiny(), config.COL_TEXT_DIM)
-                    widgets.draw_text(surf, str(val), (x + cw - 16, y), fonts.small(bold=True),
-                                      config.COL_WHITE, align="right")
-                    y += 24
-        # graphe de cours 5 ans (droite)
-        chart = pygame.Rect(rect.x + half + 20, rect.y, rect.w - half - 20, rect.h)
-        cinner = widgets.draw_panel(surf, chart, "Cours — 5 ans", self.accent)
+        cw = (rect.w - 40) // 3
+        stats = pygame.Rect(rect.x, rect.y, cw, rect.h)
+        earn = pygame.Rect(rect.x + cw + 20, rect.y, cw, rect.h)
+        chart = pygame.Rect(rect.x + 2 * (cw + 20), rect.y, rect.w - 2 * (cw + 20), rect.h)
+
+        self._draw_stats_panel(surf, stats, mt)
+        self._draw_earnings_panel(surf, earn, mt)
+        self._draw_chart_panel(surf, chart, mt)
+
+    def _draw_stats_panel(self, surf, rect, mt):
+        inner = widgets.draw_panel(surf, rect, "Statistiques clés", self.accent)
+        if not mt:
+            return
+        f2 = lambda v, s="", d=2: ("n.m." if v is None else f"{v:.{d}f}{s}")
+        chg = mt["change_pct"]
+        ccol = config.COL_UP if chg >= 0 else config.COL_DOWN
+        widgets.draw_text(surf, f"{mt['price']:,.2f} {self.cur}", (inner.x, inner.y),
+                          fonts.head(bold=True), config.COL_WHITE)
+        widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.1f}% (1 an)",
+                          (inner.right, inner.y), fonts.small(bold=True), ccol, align="right")
+        rows = [
+            ("Capitalisation", widgets.format_money(mt["mktcap"] * 1e6, self.cur)),
+            ("P/E", f2(mt["pe"], "x", 1)), ("EV/EBITDA", f2(mt["ev_ebitda"], "x", 1)),
+            ("P/Sales", f2(mt["ps"], "x", 1)),
+            ("Marge nette", f2(mt["net_margin"] * 100, "%", 1)),
+            ("Dette/EBITDA", f2(mt["nd_ebitda"], "x", 1)),
+            ("Notation crédit", mt["credit_rating"]),
+            ("Rendement div.", f2(mt["div_yield"] * 100, "%", 2)),
+            ("Bêta", f2(mt["beta"], "", 2)),
+        ]
+        y = inner.y + 28
+        for label, val in rows:
+            widgets.draw_text(surf, label, (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, str(val), (inner.right, y), fonts.small(bold=True),
+                              config.COL_WHITE, align="right")
+            y += 13
+
+    def _draw_earnings_panel(self, surf, rect, mt):
+        """Derniers résultats trimestriels (beat/miss, guidance, anticipation,
+        PEAD) puis valeur relative vs médiane du secteur (mêmes champs que la
+        commande RV du terminal)."""
+        inner = widgets.draw_panel(surf, rect, "Résultats & valeur relative", self.accent)
+        if not mt:
+            return
+        y = inner.y
+        le = mt.get("last_earnings")
+        if le:
+            ecol = config.COL_UP if le["beat"] else config.COL_DOWN
+            verb = "BEAT" if le["beat"] else "MISS"
+            widgets.draw_text(surf, f"Derniers résultats : {verb}", (inner.x, y),
+                              fonts.small(bold=True), ecol)
+            y += 17
+            widgets.draw_text_fit(surf, f"Surprise {le['surprise']*100:+.1f}%  ·  "
+                                        f"croissance CA {le['growth']*100:+.1f}%",
+                                  (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM,
+                                  max_width=inner.w)
+            y += 15
+            g_label = le.get("guidance_label")
+            if g_label:
+                widgets.draw_text(surf, f"Guidance {g_label}", (inner.x, y),
+                                  fonts.tiny(), config.COL_TEXT_DIM)
+                y += 15
+        else:
+            widgets.draw_text(surf, "Aucun résultat publié pour l'instant.", (inner.x, y),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+            y += 15
+        if mt.get("earnings_anticipation"):
+            widgets.draw_text(surf, f"⏳ Publication dans {mt['steps_to_earnings']} pas",
+                              (inner.x, y), fonts.tiny(), config.COL_WARN)
+            y += 15
+        pead = mt.get("pead_drift_remaining") or 0.0
+        if abs(pead) > 1e-4:
+            pcol = config.COL_UP if pead > 0 else config.COL_DOWN
+            widgets.draw_text(surf, f"↗ Drift post-résultats résiduel : {pead*100:+.2f}%",
+                              (inner.x, y), fonts.tiny(), pcol)
+            y += 15
+
+        y += 4
+        pygame.draw.line(surf, config.COL_BORDER, (inner.x, y), (inner.right, y), 1)
+        y += 5
+        med = self.sector_med
+        widgets.draw_text(surf, f"Vs secteur {mt['sector']} ({med['n'] if med else 0} pairs)",
+                          (inner.x, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        y += 16
+
+        def fmt(v):
+            return f"{v:.1f}x" if v else "n.m."
+
+        def verdict(val, ref):
+            if not val or not ref:
+                return ("—", config.COL_TEXT_DIM)
+            if val < ref * 0.9:
+                return ("décoté", config.COL_UP)
+            if val > ref * 1.1:
+                return ("cher", config.COL_DOWN)
+            return ("en ligne", config.COL_TEXT)
+
+        for label, key in [("P/E", "pe"), ("EV/EBITDA", "ev_ebitda"), ("P/S", "ps")]:
+            v, r = mt.get(key), (med.get(key) if med else None)
+            txt, col = verdict(v, r)
+            widgets.draw_text(surf, f"{label} {fmt(v)} / méd. {fmt(r)}", (inner.x, y),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, txt, (inner.right, y), fonts.tiny(bold=True),
+                              col, align="right")
+            y += 15
+
+    def _draw_chart_panel(self, surf, rect, mt):
+        """Graphe de cours 5 ans + attribution factorielle du dernier pas
+        (m.factor_attribution, déjà utilisée pour le P&L du portefeuille,
+        appliquée ici à une action détenue de ce titre)."""
+        cinner = widgets.draw_panel(surf, rect, "Cours — 5 ans & attribution", self.accent)
+        chart_h = cinner.h - 56     # réserve fixe en bas pour la ligne d'attribution
+        plot_rect = pygame.Rect(cinner.x, cinner.y, cinner.w, chart_h)
         hist = self.app.market.history_of(self.ticker) if self.app.market else []
         if len(hist) >= 2:
-            plot = pygame.Rect(cinner.x, cinner.y + 4, cinner.w, cinner.h - 20)
+            plot = pygame.Rect(plot_rect.x, plot_rect.y + 4, plot_rect.w, plot_rect.h - 20)
             col = config.COL_UP if hist[-1] >= hist[0] else config.COL_DOWN
             widgets.draw_series(surf, plot, hist, col)
             chg = (hist[-1] / hist[0] - 1) * 100 if hist[0] else 0.0
             widgets.draw_text(surf, f"{hist[-1]:,.2f} {self.cur}  ({chg:+.1f}% sur 5 ans)",
-                              (cinner.x, cinner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
+                              (plot_rect.x, plot_rect.bottom - 14), fonts.tiny(),
+                              config.COL_TEXT_DIM)
         else:
             widgets.draw_text(surf, "Historique en constitution (ADV).",
-                              (cinner.x, cinner.y), fonts.small(), config.COL_TEXT_DIM)
+                              (plot_rect.x, plot_rect.y), fonts.small(), config.COL_TEXT_DIM)
+
+        # attribution factorielle du dernier pas (drift, monde, secteur, région,
+        # spécifique), exprimée en % du rendement total pour rester lisible
+        # indépendamment de la taille de la position fictive utilisée au calcul.
+        # Réutilise m.factor_attribution (même calcul que le P&L du portefeuille),
+        # affiché en une seule ligne compacte pour tenir dans le panneau.
+        y = plot_rect.bottom + 8
+        pygame.draw.line(surf, config.COL_BORDER, (cinner.x, y), (cinner.right, y), 1)
+        y += 6
+        widgets.draw_text(surf, "Attribution du dernier pas", (cinner.x, y),
+                          fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        y += 16
+        attr = self.attribution
+        total = attr["total"] if attr else 0.0
+        if attr and abs(total) > 1e-9:
+            parts = [("Dérive", "drift"), ("Monde", "world"), ("Secteur", "sector"),
+                     ("Région", "region"), ("Spécif.", "specific")]
+            seg_w = cinner.w // len(parts)
+            for k, (label, key) in enumerate(parts):
+                share = attr[key] / total * 100.0
+                col = config.COL_UP if attr[key] >= 0 else config.COL_DOWN
+                x = cinner.x + k * seg_w
+                widgets.draw_text(surf, label, (x, y), fonts.tiny(), config.COL_TEXT_DIM)
+                widgets.draw_text(surf, f"{share:+.0f}%", (x, y + 14),
+                                  fonts.tiny(bold=True), col)
+        else:
+            widgets.draw_text(surf, "Pas de mouvement de cours au dernier pas.",
+                              (cinner.x, y), fonts.tiny(), config.COL_TEXT_DIM)

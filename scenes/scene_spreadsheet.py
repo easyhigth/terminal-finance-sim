@@ -2,7 +2,10 @@
 scene_spreadsheet.py — Tableur intégré (type Excel).
 Grille de cellules cliquables, barre de formule, édition au clavier.
 Affiche valeurs calculées dans la grille, formule brute dans la barre.
-Pré-rempli avec un mini-modèle DCF pour illustrer l'usage.
+Pré-rempli avec un mini-modèle DCF pour illustrer l'usage — ou, si ouvert
+depuis un état financier (`import_data`), pré-rempli avec les lignes de cet
+état (compte de résultat ou bilan) pour permettre au joueur d'ajouter ses
+propres cellules de calcul (ratios) à côté des chiffres importés.
 """
 import pygame
 
@@ -17,14 +20,23 @@ HEAD_W = 44       # largeur colonne des numéros de ligne
 GRID_X = 40
 GRID_Y = 172
 N_COLS = 8
-N_ROWS = 13
+N_ROWS = 16       # assez de lignes pour importer un bilan (≈14 lignes) + 1-2 ratios
 
 
 class SpreadsheetScene(Scene):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
-        # réutilise le tableur stocké dans l'app (persistant entre visites)
-        if not hasattr(self.app, "sheet") or self.app.sheet is None:
+        self.return_kwargs = kwargs.get("return_kwargs") or {}
+        import_data = kwargs.get("import_data")
+        self.import_title = None
+        if import_data:
+            # ouverture depuis un état financier : nouvelle grille fraîche,
+            # remplie avec les lignes de cet état (écrase le tableur courant —
+            # c'est un "snapshot" d'export, pas une fusion).
+            self.app.sheet = Spreadsheet(N_ROWS, N_COLS)
+            self._seed_import(self.app.sheet, import_data)
+            self.import_title = import_data.get("title")
+        elif not hasattr(self.app, "sheet") or self.app.sheet is None:
             self.app.sheet = Spreadsheet(N_ROWS, N_COLS)
             self._seed_demo(self.app.sheet)
         self.sheet = self.app.sheet
@@ -38,6 +50,29 @@ class SpreadsheetScene(Scene):
             "TOUT EFFACER", config.COL_DOWN)
         self.tuto_btn = widgets.Button(
             (230, config.SCREEN_HEIGHT-50, 150, 42), "📘 TUTO", config.COL_CYAN)
+
+    def _seed_import(self, s, data):
+        """Remplit la grille à partir d'un état financier exporté : colonne A =
+        libellés, colonnes B... = valeurs par exercice (le plus récent en B).
+        Laisse des lignes vides en bas pour les ratios du joueur."""
+        title = data.get("title", "DONNÉES IMPORTÉES")
+        years = data.get("years") or []
+        rows = data.get("rows") or []
+        s.set("A1", title)
+        s.set("A2", "Poste")
+        n_years = min(len(years), N_COLS - 1)
+        for k in range(n_years):
+            tag = "N" if k == 0 else f"N-{k}"
+            s.set(f"{idx_to_col(k+1)}2", f"{years[k]} ({tag})")
+        r = 3
+        for label, vals in rows:
+            if r > N_ROWS:
+                break
+            s.set(f"A{r}", label)
+            for k in range(n_years):
+                v = vals[k] if k < len(vals) else 0.0
+                s.set(f"{idx_to_col(k+1)}{r}", f"{v:.4f}")
+            r += 1
 
     def _seed_demo(self, s):
         """Mini-modèle DCF pour montrer l'outil."""
@@ -79,7 +114,7 @@ class SpreadsheetScene(Scene):
                     self.edit_buf += event.unicode
             else:
                 if event.key == pygame.K_ESCAPE:
-                    self.app.scenes.go(self.return_to)
+                    self.app.scenes.go(self.return_to, **self.return_kwargs)
                 elif event.key in (pygame.K_RETURN, pygame.K_F2):
                     self.editing = True
                     self.edit_buf = self.sheet.get_raw(self.sel)
@@ -99,7 +134,7 @@ class SpreadsheetScene(Scene):
                     self.edit_buf = event.unicode
 
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.go(self.return_to, **self.return_kwargs)
         if self.clear_btn.handle(event):
             self.app.sheet = Spreadsheet(N_ROWS, N_COLS)
             self.sheet = self.app.sheet
@@ -152,7 +187,10 @@ class SpreadsheetScene(Scene):
 
         self._draw_formula_bar(surf)
         self._draw_grid(surf)
-        self._draw_help(surf)
+        if self.import_title:
+            self._draw_import_banner(surf)
+        else:
+            self._draw_help(surf)
         self.back_btn.draw(surf)
         self.clear_btn.draw(surf)
         self.tuto_btn.draw(surf)
@@ -223,6 +261,14 @@ class SpreadsheetScene(Scene):
                     else:
                         widgets.draw_text(surf, text[:14], (rect.x+5, rect.y+5),
                                           fonts.small(), col)
+
+    def _draw_import_banner(self, surf):
+        y = GRID_Y + (N_ROWS+1)*CELL_H + 10
+        panel = pygame.Rect(40, y, config.SCREEN_WIDTH-80, 40)
+        inner = widgets.draw_panel(surf, panel, None, config.COL_CYAN)
+        widgets.draw_text(surf, f"Importé : {self.import_title} · ajoutez vos propres "
+                                "cellules de calcul (ex. =B3/B10) dans les lignes/colonnes libres.",
+                          (inner.x, inner.y + 2), fonts.small(), config.COL_TEXT_DIM)
 
     def _draw_help(self, surf):
         y = GRID_Y + (N_ROWS+1)*CELL_H + 16

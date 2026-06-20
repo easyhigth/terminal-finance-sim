@@ -49,6 +49,10 @@ class MATargetScene(Scene):
         self._refresh()
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
+        self.sheet_inc_btn = widgets.Button((210, config.SCREEN_HEIGHT - 70, 200, 46),
+                                            "→ TABLEUR (CR)", config.COL_UP)
+        self.sheet_bal_btn = widgets.Button((420, config.SCREEN_HEIGHT - 70, 200, 46),
+                                            "→ TABLEUR (BILAN)", config.COL_UP)
 
     def _refresh(self):
         p = self.app.gs.player
@@ -70,6 +74,13 @@ class MATargetScene(Scene):
             return
         if not self._can_ma() or not self.data:
             return
+        if self.tab == "ÉTATS FINANCIERS":
+            if self.sheet_inc_btn.handle(event):
+                self._open_spreadsheet("income")
+                return
+            if self.sheet_bal_btn.handle(event):
+                self._open_spreadsheet("balance")
+                return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for name, rect in self._tab_rects.items():
                 if rect.collidepoint(event.pos):
@@ -129,8 +140,37 @@ class MATargetScene(Scene):
             self._msg = res["reason"]
             self._msg_col = config.COL_DOWN
 
+    def _open_spreadsheet(self, which):
+        p = self.app.gs.player
+        years_elapsed = (p.day - 1) // 365
+        base_year = BASE_FISCAL_YEAR + years_elapsed
+        block = M.statements_for(self.data, base_year, n_years=5)
+        years = [b["year"] for b in block]
+        if which == "income":
+            title = f"{self.ticker} — Compte de résultat"
+            lines = block[0]["income"]["lines"]
+            rows = [(line["label"], [b["income"]["lines"][r]["value"] for b in block])
+                    for r, line in enumerate(lines)]
+        else:
+            title = f"{self.ticker} — Bilan"
+            rows = []
+            n_assets = len(block[0]["balance"]["assets_lines"])
+            for r in range(n_assets):
+                rows.append((block[0]["balance"]["assets_lines"][r]["label"],
+                             [b["balance"]["assets_lines"][r]["value"] for b in block]))
+            for r in range(len(block[0]["balance"]["liab_lines"])):
+                rows.append((block[0]["balance"]["liab_lines"][r]["label"],
+                             [b["balance"]["liab_lines"][r]["value"] for b in block]))
+        self.app.scenes.go("spreadsheet", return_to="ma_target",
+                           return_kwargs={"ticker": self.ticker, "return_to": self.return_to},
+                           import_data={"title": title, "years": years, "rows": rows})
+
     def update(self, dt):
         self.back_btn.update(pygame.mouse.get_pos(), dt)
+        if self.tab == "ÉTATS FINANCIERS":
+            mp = pygame.mouse.get_pos()
+            self.sheet_inc_btn.update(mp, dt)
+            self.sheet_bal_btn.update(mp, dt)
 
     # ------------------------------------------------------------- draw
     def draw(self, surf):
@@ -178,6 +218,8 @@ class MATargetScene(Scene):
             self._draw_apercu(surf, top, cur)
         else:
             self._draw_statements(surf, top, cur)
+            self.sheet_inc_btn.draw(surf)
+            self.sheet_bal_btn.draw(surf)
         self.back_btn.draw(surf)
 
     # --------------------------------------------------------- onglet APERÇU
@@ -379,6 +421,7 @@ class MATargetScene(Scene):
         years = [b["year"] for b in block]
         colw = 92
         xs = [inner.right - colw * (len(years) - k) for k in range(len(years))]
+        label_w = max(10, xs[0] - inner.x - 10)   # marge avant la 1ère colonne de chiffres
         for k, yr in enumerate(years):
             tag = "N" if k == 0 else f"N-{k}"
             widgets.draw_text(surf, f"{yr} ({tag})", (xs[k] + colw - 8, inner.y),
@@ -387,7 +430,8 @@ class MATargetScene(Scene):
         for label, vals in rows_by_year:
             emph = label in _EMPH
             lab_col = config.COL_AMBER if emph else config.COL_TEXT_DIM
-            widgets.draw_text(surf, label, (inner.x, y), fonts.small(bold=emph), lab_col)
+            widgets.draw_text_fit(surf, label, (inner.x, y), fonts.small(bold=emph), lab_col,
+                                  max_width=label_w)
             for k, v in enumerate(vals):
                 col = config.COL_WHITE if emph else config.COL_TEXT
                 if v < -0.5 and not emph:

@@ -97,3 +97,63 @@ def test_terminal_after_every_scene_still_works(app):
     app.scenes.current.update(0.016)
     app.scenes.current.draw(app.screen)
     assert app.scenes.current_name == "terminal"
+
+
+# --------------------------------------------------------- export vers le tableur
+# Couvre l'option "→ TABLEUR" ajoutée sur les écrans d'états financiers
+# (scene_financials.py / scene_ma_target.py) : ouverture de scene_spreadsheet
+# avec les données importées, et retour vers l'écran d'origine avec le bon
+# contexte (ticker conservé).
+
+def test_financials_open_spreadsheet_income(app):
+    ticker = app.market.companies[0]["ticker"]
+    app.scenes.go("financials", ticker=ticker, return_to="terminal")
+    scene = app.scenes.current
+    scene.update(0.016)
+    scene._open_spreadsheet("income")
+    assert app.scenes.current_name == "spreadsheet"
+    sheet = app.scenes.current
+    assert sheet.import_title == f"{ticker} — Compte de résultat"
+    # libellé de la première ligne importée (Chiffre d'affaires) en A3
+    assert sheet.sheet.get_raw("A3") == "Chiffre d'affaires"
+    # valeur numérique importée et lisible par le moteur de formules
+    assert isinstance(sheet.sheet.get_value("B3"), float)
+    # le retour ramène bien sur la fiche financière du même ticker
+    sheet.handle_event(pygame.event.Event(
+        pygame.MOUSEBUTTONDOWN, button=1, pos=sheet.back_btn.rect.center))
+    assert app.scenes.current_name == "financials"
+    assert app.scenes.current.ticker == ticker
+
+
+def test_financials_open_spreadsheet_balance_fits_grid(app):
+    """Le bilan (~14 lignes) doit tenir entièrement dans la grille du tableur
+    (régression : la grille était trop petite -> lignes tronquées silencieusement)."""
+    from scenes.scene_spreadsheet import N_ROWS
+    ticker = app.market.companies[0]["ticker"]
+    app.scenes.go("financials", ticker=ticker, return_to="terminal")
+    scene = app.scenes.current
+    scene.update(0.016)
+    n_bal_rows = (len(scene.block[0]["balance"]["assets_lines"])
+                  + len(scene.block[0]["balance"]["liab_lines"]))
+    scene._open_spreadsheet("balance")
+    sheet = app.scenes.current
+    assert n_bal_rows + 2 <= N_ROWS   # +2 lignes d'en-tête (titre, années)
+    last_row = 2 + n_bal_rows
+    assert sheet.sheet.get_raw(f"A{last_row}") != ""
+
+
+def test_ma_target_open_spreadsheet_roundtrip(app):
+    from data.ma_targets import all_targets
+    target = all_targets()[0]
+    app.scenes.go("ma_target", ticker=target["ticker"], return_to="ma")
+    scene = app.scenes.current
+    scene.tab = "ÉTATS FINANCIERS"
+    scene.update(0.016)
+    scene._open_spreadsheet("balance")
+    assert app.scenes.current_name == "spreadsheet"
+    sheet = app.scenes.current
+    assert sheet.import_title == f"{target['ticker']} — Bilan"
+    sheet.handle_event(pygame.event.Event(
+        pygame.MOUSEBUTTONDOWN, button=1, pos=sheet.back_btn.rect.center))
+    assert app.scenes.current_name == "ma_target"
+    assert app.scenes.current.ticker == target["ticker"]

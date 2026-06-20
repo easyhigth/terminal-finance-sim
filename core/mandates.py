@@ -34,6 +34,149 @@ CLIENTS = [
     "Fondation Maray", "Hedge Fund Cyrl", "Trésorerie Ostia", "Dotation Veles",
 ]
 
+# ---------------------------------------------------------------------------
+# PROFILS CLIENTS (item 4 du plan) : QUI est le client, par opposition au
+# type de mandat (income/low_vol/esg/...) qui décrit le STYLE d'investissement
+# visé. Un profil client a une identité propre (noms dédiés), une préférence
+# pondérée pour certains types de mandat, des contraintes structurellement
+# plus ou moins serrées (drawdown/duration/tracking error/liquidité — cf.
+# core.alm pour l'intuition duration-matching d'un assureur/fonds de pension),
+# un appétit pour le bêta, un horizon typique et un multiplicateur de
+# récompense/pénalité cohérent avec sa tolérance au risque. Cette dimension
+# compose avec (ne duplique pas) les perks d'archétype `mandate_offer_mult`/
+# `mandate_reward_mult` (core.archetypes) : le profil influence QUEL mandat et
+# QUELLES contraintes sont générées, les perks d'archétype restent un facteur
+# multiplicatif appliqué par-dessus sur la fréquence/récompense globales.
+CLIENT_PROFILES = [
+    {
+        "key": "assureur",
+        "label": ("Assureur", "Insurer"),
+        "names": ["Assureur Norvik", "Assurance Velmont", "Compagnie Hosk Vie"],
+        "desc": ("Passif long et réglementé : duration-matching strict, faible "
+                 "volatilité, drawdown très limité.",
+                 "Long, regulated liabilities: strict duration-matching, low "
+                 "volatility, very limited drawdown."),
+        "type_weights": {"income": 3, "low_vol": 3, "capital_preservation": 2,
+                          "inflation_hedge": 1},
+        "horizon_choices": [3, 4],
+        "beta_mult": 0.65,
+        "drawdown_mult": 0.55,
+        "duration_target": (4.0, 7.0),   # duration-matching : fenêtre resserrée autour d'une cible longue
+        "tracking_error_mult": 0.6,
+        "liquidity_mult": 1.3,
+        "fee_mult": 0.85,
+        "reward_rep_mult": 0.9,
+        "penalty_rep_mult": 1.5,         # un assureur sanctionne durement un dépassement de contrainte
+        "strict": True,                  # résilie le mandat dès qu'une contrainte casse, sans attendre l'échéance
+    },
+    {
+        "key": "pension",
+        "label": ("Fonds de pension", "Pension fund"),
+        "names": ["Fonds de pension Helven", "Caisse de retraite Surin",
+                  "Fonds de pension Adrel"],
+        "desc": ("Passif long mais davantage de marge de croissance que "
+                 "l'assureur : duration longue, tolérance au bêta modérée.",
+                 "Long liabilities but more growth room than an insurer: "
+                 "long duration, moderate beta tolerance."),
+        "type_weights": {"income": 2, "growth": 2, "inflation_hedge": 2,
+                          "low_vol": 1, "value": 1},
+        "horizon_choices": [3, 4],
+        "beta_mult": 0.85,
+        "drawdown_mult": 0.75,
+        "duration_target": (3.5, 6.5),
+        "tracking_error_mult": 0.8,
+        "liquidity_mult": 1.0,
+        "fee_mult": 0.95,
+        "reward_rep_mult": 1.0,
+        "penalty_rep_mult": 1.2,
+    },
+    {
+        "key": "family_office",
+        "label": ("Family office", "Family office"),
+        "names": ["Family Office Drax", "Family Office Sennel", "Maison Korvain"],
+        "desc": ("Mandat large et flexible, mais soucieux de préserver le "
+                 "capital sur plusieurs générations.",
+                 "Broad, flexible mandate, but focused on preserving capital "
+                 "across generations."),
+        "type_weights": {"capital_preservation": 2, "value": 2, "esg": 2,
+                          "growth": 1, "absolute_return": 1},
+        "horizon_choices": [2, 3, 4],
+        "beta_mult": 1.0,
+        "drawdown_mult": 1.0,
+        "duration_target": None,
+        "tracking_error_mult": 1.1,
+        "liquidity_mult": 0.9,
+        "fee_mult": 1.0,
+        "reward_rep_mult": 1.0,
+        "penalty_rep_mult": 1.0,
+    },
+    {
+        "key": "opportuniste",
+        "label": ("Client opportuniste", "Opportunistic client"),
+        "names": ["Hedge Fund Cyrl", "Trésorerie Ostia", "Pool Spéculatif Renn"],
+        "desc": ("Horizon court, appétit au risque élevé : paie davantage pour "
+                 "un bêta et une performance absolue ambitieux.",
+                 "Short horizon, high risk appetite: pays more for ambitious "
+                 "beta and absolute performance."),
+        "type_weights": {"absolute_return": 3, "growth": 3, "value": 1},
+        "horizon_choices": [2, 3],
+        "beta_mult": 1.35,
+        "drawdown_mult": 1.6,
+        "duration_target": None,
+        "tracking_error_mult": 1.6,
+        "liquidity_mult": 0.6,
+        "fee_mult": 1.3,
+        "reward_rep_mult": 1.25,
+        "penalty_rep_mult": 0.8,        # tolérant : accepte le risque qu'il a lui-même demandé
+    },
+    {
+        "key": "institutionnel_prudent",
+        "label": ("Institutionnel prudent", "Conservative institutional"),
+        "names": ["Fondation Maray", "Dotation Veles", "Trésorerie d'État Korvin"],
+        "desc": ("Tracking error et drawdown très contraints : diversification "
+                 "conservatrice avant tout.",
+                 "Very constrained tracking error and drawdown: conservative "
+                 "diversification above all."),
+        "type_weights": {"low_vol": 3, "value": 2, "capital_preservation": 2,
+                          "esg": 1},
+        "horizon_choices": [2, 3, 4],
+        "beta_mult": 0.75,
+        "drawdown_mult": 0.6,
+        "duration_target": None,
+        "tracking_error_mult": 0.5,
+        "liquidity_mult": 1.1,
+        "fee_mult": 0.9,
+        "reward_rep_mult": 0.95,
+        "penalty_rep_mult": 1.4,
+        "strict": True,                  # même logique de résiliation anticipée que l'assureur
+    },
+]
+
+_PROFILE_BY_KEY = {p["key"]: p for p in CLIENT_PROFILES}
+
+
+def profile_label(profile_key):
+    p = _PROFILE_BY_KEY.get(profile_key)
+    return _L(*p["label"]) if p else profile_key
+
+
+def profile_desc(profile_key):
+    p = _PROFILE_BY_KEY.get(profile_key)
+    return _L(*p["desc"]) if p else ""
+
+
+def _pick_profile(rng):
+    return rng.choice(CLIENT_PROFILES)
+
+
+def _pick_type_for_profile(profile, rng):
+    """Tire un type de mandat pondéré selon les préférences du profil client.
+    Les types absents de `type_weights` restent tirables avec un poids
+    minimal (1) pour ne jamais exclure totalement un type — un assureur reste
+    rare en growth, mais pas strictement impossible."""
+    weights = [profile["type_weights"].get(t, 1) for t in MANDATE_TYPES]
+    return rng.choices(MANDATE_TYPES, weights=weights, k=1)[0]
+
 # Types de mandat (item 17) : chacun ajoute, en plus de l'objectif de
 # rendement et du bêta max (toujours présents), une ou des contraintes
 # RÉALISTES SUPPLÉMENTAIRES (item 18) générées dans `maybe_offer` et
@@ -64,28 +207,44 @@ def type_label(mandate_type):
     return _L(*_TYPE_LABELS.get(mandate_type, (mandate_type, mandate_type)))
 
 
-def _extra_constraints(mandate_type, rng):
+def _extra_constraints(mandate_type, rng, profile=None):
     """Génère les contraintes supplémentaires (item 18) propres à un type de
-    mandat. Retourne un dict de champs à fusionner dans l'offre."""
+    mandat. Retourne un dict de champs à fusionner dans l'offre.
+    Si `profile` (dict CLIENT_PROFILES) est fourni, les contraintes générées
+    sont resserrées/desserrées par les multiplicateurs du profil — c'est CE
+    QUI fait qu'un assureur et un client opportuniste, sur le MÊME type de
+    mandat (ex. low_vol), n'offrent pas les mêmes limites : le type décrit le
+    style visé, le profil décrit la rigueur avec laquelle le client l'exige."""
+    dd_mult = profile["drawdown_mult"] if profile else 1.0
+    te_mult = profile["tracking_error_mult"] if profile else 1.0
+    liq_mult = profile["liquidity_mult"] if profile else 1.0
+    out = {}
     if mandate_type == "income":
-        return {"target_yield": round(rng.uniform(2.5, 5.0), 2),
-                "min_liquidity": round(rng.uniform(5.0, 15.0), 1)}
-    if mandate_type == "low_vol":
-        return {"max_drawdown": round(rng.uniform(8.0, 15.0), 1)}
-    if mandate_type == "inflation_hedge":
-        return {"max_duration": round(rng.uniform(3.0, 6.0), 1)}
-    if mandate_type == "esg":
-        return {"excluded_sectors": list(ESG_EXCLUDED_SECTORS)}
-    if mandate_type == "growth":
-        return {"max_tracking_error": round(rng.uniform(12.0, 18.0), 1)}
-    if mandate_type == "value":
-        return {"max_tracking_error": round(rng.uniform(5.0, 10.0), 1)}
-    if mandate_type == "capital_preservation":
-        return {"max_drawdown": round(rng.uniform(3.0, 6.0), 1),
-                "min_liquidity": round(rng.uniform(20.0, 35.0), 1)}
-    if mandate_type == "absolute_return":
-        return {"max_drawdown": round(rng.uniform(10.0, 18.0), 1)}
-    return {}
+        out = {"target_yield": round(rng.uniform(2.5, 5.0), 2),
+                "min_liquidity": round(rng.uniform(5.0, 15.0) * liq_mult, 1)}
+    elif mandate_type == "low_vol":
+        out = {"max_drawdown": round(rng.uniform(8.0, 15.0) * dd_mult, 1)}
+    elif mandate_type == "inflation_hedge":
+        out = {"max_duration": round(rng.uniform(3.0, 6.0), 1)}
+    elif mandate_type == "esg":
+        out = {"excluded_sectors": list(ESG_EXCLUDED_SECTORS)}
+    elif mandate_type == "growth":
+        out = {"max_tracking_error": round(rng.uniform(12.0, 18.0) * te_mult, 1)}
+    elif mandate_type == "value":
+        out = {"max_tracking_error": round(rng.uniform(5.0, 10.0) * te_mult, 1)}
+    elif mandate_type == "capital_preservation":
+        out = {"max_drawdown": round(rng.uniform(3.0, 6.0) * dd_mult, 1),
+                "min_liquidity": round(rng.uniform(20.0, 35.0) * liq_mult, 1)}
+    elif mandate_type == "absolute_return":
+        out = {"max_drawdown": round(rng.uniform(10.0, 18.0) * dd_mult, 1)}
+    # duration-matching (assureur/fonds de pension, cf. core.alm pour
+    # l'intuition) : une fenêtre de duration cible resserrée autour d'une
+    # valeur longue, indépendante du type de mandat — c'est une contrainte
+    # STRUCTURELLE du profil, pas du style d'investissement visé.
+    if profile and profile.get("duration_target") and "max_duration" not in out:
+        lo, hi = profile["duration_target"]
+        out["max_duration"] = round(rng.uniform(lo, hi), 1)
+    return out
 
 
 def _scale(grade):
@@ -107,12 +266,15 @@ _REGIME_MULT = {
 
 def maybe_offer(player, rng=None, market=None):
     """Génère éventuellement une offre de mandat. Retourne l'offre ou None.
-    Le profil de risque (cf. core.career.risk_profile, dérivé du style de jeu
-    plutôt que du grade) module les offres : les clients qui acceptent un
-    bêta plus large paient une commission plus élevée à un gérant réputé
-    tolérant au risque ; un profil prudent reçoit des offres plus standard.
-    Le régime de marché courant (`market`, si fourni) module aussi la limite
-    de risque et l'objectif visés (cf. _REGIME_MULT)."""
+    Le profil de RISQUE du joueur (cf. core.career.risk_profile, dérivé du
+    style de jeu plutôt que du grade) module l'ambition de l'offre (bêta max,
+    commission) ; le profil CLIENT (cf. CLIENT_PROFILES, item 4 — qui est le
+    client : assureur/fonds de pension/family office/opportuniste/
+    institutionnel prudent) module en plus QUEL type de mandat est proposé et
+    À QUEL POINT ses contraintes (drawdown/duration/tracking error/liquidité)
+    sont serrées, ainsi que l'horizon typique et la sensibilité récompense/
+    pénalité. Le régime de marché courant (`market`, si fourni) module aussi
+    la limite de risque et l'objectif visés (cf. _REGIME_MULT)."""
     from core import career
     rng = rng or random
     if player.grade_index < MIN_GRADE:
@@ -123,30 +285,32 @@ def maybe_offer(player, rng=None, market=None):
                   * firms.perk(player, "mandate_offer_mult"))
     if rng.random() > OFFER_PROB * offer_mult:
         return None
+    client_profile = _pick_profile(rng)
     capital = round(rng.uniform(300_000, 1_200_000) * _scale(player.grade_index), -3)
-    horizon = rng.choice([2, 3, 4])
+    horizon = rng.choice(client_profile["horizon_choices"])
     rmult = _REGIME_MULT.get(getattr(market, "regime", None), _REGIME_MULT["Calme"])
     target = round(rng.uniform(4.0, 7.0) * horizon * rmult["target"], 1)  # % cumulé sur l'horizon
-    profile = career.risk_profile(player)
-    if profile == "Risque élevé":
+    risk_profile = career.risk_profile(player)
+    if risk_profile == "Risque élevé":
         max_beta = round(rng.choice([1.3, 1.5, 1.8, 2.0]), 2)
         fee_pct = rng.uniform(0.018, 0.035)
-    elif profile == "Modéré":
+    elif risk_profile == "Modéré":
         max_beta = round(rng.choice([1.15, 1.3, 1.5, 1.65]), 2)
         fee_pct = rng.uniform(0.014, 0.028)
     else:
         max_beta = round(rng.choice([1.0, 1.15, 1.3, 1.5]), 2)
         fee_pct = rng.uniform(0.010, 0.025)
-    max_beta = round(max_beta * rmult["beta"], 2)
-    fee_pct *= rmult["fee"]
+    max_beta = round(max_beta * rmult["beta"] * client_profile["beta_mult"], 2)
+    fee_pct *= rmult["fee"] * client_profile["fee_mult"]
     transformant = (player.grade_index >= TRANSFORMANT_MIN_GRADE
                      and rng.random() < TRANSFORMANT_PROB)
     if transformant:
         capital = round(capital * TRANSFORMANT_SCALE, -3)
-    mandate_type = rng.choice(MANDATE_TYPES)
+    mandate_type = _pick_type_for_profile(client_profile, rng)
     offer = {
         "id": player.next_mandate_id,
-        "client": rng.choice(CLIENTS),
+        "client": rng.choice(client_profile["names"]),
+        "client_profile": client_profile["key"],
         "capital": capital,
         "target_pct": target,
         "horizon": horizon,
@@ -154,12 +318,13 @@ def maybe_offer(player, rng=None, market=None):
         "reward_cash": round(capital * fee_pct * tracks.perk(player, "mandate_reward_mult")
                              * archetypes.perk(player, "mandate_reward_mult")
                              * firms.perk(player, "mandate_reward_mult"), 2),
-        "reward_rep": rng.randint(6, 11) * (3 if transformant else 1),
-        "penalty_rep": rng.randint(4, 8),
+        "reward_rep": round(rng.randint(6, 11) * (3 if transformant else 1)
+                            * client_profile["reward_rep_mult"]),
+        "penalty_rep": round(rng.randint(4, 8) * client_profile["penalty_rep_mult"]),
         "transformant": transformant,
         "type": mandate_type,
     }
-    offer.update(_extra_constraints(mandate_type, rng))
+    offer.update(_extra_constraints(mandate_type, rng, client_profile))
     player.next_mandate_id += 1
     player.mandate_offers.append(offer)
     return offer
@@ -339,20 +504,37 @@ def failure_reason(m, growth, beta, extra=None):
     return " · ".join(parts)
 
 
+def _is_strict(m):
+    """Un mandat est « strict » (résiliation anticipée sur dépassement de
+    contrainte, item 4) si son profil client (assureur, institutionnel
+    prudent) l'exige. Absence de `client_profile` (mandats antérieurs à cette
+    extension, saves, mandats minimalistes de test) => jamais strict, donc
+    rétrocompatible : ces mandats ne sont évalués qu'à l'échéance comme avant."""
+    profile = _PROFILE_BY_KEY.get(m.get("client_profile"))
+    return bool(profile and profile.get("strict"))
+
+
 def evaluate_due(player, market):
-    """Évalue les mandats arrivés à échéance (au changement de trimestre).
-    Applique récompenses/pénalités. Retourne la liste des résultats (chacun
-    augmenté d'un champ `reason` pour le postmortem affiché dans l'UI)."""
+    """Évalue les mandats arrivés à échéance (au changement de trimestre) ET,
+    pour les profils clients « stricts » (assureur, institutionnel prudent —
+    item 4), résilie immédiatement tout mandat dont une contrainte est
+    rompue AVANT l'échéance plutôt que d'attendre la fin de l'horizon : un
+    assureur réglementé ne tolère pas un dérapage de duration/drawdown
+    pendant plusieurs trimestres avant de réagir. Applique
+    récompenses/pénalités. Retourne la liste des résultats (chacun augmenté
+    d'un champ `reason` pour le postmortem affiché dans l'UI)."""
     from core import career
     results = []
     still = []
     for m in player.mandates:
-        if player.quarter < m["deadline_q"]:
-            still.append(m)
-            continue
+        due = player.quarter >= m["deadline_q"]
         growth, beta = progress(player, market, m)
         check = check_constraints(player, market, m, growth, beta)
-        ok = check["ok"]
+        early_break = (not due) and _is_strict(m) and not check["ok"] and bool(check["breaches"])
+        if not due and not early_break:
+            still.append(m)
+            continue
+        ok = check["ok"] and due
         if ok:
             player.adjust_cash(m["reward_cash"])
             player.adjust_reputation(m["reward_rep"])
@@ -369,12 +551,19 @@ def evaluate_due(player, market):
         else:
             player.adjust_reputation(-m["penalty_rep"])
             reason = failure_reason(m, growth, beta, check["values"])
-            career.log(player, "crisis", _L(f"Mandat {m['client']} échoué ({reason})",
-                                            f"Mandate {m['client']} failed ({reason})"))
+            if early_break:
+                reason = _L(f"Mandat résilié avant échéance par le client ({reason})",
+                             f"Mandate terminated early by the client ({reason})")
+                career.log(player, "crisis", _L(f"Mandat {m['client']} résilié par anticipation ({reason})",
+                                                f"Mandate {m['client']} terminated early ({reason})"))
+            else:
+                career.log(player, "crisis", _L(f"Mandat {m['client']} échoué ({reason})",
+                                                f"Mandate {m['client']} failed ({reason})"))
         result = {"mandate": m, "ok": ok, "growth": growth, "beta": beta, "reason": reason,
                   "client": m["client"], "target_pct": m["target_pct"], "max_beta": m["max_beta"],
                   "reward_cash": m["reward_cash"], "reward_rep": m["reward_rep"],
-                  "penalty_rep": m["penalty_rep"], "day": player.day, "quarter": player.quarter}
+                  "penalty_rep": m["penalty_rep"], "day": player.day, "quarter": player.quarter,
+                  "early_terminated": early_break}
         results.append(result)
         player.mandate_history.append(result)
         if len(player.mandate_history) > MAX_HISTORY:

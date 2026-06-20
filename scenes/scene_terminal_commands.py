@@ -713,9 +713,10 @@ class TerminalCommandsMixin:
             if res == "full":
                 self._log(_L(f"  Déjà {mandates_mod.MAX_ACTIVE} mandats en cours.", f"  Already {mandates_mod.MAX_ACTIVE} active mandates."))
             elif res:
-                self._log(_L(f"  ✓ Mandat #{mid} accepté : {res['client']} — objectif "
+                profile_txt = f" ({mandates_mod.profile_label(res['client_profile'])})" if res.get("client_profile") else ""
+                self._log(_L(f"  ✓ Mandat #{mid} accepté : {res['client']}{profile_txt} — objectif "
                           f"+{res['target_pct']:.0f}% en {res['horizon']}T, bêta ≤ {res['max_beta']:.2f}.",
-                          f"  ✓ Mandate #{mid} accepted: {res['client']} — target "
+                          f"  ✓ Mandate #{mid} accepted: {res['client']}{profile_txt} — target "
                           f"+{res['target_pct']:.0f}% in {res['horizon']}Q, beta ≤ {res['max_beta']:.2f}."))
                 career_mod.log(p, "deal", f"Mandat accepté : {res['client']}")
             else:
@@ -1414,17 +1415,18 @@ class TerminalCommandsMixin:
         # nouvelle offre de mandat éventuelle
         offer = mandates_mod.maybe_offer(p, random, m)
         if offer:
+            profile_txt = f" ({mandates_mod.profile_label(offer['client_profile'])})" if offer.get("client_profile") else ""
             if offer.get("transformant"):
-                self._log(_L(f"  ★★ MANDAT TRANSFORMANT : {offer['client']} — "
+                self._log(_L(f"  ★★ MANDAT TRANSFORMANT : {offer['client']}{profile_txt} — "
                           f"{widgets.format_money(offer['capital'], cur)} (MANDATES pour voir).",
-                          f"  ★★ TRANSFORMATIVE MANDATE: {offer['client']} — "
+                          f"  ★★ TRANSFORMATIVE MANDATE: {offer['client']}{profile_txt} — "
                           f"{widgets.format_money(offer['capital'], cur)} (type MANDATES to view)."))
                 self.app.notify(_L(f"Mandat transformant : {offer['client']}",
                                    f"Transformative mandate: {offer['client']}"), "prestige")
             else:
-                self._log(_L(f"  ✶ OFFRE DE MANDAT : {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
+                self._log(_L(f"  ✶ OFFRE DE MANDAT : {offer['client']}{profile_txt} — {widgets.format_money(offer['capital'], cur)} "
                           f"(MANDATES pour voir).",
-                          f"  ✶ MANDATE OFFER: {offer['client']} — {widgets.format_money(offer['capital'], cur)} "
+                          f"  ✶ MANDATE OFFER: {offer['client']}{profile_txt} — {widgets.format_money(offer['capital'], cur)} "
                           f"(type MANDATES to view)."))
                 self.app.notify(_L(f"Offre de mandat : {offer['client']}", f"Mandate offer: {offer['client']}"), "info")
             inbox_mod.push(p, "client", offer["client"], "Proposition de mandat",

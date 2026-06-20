@@ -48,8 +48,20 @@ from core.portfolio_views import (  # noqa: F401 (réexporté, API publique de p
 
 COMMISSION = 0.001        # 10 points de base par transaction
 HALF_SPREAD = 0.0008      # demi-spread bid/ask de base (8 bps)
-IMPACT_K = 0.12           # coefficient d'impact de marché (slippage selon la taille)
-MAX_SLIPPAGE = 0.05       # impact plafonné à 5 %
+IMPACT_K = 0.12           # coefficient d'impact de marché de base (à tension nulle)
+IMPACT_ALPHA = 0.6        # exposant sous-linéaire (style Almgren-Chriss, typiquement
+                          # 0.5-0.7) : l'impact croît avec (taille/liquidité)**alpha,
+                          # une courbe racine-carré-like — convexe en valeur absolue
+                          # mais qui s'aplatit par unité d'ordre (pas purement linéaire)
+IMPACT_STRESS_MAX_MULT = 3.0  # à stress de marché maximal (last_stress_level=1.0, cf.
+                               # Market._stress_level()/self.last_stress_level), le
+                               # coefficient d'impact est multiplié par (1 + ce facteur)
+                               # = x4 vs marché calme : la liquidité s'évapore en
+                               # crise, le même ordre glisse bien plus qu'en régime calme
+MAX_SLIPPAGE = 0.20       # plafond de sécurité (avant : 5 % avec modèle linéaire).
+                          # La courbe non-linéaire tasse déjà naturellement l'impact
+                          # pour les ordres réalistes ; ce plafond n'évite qu'un fill
+                          # absurde sur une taille d'ordre pathologique.
 LIQUIDATION_FEE = 0.005   # surcoût appliqué à la valeur liquidée lors d'un appel de marge
 
 
@@ -58,17 +70,42 @@ def _commission(player):
     return COMMISSION * tracks.perk(player, "commission_mult")
 
 
+def market_impact(order_value, liquidity, stress_level=0.0):
+    """Impact de marché NON-LINÉAIRE = k_eff * (order_value / liquidité) ** alpha.
+
+    Modèle à la Almgren-Chriss : avec alpha < 1 (ici 0.6), doubler la taille de
+    l'ordre NE double PAS l'impact (la courbe est sous-linéaire par unité d'ordre,
+    mais reste convexe en valeur absolue) — contrairement à l'ancien modèle
+    linéaire-puis-plafonné. Le coefficient effectif k_eff croît avec `stress_level`
+    (0..1, cf. Market.last_stress_level / Market._stress_level(), déjà calculé de
+    façon déterministe à partir de l'asymétrie de volatilité et du régime de fond
+    courant) : un même ordre coûte plus cher en pleine crise qu'en marché calme,
+    la liquidité s'évaporant sous stress. Plafonné à MAX_SLIPPAGE par sécurité
+    (ordre pathologique)."""
+    if liquidity <= 0 or order_value <= 0:
+        return 0.0
+    stress_frac = min(1.0, max(0.0, stress_level))
+    k_eff = IMPACT_K * (1.0 + IMPACT_STRESS_MAX_MULT * stress_frac)
+    impact = k_eff * (order_value / liquidity) ** IMPACT_ALPHA
+    return min(MAX_SLIPPAGE, impact)
+
+
 def fill_price(market, ticker, qty, side):
     """Prix d'exécution réel (microstructure) = mid ± demi-spread ± impact de marché.
-    L'impact croît avec la taille de l'ordre rapportée à la liquidité (capi) :
-    un gros ordre « mange » le carnet et dégrade le prix obtenu."""
+    L'impact croît de façon NON-LINÉAIRE avec la taille de l'ordre rapportée à la
+    liquidité (capi, proxy de profondeur) et avec le stress de marché courant
+    (market.last_stress_level, 0..1, cf. core/market.py chantier sur l'asymétrie de
+    volatilité) : un gros ordre « mange » le carnet, et le carnet est plus mince en
+    pleine crise — pour un même order_value, le slippage est donc plus élevé sur une
+    petite capi que sur une grosse, et plus élevé en stress qu'en marché calme."""
     i = market.ticker_idx.get(ticker)
     mid = market.price_of(ticker)
     if i is None or mid is None:
         return mid
     liquidity = float(market.price[i] * market.shares[i])      # capi (proxy de profondeur)
     order_value = abs(qty) * mid
-    impact = min(MAX_SLIPPAGE, IMPACT_K * (order_value / liquidity)) if liquidity > 0 else 0.0
+    stress_level = getattr(market, "last_stress_level", 0.0)
+    impact = market_impact(order_value, liquidity, stress_level)
     cost_frac = HALF_SPREAD + impact
     return mid * (1 + cost_frac) if side == "buy" else mid * (1 - cost_frac)
 

@@ -51,6 +51,11 @@ class MarketHubScene(Scene, PopupMixin):
         self._eco_row_rects = {}
         self._sector_row_rects = {}
         self._regime_rect = None
+        # une ScrollState indépendante par panneau défilant (clé = id de panneau).
+        self._scrolls = {}
+
+    def _scroll(self, key):
+        return self._scrolls.setdefault(key, widgets.ScrollState())
 
     def handle_event(self, event):
         if self.popups_handle_event(event):
@@ -61,6 +66,10 @@ class MarketHubScene(Scene, PopupMixin):
             self.app.scenes.go(self.return_to)
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            for st in self._scrolls.values():
+                if st.handle_wheel(event):
+                    return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for tab_id, rect in self._tab_rects.items():
                 if rect.collidepoint(event.pos):
@@ -194,22 +203,32 @@ class MarketHubScene(Scene, PopupMixin):
     def _draw_indices(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Indices mondiaux", config.COL_AMBER)
         mp = pygame.mouse.get_pos()
+        st = self._scroll("indices")
+        list_area = pygame.Rect(inner.x - 6, inner.y, inner.w + 12, inner.h)
         self._index_row_rects = {}
-        y = inner.y
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        y = inner.y - st.scroll
         for name, *_ in self.market.index_defs:
             v = self.market.index_value(name)
             chg = self.market.index_change_pct(name)
             ccol = config.COL_UP if chg >= 0 else config.COL_DOWN
             row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 22)
-            self._index_row_rects[name] = row
-            if row.collidepoint(mp):
-                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
-            widgets.draw_text(surf, name, (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
-            widgets.draw_text(surf, f"{v:,.0f}", (inner.x + inner.w // 2, y),
-                              fonts.small(), config.COL_TEXT, align="right")
-            widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.2f}%", (inner.right, y),
-                              fonts.small(bold=True), ccol, align="right")
+            visible = list_area.top - 24 < y < list_area.bottom
+            if visible:
+                self._index_row_rects[name] = row
+                if row.collidepoint(mp):
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+                widgets.draw_text(surf, name, (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
+                widgets.draw_text(surf, f"{v:,.0f}", (inner.x + inner.w // 2, y),
+                                  fonts.small(), config.COL_TEXT, align="right")
+                widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.2f}%", (inner.right, y),
+                                  fonts.small(bold=True), ccol, align="right")
             y += 24
+        surf.set_clip(prev_clip)
+        content_h = (y + st.scroll) - inner.y
+        st.set_bounds(list_area, content_h)
+        widgets.draw_scrollbar(surf, rect, list_area, st.scroll, st.max_scroll, content_h)
 
     def _draw_top(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Top sociétés", config.COL_CYAN)
@@ -230,54 +249,80 @@ class MarketHubScene(Scene, PopupMixin):
             widgets.draw_text(surf, label, (r.x + 7, r.y + 1), fonts.tiny(bold=active), col)
             x = r.right + 6
         y += 26
-        n = max(1, (inner.bottom - y) // 26)
-        for c in self.market.top_companies(region=self.top_region, n=n):
+        list_top = y
+        list_area = pygame.Rect(inner.x - 6, list_top, inner.w + 12, inner.bottom - list_top)
+        st = self._scroll("top")
+        # demande large : la liste défile, donc on n'a plus besoin de borner n à la hauteur visible.
+        companies = self.market.top_companies(region=self.top_region, n=40)
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        y = list_top - st.scroll
+        for c in companies:
             row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 24)
-            self._ticker_rects[c["ticker"]] = row
-            if row.collidepoint(mp):
-                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
-            widgets.draw_text(surf, c["ticker"], (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
-            widgets.draw_text(surf, c["name"][:16], (inner.x + 58, y), fonts.small(), config.COL_TEXT)
-            widgets.draw_text(surf, widgets.format_money(c["mktcap"] * 1e6, cur), (inner.right, y),
-                              fonts.tiny(bold=True), config.COL_WHITE, align="right")
+            visible = list_area.top - 26 < y < list_area.bottom
+            if visible:
+                self._ticker_rects[c["ticker"]] = row
+                if row.collidepoint(mp):
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+                widgets.draw_text(surf, c["ticker"], (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
+                widgets.draw_text(surf, c["name"][:16], (inner.x + 58, y), fonts.small(), config.COL_TEXT)
+                widgets.draw_text(surf, widgets.format_money(c["mktcap"] * 1e6, cur), (inner.right, y),
+                                  fonts.tiny(bold=True), config.COL_WHITE, align="right")
             y += 26
+        surf.set_clip(prev_clip)
+        content_h = (y + st.scroll) - list_top
+        st.set_bounds(list_area, content_h)
+        widgets.draw_scrollbar(surf, rect, list_area, st.scroll, st.max_scroll, content_h)
 
     def _draw_movers(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Variations — plus forts mouvements", config.COL_DEAL)
         mp = pygame.mouse.get_pos()
-        y = inner.y
-        n = max(1, (inner.h // 2 - 18) // 24)
-        widgets.draw_text(surf, "HAUSSES", (inner.x, y), fonts.tiny(bold=True), config.COL_UP)
-        y += 18
-        for c in self.market.top_companies(n=n, by="gain"):
-            row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 22)
-            self._ticker_rects[c["ticker"]] = row
-            if row.collidepoint(mp):
-                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
-            widgets.draw_text(surf, "↑ " + c["ticker"], (inner.x, y), fonts.small(bold=True), config.COL_UP)
-            widgets.draw_text(surf, c["name"][:18], (inner.x + 70, y), fonts.small(), config.COL_TEXT)
-            widgets.draw_text(surf, c["sector"], (inner.right, y),
-                              fonts.tiny(), config.COL_TEXT_DIM, align="right")
+        colw = (inner.w - 16) // 2
+        col_x1, col_x2 = inner.x, inner.x + colw + 16
+        list_top = inner.y + 18
+        list_area1 = pygame.Rect(col_x1 - 4, list_top, colw + 8, inner.bottom - list_top)
+        list_area2 = pygame.Rect(col_x2 - 4, list_top, colw + 8, inner.bottom - list_top)
+
+        widgets.draw_text(surf, "HAUSSES", (col_x1, inner.y), fonts.tiny(bold=True), config.COL_UP)
+        widgets.draw_text(surf, "BAISSES", (col_x2, inner.y), fonts.tiny(bold=True), config.COL_DOWN)
+
+        self._draw_mover_column(surf, self._scroll("movers_up"), list_area1, col_x1, colw,
+                                self.market.top_companies(n=40, by="gain"), "↑", config.COL_UP, mp)
+        self._draw_mover_column(surf, self._scroll("movers_down"), list_area2, col_x2, colw,
+                                self.market.top_companies(n=40, by="loss"), "↓", config.COL_DOWN, mp)
+
+    def _draw_mover_column(self, surf, st, list_area, col_x, colw, companies, arrow, col, mp):
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        y = list_area.y - st.scroll
+        for c in companies:
+            row = pygame.Rect(col_x - 4, y - 2, colw + 8, 22)
+            visible = list_area.top - 24 < y < list_area.bottom
+            if visible:
+                self._ticker_rects[c["ticker"]] = row
+                if row.collidepoint(mp):
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+                widgets.draw_text(surf, f"{arrow} " + c["ticker"], (col_x, y), fonts.small(bold=True), col)
+                widgets.draw_text(surf, c["name"][:18], (col_x + 70, y), fonts.small(), config.COL_TEXT)
+                widgets.draw_text(surf, c["sector"], (col_x + colw, y),
+                                  fonts.tiny(), config.COL_TEXT_DIM, align="right")
             y += 24
-        y += 8
-        widgets.draw_text(surf, "BAISSES", (inner.x, y), fonts.tiny(bold=True), config.COL_DOWN)
-        y += 18
-        for c in self.market.top_companies(n=n, by="loss"):
-            row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 22)
-            self._ticker_rects[c["ticker"]] = row
-            if row.collidepoint(mp):
-                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
-            widgets.draw_text(surf, "↓ " + c["ticker"], (inner.x, y), fonts.small(bold=True), config.COL_DOWN)
-            widgets.draw_text(surf, c["name"][:18], (inner.x + 70, y), fonts.small(), config.COL_TEXT)
-            widgets.draw_text(surf, c["sector"], (inner.right, y),
-                              fonts.tiny(), config.COL_TEXT_DIM, align="right")
-            y += 24
+        surf.set_clip(prev_clip)
+        content_h = (y + st.scroll) - list_area.y
+        st.set_bounds(list_area, content_h)
+        widgets.draw_scrollbar(surf, pygame.Rect(col_x - 4, list_area.y, colw + 12, list_area.h),
+                               list_area, st.scroll, st.max_scroll, content_h)
 
     def _draw_eco(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Éco — macro-économie", config.COL_PRESTIGE)
         mp = pygame.mouse.get_pos()
         m = self.market.macro
         reg_good = self.market.regime in ("Expansion", "Calme")
+
+        # Le régime + la courbe des taux restent fixes en tête de panneau (peu de
+        # contenu, pas besoin de défilement) ; seule la liste d'indicateurs défile,
+        # ce qui évite le chevauchement constaté quand tout était empilé dans la
+        # même hauteur fixe sans clipping ni espacement suffisant.
         y = inner.y
         self._regime_rect = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 22)
         if self._regime_rect.collidepoint(mp):
@@ -287,6 +332,7 @@ class MarketHubScene(Scene, PopupMixin):
         widgets.draw_text(surf, f"{self.market.regime_label()} (depuis {age} sem.)",
                           (inner.right, y), fonts.small(bold=True),
                           config.COL_UP if reg_good else config.COL_DOWN, align="right")
+        y += 26
         if hasattr(self.market, "curve_slope"):
             slope = self.market.curve_slope()
             phase = self.market.curve_phase()
@@ -295,25 +341,40 @@ class MarketHubScene(Scene, PopupMixin):
             widgets.draw_text(surf, f"{phase} ({'+' if slope>=0 else ''}{slope:.2f}pb)",
                               (inner.right, y), fonts.small(bold=True), scol, align="right")
             y += 26
+
+        list_top = y
+        list_area = pygame.Rect(inner.x - 6, list_top, inner.w + 12, inner.bottom - list_top)
+        st = self._scroll("eco")
         self._eco_row_rects = {}
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        y = list_top - st.scroll
         for key in ["rate", "inflation", "growth", "unemployment", "confidence",
                     "credit_ig", "credit_hy", "liquidity"]:
             d = m[key]
             ch = self.market.macro_change(key)
             ccol = config.COL_UP if ch >= 0 else config.COL_DOWN
             row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 40)
-            self._eco_row_rects[key] = row
-            if row.collidepoint(mp):
-                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
-            widgets.draw_text(surf, d["label"], (inner.x, y), fonts.small(), config.COL_TEXT)
-            widgets.draw_text(surf, f"{d['v']:.2f}{d['unit']}", (inner.x + inner.w - 90, y),
-                              fonts.small(bold=True), config.COL_WHITE, align="right")
-            widgets.draw_text(surf, f"{'+' if ch>=0 else ''}{ch:.2f}", (inner.right, y),
-                              fonts.small(), ccol, align="right")
-            y += 22
-            widgets.draw_text(surf, _ECO_NOTES.get(key, ""), (inner.x, y),
-                              fonts.tiny(), config.COL_TEXT_DIM)
-            y += 18
+            visible = list_area.top - 44 < y < list_area.bottom
+            if visible:
+                self._eco_row_rects[key] = row
+                if row.collidepoint(mp):
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+                widgets.draw_text(surf, d["label"], (inner.x, y), fonts.small(), config.COL_TEXT)
+                widgets.draw_text(surf, f"{d['v']:.2f}{d['unit']}", (inner.x + inner.w - 90, y),
+                                  fonts.small(bold=True), config.COL_WHITE, align="right")
+                widgets.draw_text(surf, f"{'+' if ch>=0 else ''}{ch:.2f}", (inner.right, y),
+                                  fonts.small(), ccol, align="right")
+                y += 22
+                widgets.draw_text(surf, _ECO_NOTES.get(key, ""), (inner.x, y),
+                                  fonts.tiny(), config.COL_TEXT_DIM)
+                y += 18
+            else:
+                y += 40
+        surf.set_clip(prev_clip)
+        content_h = (y + st.scroll) - list_top
+        st.set_bounds(list_area, content_h)
+        widgets.draw_scrollbar(surf, rect, list_area, st.scroll, st.max_scroll, content_h)
 
     def _draw_sectors(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Performance sectorielle (dernier pas, pondérée par capitalisation)",
@@ -323,26 +384,37 @@ class MarketHubScene(Scene, PopupMixin):
         cur = self._cur()
         mp = pygame.mouse.get_pos()
         self._sector_row_rects = {}
-        y = inner.y + 22
+        list_top = inner.y + 22
+        list_area = pygame.Rect(inner.x - 6, list_top, inner.w + 12, inner.bottom - list_top)
+        st = self._scroll("sectors")
         row_h = 28
         bar_w = 160
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        y = list_top - st.scroll
         for s in self.market.sector_performance():
             row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, row_h - 2)
-            self._sector_row_rects[s["sector"]] = row
-            if row.collidepoint(mp):
-                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
-            ccol = config.COL_UP if s["change_pct"] >= 0 else config.COL_DOWN
-            widgets.draw_text(surf, s["sector"], (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
-            bar_rect = pygame.Rect(inner.x + 160, y + 2, bar_w, 14)
-            ratio = min(1.0, abs(s["change_pct"]) / _SECTOR_BAR_MAX)
-            widgets.draw_progress(surf, bar_rect, ratio, accent=ccol)
-            widgets.draw_text(surf, f"{'+' if s['change_pct']>=0 else ''}{s['change_pct']:.2f}%",
-                              (bar_rect.right + 12, y), fonts.small(bold=True), ccol)
-            widgets.draw_text(surf, f"{s['n']} sociétés", (inner.x + inner.w - 200, y),
-                              fonts.tiny(), config.COL_TEXT_DIM, align="right")
-            widgets.draw_text(surf, widgets.format_money(s["mktcap"] * 1e6, cur), (inner.right, y),
-                              fonts.tiny(bold=True), config.COL_WHITE, align="right")
+            visible = list_area.top - row_h < y < list_area.bottom
+            if visible:
+                self._sector_row_rects[s["sector"]] = row
+                if row.collidepoint(mp):
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+                ccol = config.COL_UP if s["change_pct"] >= 0 else config.COL_DOWN
+                widgets.draw_text(surf, s["sector"], (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
+                bar_rect = pygame.Rect(inner.x + 160, y + 2, bar_w, 14)
+                ratio = min(1.0, abs(s["change_pct"]) / _SECTOR_BAR_MAX)
+                widgets.draw_progress(surf, bar_rect, ratio, accent=ccol)
+                widgets.draw_text(surf, f"{'+' if s['change_pct']>=0 else ''}{s['change_pct']:.2f}%",
+                                  (bar_rect.right + 12, y), fonts.small(bold=True), ccol)
+                widgets.draw_text(surf, f"{s['n']} sociétés", (inner.x + inner.w - 200, y),
+                                  fonts.tiny(), config.COL_TEXT_DIM, align="right")
+                widgets.draw_text(surf, widgets.format_money(s["mktcap"] * 1e6, cur), (inner.right, y),
+                                  fonts.tiny(bold=True), config.COL_WHITE, align="right")
             y += row_h
+        surf.set_clip(prev_clip)
+        content_h = (y + st.scroll) - list_top
+        st.set_bounds(list_area, content_h)
+        widgets.draw_scrollbar(surf, rect, list_area, st.scroll, st.max_scroll, content_h)
 
     def _draw_topflop(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Top/Flop — plus forts mouvements sur la période", config.COL_DEAL)
@@ -372,32 +444,41 @@ class MarketHubScene(Scene, PopupMixin):
 
         colw = (inner.w - 16) // 2
         col_x1, col_x2 = inner.x, inner.x + colw + 16
-        n = max(1, (inner.bottom - y - 18) // 24)
 
         widgets.draw_text(surf, "HAUSSES", (col_x1, y), fonts.tiny(bold=True), config.COL_UP)
         widgets.draw_text(surf, "BAISSES", (col_x2, y), fonts.tiny(bold=True), config.COL_DOWN)
-        y_rows = y + 18
-        for c in self.market.top_movers(self.topflop_steps, n=n, by="gain"):
-            row = pygame.Rect(col_x1 - 4, y_rows - 2, colw + 8, 22)
-            self._ticker_rects[c["ticker"]] = row
-            if row.collidepoint(mp):
-                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
-            widgets.draw_text(surf, "↑ " + c["ticker"], (col_x1, y_rows), fonts.small(bold=True), config.COL_UP)
-            widgets.draw_text(surf, c["name"][:16], (col_x1 + 70, y_rows), fonts.small(), config.COL_TEXT)
-            widgets.draw_text(surf, f"{'+' if c['change_pct']>=0 else ''}{c['change_pct']:.2f}%",
-                              (col_x1 + colw, y_rows), fonts.tiny(bold=True), config.COL_UP, align="right")
+        list_top = y + 18
+        list_area1 = pygame.Rect(col_x1 - 4, list_top, colw + 8, inner.bottom - list_top)
+        list_area2 = pygame.Rect(col_x2 - 4, list_top, colw + 8, inner.bottom - list_top)
+
+        gainers = self.market.top_movers(self.topflop_steps, n=40, by="gain")
+        losers = self.market.top_movers(self.topflop_steps, n=40, by="loss")
+        self._draw_topflop_column(surf, self._scroll("topflop_up"), list_area1, col_x1, colw,
+                                  gainers, "↑", config.COL_UP, mp)
+        self._draw_topflop_column(surf, self._scroll("topflop_down"), list_area2, col_x2, colw,
+                                  losers, "↓", config.COL_DOWN, mp)
+
+    def _draw_topflop_column(self, surf, st, list_area, col_x, colw, companies, arrow, col, mp):
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        y_rows = list_area.y - st.scroll
+        for c in companies:
+            row = pygame.Rect(col_x - 4, y_rows - 2, colw + 8, 22)
+            visible = list_area.top - 24 < y_rows < list_area.bottom
+            if visible:
+                self._ticker_rects[c["ticker"]] = row
+                if row.collidepoint(mp):
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+                widgets.draw_text(surf, f"{arrow} " + c["ticker"], (col_x, y_rows), fonts.small(bold=True), col)
+                widgets.draw_text(surf, c["name"][:16], (col_x + 70, y_rows), fonts.small(), config.COL_TEXT)
+                widgets.draw_text(surf, f"{'+' if c['change_pct']>=0 else ''}{c['change_pct']:.2f}%",
+                                  (col_x + colw, y_rows), fonts.tiny(bold=True), col, align="right")
             y_rows += 24
-        y_rows = y + 18
-        for c in self.market.top_movers(self.topflop_steps, n=n, by="loss"):
-            row = pygame.Rect(col_x2 - 4, y_rows - 2, colw + 8, 22)
-            self._ticker_rects[c["ticker"]] = row
-            if row.collidepoint(mp):
-                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
-            widgets.draw_text(surf, "↓ " + c["ticker"], (col_x2, y_rows), fonts.small(bold=True), config.COL_DOWN)
-            widgets.draw_text(surf, c["name"][:16], (col_x2 + 70, y_rows), fonts.small(), config.COL_TEXT)
-            widgets.draw_text(surf, f"{'+' if c['change_pct']>=0 else ''}{c['change_pct']:.2f}%",
-                              (col_x2 + colw, y_rows), fonts.tiny(bold=True), config.COL_DOWN, align="right")
-            y_rows += 24
+        surf.set_clip(prev_clip)
+        content_h = (y_rows + st.scroll) - list_area.y
+        st.set_bounds(list_area, content_h)
+        widgets.draw_scrollbar(surf, pygame.Rect(col_x - 4, list_area.y, colw + 12, list_area.h),
+                               list_area, st.scroll, st.max_scroll, content_h)
 
     def _draw_heatmap(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Heatmap secteur × région (dernier pas, pondérée par capitalisation)",
@@ -445,23 +526,33 @@ class MarketHubScene(Scene, PopupMixin):
             return
         mp = pygame.mouse.get_pos()
         cur = self._cur()
-        y = inner.y
+        list_area = pygame.Rect(inner.x - 6, inner.y, inner.w + 12, inner.h)
+        st = self._scroll("watchlist")
         row_h = 30
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        y = inner.y - st.scroll
         for tk in p.watchlist:
             mt = self.market.metrics(tk)
             if mt is None:
                 continue
             row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, row_h - 2)
-            self._ticker_rects[tk] = row
-            if row.collidepoint(mp):
-                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
-            ccol = config.COL_UP if mt["change_pct"] >= 0 else config.COL_DOWN
-            widgets.draw_text(surf, tk, (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
-            widgets.draw_text(surf, mt["name"][:24], (inner.x + 64, y), fonts.small(), config.COL_TEXT)
-            widgets.draw_text(surf, mt["sector"], (inner.x + inner.w // 2, y),
-                              fonts.tiny(), config.COL_TEXT_DIM, align="right")
-            widgets.draw_text(surf, widgets.format_money(mt["price"], cur), (inner.right - 90, y),
-                              fonts.small(bold=True), config.COL_WHITE, align="right")
-            widgets.draw_text(surf, f"{'+' if mt['change_pct']>=0 else ''}{mt['change_pct']:.2f}% (1an)",
-                              (inner.right, y), fonts.small(bold=True), ccol, align="right")
+            visible = list_area.top - row_h < y < list_area.bottom
+            if visible:
+                self._ticker_rects[tk] = row
+                if row.collidepoint(mp):
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+                ccol = config.COL_UP if mt["change_pct"] >= 0 else config.COL_DOWN
+                widgets.draw_text(surf, tk, (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
+                widgets.draw_text(surf, mt["name"][:24], (inner.x + 64, y), fonts.small(), config.COL_TEXT)
+                widgets.draw_text(surf, mt["sector"], (inner.x + inner.w // 2, y),
+                                  fonts.tiny(), config.COL_TEXT_DIM, align="right")
+                widgets.draw_text(surf, widgets.format_money(mt["price"], cur), (inner.right - 90, y),
+                                  fonts.small(bold=True), config.COL_WHITE, align="right")
+                widgets.draw_text(surf, f"{'+' if mt['change_pct']>=0 else ''}{mt['change_pct']:.2f}% (1an)",
+                                  (inner.right, y), fonts.small(bold=True), ccol, align="right")
             y += row_h
+        surf.set_clip(prev_clip)
+        content_h = (y + st.scroll) - inner.y
+        st.set_bounds(list_area, content_h)
+        widgets.draw_scrollbar(surf, rect, list_area, st.scroll, st.max_scroll, content_h)

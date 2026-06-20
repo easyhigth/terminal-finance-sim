@@ -40,3 +40,52 @@ def test_sma_values():
     assert ma[1] == pytest.approx(3.0)           # (2+4)/2
     assert ma[4] == pytest.approx(9.0)           # (8+10)/2
     assert len(ma) == len(vals)
+
+
+def test_scroll_state_clamps_to_content_bounds():
+    import pygame
+    st = widgets.ScrollState()
+    list_area = pygame.Rect(0, 0, 200, 100)
+
+    # Contenu plus court que la zone visible -> rien à défiler.
+    st.set_bounds(list_area, content_h=50)
+    assert st.max_scroll == 0
+    assert st.scroll == 0
+    st.scroll_by(48)
+    assert st.scroll == 0
+
+    # Contenu plus long -> défilement borné à [0, max_scroll].
+    st.set_bounds(list_area, content_h=350)
+    assert st.max_scroll == 250
+    st.scroll_by(48)
+    assert st.scroll == 48
+    st.scroll_by(10_000)                         # tentative de dépasser le max
+    assert st.scroll == st.max_scroll == 250
+    st.scroll_by(-10_000)                        # tentative de descendre sous 0
+    assert st.scroll == 0
+
+    # Si le contenu rétrécit (ex: filtre réduit la liste), le scroll courant
+    # doit être re-clampé au nouveau max plutôt que de rester hors bornes.
+    st.scroll_by(200)
+    assert st.scroll == 200
+    st.set_bounds(list_area, content_h=120)      # nouveau max_scroll = 20
+    assert st.max_scroll == 20
+    assert st.scroll == 20
+
+
+def test_scroll_state_handle_wheel_only_inside_rect():
+    import pygame
+    st = widgets.ScrollState()
+    list_area = pygame.Rect(0, 0, 200, 100)
+    st.set_bounds(list_area, content_h=400)      # max_scroll = 300
+
+    inside = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=5, pos=(50, 50))
+    outside = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=5, pos=(500, 500))
+    other = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(50, 50))
+
+    assert st.handle_wheel(outside) is False
+    assert st.scroll == 0
+    assert st.handle_wheel(other) is False
+    assert st.scroll == 0
+    assert st.handle_wheel(inside) is True
+    assert st.scroll == 48                       # molette bas = +48px

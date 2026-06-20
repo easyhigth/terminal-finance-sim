@@ -47,6 +47,46 @@ VOL_SECTOR = 0.012
 VOL_REGION = 0.010
 DRIFT_MULT = 0.2        # atténue les dérives propres des sociétés (anti sur-bull)
 
+# ---- queues épaisses (fat tails) ----------------------------------------
+# Les facteurs (monde/secteur/région) et le bruit idiosyncratique ne sont plus
+# gaussiens : ils suivent une loi de Student (rng.standard_t), dont les queues
+# sont plus épaisses qu'une gaussienne pour un même écart-type — des mouvements
+# extrêmes y sont rares mais nettement plus probables que sous une gaussienne
+# (kurtosis excédentaire = 6/(df-4) pour df>4). On choisit un df bas (4-6) pour
+# un effet perceptible, et on RE-NORMALISE le tirage par son écart-type
+# théorique sqrt(df/(df-2)) pour que la volatilité par pas reste calibrée
+# EXACTEMENT comme avant (mêmes VOL_WORLD/VOL_SECTOR/VOL_REGION/sigma) : seule
+# la FORME de la distribution change, pas son second moment.
+T_DF_WORLD = 5      # degrés de liberté du facteur monde (le plus déterminant)
+T_DF_SECTOR = 6
+T_DF_REGION = 6
+T_DF_IDIO = 6        # bruit spécifique de chaque société
+
+
+def _t_scale(df):
+    """Facteur multiplicatif pour ramener un tirage standard_t(df) à un
+    écart-type unitaire (variance théorique de Student = df/(df-2), df>2)."""
+    return 1.0 / np.sqrt(df / (df - 2.0))
+
+
+_T_SCALE_WORLD = _t_scale(T_DF_WORLD)
+_T_SCALE_SECTOR = _t_scale(T_DF_SECTOR)
+_T_SCALE_REGION = _t_scale(T_DF_REGION)
+_T_SCALE_IDIO = _t_scale(T_DF_IDIO)
+
+# ---- sauts rares (jump-diffusion), structurels, SOUS les crises scénarisées --
+# En plus des queues épaisses du bruit courant, on injecte un saut discret rare
+# sur le facteur MONDE (et un peu sur secteurs/régions) — la part « événement
+# extrême crédible mais rare » du brief (krach éclair, défaut surprise...).
+# Couche structurelle indépendante de core.scenarios.Crisis (qui reste le
+# système scénarisé/narratif au-dessus) : ce saut est un AUTRE tirage rng,
+# consommé À CHAQUE pas (probabilité testée systématiquement, jamais sautée),
+# pour ne jamais désynchroniser la séquence de tirages d'un pas à l'autre.
+JUMP_PROBA = 0.012          # ~1.2 %/pas -> en moyenne quelques fois par an
+JUMP_MAGNITUDE_MEAN = 0.045  # ampleur moyenne (log-rendement) du saut sur F_monde
+JUMP_MAGNITUDE_VOL = 0.02    # dispersion de l'ampleur autour de la moyenne
+JUMP_DOWN_BIAS = 0.8         # probabilité qu'un saut soit baissier (krachs > booms)
+
 # Régimes de marché — toile de fond lente (déterministe) par-dessus les crises.
 # Chaque régime module la dérive et la volatilité du facteur MONDE. Les écarts
 # entre régimes sont volontairement marqués (et leur persistance élevée, cf.
@@ -286,10 +326,38 @@ class Market:
                 # monte (demande peu cyclique, rotation défensive des flux).
                 sec_shock[self._sector_idx[_defensif]] += (mc["unemployment"]["v"] - 5.0) * 0.0003
 
-        F_world = self.rng.normal(MU_WORLD + reg["drift"], VOL_WORLD * vol_mult) + world_shock
-        F_sector = self.rng.normal(0.0, VOL_SECTOR * vol_mult, size=len(self.sectors)) + sec_shock
-        F_region = self.rng.normal(0.0, VOL_REGION * vol_mult, size=len(self.regions)) + reg_shock
-        eps = self.rng.normal(0.0, 1.0, size=self.n)
+        # facteurs à queues épaisses (Student-t re-normalisée, cf. _t_scale) au
+        # lieu d'une gaussienne pure : même volatilité par pas, mouvements
+        # extrêmes plus fréquents qu'une gaussienne ne le permettrait.
+        F_world = (MU_WORLD + reg["drift"]
+                   + VOL_WORLD * vol_mult * _T_SCALE_WORLD * self.rng.standard_t(T_DF_WORLD)
+                   + world_shock)
+        F_sector = (VOL_SECTOR * vol_mult * _T_SCALE_SECTOR
+                    * self.rng.standard_t(T_DF_SECTOR, size=len(self.sectors)) + sec_shock)
+        F_region = (VOL_REGION * vol_mult * _T_SCALE_REGION
+                    * self.rng.standard_t(T_DF_REGION, size=len(self.regions)) + reg_shock)
+        eps = _T_SCALE_IDIO * self.rng.standard_t(T_DF_IDIO, size=self.n)
+
+        # ---- couche structurelle de sauts rares (jump-diffusion) -----------
+        # Tirages CONSOMMÉS À CHAQUE PAS (déterminisme : la séquence de tirages
+        # rng ne doit jamais dépendre du résultat d'un tirage précédent), même
+        # quand aucun saut ne se déclenche, pour que fast_forward/sync_to par
+        # nombre de pas restent parfaitement reproductibles.
+        jump_roll = self.rng.random_sample()
+        jump_dir_roll = self.rng.random_sample()
+        jump_mag_draw = self.rng.standard_normal()
+        if jump_roll < JUMP_PROBA:
+            sign = -1.0 if jump_dir_roll < JUMP_DOWN_BIAS else 1.0
+            magnitude = max(0.0, JUMP_MAGNITUDE_MEAN + JUMP_MAGNITUDE_VOL * jump_mag_draw)
+            world_jump = sign * magnitude
+            F_world += world_jump
+            # tilt sectoriel/régional léger et déterministe (mêmes tirages que
+            # ci-dessus, pas de tirage rng supplémentaire) : Finance et
+            # Immobilier amplifient un peu un krach mondial, comme dans Crisis.
+            if "Finance" in self._sector_idx:
+                F_sector[self._sector_idx["Finance"]] += world_jump * 0.6
+            if "Immobilier" in self._sector_idx:
+                F_sector[self._sector_idx["Immobilier"]] += world_jump * 0.4
 
         # saison de résultats : choc de cours sur les sociétés qui publient ce pas
         earnings_shock = self._step_earnings()

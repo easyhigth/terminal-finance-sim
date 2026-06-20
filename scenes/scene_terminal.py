@@ -30,6 +30,35 @@ def _L(fr, en):
 from ui import widgets
 from ui.worldmap import WorldMap
 
+# Raccourcis directs Ctrl+<lettre> vers les commandes du rail latéral. Les
+# lettres simples et Maj+lettre sont réservées à la saisie au clavier dans la
+# ligne de commande (cf. handle_event, fallback unicode imprimable) — Ctrl
+# est donc le seul modificateur disponible pour des déclencheurs instantanés
+# sans ambiguïté. Mnémonique en priorité (M=Marché, P=Portefeuille…), avec un
+# repli logique quand la lettre attendue est déjà prise par une autre entrée
+# du rail (ex. Mandats → A, M&A → F pour Fusions). Documenté dans
+# data/shortcuts_data.py (cf. ShortcutsPanel) — garder synchronisé.
+RAIL_SHORTCUTS = {
+    pygame.K_m: "MARKETHUB",
+    pygame.K_p: "PORTFOLIO",
+    pygame.K_i: "INBOX",
+    pygame.K_n: "NEWS",
+    pygame.K_j: "MISSION",
+    pygame.K_a: "MANDATES",
+    pygame.K_d: "DEALS",
+    pygame.K_f: "MA",
+    pygame.K_e: "DECIDE",
+    pygame.K_v: "ADV",
+    pygame.K_x: "EXAMCERT",
+    pygame.K_b: "SHOP",
+    pygame.K_t: "SHEET",
+    pygame.K_l: "LEARN",
+    pygame.K_g: "GLOSSARY",
+    pygame.K_o: "MORE",
+    pygame.K_s: "SAVE",
+    pygame.K_h: "COMMANDS",
+}
+
 # Noms de commandes pour l'autocomplétion (Tab) et la suggestion fantôme
 CMD_NAMES = [
     "HELP", "COMMANDS", "ADV", "MISSION", "EVAL", "EXAMCERT", "TRACK", "CAREER", "INBOX",
@@ -281,6 +310,11 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
                     return
         # 3) clavier : ligne de commande
         if event.type == pygame.KEYDOWN:
+            if (event.mod & pygame.KMOD_CTRL) and event.key in RAIL_SHORTCUTS:
+                cmd = RAIL_SHORTCUTS[event.key]
+                if unlocks_mod.cmd_unlocked(self.app.gs.player, cmd):
+                    self._run_command(cmd)
+                return
             if event.key == pygame.K_RETURN:
                 self._run_command(self.cmd.strip())
                 self.cmd = ""

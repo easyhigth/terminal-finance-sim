@@ -20,6 +20,7 @@ CATALOG = [
         ("COMMANDS / ?", "Ce catalogue complet"),
         ("STATUS", "Votre situation : grade, cash, réputation, temps"),
         ("ADV / NEXT / T", "Avancer le temps de 5 jours (un pas de marché)"),
+        ("ADV Q", "Avancer jusqu'au trimestre suivant (s'arrête sur tout évènement)"),
         ("MENU / ESC", "Retour au menu principal"),
         ("SAVE", "Sauvegarde manuelle (désactivée en hardcore)"),
         ("SAVES / LOAD", "Gestion des sauvegardes (slots)"),

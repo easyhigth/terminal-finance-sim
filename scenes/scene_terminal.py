@@ -481,7 +481,7 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
             if novice:
                 if get_lang() == "en":
                     self._log(
-                        "  ADV advance · COMMANDS full catalogue",
+                        "  ADV advance · ADV Q advance to next quarter · COMMANDS full catalogue",
                         "  MARKET indices · COMPANY <tk> · SEARCH · WATCHLIST",
                         "  MISSION work · CAREER career · EVAL promotion",
                         "  LEARN academy · GLOSSARY · DEFINE <term>",
@@ -491,7 +491,7 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
                     )
                 else:
                     self._log(
-                        "  ADV avancer · COMMANDS catalogue complet",
+                        "  ADV avancer · ADV Q avancer jusqu'au trimestre suivant · COMMANDS catalogue complet",
                         "  MARKET indices · COMPANY <tk> · SEARCH · WATCHLIST",
                         "  MISSION travailler · CAREER carrière · EVAL promotion",
                         "  LEARN académie · GLOSSARY · DEFINE <terme>",
@@ -502,7 +502,7 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
                 return
             if get_lang() == "en":
                 self._log(
-                    "  ADV advance · COMMANDS full catalogue",
+                    "  ADV advance · ADV Q advance to next quarter (stops on events) · COMMANDS full catalogue",
                     "  MARKET indices · TOP [region] · MOVERS · EXPLORE explorer",
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
                     "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC charts",
@@ -520,7 +520,7 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
                 )
             else:
                 self._log(
-                    "  ADV avancer · COMMANDS catalogue complet",
+                    "  ADV avancer · ADV Q avancer jusqu'au trimestre suivant (s'arrête sur évènement) · COMMANDS catalogue complet",
                     "  MARKET indices · TOP [region] · MOVERS · EXPLORE explorer",
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
                     "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC graphes",
@@ -539,7 +539,10 @@ class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
         elif cmd in ("COMMANDS", "?", "CMD"):
             self.app.scenes.go("commands", return_to="terminal")
         elif cmd in ("ADV", "NEXT", "ADVANCE", "T"):
-            self._advance_time()
+            if arg and arg.upper() == "Q":
+                self._advance_to_quarter()
+            else:
+                self._advance_time()
         elif cmd in ("MARKET", "INDEX", "INDICES", "WEI"):
             self._cmd_market()
         elif cmd == "MARKETHUB":

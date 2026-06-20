@@ -256,6 +256,7 @@ python main.py
 | `COMMANDS` / `?` | Catalogue complet des commandes   |
 | `STATUS`   | Situation actuelle (grade, cash, rép.)  |
 | `ADV`      | Avancer le temps (+5 jours, 1 pas marché)|
+| `ADV Q`    | Avancer jusqu'au trimestre suivant (s'arrête net sur le premier évènement bloquant) |
 | `PORTFOLIO`/`BOOK` | Livre de positions (valeur nette, P&L) |
 | `BUY`/`SELL`/`ALLOCATE`/`HEDGE`/`REBALANCE` | Trading |
 | `RESEARCH <tk>` / `ALERT <tk> <px>` | Analyse & alertes |

@@ -205,8 +205,12 @@ def close_quarter(player):
         rep += 4
         cash += _round_money(18000 * (1 + player.grade_index))
         log(player, "objective", f"Trimestre parfait ({done}/{total} objectifs).")
+        reason = f"Trimestre parfait ({done}/{total} objectifs)"
     elif done:
         log(player, "objective", f"Objectifs trimestriels : {done}/{total} atteints.")
-    player.adjust_reputation(rep)
+        reason = f"Objectifs trimestriels : {done}/{total} atteints"
+    else:
+        reason = "Objectifs trimestriels non atteints" if total else None
+    player.adjust_reputation(rep, reason=reason)
     player.adjust_cash(cash)
     return {"done": done, "total": total, "rep": rep, "cash": cash}

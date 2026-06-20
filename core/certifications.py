@@ -104,7 +104,9 @@ def pass_stage(player, program):
     if lvl >= prog["levels"]:
         return None
     player.certs[program] = lvl + 1
-    player.adjust_reputation(prog["rep"][lvl])
+    player.adjust_reputation(prog["rep"][lvl], reason=(
+        f"Certification: {prog['name']} level {lvl + 1}" if en
+        else f"Certification : {prog['name']} niveau {lvl + 1}"))
     done = player.certs[program] >= prog["levels"]
     if done:
         title = f"{prog['name']} Charterholder"

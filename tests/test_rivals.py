@@ -39,11 +39,17 @@ def test_act_snipe_removes_a_late_deal():
     for _ in range(200):
         p.deals = [{"id": 1, "title": "Deal tardif", "kind": "M&A",
                     "reward_cash": 100_000, "days_left": 5}]
+        p.rep_log = []
         rep0 = p.reputation
         evs = rivals.act(p, m, rng)
         if any(e["type"] == "snipe" for e in evs):
             assert p.deals == []                 # deal raflé -> retiré
             assert p.reputation == rep0 - 2      # pénalité de réputation
+            # la pénalité doit être journalisée avec une raison explicite
+            assert len(p.rep_log) == 1
+            reason, delta = p.rep_log[0]
+            assert delta == -2
+            assert "Deal tardif" in reason
             fired = True
             break
     assert fired

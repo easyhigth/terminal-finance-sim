@@ -1114,7 +1114,7 @@ class TerminalCommandsMixin:
             else:
                 self._log(_L("  ✓ Pitch réussi, mais votre pipeline de deals est déjà plein.","  ✓ Pitch won, but your deal pipeline is already full."))
         else:
-            p.adjust_reputation(-1)
+            p.adjust_reputation(-1, reason=_L("Pitch infructueux", "Pitch failed"))
             self._log(_L("  ✗ Pitch infructueux. Le client passe son tour (-1 réputation).","  ✗ Pitch failed. The client passes (-1 reputation)."))
         if not p.hardcore:
             self.app.gs.save(config.AUTOSAVE_SLOT)
@@ -1519,6 +1519,18 @@ class TerminalCommandsMixin:
             bits.append(f"{rep_sign}{rep_delta} rép.")
         if new_events > 0:
             bits.append(_L(f"{new_events} évènement(s)", f"{new_events} event(s)"))
+        # détail « pourquoi ma réputation a bougé » : une ligne par cause, pour que
+        # le joueur comprenne IMMÉDIATEMENT l'origine de chaque variation (et ne
+        # vive plus l'oscillation comme du bruit non expliqué).
+        rep_log = getattr(p, "rep_log", None) or []
+        if rep_log:
+            for reason, delta in rep_log:
+                sign = "+" if delta >= 0 else ""
+                self._log(f"    {sign}{delta} rép. — {reason}")
+                if abs(delta) >= 3:    # variation individuelle notable -> toast dédié
+                    self.app.notify(
+                        _L(f"Réputation {sign}{delta} — {reason}", f"Reputation {sign}{delta} — {reason}"),
+                        "good" if delta >= 0 else "bad")
         self._log(_L(f"  ════ BILAN DU TOUR — jour {p.day} : {' · '.join(bits)} ════",
                       f"  ════ TURN RECAP — day {p.day}: {' · '.join(bits)} ════"))
         self.app.notify(

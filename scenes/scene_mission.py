@@ -147,7 +147,7 @@ class MissionScene(Scene):
         p = self.app.gs.player
         total = len(self.mission["items"])
         self.rep_gain, self.cash_gain = M.compute_rewards(self.mission, self.score, total)
-        p.adjust_reputation(self.rep_gain)
+        p.adjust_reputation(self.rep_gain, reason=f"Mission : {self.mission.get('title', '')}")
         p.adjust_cash(self.cash_gain)
         p.missions_done += 1
         p.grade_missions += 1

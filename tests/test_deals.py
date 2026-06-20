@@ -54,6 +54,21 @@ def test_age_deals_expires_and_penalizes():
     assert p.reputation == rep_before - deal["penalty_rep"]
 
 
+def test_age_deals_logs_reputation_penalty_reason():
+    """La pénalité de réputation d'un deal expiré doit être journalisée dans
+    rep_log avec le titre du deal, pour que le joueur comprenne pourquoi sa
+    réputation a baissé (cf. bilan du tour dans le terminal)."""
+    p = _player()
+    deal = _force_deal(p)
+    deal["days_left"] = 1
+    p.rep_log = []
+    deals.age_deals(p)
+    assert len(p.rep_log) == 1
+    reason, delta = p.rep_log[0]
+    assert delta == -deal["penalty_rep"]
+    assert deal["title"] in reason
+
+
 def test_age_deals_keeps_active_deal():
     p = _player()
     deal = _force_deal(p)

@@ -131,7 +131,7 @@ def _instantiate(template, player, rng):
     if rep:
         rep = int(round(rep * EVENT_REP_SCALE))
     player.adjust_cash(cash)
-    player.adjust_reputation(rep)
+    player.adjust_reputation(rep, reason=template["title"])
     return {
         "id": template["id"],
         "title": template["title"],

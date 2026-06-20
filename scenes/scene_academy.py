@@ -44,7 +44,7 @@ class AcademyScene(Scene):
         p = self.app.gs.player
         if lesson_id not in p.learned:
             p.learned.append(lesson_id)
-            p.adjust_reputation(1)
+            p.adjust_reputation(1, reason="Leçon apprise (Académie)")
             self.app.notify("Leçon apprise (+1 réputation)", "good")
             if len(p.learned) >= len(L.LESSONS):
                 from core import badges

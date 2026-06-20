@@ -22,6 +22,7 @@ N_ROWS = 13
 
 class SpreadsheetScene(Scene):
     def on_enter(self, **kwargs):
+        self.return_to = kwargs.get("return_to", "terminal")
         # réutilise le tableur stocké dans l'app (persistant entre visites)
         if not hasattr(self.app, "sheet") or self.app.sheet is None:
             self.app.sheet = Spreadsheet(N_ROWS, N_COLS)
@@ -31,7 +32,7 @@ class SpreadsheetScene(Scene):
         self.editing = False
         self.edit_buf = ""
         self.back_btn = widgets.Button(
-            config.back_button_rect(180), "← TERMINAL", config.COL_TEXT_DIM)
+            config.back_button_rect(180), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.clear_btn = widgets.Button(
             (config.SCREEN_WIDTH-220, config.SCREEN_HEIGHT-50, 180, 42),
             "TOUT EFFACER", config.COL_DOWN)
@@ -78,7 +79,7 @@ class SpreadsheetScene(Scene):
                     self.edit_buf += event.unicode
             else:
                 if event.key == pygame.K_ESCAPE:
-                    self.app.scenes.go("terminal")
+                    self.app.scenes.go(self.return_to)
                 elif event.key in (pygame.K_RETURN, pygame.K_F2):
                     self.editing = True
                     self.edit_buf = self.sheet.get_raw(self.sel)
@@ -98,7 +99,7 @@ class SpreadsheetScene(Scene):
                     self.edit_buf = event.unicode
 
         if self.back_btn.handle(event):
-            self.app.scenes.go("terminal")
+            self.app.scenes.go(self.return_to)
         if self.clear_btn.handle(event):
             self.app.sheet = Spreadsheet(N_ROWS, N_COLS)
             self.sheet = self.app.sheet

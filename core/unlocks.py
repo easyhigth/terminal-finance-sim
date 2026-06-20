@@ -9,7 +9,10 @@ une montée en complexité maîtrisée.
 
 # fonctionnalité -> grade minimal requis
 UNLOCKS = {
-    "analyst": 1,    # watchlist, alertes, comparaison, valeur relative, recherche
+    # ouvert dès l'arrivée (Intern) : ce sont des outils 100% lecture/analyse,
+    # sans impact économique (pas d'argent en jeu) — de quoi avoir une vraie
+    # activité (watchlist, alertes, recherche) avant le déblocage du trading.
+    "analyst": 0,    # watchlist, alertes, comparaison, valeur relative, recherche
     "track": 2,      # choisir une voie de spécialisation
     "deals": 2,      # traiter des deals
     "trade": 4,      # investir : acheter / vendre / allouer / rééquilibrer
@@ -23,9 +26,9 @@ UNLOCKS = {
     "fx": 5,         # desk FX (spot + forward sur devises)
     "calendar": 2,   # calendrier macro (paris sur évènements programmés)
     "team": 6,       # recrutement d'analystes juniors (équipe)
-    "alm": 1,        # desk ALM (sandbox actif-passif, lecture/simulation seule)
-    "risk": 1,       # module risk (VaR/stress sur exposition de référence, sandbox)
-    "quant": 1,      # module quant (pricing d'options, sandbox)
+    "alm": 0,        # desk ALM (sandbox actif-passif, lecture/simulation seule)
+    "risk": 0,       # module risk (VaR/stress sur exposition de référence, sandbox)
+    "quant": 0,      # module quant (pricing d'options, sandbox)
     "credit": 6,     # titrisation : tranches de pool de prêts (cash réellement investi)
     "structured": 6,  # produits structurés (cash réellement investi)
 }

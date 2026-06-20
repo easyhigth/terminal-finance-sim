@@ -205,7 +205,8 @@ class MarketExplorerScene(Scene, PopupMixin):
     def _quick_add(self, kind, key):
         p = self.app.gs.player
         if not self._can_watch():
-            self.app.notify("Watchlist verrouillée (débloqué au grade Analyst).", "warn")
+            g = unlocks_mod.effective_required_grade(p, "analyst")
+            self.app.notify(f"Watchlist verrouillée (débloqué au grade {config.GRADES[g]}).", "warn")
             return
         attr = WATCHLIST_ATTR.get(kind)
         if attr is None:
@@ -227,7 +228,8 @@ class MarketExplorerScene(Scene, PopupMixin):
     def _bulk_add(self):
         p = self.app.gs.player
         if not self._can_watch():
-            self.app.notify("Watchlist verrouillée (débloqué au grade Analyst).", "warn")
+            g = unlocks_mod.effective_required_grade(p, "analyst")
+            self.app.notify(f"Watchlist verrouillée (débloqué au grade {config.GRADES[g]}).", "warn")
             return
         added, dup, capped = 0, 0, 0
         for kind, key in sorted(self.selected):
@@ -512,7 +514,8 @@ class MarketExplorerScene(Scene, PopupMixin):
 
         sel_txt = (f"{len(self.selected)} sélectionnée(s)" if self.selected
                    else "Aucune sélection" if self._can_watch()
-                   else "Sélection : débloqué au grade Analyst")
+                   else f"Sélection : débloqué au grade "
+                        f"{config.GRADES[unlocks_mod.effective_required_grade(self.app.gs.player, 'analyst')]}")
         widgets.draw_text(surf, sel_txt, (inner.x, inner.bottom - 6), fonts.tiny(), config.COL_TEXT_DIM)
 
         self.back_btn.draw(surf)

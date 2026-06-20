@@ -9,10 +9,11 @@ dans le désordre. Affichée en bandeau dans scene_terminal ; ignorable (skip).
 
 # NB : les premières étapes ne portent volontairement que sur des commandes
 # toujours accessibles au grade Stagiaire (absentes de core/unlocks.py::CMD_FEATURE,
-# cf. RESEARCH/BUY/ALERT qui restent verrouillés jusqu'aux grades Analyst/Trade) —
-# sans ça, le parcours pourrait rester bloqué indéfiniment sur une commande
-# encore inaccessible. Les outils d'analyse et d'investissement sont introduits
-# plus tard, à leur déblocage (core/unlocks.py::FEATURE_TUTORIAL).
+# ou débloquées dès le grade 0 comme RESEARCH/ALERT — seul BUY/SELL reste
+# verrouillé jusqu'au grade Associate) — sans ça, le parcours pourrait rester
+# bloqué indéfiniment sur une commande encore inaccessible. Les outils
+# d'investissement (trading, mandats...) sont introduits plus tard, à leur
+# déblocage (core/unlocks.py::FEATURE_TUTORIAL).
 STEPS = [
     {"id": "career", "title": "Découvrir votre feuille de route",
      "hint": "Tapez CAREER pour voir votre progression, vos objectifs du trimestre et votre grade.",

@@ -43,7 +43,8 @@ def test_every_label_has_a_matching_unlock_entry():
 def test_next_unlock_returns_lowest_pending_grade():
     p = _player(grade=0)
     label, grade = unlocks.next_unlock(p)
-    assert grade == min(unlocks.UNLOCKS.values())
+    pending = [g for g in unlocks.UNLOCKS.values() if g > p.grade_index]
+    assert grade == min(pending)
     assert label == unlocks.feature_label(
         next(f for f, g in unlocks.UNLOCKS.items() if g == grade)
     )
@@ -52,3 +53,18 @@ def test_next_unlock_returns_lowest_pending_grade():
 def test_next_unlock_none_when_everything_open():
     p = _player(grade=max(unlocks.UNLOCKS.values()))
     assert unlocks.next_unlock(p) is None
+
+
+def test_intern_has_read_only_analysis_tools_from_day_one():
+    """Dès le grade Intern (0), les outils d'analyse/sandbox sans impact
+    économique (watchlist, alertes, recherche, ALM/RISK/QUANT en lecture/
+    simulation) sont ouverts, pour donner une activité réelle avant que le
+    trading/les mandats ne se débloquent."""
+    p = _player(grade=0)
+    for feature in ("analyst", "alm", "risk", "quant"):
+        assert unlocks.unlocked(p, feature), feature
+    for cmd in ("WATCHLIST", "ALERT", "COMPARE", "RESEARCH"):
+        assert unlocks.cmd_unlocked(p, cmd), cmd
+    # le trading et les mandats restent verrouillés (pas de changement d'équilibre)
+    for feature in ("trade", "mandates", "deals", "ma"):
+        assert not unlocks.unlocked(p, feature), feature

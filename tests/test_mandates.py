@@ -202,3 +202,116 @@ def test_failure_reason_extra_none_keeps_legacy_behaviour():
     m = {"target_pct": 5.0, "max_beta": 1.5}
     reason = mandates.failure_reason(m, growth=1.0, beta=0.5)
     assert "Rendement cible non atteint" in reason
+
+
+# ---------------------------------------------------------------------------
+# Profils clients (item 4) : assureur, fonds de pension, family office,
+# client opportuniste, institutionnel prudent.
+# ---------------------------------------------------------------------------
+
+def test_client_profiles_cover_the_five_expected_keys():
+    keys = {p["key"] for p in mandates.CLIENT_PROFILES}
+    assert keys == {"assureur", "pension", "family_office", "opportuniste",
+                     "institutionnel_prudent"}
+
+
+def test_maybe_offer_attaches_client_profile_and_consistent_name():
+    p, _ = _mk()
+    rng = random.Random(7)
+    offer = None
+    for _ in range(80):
+        offer = mandates.maybe_offer(p, rng)
+        if offer:
+            break
+    assert offer is not None
+    assert offer["client_profile"] in {pr["key"] for pr in mandates.CLIENT_PROFILES}
+    profile = next(pr for pr in mandates.CLIENT_PROFILES if pr["key"] == offer["client_profile"])
+    assert offer["client"] in profile["names"]
+
+
+def test_profile_label_and_desc_known_and_unknown_key():
+    assert mandates.profile_label("assureur") == "Assureur"
+    assert mandates.profile_label("inconnu") == "inconnu"
+    assert mandates.profile_desc("assureur")
+    assert mandates.profile_desc("inconnu") == ""
+
+
+def test_insurer_profile_tightens_drawdown_vs_opportunist():
+    """Pour le même type de mandat (low_vol), l'assureur doit générer une
+    contrainte de drawdown strictement plus serrée que le client opportuniste
+    (item 4 : la rigueur des contraintes dépend du profil CLIENT, pas
+    seulement du type de mandat)."""
+    rng_a = random.Random(123)
+    rng_o = random.Random(123)
+    assureur = next(p for p in mandates.CLIENT_PROFILES if p["key"] == "assureur")
+    opportuniste = next(p for p in mandates.CLIENT_PROFILES if p["key"] == "opportuniste")
+    c_a = mandates._extra_constraints("low_vol", rng_a, assureur)
+    c_o = mandates._extra_constraints("low_vol", rng_o, opportuniste)
+    assert c_a["max_drawdown"] < c_o["max_drawdown"]
+
+
+def test_insurer_and_pension_profiles_generate_duration_target():
+    rng = random.Random(5)
+    assureur = next(p for p in mandates.CLIENT_PROFILES if p["key"] == "assureur")
+    offer = mandates._extra_constraints("growth", rng, assureur)
+    assert "max_duration" in offer
+    lo, hi = assureur["duration_target"]
+    assert lo <= offer["max_duration"] <= hi
+
+
+def test_pick_type_for_profile_only_returns_known_types():
+    rng = random.Random(3)
+    for profile in mandates.CLIENT_PROFILES:
+        for _ in range(20):
+            t = mandates._pick_type_for_profile(profile, rng)
+            assert t in mandates.MANDATE_TYPES
+
+
+def test_evaluate_due_early_terminates_strict_profile_on_breach():
+    """Un mandat d'assureur (profil 'strict') doit être résilié avant
+    échéance dès qu'une contrainte casse, sans attendre le trimestre de fin
+    (item 4 : enforcement actif, pas seulement à l'échéance)."""
+    p, m = _mk()
+    mandate = _due_mandate(p, m, target_pct=-100.0, max_beta=1000.0)
+    mandate["client_profile"] = "assureur"
+    mandate["max_drawdown"] = 1.0          # limite quasi nulle -> cassée immédiatement
+    mandate["deadline_q"] = p.quarter + 5  # échéance lointaine : ne devrait PAS être attendue
+    p.mandates = [mandate]
+    p.cash_history = [100, 50]             # 50% drawdown >> 1.0% limite
+    rep0 = p.reputation
+    results = mandates.evaluate_due(p, m)
+    assert len(results) == 1
+    res = results[0]
+    assert res["ok"] is False
+    assert res["early_terminated"] is True
+    assert p.mandates == []
+    assert p.reputation == rep0 - res["penalty_rep"]
+
+
+def test_evaluate_due_non_strict_profile_not_early_terminated():
+    """Un mandat de client opportuniste (non strict) doit survivre jusqu'à
+    l'échéance même en cas de contrainte cassée en cours de route."""
+    p, m = _mk()
+    mandate = _due_mandate(p, m, target_pct=-100.0, max_beta=1000.0)
+    mandate["client_profile"] = "opportuniste"
+    mandate["max_drawdown"] = 1.0
+    mandate["deadline_q"] = p.quarter + 5
+    p.mandates = [mandate]
+    p.cash_history = [100, 50]
+    results = mandates.evaluate_due(p, m)
+    assert results == []
+    assert p.mandates == [mandate]
+
+
+def test_evaluate_due_legacy_mandate_without_profile_not_early_terminated():
+    """Rétrocompatibilité : un mandat sans `client_profile` (save antérieure
+    à cette extension) ne doit jamais être résilié par anticipation."""
+    p, m = _mk()
+    mandate = _due_mandate(p, m, target_pct=-100.0, max_beta=1000.0)
+    mandate["max_drawdown"] = 1.0
+    mandate["deadline_q"] = p.quarter + 5
+    p.mandates = [mandate]
+    p.cash_history = [100, 50]
+    results = mandates.evaluate_due(p, m)
+    assert results == []
+    assert p.mandates == [mandate]

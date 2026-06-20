@@ -341,6 +341,13 @@ class MarketHubScene(Scene, PopupMixin):
             widgets.draw_text(surf, f"{phase} ({'+' if slope>=0 else ''}{slope:.2f}pb)",
                               (inner.right, y), fonts.small(bold=True), scol, align="right")
             y += 26
+        if hasattr(self.market, "curve_curvature"):
+            curv = self.market.curve_curvature()
+            ccol = config.COL_DOWN if curv > 0.3 else config.COL_TEXT_DIM
+            widgets.draw_text(surf, "Courbure (bosse mi-courbe)", (inner.x, y), fonts.small(), config.COL_TEXT)
+            widgets.draw_text(surf, f"{curv:.2f}pb", (inner.right, y),
+                              fonts.small(bold=True), ccol, align="right")
+            y += 26
 
         list_top = y
         list_area = pygame.Rect(inner.x - 6, list_top, inner.w + 12, inner.bottom - list_top)

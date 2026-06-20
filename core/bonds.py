@@ -150,9 +150,11 @@ def _region_bump(market, region):
 
 
 def term_premium(market, years):
-    """Composante de prime de terme dérivée de la courbe des taux du marché
-    (pentue en expansion, plate/inversée en récession/marché volatil). Sans
-    marché disponible (ou ancienne API), retombe sur la prime fixe historique."""
+    """Composante de prime de terme dérivée de la courbe des taux du marché —
+    modèle à 3 facteurs niveau/pente/courbure (core.market.Market.curve_point) :
+    pentue en expansion, plate/inversée en récession/marché volatil, bosse de
+    mi-courbe accentuée en stress. Sans marché disponible (ou ancienne API),
+    retombe sur la prime fixe historique."""
     if market is None or not hasattr(market, "curve_point"):
         return TERM_PREMIUM * years
     return market.curve_point(years) - base_yield_level(market)

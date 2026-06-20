@@ -110,8 +110,10 @@ def correlation_matrix(series_map):
 
 def yield_curve(market, rating="AAA", maturities=(1, 2, 3, 5, 7, 10, 20, 30)):
     """Courbe des taux : (maturité en années, rendement en %) pour un rating donné.
-    Reconstruite depuis le niveau de courbe du marché + prime de terme + spread."""
+    Reconstruite depuis le niveau de courbe du marché (modèle Nelson-Siegel à 3
+    facteurs niveau/pente/courbure, cf. core.market.Market.curve_point) + prime
+    de terme cyclique + spread de crédit du rating."""
     from core import bonds as _bonds
     base = _bonds.base_yield_level(market)
     spr = _bonds._RATING_SPREAD.get(rating, 0.02)
-    return [(m, (base + _bonds.TERM_PREMIUM * m + spr) * 100.0) for m in maturities]
+    return [(m, (base + _bonds.term_premium(market, m) + spr) * 100.0) for m in maturities]

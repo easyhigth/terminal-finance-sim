@@ -254,18 +254,88 @@ EARN_NEWS_THRESH = 0.06 # |surprise| au-delà de laquelle on génère une news
 CRISIS_SEVERE_SEVERITY = 1.35  # seuil au-delà duquel une crise est jugée "majeure"
 CRISIS_COOLDOWN_STEPS = 5      # accalmie forcée après une crise majeure (pas de nouveau choc)
 
-# Courbe des taux : DÉRIVÉE du taux directeur courant + une pente qui dépend du
-# cycle (régime + croissance), pas un indicateur mean-reverting séparé. À l'état
-# neutre (régime Calme, croissance = mean macro), elle se réduit à l'ancienne
-# prime de terme fixe (CURVE_TERM_PREMIUM == ancien core.bonds.TERM_PREMIUM),
-# pour ne pas changer les niveaux de rendement déjà calibrés.
+# Courbe des taux : modèle à 3 facteurs (Nelson-Siegel) NIVEAU / PENTE /
+# COURBURE, plutôt qu'une simple prime de terme statique. À l'état neutre
+# (régime Calme, croissance = mean macro, stress nul), pente et courbure
+# cycliques sont nulles par construction : la courbe se réduit exactement à
+# l'ancienne prime de terme fixe (short + CURVE_TERM_PREMIUM*years), pour ne
+# pas changer les niveaux de rendement déjà calibrés (cf. tests/test_market.py).
+#
+#   y(tau) = [short + CURVE_TERM_PREMIUM*tau]                     (legacy, niveau+terme, inchangé)
+#          + slope_cyclique   * h1(tau)                            (pentification/inversion)
+#          + curvature_cyclique * g2(tau)                          (bosse mi-courbe)
+#
+# où g1/h1/g2 sont les charges de Nelson-Siegel (forme "Diebold-Li", où le
+# facteur pente charge le LONG terme et non le court -- convention choisie ici
+# pour que slope_cyclique>0 == pentification normale, slope_cyclique<0 ==
+# inversion, lisible directement comme dans le brief) :
+#   g1(tau) = (1 - exp(-tau/lambda)) / (tau/lambda)      -> 1 en tau=0, 0 en tau=inf
+#   h1(tau) = 1 - g1(tau)                                 -> 0 en tau=0, 1 en tau=inf
+#   g2(tau) = g1(tau) - exp(-tau/lambda)                  -> 0 en tau=0 ET tau=inf, max en mi-courbe
+# (lambda fixe la maturité où la courbure est maximale ; cf. CURVE_NS_LAMBDA).
+#
+# Pente et courbure sont chacune un état PERSISTANT et lissé (même logique que
+# world_vol_mult_state, chantier 6) : elles ne sautent pas instantanément à
+# leur cible macro/régime à chaque pas, elles s'en approchent progressivement
+# (mean-reversion), pour une dynamique réaliste de la courbe qui ne se
+# redessine pas en un seul pas. Mises à jour dans Market.step() (déterministe,
+# AUCUN tirage rng supplémentaire : fonctions pures du régime/macro/stress
+# déjà calculés ce pas-ci). Le NIVEAU reste le short rate + prime de terme
+# (macro["rate"], déjà mean-reverting via son propre AR(1)) : pas dupliqué en
+# un 3e état, pour ne pas introduire une double dynamique sur la même grandeur.
 CURVE_TENORS = {"3M": 0.25, "2Y": 2.0, "5Y": 5.0, "10Y": 10.0, "30Y": 30.0}
 CURVE_TERM_PREMIUM = 0.0015
+CURVE_NS_LAMBDA = 5.0    # maturité (années) où la charge de courbure est maximale
+
 # pentification en expansion (le marché anticipe une croissance soutenue),
 # aplatissement/inversion en marché volatil/récession (le marché anticipe des
-# baisses de taux directeur futures) — capé aux 10 premières années (la partie
-# longue de la courbe réagit peu au cycle court terme).
-_REGIME_SLOPE_BIAS = {"Expansion": 0.0028, "Calme": 0.0, "Volatil": -0.0065, "Récession": -0.015}
+# baisses de taux directeur futures) — cible INSTANTANÉE de la composante
+# slope, appliquée via la charge NS h1 (remplace l'ancien poids linéaire capé
+# à 10 ans). Amplitudes calibrées (x2 vs l'ancien biais linéaire) pour que la
+# pente 10Y-2Y résultante (après charge h1, qui sature progressivement plutôt
+# que linéairement) reste du même ordre de grandeur que l'ancien modèle.
+_REGIME_SLOPE_BIAS = {"Expansion": 0.0056, "Calme": 0.0, "Volatil": -0.013, "Récession": -0.030}
+
+# courbure cyclique : la "bosse" de mi-courbe s'accentue avec l'incertitude
+# (stress de marché, cf. Market.last_stress_level, chantier 7) — un marché
+# calme a une courbure quasi nulle, un marché stressé/incertain en a une plus
+# marquée en mi-courbe (le court terme intègre une détente monétaire imminente,
+# le long terme reste arrimé à l'inflation de long terme, d'où une bosse ~5 ans).
+CURVE_CURVATURE_STRESS_GAIN = 0.012   # amplitude de courbure (décimal) à stress=1.0
+
+# vitesse de retour à la cible instantanée (par pas) des états persistants
+# pente/courbure -- même constante que world_vol_mult_state (chantier 6) pour
+# une demi-vie comparable (~ quelques pas), cohérente avec le reste du moteur.
+CURVE_FACTOR_MEAN_REV = 0.18
+# bornes anti-explosion des états persistants (mêmes unités que les cibles ;
+# couvrent la cible max théorique : régime extrême + croissance extrême).
+CURVE_SLOPE_BOUND = 0.05
+CURVE_CURV_BOUND = 0.03
+
+
+def _curve_ns_loadings(years, lam=CURVE_NS_LAMBDA):
+    """Charges de Nelson-Siegel (h1, g2) pour une maturité `years` (>=0).
+    h1 (pente) croît de 0 (court terme) vers 1 (long terme) ; g2 (courbure)
+    est nulle aux deux extrémités et maximale en mi-courbe."""
+    tau = max(1e-6, float(years)) / lam
+    decay = np.exp(-tau)
+    g1 = (1.0 - decay) / tau
+    h1 = 1.0 - g1
+    g2 = g1 - decay
+    return h1, g2
+
+
+def _curve_slope_target(regime, growth):
+    """Cible instantanée de la composante PENTE (décimal), nulle à l'état
+    neutre (régime Calme, growth==2.0 -> growth_bias==0)."""
+    growth_bias = (growth - 2.0) * 0.003
+    return _REGIME_SLOPE_BIAS.get(regime, 0.0) + growth_bias
+
+
+def _curve_curvature_target(stress_level):
+    """Cible instantanée de la composante COURBURE (décimal), nulle hors
+    stress (marché calme) -- cf. Market.last_stress_level (chantier 7)."""
+    return CURVE_CURVATURE_STRESS_GAIN * max(0.0, min(1.0, stress_level))
 
 # Spreads de crédit IG/HY — niveaux de référence (en points de base), utilisés
 # comme indicateurs macro centraux de stress de marché (core.bonds les lit pour
@@ -366,6 +436,18 @@ class Market:
         # corrélations dynamiques (cf. _stress_level/_blend_toward_world) : niveau
         # de stress du dernier pas (0..1), conservé pour lecture/diagnostic.
         self.last_stress_level = 0.0
+        # courbe des taux à 3 facteurs (Nelson-Siegel, cf. constantes CURVE_*) :
+        # états PERSISTANTS et lissés des composantes pente/courbure cycliques
+        # (la composante niveau reste l'ancien short rate + prime de terme,
+        # déjà mean-reverting via macro["rate"], pas dupliquée ici). Initialisés
+        # à 0.0 = état neutre, identique à la cible à l'état neutre -> aucune
+        # régression sur les tests existants qui mutent regime/macro SANS
+        # appeler step() (la courbe reste alors une fonction instantanée, cf.
+        # curve_point). Ces deux états ne sont PAS sérialisés dans les saves
+        # (PlayerState ne stocke que market_seed/market_step) : ils se
+        # reconstruisent exactement en rejouant step() depuis l'origine.
+        self.curve_slope_state = 0.0
+        self.curve_curv_state = 0.0
         self.crises = []
         self.ended_crises = []   # crises qui viennent de s'éteindre CE pas (pour postmortem)
         self.crisis_cooldown = 0  # pas restants d'accalmie forcée après une crise majeure
@@ -585,6 +667,20 @@ class Market:
                      + ASYM_VOL_MEAN_REV * (1.0 - self.world_vol_mult_state)
                      + ASYM_VOL_MEAN_REV * gain * (shock_sq - 1.0))
         self.world_vol_mult_state = min(ASYM_VOL_MAX_MULT, max(ASYM_VOL_MIN_MULT, new_state))
+
+        # ---- courbe des taux : lissage des états persistants pente/courbure --
+        # Mêmes cibles instantanées que curve_point()/curve_slope() (régime,
+        # croissance, stress du pas déjà calculé ci-dessus), mais approchées
+        # progressivement (mean-reversion, AUCUN tirage rng supplémentaire) au
+        # lieu d'être atteintes en un seul pas -- une courbe réelle ne se
+        # redessine pas instantanément à chaque nouvelle donnée macro.
+        slope_target = _curve_slope_target(self.regime, self.macro["growth"]["v"])
+        curv_target = _curve_curvature_target(self.last_stress_level)
+        self.curve_slope_state += CURVE_FACTOR_MEAN_REV * (slope_target - self.curve_slope_state)
+        self.curve_curv_state += CURVE_FACTOR_MEAN_REV * (curv_target - self.curve_curv_state)
+        self.curve_slope_state = min(CURVE_SLOPE_BOUND, max(-CURVE_SLOPE_BOUND, self.curve_slope_state))
+        self.curve_curv_state = min(CURVE_CURV_BOUND, max(-CURVE_CURV_BOUND, self.curve_curv_state))
+
         self.step_count += 1
 
         # historiques
@@ -774,34 +870,64 @@ class Market:
             self.earnings_log[rep["ticker"]] = rep
         return shock
 
-    def curve_point(self, years):
-        """Rendement de la courbe (décimal) pour une maturité (en années) donnée.
-        À l'état neutre (régime Calme, croissance = mean macro de 2.0), équivaut
-        exactement à l'ancienne prime de terme fixe (taux court + 0.15%/an)."""
+    def curve_point(self, years, smoothed=False):
+        """Rendement de la courbe (décimal) pour une maturité (en années) donnée,
+        modèle de Nelson-Siegel à 3 facteurs NIVEAU / PENTE / COURBURE :
+
+            y(years) = [niveau = short + CURVE_TERM_PREMIUM*years]   (legacy, inchangé)
+                     + pente_cyclique    * h1(years)
+                     + courbure_cyclique * g2(years)
+
+        Par défaut (`smoothed=False`), pente/courbure utilisent la cible
+        INSTANTANÉE (fonction pure du régime/croissance/stress courants) :
+        lecture réactive immédiate, identique au comportement historique de
+        cette méthode (utilisée par les tests, le pricing obligataire au vol,
+        et tout code qui lit la courbe APRÈS avoir mute regime/macro à la main
+        sans rejouer step()). Avec `smoothed=True`, utilise l'état persistant
+        et lissé (curve_slope_state/curve_curv_state, mis à jour pas après pas
+        dans step(), mean-reverting vers la cible instantanée) : dynamique
+        réaliste pour le gameplay normal, où la courbe ne se redessine pas
+        intégralement en un seul pas (cf. curve_slope_state/curve_curv_state).
+
+        À l'état neutre (régime Calme, croissance = mean macro de 2.0, stress
+        nul), pente et courbure valent 0 dans les deux cas : la courbe équivaut
+        alors exactement à l'ancienne prime de terme fixe (taux court + 0.15%/an)."""
         short = self.macro["rate"]["v"] / 100.0
-        growth_bias = (self.macro["growth"]["v"] - 2.0) * 0.0015
-        # poids 0 (très court terme) -> 1 (10 ans et plus) : la partie courte de
-        # la courbe suit surtout le taux directeur, la partie longue capte le
-        # cycle (pentification/inversion).
-        weight = min(years, 10.0) / 10.0
-        cycle_bias = (_REGIME_SLOPE_BIAS.get(self.regime, 0.0) + growth_bias) * weight
+        h1, g2 = _curve_ns_loadings(years)
+        if smoothed:
+            slope = self.curve_slope_state
+            curv = self.curve_curv_state
+        else:
+            slope = _curve_slope_target(self.regime, self.macro["growth"]["v"])
+            curv = _curve_curvature_target(self.last_stress_level)
+        cycle_bias = slope * h1 + curv * g2
         return max(0.0, short + CURVE_TERM_PREMIUM * years + cycle_bias)
 
-    def yield_curve(self):
+    def yield_curve(self, smoothed=False):
         """Courbe complète {tenor: rendement décimal} pour les maturités usuelles."""
-        return {tenor: self.curve_point(years) for tenor, years in CURVE_TENORS.items()}
+        return {tenor: self.curve_point(years, smoothed=smoothed)
+                for tenor, years in CURVE_TENORS.items()}
 
-    def curve_slope(self):
+    def curve_slope(self, smoothed=False):
         """Pente 10 ans - 2 ans (en points de %) : lecture usuelle de la forme
         de la courbe (positive = pentue/normale, négative = inversée)."""
-        return (self.curve_point(10.0) - self.curve_point(2.0)) * 100.0
+        return (self.curve_point(10.0, smoothed=smoothed)
+                - self.curve_point(2.0, smoothed=smoothed)) * 100.0
 
-    def curve_inverted(self):
-        return self.curve_slope() < 0.0
+    def curve_curvature(self, smoothed=True):
+        """Composante de courbure courante (en points de %) : la "bosse" de
+        mi-courbe, qui s'accentue avec le stress de marché. Lissée par défaut
+        (état persistant curve_curv_state, dynamique de gameplay normale)."""
+        if smoothed:
+            return self.curve_curv_state * 100.0
+        return _curve_curvature_target(self.last_stress_level) * 100.0
 
-    def curve_phase(self):
+    def curve_inverted(self, smoothed=False):
+        return self.curve_slope(smoothed=smoothed) < 0.0
+
+    def curve_phase(self, smoothed=False):
         """Étiquette qualitative de la forme courante de la courbe."""
-        slope = self.curve_slope()
+        slope = self.curve_slope(smoothed=smoothed)
         if slope < -0.05:
             return "Inversion"
         if slope < 0.30:

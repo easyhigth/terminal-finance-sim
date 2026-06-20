@@ -301,6 +301,7 @@ def maybe_investigate(player, rng=None):
     player.adjust_cash(-fine)
     player.adjust_reputation(-rep_loss)
     player.heat = max(0, player.heat - 35)
+    player.investigations_count = getattr(player, "investigations_count", 0) + 1
     from core import career, inbox
     career.log(player, "crisis", f"Enquête réglementaire : scrutin {heat_before}/100 (seuil 55) "
                                   f"a déclenché un contrôle. Amende {fine/1000:.0f}K, "

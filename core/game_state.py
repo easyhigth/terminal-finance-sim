@@ -51,6 +51,9 @@ class PlayerState:
     ma_history: list = field(default_factory=list)      # historique M&A (cessions, défauts)
     eval_state: dict = field(default_factory=dict)     # examen en pause (reprise possible)
     realized_pnl: float = 0.0                          # P&L réalisé cumulé (ventes)
+    total_fees_paid: float = 0.0                       # commissions/frais d'exécution cumulés (achats/ventes/short/cover)
+    total_margin_penalty: float = 0.0                  # surcoûts cumulés de liquidation forcée (appels de marge)
+    investigations_count: int = 0                       # nb d'enquêtes réglementaires subies (cf. core/dilemmas.py)
     # ----- progression de carrière -----
     deals_won: int = 0                                 # deals conclus (cumulatif)
     missions_done: int = 0                             # missions réalisées (cumulatif)

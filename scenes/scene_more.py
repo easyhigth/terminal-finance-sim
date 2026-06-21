@@ -240,13 +240,13 @@ class MoreScene(Scene):
                     # bouton retour (footer) ni sur le reste de l'UI.
                     self._btn_rects.append((rect.clip(area), scene, kw))
                     hover = rect.collidepoint(mp)
+                    acc = widgets.hover_accent(hover)
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL,
                                      rect, border_radius=5)
-                    pygame.draw.rect(surf, config.COL_AMBER if hover else config.COL_BORDER,
-                                     rect, 1, border_radius=5)
+                    pygame.draw.rect(surf, acc, rect, 1, border_radius=5)
                     widgets.draw_row_selection(surf, rect, is_cursor)
                     widgets.draw_text(surf, label, rect.center, fonts.small(bold=hover),
-                                      config.COL_AMBER if hover else config.COL_TEXT, align="center")
+                                      acc if hover else config.COL_TEXT, align="center")
             y += BTN_H + BTN_GAP + 8
         surf.set_clip(prev_clip)
 

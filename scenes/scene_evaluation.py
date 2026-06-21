@@ -391,7 +391,7 @@ class EvaluationScene(Scene):
             else:
                 hover = rect.collidepoint(pygame.mouse.get_pos())
                 bg = config.COL_PANEL_HEAD if hover else config.COL_PANEL
-                border = config.COL_CYAN if hover else config.COL_BORDER
+                border = config.COL_CYAN if hover else config.COL_AMBER
                 txt = config.COL_WHITE if hover else config.COL_TEXT
             pygame.draw.rect(surf, bg, rect)
             pygame.draw.rect(surf, border, rect, 1)

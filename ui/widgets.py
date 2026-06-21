@@ -29,11 +29,24 @@ def list_key_nav(event, selected, count):
     return selected, False
 
 
+def hover_accent(active, base=config.COL_AMBER, hover_color=config.COL_CYAN):
+    """Couleur d'un bloc cliquable neutre : `base` (ambre) au repos, `hover_color`
+    (cyan) dès qu'il est survolé/sélectionné — convention visuelle commune à tous
+    les éléments sélectionnables qui n'ont pas de couleur sémantique propre
+    (vert=succès, rouge=danger, couleur de continent...). Si `base` n'est pas
+    l'ambre par défaut (c'est-à-dire que l'appelant a déjà choisi une couleur
+    sémantique), cette couleur est conservée au survol plutôt que d'être
+    remplacée par du cyan."""
+    if base != config.COL_AMBER:
+        return base
+    return hover_color if active else base
+
+
 def draw_row_selection(surf, rect, selected, accent=config.COL_AMBER):
     """Surligne `rect` quand un item est navigué au clavier (sans le cliquer),
     pour donner un retour visuel cohérent avec la sélection à la souris."""
     if selected:
-        pygame.draw.rect(surf, accent, rect, 1, border_radius=3)
+        pygame.draw.rect(surf, hover_accent(True, accent), rect, 1, border_radius=3)
 
 
 # ---------------------------------------------------------------------------
@@ -195,10 +208,13 @@ class Button:
         if not self.enabled:
             bg, border, txt = config.COL_PANEL, config.COL_BORDER, config.COL_TEXT_DIM
         else:
-            # interpolation fond/bordure/texte selon le survol animé
+            # interpolation fond/bordure/texte selon le survol animé ; les boutons
+            # à accent neutre (ambre) glissent vers le cyan, les boutons à
+            # couleur sémantique (vert/rouge...) gardent leur propre couleur.
+            target = hover_accent(True, self.accent)
             bg = _lerp_col(config.COL_PANEL, config.COL_PANEL_HEAD, self._hover_t)
-            border = self.accent
-            txt = _lerp_col(config.COL_TEXT, self.accent, self._hover_t)
+            border = _lerp_col(self.accent, target, self._hover_t)
+            txt = _lerp_col(config.COL_TEXT, target, self._hover_t)
         # flash d'appui : éclaircit le fond brièvement
         if press > 0:
             bg = _lerp_col(bg, self.accent, 0.35 * press)
@@ -240,7 +256,7 @@ def draw_card_footer(surf, card_rect, label, accent=config.COL_AMBER,
     card_rect = pygame.Rect(card_rect)
     rect = pygame.Rect(card_rect.x + pad, card_rect.bottom - pad - height,
                         card_rect.w - 2 * pad, height)
-    col = accent if enabled else config.COL_TEXT_DIM
+    col = hover_accent(hover, accent) if enabled else config.COL_TEXT_DIM
     bg = config.COL_PANEL_HEAD if (hover and enabled) else config.COL_PANEL
     pygame.draw.rect(surf, bg, rect, border_radius=5)
     pygame.draw.rect(surf, col, rect, 1, border_radius=5)

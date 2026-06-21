@@ -135,9 +135,10 @@ class TerminalRenderMixin:
                 acc = config.COL_CYAN
             elif cmd == "DECIDE" and p.pending_dilemmas:
                 acc = config.COL_WARN
+            border_acc = widgets.hover_accent(hover and not locked, acc)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if (hover and not locked) else config.COL_PANEL,
                              br, border_radius=4)
-            pygame.draw.rect(surf, acc, br, 1, border_radius=4)
+            pygame.draw.rect(surf, border_acc, br, 1, border_radius=4)
             ty = br.y + (bh - fonts.small().get_height()) // 2
             if locked:
                 g = unlocks_mod.effective_required_grade(p, unlocks_mod.CMD_FEATURE[cmd])
@@ -156,7 +157,7 @@ class TerminalRenderMixin:
                     txt = f"{txt} !"
                 widgets.draw_text(surf, widgets.fit_text(txt, fonts.small(bold=hover), br.w - 16),
                                   (br.x + 10, ty),
-                                  fonts.small(bold=hover), acc if hover else config.COL_TEXT)
+                                  fonts.small(bold=hover), border_acc if hover else config.COL_TEXT)
             y += bh + gap
 
     def _draw_topbar(self, surf, p, info, accent):
@@ -292,8 +293,9 @@ class TerminalRenderMixin:
 
     def _draw_health(self, surf, rect, p, info):
         self._health_rect = pygame.Rect(rect)     # cliquable → analyse détaillée (BOOK)
-        title = _t("term.health") + (" ▸" if rect.collidepoint(pygame.mouse.get_pos()) else "")
-        inner = widgets.draw_panel(surf, rect, title, config.COL_AMBER)
+        hover = rect.collidepoint(pygame.mouse.get_pos())
+        title = _t("term.health") + (" ▸" if hover else "")
+        inner = widgets.draw_panel(surf, rect, title, config.COL_CYAN if hover else config.COL_AMBER)
         cur = info["currency"]
         pos_val = pf_mod.positions_value(p, self.market)
         nw = pf_mod.net_worth(p, self.market)

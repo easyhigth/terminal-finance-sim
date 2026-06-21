@@ -277,7 +277,7 @@ class MissionScene(Scene):
                 hover = rect.collidepoint(pygame.mouse.get_pos())
                 focused = (i == self.mcq_focus)
                 bg = config.COL_PANEL_HEAD if (hover or focused) else config.COL_PANEL
-                border = config.COL_CYAN if (hover or focused) else config.COL_BORDER
+                border = config.COL_CYAN if (hover or focused) else config.COL_AMBER
                 txt = config.COL_WHITE if (hover or focused) else config.COL_TEXT
             pygame.draw.rect(surf, bg, rect)
             pygame.draw.rect(surf, border, rect, 3 if (self.state == "question" and i == self.mcq_focus) else 1)

@@ -328,7 +328,7 @@ class CommandsScene(Scene):
                     if vp.top - self.ITEM_H < y < vp.bottom:
                         self._hit.append((row.copy(), label))
                         label_col = config.COL_TEXT_DIM if lock_g is not None else (
-                            config.COL_WHITE if hovered else config.COL_AMBER)
+                            config.COL_CYAN if hovered else config.COL_AMBER)
                         badge = f"🔒 {config.GRADES[lock_g]}" if lock_g is not None else ""
                         avail_w = self._col_w - 8 - (fonts.tiny().size(badge)[0] + 6 if badge else 0)
                         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(bold=True),

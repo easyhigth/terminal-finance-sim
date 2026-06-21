@@ -365,11 +365,31 @@ class EvaluationScene(Scene):
     def _draw_charts(self, surf, it, rect):
         inner = widgets.draw_panel(surf, rect, _L("Cours","Price"), config.COL_CYAN)
         names = ["A", "B"] if it.get("chart") == "AB" else [it.get("chart", "A")]
+        series = [it["charts"][nm] for nm in names if it["charts"].get(nm)]
+        y_margin = 38
+        plot = pygame.Rect(inner.x + y_margin, inner.y + 8, inner.w - y_margin, inner.h - 36)
+        if series:
+            lo = min(min(s) for s in series)
+            hi = max(max(s) for s in series)
+            pad = (hi - lo) * 0.08 or 1.0
+            lo, hi, span = widgets.draw_chart_axes(surf, plot, lo - pad, hi + pad,
+                                                    y_fmt=lambda v: f"{v:.0f}")
+            n = max(len(s) for s in series)
+            widgets.draw_text(surf, _L("J0","D0"), (plot.x, plot.bottom + 4),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, _L(f"J{n-1}", f"D{n-1}"), (plot.right - 28, plot.bottom + 4),
+                              fonts.tiny(), config.COL_TEXT_DIM)
         for nm in names:
             s = it["charts"].get(nm)
-            if s:
-                widgets.draw_series(surf, pygame.Rect(inner.x, inner.y+8, inner.w, inner.h-36),
-                                    s, CHART_COLORS.get(nm, config.COL_CYAN), baseline=False)
+            if not s:
+                continue
+            col = CHART_COLORS.get(nm, config.COL_CYAN)
+            widgets.draw_series(surf, plot, s, col, baseline=False)
+            x0, x1 = plot.x, plot.right
+            y0 = plot.bottom - int((s[0] - lo) / span * plot.h)
+            y1 = plot.bottom - int((s[-1] - lo) / span * plot.h)
+            widgets.draw_text(surf, f"{s[0]:.0f}", (x0 + 4, y0 - 16), fonts.tiny(bold=True), col)
+            widgets.draw_text(surf, f"{s[-1]:.0f}", (x1 - 32, y1 - 16), fonts.tiny(bold=True), col)
         lx = inner.x
         for nm in names:
             widgets.draw_text(surf, _L(f"■ Titre {nm}", f"■ Stock {nm}"), (lx, inner.bottom-18),

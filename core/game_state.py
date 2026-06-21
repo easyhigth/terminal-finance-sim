@@ -82,6 +82,7 @@ class PlayerState:
     pending_dilemmas: list = field(default_factory=list)  # dilemmes en attente de décision
     decisions_log: list = field(default_factory=list)  # historique des choix marquants
     badges: list = field(default_factory=list)         # ids de succès/prestige débloqués
+    streak_badges: list = field(default_factory=list)  # ids de badges à enjeu actifs (core/badges.py, révocables)
     legacy: list = field(default_factory=list)         # ids d'objectifs de légende (core/legacy.py) débloqués
     # ----- contenu : mandats / recherche / alertes -----
     mandates: list = field(default_factory=list)       # mandats clients actifs

@@ -112,3 +112,93 @@ def test_badge_not_awarded_twice():
     ids_second = [b["id"] for b in second]
     assert "hedged" not in ids_second
     assert p.badges.count("hedged") == 1
+
+
+# ----------------------------------------------------- badges à enjeu (streaks)
+def test_on_quarter_close_increments_clean_streak_when_heat_zero():
+    p, m = _mk()
+    p.heat = 0
+    badges.on_quarter_close(p)
+    badges.on_quarter_close(p)
+    assert p.flags["clean_quarter_streak"] == 2
+
+
+def test_on_quarter_close_resets_clean_streak_when_heat_positive():
+    p, m = _mk()
+    p.heat = 0
+    badges.on_quarter_close(p)
+    p.heat = 5
+    badges.on_quarter_close(p)
+    assert p.flags["clean_quarter_streak"] == 0
+
+
+def test_check_streaks_awards_badge_once_target_reached():
+    p, m = _mk()
+    p.heat = 0
+    for _ in range(8):
+        badges.on_quarter_close(p)
+    earned, revoked = badges.check_streaks(p)
+    ids = [b["id"] for b in earned]
+    assert "untouchable" in ids
+    assert "untouchable" in p.streak_badges
+    assert revoked == []
+
+
+def test_check_streaks_does_not_reaward_already_held_badge():
+    p, m = _mk()
+    p.heat = 0
+    for _ in range(8):
+        badges.on_quarter_close(p)
+    badges.check_streaks(p)
+    earned_again, _ = badges.check_streaks(p)
+    assert earned_again == []
+
+
+def test_check_streaks_revokes_badge_when_streak_breaks():
+    p, m = _mk()
+    p.heat = 0
+    for _ in range(8):
+        badges.on_quarter_close(p)
+    earned, _ = badges.check_streaks(p)
+    assert any(b["id"] == "untouchable" for b in earned)
+
+    p.heat = 5
+    badges.on_quarter_close(p)
+    earned2, revoked2 = badges.check_streaks(p)
+    ids_revoked = [b["id"] for b in revoked2]
+    assert "untouchable" in ids_revoked
+    assert "untouchable" not in p.streak_badges
+    assert earned2 == []
+
+
+def test_check_streaks_can_reaward_after_rebuilding_streak():
+    p, m = _mk()
+    p.heat = 0
+    for _ in range(8):
+        badges.on_quarter_close(p)
+    badges.check_streaks(p)
+    p.heat = 5
+    badges.on_quarter_close(p)
+    badges.check_streaks(p)
+    assert "untouchable" not in p.streak_badges
+
+    p.heat = 0
+    for _ in range(8):
+        badges.on_quarter_close(p)
+    earned3, _ = badges.check_streaks(p)
+    assert any(b["id"] == "untouchable" for b in earned3)
+    assert "untouchable" in p.streak_badges
+
+
+def test_lasting_dominance_streak_badge_uses_legacy_top_rank_streak_flag():
+    p, m = _mk()
+    p.flags["top_rank_streak"] = 4
+    earned, _ = badges.check_streaks(p)
+    assert any(b["id"] == "lasting_dominance" for b in earned)
+
+
+def test_blue_chip_streak_badge_uses_legacy_profit_streak_flag():
+    p, m = _mk()
+    p.flags["profit_streak"] = 6
+    earned, _ = badges.check_streaks(p)
+    assert any(b["id"] == "blue_chip" for b in earned)

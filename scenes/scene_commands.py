@@ -32,6 +32,7 @@ CATALOG = [
         ("ROADMAP / OBJECTIVES", "Raccourcis vers l'écran carrière"),
         ("HISTORY / JOURNAL", "Journal de carrière"),
         ("TRACK", "Choisir / voir sa voie de spécialisation"),
+        ("RECONVERT [voie]", "Changer de voie après le choix initial (coût cash + rodage)"),
         ("ARCHETYPE", "Philosophie de run choisie au départ : avantages et coûts"),
         ("CERT", "Certifications CFA / FRM / CQF (boost de carrière)"),
         ("LEGACY", "Objectifs de légende : ambitions de carrière long terme"),

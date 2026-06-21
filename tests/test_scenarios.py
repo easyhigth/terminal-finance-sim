@@ -257,6 +257,118 @@ def test_targeted_scenarios_inject_crisis_without_world_shock():
     assert not missing, f"scénarios ciblés jamais déclenchés sur 20000 tirages : {missing}"
 
 
+# ------------------------------------------------------------------ contagion
+def test_contagion_table_references_existing_scenario_ids():
+    ids = {s["id"] for s in scenarios.SCENARIOS}
+    for src, related in scenarios.CONTAGION.items():
+        assert src in ids
+        for rid in related:
+            assert rid in ids
+
+
+def test_triggering_a_scenario_sets_contagion_for_related_scenarios():
+    m = _setup()
+    rng = random.Random(7)
+    ev = None
+    for _ in range(2000):
+        ev = scenarios.maybe_trigger(m, rng)
+        if ev and ev["id"] in scenarios.CONTAGION:
+            break
+    assert ev is not None and ev["id"] in scenarios.CONTAGION
+    for rid in scenarios.CONTAGION[ev["id"]]:
+        assert m.contagion.get(rid, 0) > 0
+
+
+def test_contagion_boosts_weight_of_related_scenario():
+    """Avec une contagion active sur un scénario donné, son poids de tirage
+    (à stress macro neutre) doit être multiplié par CONTAGION_BOOST."""
+    m = _setup()
+    pool = scenarios.localized("fr")
+    idx = next(i for i, s in enumerate(pool) if s["id"] == "credit")
+    base_weight = pool[idx]["weight"]
+
+    captured = {}
+
+    class _Recorder(random.Random):
+        def random(self):
+            return 0.0   # force le franchissement du seuil de déclenchement
+
+        def choices(self, population, weights=None, k=1):
+            captured["weights"] = weights
+            return super().choices(population, weights=weights, k=k)
+
+    m.contagion = {"credit": scenarios.CONTAGION_STEPS}
+    scenarios.maybe_trigger(m, _Recorder(1))
+    assert captured["weights"][idx] == pytest.approx(base_weight * scenarios.CONTAGION_BOOST)
+
+
+def test_contagion_decays_after_enough_turns():
+    m = _setup()
+    m.contagion = {"credit": 2}
+    rng = random.Random(1)
+    scenarios.maybe_trigger(m, rng)
+    scenarios.maybe_trigger(m, rng)
+    scenarios.maybe_trigger(m, rng)
+    assert "credit" not in m.contagion
+
+
+# --------------------------------------------------------------- maybe_warn
+def test_maybe_warn_none_when_stress_below_threshold():
+    m = _setup()
+    assert scenarios.macro_stress(m) < scenarios.WARNING_STRESS_THRESHOLD
+    assert scenarios.maybe_warn(m, random.Random(1)) is None
+
+
+def test_maybe_warn_fires_when_stress_high_and_rng_favourable():
+    m = _setup()
+    m.macro["credit_hy"]["v"] = 900.0
+    m.macro["growth"]["v"] = -3.0
+    m.macro["unemployment"]["v"] = 9.0
+    assert scenarios.macro_stress(m) >= scenarios.WARNING_STRESS_THRESHOLD
+
+    class _AlwaysLow(random.Random):
+        def random(self):
+            return 0.0
+
+    out = scenarios.maybe_warn(m, _AlwaysLow())
+    assert out is not None
+    assert out["kind"] == "warning"
+    assert out["story"]
+    assert out["stress"] >= scenarios.WARNING_STRESS_THRESHOLD
+
+
+def test_maybe_warn_respects_cooldown_after_firing():
+    m = _setup()
+    m.macro["credit_hy"]["v"] = 900.0
+    m.macro["growth"]["v"] = -3.0
+    m.macro["unemployment"]["v"] = 9.0
+
+    class _AlwaysLow(random.Random):
+        def random(self):
+            return 0.0
+
+    first = scenarios.maybe_warn(m, _AlwaysLow())
+    assert first is not None
+    assert m.warning_cooldown == scenarios.WARNING_COOLDOWN_STEPS
+    second = scenarios.maybe_warn(m, _AlwaysLow())
+    assert second is None
+    assert m.warning_cooldown == scenarios.WARNING_COOLDOWN_STEPS - 1
+
+
+def test_maybe_warn_blocked_during_crisis_cooldown():
+    m = _setup()
+    m.macro["credit_hy"]["v"] = 900.0
+    m.macro["growth"]["v"] = -3.0
+    m.macro["unemployment"]["v"] = 9.0
+    m.crisis_cooldown = 3
+
+    class _AlwaysLow(random.Random):
+        def random(self):
+            return 0.0
+
+    assert scenarios.maybe_warn(m, _AlwaysLow()) is None
+
+
 def test_fx_emergent_targets_only_emerging_region_pool():
     """fx_emergent doit cibler uniquement Am.Sud/Afrique, jamais une autre région."""
     m = _setup()

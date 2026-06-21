@@ -84,11 +84,76 @@ _DEFAULTS = {
     "deal_gen_prob_mult": 1.0, "deal_days_mult": 1.0, "stresstest_period_mult": 1.0,
 }
 
+# ---------------------------------------------------------------------------
+# Reconversion : le choix initial de voie (post-Analyst) est gratuit, mais
+# changer de voie ENSUITE a un coût tangible — sinon le choix de voie (et tout
+# pivot ultérieur) n'engage à rien. Coût cash proportionnel à la valeur nette
+# + période de "rodage" pendant laquelle les avantages de la nouvelle voie
+# montent en puissance progressivement (perk() interpole depuis le neutre)
+# plutôt que d'être pleinement actifs dès le changement.
+RECONVERSION_COST_FRAC = 0.08   # part de la valeur nette payée en cash
+RAMP_DAYS = 90                  # durée du rodage (perks montent en puissance)
+
+
+def _ramp_factor(player):
+    """0.0 juste après une reconversion -> 1.0 une fois le rodage terminé
+    (ou si aucune reconversion n'a eu lieu)."""
+    switch_day = player.flags.get("track_switch_day") if hasattr(player, "flags") else None
+    if switch_day is None:
+        return 1.0
+    elapsed = player.day - switch_day
+    if elapsed >= RAMP_DAYS:
+        return 1.0
+    return max(0.0, min(1.0, elapsed / RAMP_DAYS))
+
+
+def reconversion_cost(player, market=None):
+    """Coût cash d'une reconversion, proportionnel à la valeur nette courante
+    (ou au cash si le marché n'est pas disponible)."""
+    nw = player.cash
+    if market is not None:
+        try:
+            from core import portfolio_margin as pm
+            nw = pm.net_worth(player, market)
+        except Exception:
+            nw = player.cash
+    return max(0.0, nw) * RECONVERSION_COST_FRAC
+
+
+def switch_track(player, market, new_track):
+    """Change de voie après le choix initial (gratuit, via TRACK), contre un
+    coût tangible. Retourne un dict {ok, ...} : si ok, {cost, ramp_days} ;
+    sinon {reason} parmi {"invalid_track", "same_track", "cash"}."""
+    if new_track not in PERKS or new_track == "General":
+        return {"ok": False, "reason": "invalid_track"}
+    if getattr(player, "track", "General") == new_track:
+        return {"ok": False, "reason": "same_track"}
+    cost = reconversion_cost(player, market)
+    if player.cash < cost:
+        return {"ok": False, "reason": "cash", "cost": cost}
+    player.cash -= cost
+    player.track = new_track
+    player.flags["track_switch_day"] = player.day
+    return {"ok": True, "cost": cost, "ramp_days": RAMP_DAYS}
+
 
 def perk(player, key):
-    """Valeur du perk `key` pour la voie du joueur (ou défaut neutre)."""
+    """Valeur du perk `key` pour la voie du joueur (ou défaut neutre). Si une
+    reconversion est en cours de rodage, la valeur est interpolée entre le
+    défaut neutre et la pleine valeur de la voie (cf. RAMP_DAYS)."""
     track = getattr(player, "track", "General")
-    return PERKS.get(track, {}).get(key, _DEFAULTS.get(key))
+    raw = PERKS.get(track, {}).get(key, _DEFAULTS.get(key))
+    if key == "label" or raw is None:
+        return raw
+    default = _DEFAULTS.get(key)
+    if raw == default:
+        return raw
+    ramp = _ramp_factor(player)
+    if ramp >= 1.0:
+        return raw
+    if default is None:
+        return None   # rodage : pas encore d'override actif (ex. maint_margin)
+    return default + (raw - default) * ramp
 
 
 def deal_edge(player, deal):

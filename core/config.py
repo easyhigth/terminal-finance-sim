@@ -30,6 +30,7 @@ COL_TEXT        = (210, 216, 226)    # texte secondaire clair
 COL_TEXT_DIM    = (120, 128, 142)    # texte tertiaire / labels
 COL_CYAN        = (64, 220, 240)     # accents / liens / sélection
 COL_WHITE       = (240, 244, 250)
+COL_FOCUS       = (255, 255, 255)    # focus CLAVIER (distinct du survol souris cyan)
 
 COL_UP          = (38, 214, 122)     # vert : hausse
 COL_DOWN        = (240, 64, 72)      # rouge : baisse

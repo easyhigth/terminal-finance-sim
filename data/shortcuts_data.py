@@ -8,22 +8,45 @@ Garder ce fichier à jour quand un raccourci est ajouté/retiré dans une scène
 
 SECTIONS = [
     ("Général — partout dans le jeu", [
-        ("ÉCHAP", "Retour à l'écran précédent (ou efface la recherche en cours, "
-                   "ou ferme la fenêtre flottante la plus récente)"),
-        ("↑ / ↓", "Naviguer dans une liste sélectionnable (messages, produits, lignes…)"),
-        ("ENTRÉE", "Activer l'élément sélectionné — équivalent à un clic dessus"),
+        ("ÉCHAP", "Remonter d'un niveau : sort d'un bloc focalisé, ferme une fenêtre "
+                   "flottante, efface une recherche, ou revient à l'écran précédent"),
+        ("TAB / MAJ+TAB", "Passer au bloc/zone interactive suivant ou précédent"),
+        ("↑ / ↓ / ← / →", "Déplacer le focus selon la position visuelle réelle des "
+                           "blocs ou des éléments d'une liste/grille"),
+        ("ENTRÉE", "Descendre dans le bloc focalisé (1ʳᵉ pression) puis activer "
+                    "l'élément interne focalisé (2ᵉ pression) — équivalent à un clic"),
         ("Lettres/chiffres", "Taper dans le champ de recherche actif (curseur clignotant = "
                               "champ éditable)"),
         ("RETOUR ARRIÈRE", "Effacer le dernier caractère du champ de recherche"),
         ("Molette souris", "Faire défiler une liste ou un panneau sous le curseur"),
+        ("Focus clavier", "Liseré BLANC à coins marqués = focus clavier (distinct du "
+                           "survol souris en cyan et de la sélection ambre)"),
     ]),
-    ("Terminal (hub principal)", [
-        ("Lettres/chiffres", "Écrire une commande dans la ligne CMD>"),
-        ("ENTRÉE", "Exécuter la commande tapée (équivaut à COMMANDS pour la liste complète)"),
-        ("↑ / ↓", "Rappeler les commandes précédentes/suivantes de l'historique"),
-        ("TAB", "Auto-complétion de la commande en cours"),
+    ("Terminal (hub principal) — navigation hiérarchique", [
+        ("Lettres/chiffres (focus console)", "Écrire une commande dans la ligne CMD> "
+            "— par défaut le focus est dans la console, donc la saisie marche "
+            "immédiatement comme avant"),
+        ("ENTRÉE (focus console)", "Exécuter la commande tapée"),
+        ("↑ / ↓ (focus console)", "Rappeler les commandes précédentes/suivantes de l'historique"),
+        ("TAB (focus console)", "Auto-complétion de la commande en cours"),
         ("PAGE PRÉC. / PAGE SUIV.", "Faire défiler l'historique de la console"),
-        ("ÉCHAP", "Fermer la fenêtre flottante la plus récente, sinon ouvrir le menu"),
+        ("ÉCHAP (focus console)", "Remonte au niveau bloc (la console reste sélectionnée, "
+            "liseré blanc visible) — un 2ᵉ usage d'ÉCHAP au niveau bloc ouvre le menu"),
+        ("TAB (niveau bloc)", "Passe au bloc suivant : CONSOLE → RAIL → INDICES → "
+            "SANTÉ → SOCIÉTÉS → CARRIÈRE → FLUX (MAJ+TAB pour reculer)"),
+        ("↑ / ↓ / ← / → (niveau bloc)", "Déplace le focus vers le bloc le plus proche "
+            "dans cette direction, selon sa position réelle à l'écran"),
+        ("ENTRÉE (bloc RAIL/INDICES/SOCIÉTÉS)", "Entre dans le bloc : les flèches "
+            "naviguent alors ses lignes internes (commandes, indices, sociétés suivies)"),
+        ("ENTRÉE (bloc SANTÉ/CARRIÈRE/FLUX)", "Ouvre directement la scène associée "
+            "(ces blocs n'ont pas de contenu interne navigable)"),
+        ("ENTRÉE (item interne)", "Active l'élément : lance la commande du rail, ouvre "
+            "le graphe d'un indice, ouvre la fiche d'une société suivie"),
+        ("ÉCHAP (niveau bloc, dans un bloc)", "Remonte du contenu interne au niveau "
+            "bloc (ex. sort de la liste du rail sans quitter le terminal)"),
+        ("Exemple concret", "Focus sur le bloc CONSOLE (vide) → ÉCHAP pour remonter au "
+            "niveau bloc → ↓ pour aller au bloc situé en dessous (RAIL) → ENTRÉE pour "
+            "y entrer → ↑/↓ pour choisir une commande → ENTRÉE pour la lancer"),
         ("Clic rail / NOM_COMMANDE", "Chaque bouton du rail correspond à une commande tapable "
                                      "(ex. SHOP, INBOX, NEWS, MORE, SHORTCUTS…)"),
         ("CTRL+M", "Marché (MARKETHUB)"),
@@ -45,6 +68,24 @@ SECTIONS = [
         ("CTRL+S", "Sauvegarder"),
         ("CTRL+H", "Aide (catalogue des commandes)"),
         ("CTRL+K", "Palette de commandes (recherche rapide)"),
+    ]),
+    ("Terminal — pages disponibles seulement depuis PLUS", [
+        ("CTRL+MAJ+E", "Explorateur de marché (EXPLORE)"),
+        ("CTRL+MAJ+C", "Carrière (CAREER)"),
+        ("CTRL+MAJ+B", "Portefeuille détaillé (BOOK)"),
+        ("CTRL+MAJ+H", "Historique complet (TIMELINE)"),
+        ("CTRL+MAJ+T", "Équipe / analystes (TEAM)"),
+        ("CTRL+MAJ+R", "Risque / VaR (RISK)"),
+        ("CTRL+MAJ+A", "Calendrier macro (AGENDA)"),
+        ("CTRL+MAJ+V", "Revue annuelle (REVIEW)"),
+        ("CTRL+MAJ+L", "Rivaux / classement (RIVALS)"),
+        ("CTRL+MAJ+S", "Stress test régulateur (STRESS)"),
+        ("CTRL+MAJ+W", "Sauvegardes (SAVES)"),
+        ("CTRL+MAJ+O", "Voie / spécialisation (TRACK)"),
+        ("Autres pages PLUS", "Toujours accessibles via CTRL+O (MORE) puis flèches/recherche, "
+            "ou en tapant directement leur commande (ETF, BONDS, CMDTY, CRYPTO, STRUCT, "
+            "CREDIT, SWAP, GOV, FX, OPTIONS, IPO, GP, PA, ATTR, ALERT, QUANT, FRONTIER, "
+            "HEDGE, ALM, TUTO, CERT…)"),
     ]),
     ("Inbox (messagerie)", [
         ("↑ / ↓", "Sélectionner le message précédent/suivant dans la liste filtrée"),
@@ -94,9 +135,11 @@ SECTIONS = [
         ("ENTRÉE", "Choisir la région sélectionnée"),
     ]),
     ("PLUS (raccourcis vers toutes les pages)", [
-        ("↑ / ↓", "Sélectionner le bouton de page précédent/suivant"),
-        ("ENTRÉE", "Ouvrir la page sélectionnée"),
+        ("↑ / ↓ / ← / →", "Déplacer le focus vers le bouton le plus proche dans cette "
+                           "direction, selon sa position réelle dans la grille"),
+        ("ENTRÉE", "Ouvrir la page sélectionnée (liseré blanc = focus clavier)"),
         ("Lettres", "Filtrer les pages par nom"),
+        ("ÉCHAP", "Vider la recherche, sinon revenir à l'écran précédent"),
     ]),
     ("Exam / Certif (carte de progression)", [
         ("TAB ou ← / →", "Basculer le focus entre les deux cartes (examen / certification)"),

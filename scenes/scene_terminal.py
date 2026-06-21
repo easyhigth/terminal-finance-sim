@@ -30,7 +30,7 @@ from scenes.scene_terminal_render import TerminalRenderMixin
 def _L(fr, en):
     """Renvoie la version FR ou EN selon la langue courante (logs de la console)."""
     return en if get_lang() == "en" else fr
-from ui import widgets
+from ui import keynav, widgets
 from ui.worldmap import WorldMap
 
 # Raccourcis directs Ctrl+<lettre> vers les commandes du rail latéral. Les
@@ -61,6 +61,32 @@ RAIL_SHORTCUTS = {
     pygame.K_s: "SAVE",
     pygame.K_h: "COMMANDS",
 }
+
+# Raccourcis Ctrl+Maj+<lettre> vers les pages qui ne sont QUE dans la scène
+# PLUS (pas de rang dans le rail). Modificateur double pour ne jamais entrer
+# en conflit ni avec RAIL_SHORTCUTS (Ctrl seul) ni avec la saisie de commandes
+# en Maj (BUY, SELL...). Couvre les destinations les plus utiles ; le reste
+# des pages PLUS reste à une commande tapée ou à Ctrl+O (MORE) + flèches.
+# Documenté dans data/shortcuts_data.py — garder synchronisé.
+MORE_SHORTCUTS = {
+    pygame.K_e: "EXPLORE",
+    pygame.K_c: "CAREER",
+    pygame.K_b: "BOOK",
+    pygame.K_h: "TIMELINE",
+    pygame.K_t: "TEAM",
+    pygame.K_r: "RISK",
+    pygame.K_a: "AGENDA",
+    pygame.K_v: "REVIEW",
+    pygame.K_l: "RIVALS",
+    pygame.K_s: "STRESS",
+    pygame.K_w: "SAVES",
+    pygame.K_o: "TRACK",
+}
+
+# ordre de parcours Tab des blocs du terminal (sens horaire approximatif) ;
+# la navigation aux flèches utilise la position réelle des blocs
+# (cf. ui/keynav.nearest_in_direction), Tab suit cet ordre fixe.
+ZONE_ORDER = ["console", "rail", "indices", "health", "topco", "career", "feed"]
 
 # Noms de commandes pour l'autocomplétion (Tab) et la suggestion fantôme
 CMD_NAMES = [
@@ -143,6 +169,13 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         self._cheat_btn_rect = None
         self.shortcuts_panel = None   # panneau des raccourcis clavier (overlay)
         self._shortcuts_btn_rect = None
+        # navigation hiérarchique au clavier : pile de focus bloc → contenu
+        # interne (cf. ui/keynav.ZoneStack). Par défaut le focus reste « dans »
+        # la console comme avant (saisie immédiate), Échap permet de remonter
+        # au niveau bloc pour naviguer le reste du terminal aux flèches/Tab.
+        self.zones = keynav.ZoneStack(ZONE_ORDER)
+        self.zones.inside = True
+        self._zone_rects = {}     # rects des blocs (zone -> Rect), pour les flèches
         self._rail_rects = {}     # boutons du rail latéral (label -> Rect)
         self._topco_rects = {}    # sociétés cliquables (panneau top sociétés)
         self._topco_header_rect = None   # titre du panneau (clic → explorateur)
@@ -293,14 +326,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                     return
             for name, rect in self._index_rects.items():
                 if rect.collidepoint(event.pos):
-                    from ui.datawindow import DataWindow
-                    self.datawins.append(DataWindow(
-                        f"{name} — historique", [], [],
-                        pos=(self.rail_w + 40, 100),
-                        accent=config.COL_AMBER,
-                        chart=list(self.market.index_history(name))))
-                    if len(self.datawins) > 5:
-                        self.datawins.pop(0)
+                    self._open_index_chart(name)
                     return
             if getattr(self, "_map_rect", None):
                 action = self.worldmap.handle_click(event.pos, self._map_rect, self.market)
@@ -312,38 +338,79 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                     return
                 if action:
                     return
-        # 3) clavier : ligne de commande
+        # 3) clavier : raccourcis globaux, navigation de blocs, ligne de commande
         if event.type == pygame.KEYDOWN:
-            if (event.mod & pygame.KMOD_CTRL) and event.key in RAIL_SHORTCUTS:
+            ctrl = bool(event.mod & pygame.KMOD_CTRL)
+            shift = bool(event.mod & pygame.KMOD_SHIFT)
+            # Ctrl+Shift+<lettre> : raccourcis vers les pages de la scène PLUS
+            # (Ctrl seul est réservé au rail, cf. RAIL_SHORTCUTS plus bas).
+            if ctrl and shift and event.key in MORE_SHORTCUTS:
+                self._run_command(MORE_SHORTCUTS[event.key])
+                return
+            # Ctrl+<lettre> : raccourcis directs vers les commandes du rail
+            if ctrl and not shift and event.key in RAIL_SHORTCUTS:
                 cmd = RAIL_SHORTCUTS[event.key]
                 if unlocks_mod.cmd_unlocked(self.app.gs.player, cmd):
                     self._run_command(cmd)
                 return
-            if event.key == pygame.K_RETURN:
-                self._run_command(self.cmd.strip())
-                self.cmd = ""
-                self.hist_pos = None
-            elif event.key == pygame.K_BACKSPACE:
-                self.cmd = self.cmd[:-1]
-            elif event.key == pygame.K_ESCAPE:
+
+            # navigation hiérarchique des blocs (rail / panneaux) : tant que le
+            # focus est « dans » la ligne de commande, elle capte la saisie
+            # comme avant (comportement historique, zéro régression) ; Échap
+            # remonte au niveau bloc d'où l'on peut naviguer aux flèches.
+            if self.zones.zone == "console" and self.zones.inside:
+                if event.key == pygame.K_RETURN:
+                    self._run_command(self.cmd.strip())
+                    self.cmd = ""
+                    self.hist_pos = None
+                elif event.key == pygame.K_BACKSPACE:
+                    self.cmd = self.cmd[:-1]
+                elif event.key == pygame.K_ESCAPE:
+                    if self.datawins:
+                        self.datawins.pop()
+                    else:
+                        self.zones.escape()
+                elif event.key == pygame.K_UP:
+                    self._recall(-1)
+                elif event.key == pygame.K_DOWN:
+                    self._recall(1)
+                elif event.key == pygame.K_PAGEUP:
+                    self._scroll_console(self._console_visible_lines() - 1)
+                elif event.key == pygame.K_PAGEDOWN:
+                    self._scroll_console(-(self._console_visible_lines() - 1))
+                elif event.key == pygame.K_TAB:
+                    self._autocomplete()
+                else:
+                    if event.unicode and event.unicode.isprintable():
+                        self.cmd += event.unicode
+                        self.hist_pos = None
+                return
+
+            # niveau « blocs » : Échap remonte / sort, Tab change de zone,
+            # les flèches déplacent le focus selon la position visuelle réelle
+            # des blocs, Entrée descend dans le bloc puis active son item.
+            if event.key == pygame.K_ESCAPE:
                 if self.datawins:
                     self.datawins.pop()
-                else:
+                elif not self.zones.escape():
                     self.app.scenes.go("menu")
-            elif event.key == pygame.K_UP:
-                self._recall(-1)
-            elif event.key == pygame.K_DOWN:
-                self._recall(1)
-            elif event.key == pygame.K_PAGEUP:
-                self._scroll_console(self._console_visible_lines() - 1)
-            elif event.key == pygame.K_PAGEDOWN:
-                self._scroll_console(-(self._console_visible_lines() - 1))
-            elif event.key == pygame.K_TAB:
-                self._autocomplete()
-            else:
-                if event.unicode and event.unicode.isprintable():
-                    self.cmd += event.unicode
-                    self.hist_pos = None
+                return
+            if event.key == pygame.K_TAB:
+                self.zones.cycle_zone(-1 if shift else 1)
+                return
+            if event.key in keynav.DIRECTIONS:
+                direction = keynav.DIRECTIONS[event.key]
+                if not self.zones.inside:
+                    self.zones.move_zone(self._zone_rects, direction)
+                else:
+                    items = self._zone_items(self.zones.zone)
+                    if items:
+                        self.zones.item = keynav.nearest_in_direction(
+                            items, self.zones.item, direction)
+                return
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                self._activate_zone()
+                return
 
     def _datawin_row_click(self, w, idx):
         """Si la 1ʳᵉ cellule de la ligne est un ticker connu, ouvre sa fiche."""
@@ -390,6 +457,55 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         self.datawins.append(CompanyPopup(ticker, self.market, pos=pos))
         if len(self.datawins) > 5:
             self.datawins.pop(0)
+
+    def _open_index_chart(self, name):
+        """Ouvre l'historique d'un indice (clic souris ou Entrée au clavier sur
+        le bloc INDICES)."""
+        from ui.datawindow import DataWindow
+        self.datawins.append(DataWindow(
+            f"{name} — historique", [], [],
+            pos=(self.rail_w + 40, 100),
+            accent=config.COL_AMBER,
+            chart=list(self.market.index_history(name))))
+        if len(self.datawins) > 5:
+            self.datawins.pop(0)
+
+    def _zone_items(self, zone):
+        """Items navigables aux flèches à l'intérieur d'un bloc (id -> Rect)."""
+        if zone == "rail":
+            return dict(self._rail_rects)
+        if zone == "indices":
+            return dict(self._index_rects)
+        if zone == "topco":
+            return dict(self._topco_rects)
+        return {}
+
+    def _activate_zone(self):
+        """Entrée au clavier : descend dans le bloc focalisé (1ʳᵉ pression),
+        puis active l'item interne focalisé (2ᵉ pression) — navigation
+        hiérarchique bloc → contenu interne."""
+        z = self.zones.zone
+        if not self.zones.inside:
+            if z in ("rail", "indices", "topco"):
+                items = self._zone_items(z)
+                if items:
+                    self.zones.enter()
+                    self.zones.item = next(iter(items))
+            elif z == "console":
+                self.zones.enter()
+            elif z == "health":
+                self.app.scenes.go("book", return_to="terminal")
+            elif z == "career":
+                self.app.scenes.go("career", return_to="terminal")
+            elif z == "feed":
+                self.app.scenes.go("history", return_to="terminal")
+            return
+        if z == "rail" and self.zones.item is not None:
+            self._run_command(dict(self.rail)[self.zones.item])
+        elif z == "indices" and self.zones.item is not None:
+            self._open_index_chart(self.zones.item)
+        elif z == "topco" and self.zones.item is not None:
+            self._open_company_popup(self.zones.item)
 
     def _toggle_shortcuts_panel(self):
         """Ouvre/ferme le panneau listant tous les raccourcis clavier."""

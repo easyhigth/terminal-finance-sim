@@ -12,7 +12,7 @@ from core import portfolio as pf_mod
 from core import unlocks as unlocks_mod
 from core.i18n import get_lang
 from core.i18n import t as _t
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 
 def _L(fr, en):
@@ -73,6 +73,20 @@ class TerminalRenderMixin:
         self._draw_career(surf, pygame.Rect(rx, top + half + gap, col_r_w, avail_h - half - gap), p)
 
         self._draw_console(surf)
+
+        # rects des blocs pour la navigation clavier (flèches/Tab) — mêmes
+        # zones que celles dessinées ci-dessus.
+        self._zone_rects = {
+            "console": self._console_rect(),
+            "rail": pygame.Rect(M, top, self.rail_w, avail_h),
+            "indices": pygame.Rect(gx, top, col_l_w, half),
+            "health": pygame.Rect(gx, top + half + gap, col_l_w, avail_h - half - gap),
+            "topco": pygame.Rect(rx, top, col_r_w, half),
+            "career": pygame.Rect(rx, top + half + gap, col_r_w, avail_h - half - gap),
+            "feed": pygame.Rect(cx, top + map_h + gap, cw, avail_h - map_h - gap),
+        }
+        if self.zones.zone in self._zone_rects and not self.zones.inside:
+            keynav.draw_focus_ring(surf, self._zone_rects[self.zones.zone], True)
 
         # overlay : fenêtres de données déplaçables
         for w in self.datawins:
@@ -158,6 +172,8 @@ class TerminalRenderMixin:
                 widgets.draw_text(surf, widgets.fit_text(txt, fonts.small(bold=hover), br.w - 16),
                                   (br.x + 10, ty),
                                   fonts.small(bold=hover), border_acc if hover else config.COL_TEXT)
+            if self.zones.zone == "rail" and self.zones.inside and self.zones.item == label:
+                keynav.draw_focus_ring(surf, br, True)
             y += bh + gap
 
     def _draw_topbar(self, surf, p, info, accent):
@@ -279,6 +295,8 @@ class TerminalRenderMixin:
                                   fonts.small(bold=True), col, align="right")
                 widgets.draw_series(surf, pygame.Rect(inner.x, y + 16, inner.w, spark_h),
                                     self.market.index_history(name), col, baseline=False)
+                if self.zones.zone == "indices" and self.zones.inside and self.zones.item == name:
+                    keynav.draw_focus_ring(surf, row, True)
             y += step
         surf.set_clip(prev_clip)
         content_h = (y + self._indices_scroll) - inner.y
@@ -388,6 +406,8 @@ class TerminalRenderMixin:
                 widgets.draw_text(surf, c["name"][:16], (inner.x + 58, y), fonts.small(), config.COL_TEXT)
                 widgets.draw_text(surf, widgets.format_money(c["mktcap"] * 1e6, cur), (inner.right, y),
                                   fonts.tiny(bold=True), config.COL_WHITE, align="right")
+                if self.zones.zone == "topco" and self.zones.inside and self.zones.item == c["ticker"]:
+                    keynav.draw_focus_ring(surf, row, True)
             y += row_h
         surf.set_clip(prev_clip)
         content_h = (y + self._topco_scroll) - inner.y

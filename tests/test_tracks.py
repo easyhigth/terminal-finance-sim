@@ -71,3 +71,71 @@ def test_mna_track_richer_deal_reward():
     # force un template M&A et compare la récompense au multiplicateur de voie
     mult = tracks.perk(pg, "deal_reward_mult")
     assert mult > 1.0
+
+
+# ------------------------------------------------------------- reconversion
+def test_switch_track_rejects_general_or_unknown():
+    p = _player("Risk")
+    assert tracks.switch_track(p, None, "General")["reason"] == "invalid_track"
+    assert tracks.switch_track(p, None, "Bond")["reason"] == "invalid_track"
+
+
+def test_switch_track_rejects_same_track():
+    p = _player("Risk")
+    assert tracks.switch_track(p, None, "Risk")["reason"] == "same_track"
+
+
+def test_switch_track_blocks_when_cash_insufficient():
+    p = _player("Risk")
+    m = Market(seed=1)
+    tk = m.companies[0]["ticker"]
+    m.price[m.ticker_idx[tk]] = 100.0
+    p.cash = 1_000_000.0
+    pf.buy(p, m, tk, 9000)   # gros stock -> valeur nette élevée, cash résiduel faible
+    p.cash = 10.0            # force un cash résiduel insuffisant pour le coût (8% de la valeur nette)
+    res = tracks.switch_track(p, m, "Quant")
+    assert res["ok"] is False
+    assert res["reason"] == "cash"
+    assert p.track == "Risk"
+
+
+def test_switch_track_charges_cost_and_sets_new_track():
+    p = _player("Risk")
+    p.cash = 1_000_000.0
+    cost_before = tracks.reconversion_cost(p, None)
+    res = tracks.switch_track(p, None, "Quant")
+    assert res["ok"] is True
+    assert res["cost"] == pytest.approx(cost_before)
+    assert p.track == "Quant"
+    assert p.cash == pytest.approx(1_000_000.0 - cost_before)
+    assert p.flags["track_switch_day"] == p.day
+
+
+def test_perk_is_neutral_immediately_after_switch_and_ramps_up():
+    p = _player("Risk")
+    p.cash = 1_000_000.0
+    tracks.switch_track(p, None, "Quant")
+    # rodage : juste après le switch, les avantages Quant ne sont pas actifs
+    assert tracks.perk(p, "deal_bonus") == pytest.approx(tracks._DEFAULTS["deal_bonus"])
+    # à mi-rodage, valeur intermédiaire entre neutre et pleine puissance
+    p.day += tracks.RAMP_DAYS // 2
+    mid = tracks.perk(p, "deal_bonus")
+    full = tracks.PERKS["Quant"]["deal_bonus"]
+    assert tracks._DEFAULTS["deal_bonus"] < mid < full
+    # rodage terminé : pleine puissance
+    p.day += tracks.RAMP_DAYS
+    assert tracks.perk(p, "deal_bonus") == pytest.approx(full)
+
+
+def test_perk_maint_margin_falls_back_to_none_during_ramp():
+    p = _player("Quant")
+    p.cash = 1_000_000.0
+    tracks.switch_track(p, None, "Risk")
+    assert tracks.perk(p, "maint_margin") is None
+    p.day += tracks.RAMP_DAYS
+    assert tracks.perk(p, "maint_margin") == pytest.approx(tracks.PERKS["Risk"]["maint_margin"])
+
+
+def test_no_ramp_without_any_switch():
+    p = _player("Risk")
+    assert tracks.perk(p, "deal_bonus") == pytest.approx(tracks.PERKS["Risk"]["deal_bonus"])

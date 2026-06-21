@@ -52,3 +52,39 @@ def test_invest_refused_without_cash():
     m = Market(seed=2024)
     p = PlayerState(); p.cash = 1000.0; p.continent = "USA"
     assert S.invest(p, m, 0, 100_000.0)["reason"] == "cash"
+
+
+# --------------------------------------------------------- offre réactive au régime
+def test_is_featured_none_market_never_featured():
+    assert S.is_featured("capguard", None) is False
+
+
+def test_is_featured_matches_template_regimes():
+    m = Market(seed=2024)
+    m.regime = "Volatil"
+    assert S.is_featured("capguard", m) is True     # capguard favorise Volatil/Récession
+    assert S.is_featured("autocall", m) is False    # autocall favorise Expansion
+
+
+def test_featured_templates_changes_with_regime():
+    m = Market(seed=2024)
+    m.regime = "Expansion"
+    expansion_set = set(S.featured_templates(m))
+    assert "autocall" in expansion_set
+    assert "capguard" not in expansion_set
+    m.regime = "Récession"
+    recession_set = set(S.featured_templates(m))
+    assert "capguard" in recession_set
+    assert "autocall" not in recession_set
+
+
+def test_all_templates_default_market_none_marks_nothing_featured():
+    assert all(not tpl["featured"] for tpl in S.all_templates())
+
+
+def test_all_templates_with_market_marks_featured_flag():
+    m = Market(seed=2024)
+    m.regime = "Calme"
+    quoted = {tpl["id"]: tpl["featured"] for tpl in S.all_templates(m)}
+    assert quoted["rangeaccrual"] is True   # range accrual favorise Calme
+    assert quoted["autocall"] is False

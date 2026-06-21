@@ -127,6 +127,53 @@ TRIGGER_PROBABILITY = 0.06   # par tour
 # region_pool — toutes les régions connues du marché.
 _DEFAULT_REGION_POOL = ["USA", "Europe", "Asia", "Am.Nord", "Am.Sud", "Afrique", "Océanie"]
 
+# ---- contagion entre crises -------------------------------------------------
+# Quand un scénario de cette table se déclenche, les scénarios listés voient
+# leur poids de tirage temporairement amplifié (cf. CONTAGION_BOOST, pendant
+# CONTAGION_STEPS tours) : modélise le fait qu'une crise bancaire rend une
+# crise de change ou un choc de taux plus probable peu après, etc.
+CONTAGION = {
+    "krach": ["credit", "taux", "scandale_finance"],
+    "credit": ["krach", "fx_emergent", "taux"],
+    "taux": ["credit", "immo_europe", "immo_asie"],
+    "asia": ["fx_emergent", "immo_asie"],
+    "immo_asie": ["asia", "credit"],
+    "immo_europe": ["credit", "taux"],
+    "fx_emergent": ["credit", "asia"],
+    "energie": ["matieres"],
+    "matieres": ["energie"],
+    "pandemie": ["krach", "techbust"],
+    "techbust": ["pandemie"],
+}
+CONTAGION_BOOST = 2.2
+CONTAGION_STEPS = 6
+
+# ---- signaux avant-crise -----------------------------------------------------
+# Lorsque la tension macro est élevée mais qu'aucun scénario ne se déclenche
+# ce tour, probabilité de pousser un avertissement ambigu (ne révèle ni le
+# scénario exact ni le moment) : récompense la couverture proactive plutôt que
+# la seule chance.
+WARNING_STRESS_THRESHOLD = 1.6
+WARNING_PROBABILITY = 0.3
+WARNING_COOLDOWN_STEPS = 6
+
+_WARNING_SIGNS_FR = [
+    "Les spreads de crédit et la volatilité implicite grimpent sans déclencheur "
+    "clair — les desks de couverture s'agitent.",
+    "Plusieurs indicateurs avancés (courbe des taux, spreads HY, chômage) "
+    "clignotent à l'orange. Rien d'imminent, mais la prudence est de mise.",
+    "Le climat macro se tend nettement : les gérants prudents renforcent déjà "
+    "leurs couvertures par précaution.",
+]
+_WARNING_SIGNS_EN = [
+    "Credit spreads and implied volatility are creeping up with no clear "
+    "trigger — hedging desks are getting nervous.",
+    "Several leading indicators (yield curve, HY spreads, unemployment) are "
+    "flashing amber. Nothing imminent, but caution is warranted.",
+    "The macro backdrop is tightening noticeably: cautious managers are "
+    "already reinforcing their hedges as a precaution.",
+]
+
 
 # ---- accès localisé (FR / EN) ----------------------------------------------
 from data.scenarios_en import SCENARIOS_EN
@@ -204,6 +251,10 @@ def maybe_trigger(market, rng=None):
     from core.i18n import get_lang
     lang = get_lang()
     rng = rng or random
+    # contagion : décroît d'un tour à chaque appel, même si rien ne se déclenche
+    contagion = {k: v - 1 for k, v in (getattr(market, "contagion", None) or {}).items()
+                 if v - 1 > 0}
+    market.contagion = contagion
     if getattr(market, "crisis_cooldown", 0) > 0:
         return None   # accalmie forcée après une crise majeure : pas de nouveau choc
     stress = macro_stress(market)
@@ -217,8 +268,15 @@ def maybe_trigger(market, rng=None):
             w *= stress
         elif stress < 0.85 and x["kind"] == "good":
             w *= (1.0 / max(stress, 0.4))
+        if x["id"] in contagion:
+            w *= CONTAGION_BOOST
         weights.append(w)
     s = rng.choices(pool, weights=weights, k=1)[0]
+    related = CONTAGION.get(s["id"])
+    if related:
+        for rid in related:
+            contagion[rid] = max(contagion.get(rid, 0), CONTAGION_STEPS)
+        market.contagion = contagion
 
     sev_min = s.get("sev_min", 1.0)
     sev_max = s.get("sev_max", 1.0)
@@ -260,6 +318,32 @@ def maybe_trigger(market, rng=None):
 
     return {"id": s["id"], "name": s["name"], "kind": s["kind"], "story": story,
             "severity": severity, "region": region}
+
+
+def maybe_warn(market, rng=None):
+    """Signal avant-crise ambigu : à appeler quand aucun scénario ne s'est
+    déclenché ce tour. Si la tension macro dépasse WARNING_STRESS_THRESHOLD,
+    probabilité de pousser un avertissement flou (ne révèle ni le scénario
+    exact ni le moment) — récompense la couverture proactive plutôt que la
+    seule réaction après coup. Soumis à un délai de carence pour éviter le
+    spam. Retourne un dict {kind, stress, story} ou None."""
+    rng = rng or random
+    cooldown = getattr(market, "warning_cooldown", 0)
+    if cooldown > 0:
+        market.warning_cooldown = cooldown - 1
+        return None
+    if getattr(market, "crisis_cooldown", 0) > 0:
+        return None
+    stress = macro_stress(market)
+    if stress < WARNING_STRESS_THRESHOLD:
+        return None
+    if rng.random() > WARNING_PROBABILITY:
+        return None
+    market.warning_cooldown = WARNING_COOLDOWN_STEPS
+    from core.i18n import get_lang
+    signs = _WARNING_SIGNS_EN if get_lang() == "en" else _WARNING_SIGNS_FR
+    story = rng.choice(signs)
+    return {"kind": "warning", "stress": round(stress, 2), "story": story}
 
 
 def trigger_by_id(market, scenario_id, severity=1.0):

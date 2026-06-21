@@ -16,6 +16,7 @@ from core import mandates as mandates_mod
 from core import market as market_mod
 from core import rivals as rivals_mod
 from core import scenarios as scenarios_mod
+from core import tracks as tracks_mod
 from core.i18n import get_lang
 from ui import widgets
 
@@ -109,6 +110,51 @@ class TerminalCareerMixin:
                 f"(frais perdus : {widgets.format_money(res['cost'], self._cur())}).",
                 f"  ✗ Counter-bid failed against {res['rival']} on {res['target']} "
                 f"(fee lost: {widgets.format_money(res['cost'], self._cur())})."))
+
+    def _cmd_reconvert(self, args):
+        """RECONVERT <voie> : change de voie de spécialisation après le choix
+        initial (gratuit, via TRACK), contre un coût cash (% de la valeur
+        nette) et une période de rodage pendant laquelle les avantages de la
+        nouvelle voie montent en puissance progressivement."""
+        p = self.app.gs.player
+        names = [n for n in tracks_mod.PERKS if n != "General"]
+        if p.track == "General":
+            self._log(_L("  Vous n'avez pas encore choisi de voie : utilisez TRACK.",
+                         "  You haven't chosen a track yet: use TRACK."))
+            return
+        if not args:
+            cost = tracks_mod.reconversion_cost(p, self.market)
+            self._log(_L(
+                f"  Usage : RECONVERT <voie>  (voies : {', '.join(names)}).",
+                f"  Usage: RECONVERT <track>  (tracks: {', '.join(names)})."))
+            self._log(_L(
+                f"  Coût actuel : {widgets.format_money(cost, self._cur())} "
+                f"+ {tracks_mod.RAMP_DAYS}j de rodage avant pleine efficacité.",
+                f"  Current cost: {widgets.format_money(cost, self._cur())} "
+                f"+ {tracks_mod.RAMP_DAYS}d break-in before full perk strength."))
+            return
+        target = next((n for n in names if n.upper() == args[0].upper()), None)
+        if not target:
+            self._log(_L(f"  Voie inconnue. Voies : {', '.join(names)}.",
+                         f"  Unknown track. Tracks: {', '.join(names)}."))
+            return
+        res = tracks_mod.switch_track(p, self.market, target)
+        if not res["ok"]:
+            reasons = {
+                "same_track": _L("  Vous êtes déjà sur cette voie.",
+                                  "  You are already on that track."),
+                "cash": _L(f"  Trésorerie insuffisante (coût : {widgets.format_money(res.get('cost', 0), self._cur())}).",
+                           f"  Insufficient cash (cost: {widgets.format_money(res.get('cost', 0), self._cur())})."),
+            }
+            self._log(reasons.get(res["reason"], _L("  Échec.", "  Failed.")))
+            return
+        self._log(_L(
+            f"  ⊕ Reconversion vers {target} : -{widgets.format_money(res['cost'], self._cur())}, "
+            f"rodage {res['ramp_days']}j avant pleine efficacité des avantages.",
+            f"  ⊕ Switched to {target}: -{widgets.format_money(res['cost'], self._cur())}, "
+            f"{res['ramp_days']}d break-in before full perk strength."))
+        career_mod.log(p, "info", _L(f"Reconversion vers la voie {target}", f"Switched to {target} track"))
+        self.app.notify(_L(f"Reconversion : {target}", f"Track switch: {target}"), "info")
 
     def _cmd_crisis(self, args):
         """Déclenche un scénario de crise/stress test ad hoc — mode bac à sable
@@ -264,6 +310,15 @@ class TerminalCareerMixin:
             bname = badges_mod.badge_name(b)
             self.app.notify(_L(f"✶ Badge : {bname}", f"✶ Badge: {bname}"), "prestige")
             career_mod.log(self.app.gs.player, "info", _L(f"Badge débloqué : {bname}", f"Badge unlocked: {bname}"))
+        earned, revoked = badges_mod.check_streaks(self.app.gs.player)
+        for b in earned:
+            bname = badges_mod.streak_badge_name(b)
+            self.app.notify(_L(f"✶ Badge à enjeu : {bname}", f"✶ Streak badge: {bname}"), "prestige")
+            career_mod.log(self.app.gs.player, "info", _L(f"Badge à enjeu débloqué : {bname}", f"Streak badge unlocked: {bname}"))
+        for b in revoked:
+            bname = badges_mod.streak_badge_name(b)
+            self.app.notify(_L(f"✕ Badge perdu : {bname}", f"✕ Badge lost: {bname}"), "bad")
+            career_mod.log(self.app.gs.player, "info", _L(f"Badge à enjeu révoqué : {bname}", f"Streak badge revoked: {bname}"))
         self._check_legacy()
 
     def _check_legacy(self):

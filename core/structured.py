@@ -29,56 +29,72 @@ LOT = 50_000.0                 # notionnel souscrit par clic (desk & boutique)
 EARLY_EXIT_HAIRCUT = 0.02      # décote de sortie anticipée (illiquidité OTC)
 
 # Catalogue : id, famille, type (clé de payoff), nom, params, maturité (années).
+# `regimes` : régimes de marché (core/market_constants.py::REGIMES) où le desk
+# met en avant le produit (cohérent avec son profil de risque) — sert à faire
+# varier l'offre mise en avant selon le régime courant (cf. `featured_templates`)
+# sans jamais retirer un produit du catalogue complet.
 TEMPLATES = [
     # ---- Classique : payoff conditionnel simple sur l'indice régional ----
     {"id": "capguard", "family": "Classique", "type": "capital_guaranteed",
      "name": "Capital garanti 100% + 60% hausse", "participation": 0.60, "years": 3,
+     "regimes": ["Volatil", "Récession"],
      "desc": "Capital protégé à l'échéance + 60% de la hausse de l'indice."},
     {"id": "revconv", "family": "Classique", "type": "reverse_convertible",
      "name": "Reverse convertible 10% / barrière 70%", "coupon": 0.10, "barrier": 0.70, "years": 2,
+     "regimes": ["Calme", "Expansion"],
      "desc": "Coupon 10%/an. Si l'indice finit sous 70% du niveau initial, "
              "vous subissez la baisse."},
     {"id": "autocall", "family": "Classique", "type": "autocallable",
      "name": "Autocallable 8% / barrière 60%", "coupon": 0.08, "barrier": 0.60, "years": 3,
+     "regimes": ["Expansion"],
      "desc": "Coupon 8%/an si l'indice tient. Perte en capital sous 60% à l'échéance."},
     {"id": "twinwin", "family": "Classique", "type": "twin_win",
      "name": "Twin-Win 50% / barrière 75%", "barrier": 0.75, "cap": 0.50, "years": 2,
+     "regimes": ["Volatil"],
      "desc": "Gagne dans les deux sens (hausse OU baisse, plafonné à 50%) si la barrière "
              "à 75% n'est jamais franchie à l'échéance ; sinon perte directionnelle classique."},
     {"id": "rangeaccrual", "family": "Classique", "type": "range_accrual",
      "name": "Range accrual 12% / [85%-115%]", "low": 0.85, "high": 1.15, "coupon": 0.12, "years": 2,
+     "regimes": ["Calme"],
      "desc": "Coupon 12%/an au prorata du temps passé par l'indice dans le couloir [85%, 115%]."},
 
     # ---- Exotique : payoff path-dependent (barrière continue, lookback, panier) ----
     {"id": "digital", "family": "Exotique", "type": "digital",
      "name": "Note digitale (binaire) 20%", "payout_pct": 0.20, "floor": 0.80, "years": 1,
+     "regimes": ["Expansion"],
      "desc": "Pari binaire : +20% si l'indice finit au-dessus de son niveau initial, "
              "sinon capital ramené à 80%."},
     {"id": "koupcoupon", "family": "Exotique", "type": "knockout",
      "name": "Knock-out coupon 9% / barrière 130%", "barrier": 1.30, "coupon": 0.09, "years": 2,
+     "regimes": ["Calme", "Récession"],
      "desc": "Coupon 9%/an si l'indice ne dépasse JAMAIS 130% de son niveau initial (suivi en "
              "continu) ; sinon remboursement anticipé au pair, coupons perdus."},
     {"id": "lookback", "family": "Exotique", "type": "lookback",
      "name": "Lookback 50% sur plus haut", "participation": 0.50, "years": 2,
+     "regimes": ["Volatil"],
      "desc": "Participation de 50% à la hausse calculée sur le PLUS HAUT niveau observé "
              "pendant la vie du produit (et non le niveau final)."},
     {"id": "worstof", "family": "Exotique", "type": "worst_of",
      "name": "Worst-of panier régional 70%", "participation": 0.70, "years": 2,
+     "regimes": ["Expansion"],
      "desc": "Participation de 70% à la performance du PIRE indice d'un panier de 3 régions ; "
              "perte directionnelle si la pire performance est négative."},
 
     # ---- Volatilité : payoff lié à la volatilité réalisée du sous-jacent ----
     {"id": "varswap", "family": "Volatilité", "type": "var_swap",
      "name": "Swap de variance (strike 18%)", "vol_strike": 0.18, "vol_mult": 1.5, "years": 1,
+     "regimes": ["Volatil", "Récession"],
      "desc": "Position longue volatilité : gagne si la volatilité RÉALISÉE annualisée dépasse "
              "18%, perd (jusqu'à 0) si le marché reste calme."},
     {"id": "shortvol", "family": "Volatilité", "type": "short_vol",
      "name": "Note vol courte 18% / cap 25%", "coupon": 0.18, "vol_cap": 0.25,
      "vol_loss_mult": 3.0, "years": 1,
+     "regimes": ["Calme", "Expansion"],
      "desc": "Coupon élevé de 18% si la volatilité réalisée reste sous 25% ; perte en capital "
              "amplifiée (x3) au-delà — vend de la volatilité, encaisse la prime, risque de queue."},
     {"id": "straddle", "family": "Volatilité", "type": "straddle_note",
      "name": "Note straddle (long gamma) 80%", "participation": 0.80, "cost": 0.05, "years": 1,
+     "regimes": ["Volatil", "Récession"],
      "desc": "Réplique un straddle : gagne 80% de la VARIATION ABSOLUE de l'indice (hausse ou "
              "baisse), net d'une prime de 5% payée d'avance."},
 ]
@@ -309,15 +325,33 @@ def held_notional(player, template_id):
                if p.get("tpl_id", p.get("type")) == template_id)
 
 
-def template_quote(template_id):
+def is_featured(template_id, market):
+    """Le desk met-il ce produit en avant dans le régime de marché courant ?
+    `market` peut être None (catalogue hors contexte de marché) -> jamais
+    mis en avant."""
+    if market is None:
+        return False
+    t = _BY_ID.get(template_id) if isinstance(template_id, str) else _resolve_template(template_id)
+    if t is None:
+        return False
+    return getattr(market, "regime", None) in t.get("regimes", [])
+
+
+def featured_templates(market):
+    """Ids des templates mis en avant par le desk dans le régime courant."""
+    return [t["id"] for t in TEMPLATES if is_featured(t["id"], market)]
+
+
+def template_quote(template_id, market=None):
     t = _BY_ID[template_id]
     return {"id": t["id"], "name": t["name"], "family": t["family"],
             "type": t["type"], "years": t["years"], "desc": t["desc"],
-            "coupon": t.get("coupon"), "vol_strike": t.get("vol_strike")}
+            "coupon": t.get("coupon"), "vol_strike": t.get("vol_strike"),
+            "featured": is_featured(t["id"], market)}
 
 
-def all_templates():
-    return [template_quote(t["id"]) for t in TEMPLATES]
+def all_templates(market=None):
+    return [template_quote(t["id"], market) for t in TEMPLATES]
 
 
 def holdings_value(player, market):

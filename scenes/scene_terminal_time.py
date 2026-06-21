@@ -5,6 +5,7 @@ un pas de marché complet (_advance_time) et l'avance jusqu'au trimestre suivant
 taille ; mixé dans TerminalScene avec les autres mixins de commandes.
 """
 
+from core import badges as badges_mod
 from core import config
 from core import deals as deals_mod
 from core import dilemmas as dilemmas_mod
@@ -242,6 +243,19 @@ class TerminalTimeMixin:
                 p.flags["crises"] = p.flags.get("crises", 0) + 1
                 if scenario.get("severity", 1.0) >= 1.35:
                     p.flags["major_crises"] = p.flags.get("major_crises", 0) + 1
+        else:
+            # signal avant-crise : tension macro élevée mais rien de déclenché
+            # ce tour — avertissement ambigu, sans révéler quoi ni quand.
+            warn = scenarios_mod.maybe_warn(m, random)
+            if warn:
+                self._log(_L(
+                    f"  ⚠ Signal de marché (tension {warn['stress']:.1f}) : {warn['story']}",
+                    f"  ⚠ Market signal (stress {warn['stress']:.1f}): {warn['story']}"))
+                inbox_mod.push(p, "compliance", _L("Desk Risque", "Risk Desk"),
+                                _L("Signal de tension macro", "Macro stress signal"),
+                                warn["story"])
+                self.app.notify(_L("Signal de tension macro élevée",
+                                    "Elevated macro stress signal"), "warn")
         # événement HISTORIQUE scénarisé (campagne déterministe dans le temps)
         hist = history_mod.maybe_trigger(p, m)
         if hist:
@@ -301,6 +315,7 @@ class TerminalTimeMixin:
                                    f"Sovereign mandate: {pol['country_en']}"), "info")
         if summary.get("quarter_changed"):
             legacy_mod.on_quarter_close(p, m)
+            badges_mod.on_quarter_close(p)
             self._log(_L(f"  ── Nouveau trimestre : T{p.quarter} ──", f"  ── New quarter: Q{p.quarter} ──"))
             qr = summary.get("quarter_report")
             if qr and qr["total"]:

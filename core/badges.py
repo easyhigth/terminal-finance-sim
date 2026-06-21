@@ -124,6 +124,83 @@ def _traded_through_contagion(player, market):
         return False
 
 
+# ---------------------------------------------------------------------------
+# Badges à enjeu : séries (streaks) qui peuvent être RÉVOQUÉES si la condition
+# qui les maintient se brise, contrairement aux BADGES classiques (jalons
+# ponctuels, acquis pour toujours). Crée une tension continue plutôt qu'un
+# déblocage one-shot : le joueur doit défendre son acquis, pas seulement
+# l'obtenir une fois. S'appuient sur des compteurs de série déjà maintenus
+# par core.legacy (`on_quarter_close`), à l'exception de `clean_quarter_streak`
+# maintenu ici (scrutin nul, condition plus stricte que l'intégrité composite
+# de core.legacy).
+STREAK_BADGES = [
+    {"id": "untouchable", "name": ("Intouchable", "Untouchable"),
+     "desc": ("Aucun scandale (scrutin nul) pendant 8 trimestres consécutifs. "
+              "Révoqué si le scrutin remonte.",
+              "No scandal (zero scrutiny) for 8 consecutive quarters. "
+              "Revoked if scrutiny rises again."),
+     "streak_flag": "clean_quarter_streak", "target": 8},
+    {"id": "lasting_dominance", "name": ("Domination durable", "Lasting dominance"),
+     "desc": ("Rester n°1 du classement rivaux 4 trimestres de suite. "
+              "Révoqué si vous perdez la tête.",
+              "Stay #1 on the rivals leaderboard for 4 quarters in a row. "
+              "Revoked if you lose the lead."),
+     "streak_flag": "top_rank_streak", "target": 4},
+    {"id": "blue_chip", "name": ("Valeur sûre", "Blue chip"),
+     "desc": ("Valeur nette en croissance 6 trimestres consécutifs. "
+              "Révoqué si elle recule.",
+              "Net worth growing for 6 consecutive quarters. "
+              "Revoked if it falls back."),
+     "streak_flag": "profit_streak", "target": 6},
+]
+_STREAK_BY_ID = {b["id"]: b for b in STREAK_BADGES}
+
+
+def streak_badge_name(badge):
+    return _L(*badge["name"])
+
+
+def streak_badge_desc(badge):
+    return _L(*badge["desc"])
+
+
+def on_quarter_close(player):
+    """Met à jour le compteur 'aucun scandale' (scrutin nul) à chaque
+    changement de trimestre — à appeler une fois par trimestre écoulé, comme
+    core.legacy.on_quarter_close (dont les autres compteurs de série sont
+    réutilisés directement)."""
+    if player.heat <= 0:
+        player.flags["clean_quarter_streak"] = player.flags.get("clean_quarter_streak", 0) + 1
+    else:
+        player.flags["clean_quarter_streak"] = 0
+
+
+def check_streaks(player):
+    """Attribue ou révoque les badges à enjeu selon l'état courant des
+    compteurs de série. Retourne (earned, revoked) : earned pour le toast de
+    déblocage, revoked pour signaler la perte au joueur."""
+    earned, revoked = [], []
+    for b in STREAK_BADGES:
+        streak = player.flags.get(b["streak_flag"], 0)
+        held = b["id"] in player.streak_badges
+        qualifies = streak >= b["target"]
+        if qualifies and not held:
+            player.streak_badges.append(b["id"])
+            earned.append(b)
+        elif held and not qualifies:
+            player.streak_badges.remove(b["id"])
+            revoked.append(b)
+    return earned, revoked
+
+
+def get_streak(badge_id):
+    return _STREAK_BY_ID.get(badge_id)
+
+
+def all_streak_badges():
+    return STREAK_BADGES
+
+
 _BY_ID = {b["id"]: b for b in BADGES}
 
 

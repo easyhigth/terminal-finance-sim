@@ -112,7 +112,8 @@ class StructuredScene(Scene):
         cur = self._cur()
         widgets.draw_text(surf, "PRODUITS STRUCTURÉS", (40, 22), fonts.title(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, "Payoff non linéaire sur l'indice régional, évalué à l'échéance. "
-                                "Risque émetteur. " + self.msg,
+                                f"Risque émetteur. Régime : {m.regime_label()} (★ = recommandé par le desk). "
+                                + self.msg,
                           (42, 74), fonts.small(), config.COL_TEXT_DIM)
 
         search_rect = self._search_rect()
@@ -155,15 +156,18 @@ class StructuredScene(Scene):
         self.invest_rects = {}
         self.sell_rects = {}
         q_filter = self.search.strip().lower()
-        templates = [tpl for tpl in S.all_templates()
+        templates = [tpl for tpl in S.all_templates(m)
                      if (not self.family_filter or tpl["family"] == self.family_filter)
                      and (not q_filter or q_filter in tpl["name"].lower() or q_filter in tpl["desc"].lower())]
+        templates.sort(key=lambda tpl: not tpl["featured"])
         prev_clip = surf.get_clip()
         surf.set_clip(list_area)
         y = inner.y - self.scroll
         for tpl in templates:
             visible = (list_area.top - 100) < y < list_area.bottom
-            widgets.draw_text(surf, tpl["name"], (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
+            name = ("★ " + tpl["name"]) if tpl["featured"] else tpl["name"]
+            widgets.draw_text(surf, name, (inner.x, y), fonts.small(bold=True),
+                              config.COL_UP if tpl["featured"] else config.COL_AMBER)
             widgets.draw_text(surf, f"{tpl['family']} · {tpl['years']} ans", (inner.right - 160, y),
                               fonts.tiny(), config.COL_TEXT_DIM)
             y += 20

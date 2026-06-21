@@ -10,8 +10,13 @@ import pygame
 
 from core import config
 from core.game_state import GameState
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 
 class SavesScene(Scene):
@@ -101,6 +106,10 @@ class SavesScene(Scene):
             widgets.draw_text(surf, self.message, (120, y + 4),
                               fonts.small(), config.COL_CYAN)
 
+        if self.slots:
+            hints = [("↑↓", "slot"), (_L("ENTRÉE", "ENTER"), _L("charger", "load")),
+                     (_L("(souris)", "(mouse)"), _L("supprimer", "delete"))]
+            widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14), hints)
         self.back_btn.draw(surf)
 
     def _draw_slot(self, surf, rect, slot, meta, mp, cursor=False):

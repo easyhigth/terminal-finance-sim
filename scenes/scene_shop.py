@@ -17,9 +17,14 @@ from core import etfs as ETF
 from core import portfolio as PF
 from core import securitisation as SEC
 from core import structured as S
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
 from ui.popups import PopupMixin
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 ROW_H = 26
 SORT_FIELDS = [("name", "NOM"), ("price", "COURS"), ("value", "VALEUR"),
@@ -366,9 +371,13 @@ class ShopScene(Scene, PopupMixin):
                     return
 
     def _focus_hints(self):
+        enter_key = _L("ENTRÉE", "ENTER")
+        esc_key = _L("ÉCHAP", "ESC")
         if self.text_focus == "qty":
-            return [("TAB", "recherche"), ("chiffres", "quantité"), ("ÉCHAP", "recherche")]
-        return [("↑↓", "actifs"), ("ENTRÉE", "ouvrir"), ("TAB", "quantité"), ("lettres", "filtrer")]
+            return [("TAB", _L("recherche", "search")), (_L("chiffres", "digits"), _L("quantité", "quantity")),
+                    (esc_key, _L("recherche", "search"))]
+        return [("↑↓", _L("actifs", "assets")), (enter_key, _L("ouvrir", "open")),
+                ("TAB", _L("quantité", "quantity")), (_L("lettres", "letters"), _L("filtrer", "filter"))]
 
     def update(self, dt):
         self._t += dt

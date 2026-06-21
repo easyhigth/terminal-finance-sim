@@ -72,7 +72,8 @@ class AlertsScene(Scene):
 
     def _post_alert(self):
         if not self._can_alert():
-            self.msg = "⊘ Alertes débloquées au grade Analyst."
+            g = unlocks.effective_required_grade(self.app.gs.player, "analyst")
+            self.msg = f"⊘ Alertes débloquées au grade {config.GRADES[g]}."
             return
         if not self.sel_ticker:
             self.msg = "Sélectionnez d'abord un actif dans la liste."
@@ -262,7 +263,8 @@ class AlertsScene(Scene):
         widgets.draw_text(surf, "POSER L'ALERTE", self._post_btn.center, fonts.tiny(bold=True),
                           config.COL_AMBER if can else config.COL_TEXT_DIM, align="center")
         if not can:
-            widgets.draw_text(surf, "⊘ Alertes débloquées au grade Analyst.",
+            g = unlocks.effective_required_grade(self.app.gs.player, "analyst")
+            widgets.draw_text(surf, f"⊘ Alertes débloquées au grade {config.GRADES[g]}.",
                               (self._post_btn.right + 16, top + 4), fonts.tiny(), config.COL_TEXT_DIM)
 
         ph = config.footer_y() - 8 - (top + 36)

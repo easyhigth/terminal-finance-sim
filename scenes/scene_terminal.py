@@ -173,8 +173,12 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         # interne (cf. ui/keynav.ZoneStack). Par défaut le focus reste « dans »
         # la console comme avant (saisie immédiate), Échap permet de remonter
         # au niveau bloc pour naviguer le reste du terminal aux flèches/Tab.
-        self.zones = keynav.ZoneStack(ZONE_ORDER)
-        self.zones.inside = True
+        # Préservé entre deux passages par le terminal (ex. on quitte le bloc
+        # RAIL pour ouvrir une page puis on revient : le focus clavier reste là
+        # où le joueur l'avait laissé, sauf au tout premier on_enter).
+        if not hasattr(self, "zones"):
+            self.zones = keynav.ZoneStack(ZONE_ORDER)
+            self.zones.inside = True
         self._zone_rects = {}     # rects des blocs (zone -> Rect), pour les flèches
         self._rail_rects = {}     # boutons du rail latéral (label -> Rect)
         self._topco_rects = {}    # sociétés cliquables (panneau top sociétés)

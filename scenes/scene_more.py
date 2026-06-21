@@ -9,7 +9,7 @@ import pygame
 
 from core import config, fuzzy
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 # (titre de section, [(libellé, scène, kwargs)])
 SECTIONS = [
@@ -148,9 +148,13 @@ class MoreScene(Scene):
                 self.search = self.search[:-1]
                 self.scroll = 0
                 return
-            elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
-                self.btn_cursor, activate = widgets.list_key_nav(
-                    event, self.btn_cursor, len(self._all_btn_rects))
+            elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT,
+                               pygame.K_RETURN, pygame.K_KP_ENTER):
+                # navigation spatiale 4-directions selon la position réelle des
+                # boutons (grille de plusieurs colonnes, sections de tailles
+                # variables) — pas un simple index linéaire.
+                rects = {i: rect for i, (rect, _s, _kw) in enumerate(self._all_btn_rects)}
+                self.btn_cursor, activate = keynav.grid_nav(event, rects, self.btn_cursor)
                 if self._all_btn_rects:
                     self._scroll_to_cursor()
                 if activate and self._all_btn_rects:
@@ -244,7 +248,7 @@ class MoreScene(Scene):
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL,
                                      rect, border_radius=5)
                     pygame.draw.rect(surf, acc, rect, 1, border_radius=5)
-                    widgets.draw_row_selection(surf, rect, is_cursor)
+                    keynav.draw_focus_ring(surf, rect, is_cursor)
                     widgets.draw_text(surf, label, rect.center, fonts.small(bold=hover),
                                       acc if hover else config.COL_TEXT, align="center")
             y += BTN_H + BTN_GAP + 8

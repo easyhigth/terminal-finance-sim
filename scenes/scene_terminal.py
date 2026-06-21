@@ -484,6 +484,20 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             return dict(self._topco_rects)
         return {}
 
+    def _focus_hints(self):
+        """Raccourcis pertinents pour le focus clavier courant, affichés en
+        bandeau discret au-dessus de la ligne de commande (cf.
+        ui/widgets.draw_hint_bar). Vide en mode saisie console : la console
+        est déjà auto-explicative (CMD> + curseur clignotant)."""
+        z = self.zones.zone
+        if z == "console" and self.zones.inside:
+            return []
+        if not self.zones.inside:
+            return [("↑↓←→", "blocs"), ("ENTRÉE", "entrer"), ("TAB", "suivant"), ("ÉCHAP", "menu")]
+        if z in ("rail", "indices", "topco"):
+            return [("↑↓←→", "items"), ("ENTRÉE", "activer"), ("ÉCHAP", "bloc")]
+        return []
+
     def _activate_zone(self):
         """Entrée au clavier : descend dans le bloc focalisé (1ʳᵉ pression),
         puis active l'item interne focalisé (2ᵉ pression) — navigation

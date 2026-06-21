@@ -29,6 +29,17 @@ def list_key_nav(event, selected, count):
     return selected, False
 
 
+def draw_hint_bar(surf, anchor, hints, color=config.COL_TEXT_DIM):
+    """Bandeau contextuel discret listant les touches pertinentes pour le
+    focus clavier courant (ex. [↑↓] naviguer  [ENTRÉE] ouvrir  [ÉCHAP] retour),
+    aligné à droite à partir du point `anchor` (coin haut-droit du texte).
+    `hints` est une liste de (touche, action). No-op si vide."""
+    if not hints:
+        return
+    text = "   ".join(f"[{k}] {a}" for k, a in hints)
+    draw_text(surf, text, anchor, fonts.tiny(), color, align="right")
+
+
 def hover_accent(active, base=config.COL_AMBER, hover_color=config.COL_CYAN):
     """Couleur d'un bloc cliquable neutre : `base` (ambre) au repos, `hover_color`
     (cyan) dès qu'il est survolé/sélectionné — convention visuelle commune à tous

@@ -65,3 +65,27 @@ def list_entries(player, asset_class=None, limit=50):
     if asset_class:
         entries = [e for e in entries if e["asset_class"] == asset_class]
     return list(reversed(entries))[:limit]
+
+
+def performance_stats(player, group_by="regime"):
+    """Agrège le P&L réalisé du journal par `group_by` ("regime" ou "reason"),
+    pour donner un retour pédagogique sur les décisions passées. Ignore les
+    entrées sans P&L réalisé connu (positions encore ouvertes). Retourne une
+    liste de dicts {label, count, wins, win_rate, avg_pnl, total_pnl} triée
+    par nombre de trades décroissant."""
+    groups = {}
+    for e in player.trade_journal:
+        if e["realized"] is None:
+            continue
+        key = e.get(group_by) or "—"
+        g = groups.setdefault(key, {"label": key, "count": 0, "wins": 0, "total_pnl": 0.0})
+        g["count"] += 1
+        g["total_pnl"] += e["realized"]
+        if e["realized"] > 0:
+            g["wins"] += 1
+    out = list(groups.values())
+    for g in out:
+        g["win_rate"] = g["wins"] / g["count"] * 100.0
+        g["avg_pnl"] = g["total_pnl"] / g["count"]
+    out.sort(key=lambda g: g["count"], reverse=True)
+    return out

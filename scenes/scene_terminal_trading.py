@@ -334,3 +334,22 @@ class TerminalTradingMixin:
             self._log(_L("  Identifiant de journal inconnu.", "  Unknown journal id."))
             return
         self._log(_L(f"  ✓ Note ajoutée à l'entrée #{entry_id}.", f"  ✓ Note added to entry #{entry_id}."))
+
+    def _cmd_jstats(self, args):
+        """JSTATS [regime|reason] : bilan du journal de trading, P&L réalisé
+        agrégé par régime de marché (défaut) ou par raison de trade."""
+        p = self.app.gs.player
+        group_by = args[0].lower() if args and args[0].lower() in ("regime", "reason") else "regime"
+        stats = journal_mod.performance_stats(p, group_by=group_by)
+        if not stats:
+            self._log(_L("  Aucun trade clôturé avec P&L réalisé pour le moment.",
+                         "  No closed trade with realized P&L yet."))
+            return
+        rows = [(g["label"], str(g["count"]), f"{g['win_rate']:.0f}%",
+                 f"{g['avg_pnl']:+.0f}", f"{g['total_pnl']:+.0f}") for g in stats]
+        title = (_L("BILAN PAR RÉGIME", "STATS BY REGIME") if group_by == "regime"
+                 else _L("BILAN PAR RAISON", "STATS BY REASON"))
+        self._open_window(title, [(_L("Régime", "Regime") if group_by == "regime"
+                                    else _L("Raison", "Reason"), 140),
+                                   ("Trades", 60), ("Win %", 60),
+                                   ("P&L moy.", 90), ("P&L total", 90)], rows)

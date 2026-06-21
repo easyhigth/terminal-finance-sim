@@ -49,6 +49,7 @@ class RiskScene(Scene):
         p = self.app.gs.player
         self.real = bool(p.portfolio or getattr(p, "bonds", None))
         self.stress_real = None
+        self._profile_btns = {}
         self._simulate()
         self.back_btn = widgets.Button(
             (40, config.SCREEN_HEIGHT-66, 160, 44), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
@@ -153,6 +154,9 @@ class RiskScene(Scene):
             for pct, rect in self._reverse_btns.items():
                 if rect.collidepoint(event.pos):
                     self._reverse_target = None if self._reverse_target == pct else pct
+            for name, rect in self._profile_btns.items():
+                if rect.collidepoint(event.pos):
+                    risklimits.set_profile(self.app.gs.player, name)
 
     def update(self, dt):
         mp = pygame.mouse.get_pos()
@@ -370,12 +374,33 @@ class RiskScene(Scene):
         panel = pygame.Rect(992, 400, 248, config.footer_y() - 408)
         inner = widgets.draw_panel(surf, panel, "Limites & reverse stress", config.COL_PRESTIGE)
         self._reverse_btns = {}
+        self._profile_btns = {}
         if not self.real:
             widgets.draw_text(surf, "Disponible en mode portefeuille réel.",
                               (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
             return
-        res = risklimits.check_limits(self.app.gs.player, self.app.market)
+        p = self.app.gs.player
+        active = getattr(p, "risk_limit_profile", "default")
         y = inner.y
+        bx = inner.x
+        for name, label in (("strict", "STRICT"), ("default", "DÉFAUT"), ("souple", "SOUPLE")):
+            w = 76
+            rect = pygame.Rect(bx, y, w, 22)
+            self._profile_btns[name] = rect
+            sel = (active == name)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect)
+            pygame.draw.rect(surf, config.COL_PRESTIGE if sel else config.COL_BORDER, rect, 1)
+            widgets.draw_text(surf, label, rect.center, fonts.tiny(bold=sel),
+                              config.COL_PRESTIGE if sel else config.COL_TEXT_DIM, align="center")
+            bx += w + 4
+        y += 30
+        streak = p.flags.get("risk_breach_streak", 0)
+        if streak >= 3:
+            widgets.draw_text(surf, f"⚠ Réputation impactée (dépassement depuis {streak} tours)",
+                              (inner.x, y), fonts.tiny(), config.COL_DOWN)
+            y += 16
+
+        res = risklimits.check_limits(p, self.app.market)
         if res["ok"]:
             widgets.draw_badge(surf, "AUCUN DÉPASSEMENT", (inner.x, y), accent=config.COL_UP)
             y += 28

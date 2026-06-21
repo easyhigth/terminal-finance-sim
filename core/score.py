@@ -23,6 +23,11 @@ from dataclasses import dataclass, field
 
 from core import finmath
 
+
+def _L(fr, en):
+    from core.i18n import get_lang
+    return en if get_lang() == "en" else fr
+
 # Poids du composite (somme = 1.0) — performance et survie comptent le plus,
 # car ce sont les deux dimensions qui déterminent si la carrière a "réussi".
 WEIGHTS = {
@@ -40,15 +45,20 @@ GRADE_THRESHOLDS = [
     (90, "S"), (80, "A"), (70, "B"), (60, "C"), (45, "D"), (30, "E"), (0, "F"),
 ]
 
-RANK_LABELS = {
-    "S": "Légende de la place",
-    "A": "Trader d'élite",
-    "B": "Professionnel solide",
-    "C": "Carrière honorable",
-    "D": "Parcours irrégulier",
-    "E": "Carrière fragile",
-    "F": "Naufrage financier",
+_RANK_LABELS_RAW = {
+    "S": ("Légende de la place", "Legend of the Street"),
+    "A": ("Trader d'élite", "Elite trader"),
+    "B": ("Professionnel solide", "Solid professional"),
+    "C": ("Carrière honorable", "Honorable career"),
+    "D": ("Parcours irrégulier", "Uneven track record"),
+    "E": ("Carrière fragile", "Fragile career"),
+    "F": ("Naufrage financier", "Financial wreck"),
 }
+
+
+def rank_label(grade):
+    raw = _RANK_LABELS_RAW.get(grade)
+    return _L(*raw) if raw else ""
 
 
 def _clip(x, lo=0.0, hi=100.0):
@@ -228,6 +238,6 @@ def compute_final_score(player, market=None):
         survie=sub["survie"],
         total=total,
         grade=grade,
-        rank_label=RANK_LABELS.get(grade, ""),
+        rank_label=rank_label(grade),
         breakdown=dict(sub),
     )

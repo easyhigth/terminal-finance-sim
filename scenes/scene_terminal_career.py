@@ -153,11 +153,12 @@ class TerminalCareerMixin:
         for g in legacy_mod.all_goals():
             done = g["id"] in p.legacy
             cur, target = g["progress"](p, self.market)
-            status = "✓ ATTEINT" if done else f"{min(cur, target)}/{target}"
+            status = _L("✓ ATTEINT", "✓ ACHIEVED") if done else f"{min(cur, target)}/{target}"
             col = config.COL_UP if done else config.COL_TEXT
-            rows.append(((g["name"], config.COL_PRESTIGE), g["desc"], (status, col)))
+            rows.append(((legacy_mod.goal_name(g), config.COL_PRESTIGE), legacy_mod.goal_desc(g), (status, col)))
         self._open_window(_L("OBJECTIFS DE LÉGENDE", "LEGACY GOALS"),
-                          [("Objectif", 180), ("Description", 420), ("Avancement", 110)],
+                          [(_L("Objectif", "Goal"), 180), (_L("Description", "Description"), 420),
+                           (_L("Avancement", "Progress"), 110)],
                           rows, accent=config.COL_PRESTIGE)
 
     def _cmd_archetype(self):
@@ -214,8 +215,9 @@ class TerminalCareerMixin:
     def _check_badges(self):
         """Attribue les nouveaux badges et notifie (toast + journal)."""
         for b in badges_mod.check_new(self.app.gs.player, self.market):
-            self.app.notify(f"✶ Badge : {b['name']}", "prestige")
-            career_mod.log(self.app.gs.player, "info", f"Badge débloqué : {b['name']}")
+            bname = badges_mod.badge_name(b)
+            self.app.notify(_L(f"✶ Badge : {bname}", f"✶ Badge: {bname}"), "prestige")
+            career_mod.log(self.app.gs.player, "info", _L(f"Badge débloqué : {bname}", f"Badge unlocked: {bname}"))
         self._check_legacy()
 
     def _check_legacy(self):

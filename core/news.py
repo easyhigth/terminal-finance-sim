@@ -20,15 +20,30 @@ Persistance : stocké dans PlayerState.news_history (sérialisé JSON). On purge
 au-delà de MAX_AGE_DAYS (3 ans) et on borne la taille (MAX_HISTORY).
 """
 
-CATEGORIES = [
-    ("market",     "Marché"),
-    ("macro",      "Macro"),
-    ("corporate",  "Entreprises"),
-    ("political",  "Politique"),
-    ("regulatory", "Réglementaire"),
-    ("event",      "Événements"),
+def _L(fr, en):
+    from core.i18n import get_lang
+    return en if get_lang() == "en" else fr
+
+
+_CATEGORIES_RAW = [
+    ("market",     ("Marché", "Market")),
+    ("macro",      ("Macro", "Macro")),
+    ("corporate",  ("Entreprises", "Corporate")),
+    ("political",  ("Politique", "Political")),
+    ("regulatory", ("Réglementaire", "Regulatory")),
+    ("event",      ("Événements", "Events")),
 ]
-CATEGORY_LABEL = {k: v for k, v in CATEGORIES}
+CATEGORY_KEYS = [k for k, _ in _CATEGORIES_RAW]
+
+
+def categories():
+    """Liste (clé, libellé localisé) ; recalculée à chaque appel (langue dynamique)."""
+    return [(k, _L(*v)) for k, v in _CATEGORIES_RAW]
+
+
+def category_label(cat):
+    raw = dict(_CATEGORIES_RAW).get(cat)
+    return _L(*raw) if raw else cat
 
 MAX_AGE_DAYS = 365 * 3       # on garde jusqu'à 3 ans d'historique
 MAX_HISTORY = 800            # borne dure (taille de sauvegarde)
@@ -100,7 +115,7 @@ def for_day(player, day):
 def counts_by_category(player):
     """Compte par catégorie (pour les badges de filtre)."""
     hist = getattr(player, "news_history", []) or []
-    out = {k: 0 for k, _ in CATEGORIES}
+    out = {k: 0 for k in CATEGORY_KEYS}
     for e in hist:
         out[e["cat"]] = out.get(e["cat"], 0) + 1
     return out

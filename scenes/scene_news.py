@@ -116,7 +116,7 @@ class NewsScene(Scene):
 
         counts = N.counts_by_category(p)
         cat_chips = [(None, f"TOUTES ({len(getattr(p, 'news_history', []) or [])})")]
-        cat_chips += [(k, f"{lbl} ({counts.get(k, 0)})") for k, lbl in N.CATEGORIES]
+        cat_chips += [(k, f"{lbl} ({counts.get(k, 0)})") for k, lbl in N.categories()]
         self._cat_rects, ybot = self._chip_row(surf, x0, top + 30, config.SCREEN_WIDTH - 40,
                                                cat_chips, self.cat_filter, config.COL_AMBER)
         regions = sorted({e["region"] for e in (getattr(p, "news_history", []) or []) if e["region"]})
@@ -148,7 +148,7 @@ class NewsScene(Scene):
             if (list_area.top - ROW_H) < ry < list_area.bottom:
                 col = _KIND_COL.get(e["kind"], config.COL_TEXT)
                 tag = _KIND_TAG.get(e["kind"], "•")
-                cat = N.CATEGORY_LABEL.get(e["cat"], e["cat"])
+                cat = N.category_label(e["cat"])
                 widgets.draw_text(surf, tag, (inner.x + 12, ry), fonts.small(bold=True), col)
                 widgets.draw_text(surf, widgets.fit_text(cat, fonts.tiny(), 90),
                                   (inner.x + 32, ry + 1), fonts.tiny(), config.COL_PRESTIGE)

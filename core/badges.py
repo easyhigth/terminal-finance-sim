@@ -9,57 +9,72 @@ check_new(player, market) attribue les nouveaux badges et les retourne pour
 affichage (toast + journal).
 """
 
-# Chaque badge : id, name, desc, test(player, market) -> bool
+def _L(fr, en):
+    from core.i18n import get_lang
+    return en if get_lang() == "en" else fr
+
+
+def badge_name(badge):
+    return _L(*badge["name"])
+
+
+def badge_desc(badge):
+    return _L(*badge["desc"])
+
+
+# Chaque badge : id, name, desc (tuples fr/en), test(player, market) -> bool
 BADGES = [
-    {"id": "first_deal", "name": "Premier deal", "desc": "Conclure votre premier deal.",
+    {"id": "first_deal", "name": ("Premier deal", "First deal"), "desc": ("Conclure votre premier deal.", "Close your first deal."),
      "test": lambda p, m: p.deals_won >= 1},
-    {"id": "dealmaker", "name": "Dealmaker", "desc": "Conclure 10 deals.",
+    {"id": "dealmaker", "name": ("Dealmaker", "Dealmaker"), "desc": ("Conclure 10 deals.", "Close 10 deals."),
      "test": lambda p, m: p.deals_won >= 10},
-    {"id": "rainmaker", "name": "Rainmaker", "desc": "Conclure 25 deals.",
+    {"id": "rainmaker", "name": ("Rainmaker", "Rainmaker"), "desc": ("Conclure 25 deals.", "Close 25 deals."),
      "test": lambda p, m: p.deals_won >= 25},
-    {"id": "scholar", "name": "Érudit", "desc": "Réaliser 15 missions.",
+    {"id": "scholar", "name": ("Érudit", "Scholar"), "desc": ("Réaliser 15 missions.", "Complete 15 missions."),
      "test": lambda p, m: p.missions_done >= 15},
-    {"id": "analyst", "name": "Analyste confirmé", "desc": "Atteindre le grade Analyst.",
+    {"id": "analyst", "name": ("Analyste confirmé", "Seasoned analyst"), "desc": ("Atteindre le grade Analyst.", "Reach Analyst grade."),
      "test": lambda p, m: p.grade_index >= 2},
-    {"id": "vp", "name": "Vice President", "desc": "Atteindre le grade VP.",
+    {"id": "vp", "name": ("Vice President", "Vice President"), "desc": ("Atteindre le grade VP.", "Reach VP grade."),
      "test": lambda p, m: p.grade_index >= 6},
-    {"id": "partner", "name": "Partner", "desc": "Atteindre le sommet : Partner.",
+    {"id": "partner", "name": ("Partner", "Partner"), "desc": ("Atteindre le sommet : Partner.", "Reach the top: Partner."),
      "test": lambda p, m: p.grade_index >= 11},
-    {"id": "millionaire", "name": "Millionnaire", "desc": "Valeur nette ≥ 1M.",
+    {"id": "millionaire", "name": ("Millionnaire", "Millionaire"), "desc": ("Valeur nette ≥ 1M.", "Net worth ≥ 1M."),
      "test": lambda p, m: max(p.best_cash, p.cash) >= 1_000_000},
-    {"id": "tycoon", "name": "Magnat", "desc": "Valeur nette ≥ 10M.",
+    {"id": "tycoon", "name": ("Magnat", "Tycoon"), "desc": ("Valeur nette ≥ 10M.", "Net worth ≥ 10M."),
      "test": lambda p, m: max(p.best_cash, p.cash) >= 10_000_000},
-    {"id": "survivor", "name": "Rescapé", "desc": "Traverser une crise de marché.",
+    {"id": "survivor", "name": ("Rescapé", "Survivor"), "desc": ("Traverser une crise de marché.", "Survive a market crisis."),
      "test": lambda p, m: p.flags.get("crises", 0) >= 1},
-    {"id": "veteran", "name": "Vétéran", "desc": "Traverser 3 crises.",
+    {"id": "veteran", "name": ("Vétéran", "Veteran"), "desc": ("Traverser 3 crises.", "Survive 3 crises."),
      "test": lambda p, m: p.flags.get("crises", 0) >= 3},
-    {"id": "centurion", "name": "Endurance", "desc": "Survivre plus d'un an (365 j).",
+    {"id": "centurion", "name": ("Endurance", "Endurance"), "desc": ("Survivre plus d'un an (365 j).", "Survive more than a year (365 days)."),
      "test": lambda p, m: p.day >= 365},
-    {"id": "clean_hands", "name": "Mains propres", "desc": "Réputation ≥ 85 sans scrutin, 10 missions.",
+    {"id": "clean_hands", "name": ("Mains propres", "Clean hands"), "desc": ("Réputation ≥ 85 sans scrutin, 10 missions.", "Reputation ≥ 85 with no scrutiny, 10 missions."),
      "test": lambda p, m: p.reputation >= 85 and p.heat == 0 and p.missions_done >= 10},
-    {"id": "titled", "name": "Signature", "desc": "Obtenir un titre de prestige.",
+    {"id": "titled", "name": ("Signature", "Signature"), "desc": ("Obtenir un titre de prestige.", "Earn a title of prestige."),
      "test": lambda p, m: len(p.titles) >= 1},
-    {"id": "top_dog", "name": "Numéro un", "desc": "Dominer le classement des rivaux.",
+    {"id": "top_dog", "name": ("Numéro un", "Top dog"), "desc": ("Dominer le classement des rivaux.", "Dominate the rivals leaderboard."),
      "test": lambda p, m: _is_top(p, m)},
-    {"id": "mandate1", "name": "Gestionnaire", "desc": "Réussir un mandat client.",
+    {"id": "mandate1", "name": ("Gestionnaire", "Manager"), "desc": ("Réussir un mandat client.", "Successfully complete a client mandate."),
      "test": lambda p, m: p.flags.get("mandates_won", 0) >= 1},
-    {"id": "mandate_master", "name": "Gérant d'élite", "desc": "Réussir 3 mandats clients.",
+    {"id": "mandate_master", "name": ("Gérant d'élite", "Elite manager"), "desc": ("Réussir 3 mandats clients.", "Successfully complete 3 client mandates."),
      "test": lambda p, m: p.flags.get("mandates_won", 0) >= 3},
-    {"id": "diversified", "name": "Diversifié", "desc": "Détenir des positions dans 5 secteurs.",
+    {"id": "diversified", "name": ("Diversifié", "Diversified"), "desc": ("Détenir des positions dans 5 secteurs.", "Hold positions in 5 sectors."),
      "test": lambda p, m: len(_pf_alloc(p, m)) >= 5},
-    {"id": "analyst_pro", "name": "Œil de l'analyste", "desc": "Produire 8 recherches.",
+    {"id": "analyst_pro", "name": ("Œil de l'analyste", "Analyst's eye"), "desc": ("Produire 8 recherches.", "Produce 8 research notes."),
      "test": lambda p, m: len(p.research) >= 8},
-    {"id": "graduate", "name": "Diplômé", "desc": "Lire toutes les leçons de l'Académie.",
+    {"id": "graduate", "name": ("Diplômé", "Graduate"), "desc": ("Lire toutes les leçons de l'Académie.", "Read all Academy lessons."),
      "test": lambda p, m: _all_lessons(p)},
-    {"id": "certified", "name": "Certifié", "desc": "Obtenir une certification (CFA/FRM/CQF).",
+    {"id": "certified", "name": ("Certifié", "Certified"), "desc": ("Obtenir une certification (CFA/FRM/CQF).", "Earn a certification (CFA/FRM/CQF)."),
      "test": lambda p, m: _has_full_cert(p)},
-    {"id": "hedged", "name": "Parapluie prêt", "desc": "Souscrire un put protecteur.",
+    {"id": "hedged", "name": ("Parapluie prêt", "Umbrella ready"), "desc": ("Souscrire un put protecteur.", "Buy a protective put."),
      "test": lambda p, m: len(getattr(p, "hedges", []) or []) >= 1},
-    {"id": "hedge_in_the_money", "name": "Bien couvert", "desc": "Détenir un put protecteur actuellement dans la monnaie.",
+    {"id": "hedge_in_the_money", "name": ("Bien couvert", "Well hedged"), "desc": ("Détenir un put protecteur actuellement dans la monnaie.", "Hold a protective put currently in the money."),
      "test": lambda p, m: _has_itm_hedge(p, m)},
-    {"id": "swapper", "name": "Cambiste", "desc": "Conclure un swap de devises.",
+    {"id": "swapper", "name": ("Cambiste", "Swapper"), "desc": ("Conclure un swap de devises.", "Close a currency swap."),
      "test": lambda p, m: len(getattr(p, "currency_swaps", []) or []) >= 1},
-    {"id": "contagion_trader", "name": "Sang-froid crypto", "desc": "Détenir une crypto du groupe corrélé pendant un depeg actif, sans stablecoin décroché en portefeuille.",
+    {"id": "contagion_trader", "name": ("Sang-froid crypto", "Crypto nerves of steel"),
+     "desc": ("Détenir une crypto du groupe corrélé pendant un depeg actif, sans stablecoin décroché en portefeuille.",
+              "Hold a crypto from the correlated group during an active depeg, with no depegged stablecoin in your portfolio."),
      "test": lambda p, m: _traded_through_contagion(p, m)},
 ]
 

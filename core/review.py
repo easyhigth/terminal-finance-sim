@@ -27,6 +27,13 @@ Logique pure, sans pygame — testable headless.
 """
 import random
 
+from core.i18n import get_lang
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
 REVIEW_PERIOD_QUARTERS = 4   # une revue tous les 4 trimestres (~1 an)
 
 # ---------------------------------------------------------------------------
@@ -86,9 +93,12 @@ def negotiate(player, choice):
         bonus_paid = base
         rep_delta = random.choice([1, 2])
         player.adjust_cash(bonus_paid)
-        player.adjust_reputation(rep_delta, reason="Revue de performance : bonus accepté")
-        message = (f"Vous acceptez le bonus standard de {bonus_paid:,.0f}. "
-                   "Votre manager apprécie votre attitude constructive.")
+        player.adjust_reputation(rep_delta, reason=_L("Revue de performance : bonus accepté",
+                                                        "Performance review: bonus accepted"))
+        message = _L(f"Vous acceptez le bonus standard de {bonus_paid:,.0f}. "
+                     "Votre manager apprécie votre attitude constructive.",
+                     f"You accept the standard bonus of {bonus_paid:,.0f}. "
+                     "Your manager appreciates your constructive attitude.")
         result = {"ok": True, "choice": choice, "bonus_paid": bonus_paid,
                   "rep_delta": rep_delta, "message": message}
 
@@ -100,17 +110,23 @@ def negotiate(player, choice):
             multiplier = random.uniform(1.5, 2.0)
             bonus_paid = base * multiplier
             rep_delta = random.choice([1, 2, 3])
-            message = (f"Négociation réussie ! Vous obtenez {bonus_paid:,.0f} "
-                       f"({multiplier:.1f}x le bonus standard).")
+            message = _L(f"Négociation réussie ! Vous obtenez {bonus_paid:,.0f} "
+                         f"({multiplier:.1f}x le bonus standard).",
+                         f"Negotiation successful! You get {bonus_paid:,.0f} "
+                         f"({multiplier:.1f}x the standard bonus).")
         else:
             bonus_paid = base * 0.7
             rep_delta = -random.choice([1, 2, 3])
-            message = (f"La négociation échoue. Votre manager, déçu de votre "
-                       f"insistance, ne vous verse que {bonus_paid:,.0f}.")
+            message = _L(f"La négociation échoue. Votre manager, déçu de votre "
+                         f"insistance, ne vous verse que {bonus_paid:,.0f}.",
+                         f"The negotiation fails. Your manager, disappointed by your "
+                         f"insistence, only pays you {bonus_paid:,.0f}.")
         player.adjust_cash(bonus_paid)
-        player.adjust_reputation(rep_delta, reason=(
+        player.adjust_reputation(rep_delta, reason=_L(
             "Revue de performance : négociation réussie" if success
-            else "Revue de performance : négociation échouée"))
+            else "Revue de performance : négociation échouée",
+            "Performance review: successful negotiation" if success
+            else "Performance review: failed negotiation"))
         result = {"ok": success, "choice": choice, "bonus_paid": bonus_paid,
                   "rep_delta": rep_delta, "message": message}
 
@@ -118,8 +134,10 @@ def negotiate(player, choice):
         increment = 200 * (1 + player.grade_index * 0.1)
         player.salary_bonus_per_step += increment
         rep_delta = 0
-        message = (f"Vous renoncez au bonus ponctuel pour une hausse de salaire "
-                   f"fixe de {increment:,.0f} par tour, désormais acquise.")
+        message = _L(f"Vous renoncez au bonus ponctuel pour une hausse de salaire "
+                     f"fixe de {increment:,.0f} par tour, désormais acquise.",
+                     f"You forgo the one-time bonus for a permanent fixed salary "
+                     f"increase of {increment:,.0f} per turn.")
         result = {"ok": True, "choice": choice, "bonus_paid": 0.0,
                   "rep_delta": rep_delta, "message": message}
 

@@ -27,37 +27,54 @@ Clés de perk (toutes optionnelles ; valeur par défaut = neutre) :
                           tension de la voie est un contrôle permanent, pas un pic isolé.
 """
 
+def _L(fr, en):
+    from core.i18n import get_lang
+    return en if get_lang() == "en" else fr
+
+
 PERKS = {
     "Portfolio": {
         "commission_mult": 0.5, "deal_bonus": 0.10,
-        "label": "Gestion active : commissions de trading réduites de moitié. "
-                 "Rythme régulier, sans à-coups particuliers.",
+        "label": ("Gestion active : commissions de trading réduites de moitié. "
+                  "Rythme régulier, sans à-coups particuliers.",
+                  "Active management: trading commissions halved. "
+                  "Steady pace, no particular swings."),
     },
     "M&A": {
         "deal_reward_mult": 1.3, "deal_bonus": 0.12,
         "deal_gen_prob_mult": 0.65, "deal_days_mult": 1.5,
-        "label": "Dealmaker : deals rares mais nettement plus rémunérateurs, et "
-                 "plus de temps pour les mener — peu de décisions, mais énormes.",
+        "label": ("Dealmaker : deals rares mais nettement plus rémunérateurs, et "
+                  "plus de temps pour les mener — peu de décisions, mais énormes.",
+                  "Dealmaker: rare deals but much more lucrative, and more time "
+                  "to close them — few decisions, but huge ones."),
     },
     "Risk": {
         "max_leverage_add": 0.5, "margin_spread_mult": 0.5, "maint_margin": 0.20,
         "deal_bonus": 0.10, "stresstest_period_mult": 0.5,
-        "label": "Gestion du risque : levier accru, marge moins chère, appels de "
-                 "marge plus cléments — mais stress tests réglementaires deux fois "
-                 "plus fréquents : sous contrôle permanent.",
+        "label": ("Gestion du risque : levier accru, marge moins chère, appels de "
+                  "marge plus cléments — mais stress tests réglementaires deux fois "
+                  "plus fréquents : sous contrôle permanent.",
+                  "Risk management: higher leverage, cheaper margin, gentler margin "
+                  "calls — but regulatory stress tests twice as frequent: under "
+                  "constant scrutiny."),
     },
     "Quant": {
         "deal_bonus": 0.18, "diff_relief": 0.06,
         "deal_gen_prob_mult": 1.4, "deal_days_mult": 0.6,
-        "label": "Quant : deals techniques fréquents mais à résoudre vite — "
-                 "beaucoup de petites décisions rapides plutôt que de gros coups.",
+        "label": ("Quant : deals techniques fréquents mais à résoudre vite — "
+                  "beaucoup de petites décisions rapides plutôt que de gros coups.",
+                  "Quant: frequent technical deals but to resolve quickly — "
+                  "lots of small, fast decisions rather than big plays."),
     },
     "Advisory": {
         "mandate_offer_mult": 1.7, "mandate_reward_mult": 1.3, "deal_bonus": 0.10,
-        "label": "Conseil : davantage de mandats clients, mieux rémunérés — le "
-                 "rythme se cale sur la relation client, pas sur le marché.",
+        "label": ("Conseil : davantage de mandats clients, mieux rémunérés — le "
+                  "rythme se cale sur la relation client, pas sur le marché.",
+                  "Advisory: more client mandates, better paid — the pace follows "
+                  "the client relationship, not the market."),
     },
-    "General": {"label": "Aucune spécialisation : choisissez une voie (TRACK)."},
+    "General": {"label": ("Aucune spécialisation : choisissez une voie (TRACK).",
+                          "No specialization: choose a track (TRACK).")},
 }
 
 _DEFAULTS = {
@@ -83,4 +100,5 @@ def deal_edge(player, deal):
 
 
 def label(track):
-    return PERKS.get(track, {}).get("label", "")
+    lbl = PERKS.get(track, {}).get("label")
+    return _L(*lbl) if lbl else ""

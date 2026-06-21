@@ -49,7 +49,7 @@ class AcademyScene(Scene):
             if len(p.learned) >= len(L.LESSONS):
                 from core import badges
                 for b in badges.check_new(p, self.app.market):
-                    self.app.notify(f"✶ Badge : {b['name']}", "prestige")
+                    self.app.notify(f"✶ Badge : {badges.badge_name(b)}", "prestige")
 
     def _scroll_to_cursor(self):
         """Ajuste le scroll pour garder la leçon sélectionnée au clavier visible."""

@@ -33,27 +33,34 @@ UNLOCKS = {
     "structured": 6,  # produits structurés (cash réellement investi)
 }
 
-LABELS = {
-    "analyst": "Outils d'analyse (watchlist, alertes, recherche, RV)",
-    "track": "Choix d'une voie de spécialisation",
-    "deals": "Traiter des deals",
-    "trade": "Investir (acheter / vendre / allouer)",
-    "pitch": "Démarcher des mandats (PITCH)",
-    "hedge": "Couverture du portefeuille (HEDGE)",
-    "leverage": "Levier & vente à découvert (SHORT/COVER)",
-    "mandates": "Mandats clients",
-    "ma": "M&A : acquisition de cibles privées",
-    "options": "Options sur actions (OPTIONS)",
-    "ipo": "Souscription aux IPO (IPO)",
-    "fx": "Desk FX (spot & forward) (FX)",
-    "calendar": "Calendrier macro (MACRO)",
-    "team": "Équipe d'analystes juniors (TEAM)",
-    "alm": "Desk ALM bancaire (ALM)",
-    "risk": "Module risque / VaR (RISK)",
-    "quant": "Module quant / pricing d'options (QUANT)",
-    "credit": "Titrisation / tranches de crédit (CREDIT)",
-    "structured": "Produits structurés (STRUCT)",
+def _L(fr, en):
+    from core.i18n import get_lang
+    return en if get_lang() == "en" else fr
+
+
+_LABELS_RAW = {
+    "analyst": ("Outils d'analyse (watchlist, alertes, recherche, RV)",
+                "Analysis tools (watchlist, alerts, research, comps)"),
+    "track": ("Choix d'une voie de spécialisation", "Choosing a specialization track"),
+    "deals": ("Traiter des deals", "Handling deals"),
+    "trade": ("Investir (acheter / vendre / allouer)", "Investing (buy / sell / allocate)"),
+    "pitch": ("Démarcher des mandats (PITCH)", "Pitching for mandates (PITCH)"),
+    "hedge": ("Couverture du portefeuille (HEDGE)", "Portfolio hedging (HEDGE)"),
+    "leverage": ("Levier & vente à découvert (SHORT/COVER)", "Leverage & short selling (SHORT/COVER)"),
+    "mandates": ("Mandats clients", "Client mandates"),
+    "ma": ("M&A : acquisition de cibles privées", "M&A: acquiring private targets"),
+    "options": ("Options sur actions (OPTIONS)", "Stock options (OPTIONS)"),
+    "ipo": ("Souscription aux IPO (IPO)", "Subscribing to IPOs (IPO)"),
+    "fx": ("Desk FX (spot & forward) (FX)", "FX desk (spot & forward) (FX)"),
+    "calendar": ("Calendrier macro (MACRO)", "Macro calendar (MACRO)"),
+    "team": ("Équipe d'analystes juniors (TEAM)", "Junior analyst team (TEAM)"),
+    "alm": ("Desk ALM bancaire (ALM)", "Bank ALM desk (ALM)"),
+    "risk": ("Module risque / VaR (RISK)", "Risk / VaR module (RISK)"),
+    "quant": ("Module quant / pricing d'options (QUANT)", "Quant / options pricing module (QUANT)"),
+    "credit": ("Titrisation / tranches de crédit (CREDIT)", "Securitization / credit tranches (CREDIT)"),
+    "structured": ("Produits structurés (STRUCT)", "Structured products (STRUCT)"),
 }
+LABELS = {k: v[0] for k, v in _LABELS_RAW.items()}
 
 # fonctionnalité -> id de tutoriel (data/tutorials.py) à proposer automatiquement
 # au déblocage (toutes les fonctionnalités n'ont pas de tutoriel dédié).
@@ -134,7 +141,8 @@ def cmd_unlocked(player, cmd):
 
 
 def feature_label(feature):
-    return LABELS.get(feature, feature)
+    raw = _LABELS_RAW.get(feature)
+    return _L(*raw) if raw else feature
 
 
 def next_unlock(player):
@@ -143,5 +151,5 @@ def next_unlock(player):
     for feat in UNLOCKS:
         g = effective_required_grade(player, feat)
         if g > player.grade_index and (best is None or g < best[1]):
-            best = (LABELS[feat], g)
+            best = (feature_label(feat), g)
     return best

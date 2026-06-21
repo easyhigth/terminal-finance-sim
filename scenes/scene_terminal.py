@@ -20,7 +20,10 @@ from core import rivals as rivals_mod
 from core import unlocks as unlocks_mod
 from core.i18n import get_lang
 from core.scene_manager import Scene
-from scenes.scene_terminal_commands import TerminalCommandsMixin
+from scenes.scene_terminal_market import TerminalMarketMixin
+from scenes.scene_terminal_trading import TerminalTradingMixin
+from scenes.scene_terminal_career import TerminalCareerMixin
+from scenes.scene_terminal_time import TerminalTimeMixin
 from scenes.scene_terminal_render import TerminalRenderMixin
 
 
@@ -93,7 +96,8 @@ SAMPLE_NEWS = {
 }
 
 
-class TerminalScene(TerminalCommandsMixin, TerminalRenderMixin, Scene):
+class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMixin,
+                     TerminalTimeMixin, TerminalRenderMixin, Scene):
     def on_enter(self, **kwargs):
         self.t = 0.0
         self.cmd = ""

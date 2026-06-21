@@ -29,6 +29,13 @@ TRANSFORMANT_MIN_GRADE = 9
 TRANSFORMANT_PROB = 0.07   # proba, SI une offre est générée, qu'elle soit transformante
 TRANSFORMANT_SCALE = 3.5
 
+CFA_REWARD_BONUS = 1.10   # un CFA Charterholder inspire davantage confiance aux clients
+
+
+def _cfa_mult(player):
+    from core import certifications
+    return CFA_REWARD_BONUS if certifications.is_complete(player, "CFA") else 1.0
+
 CLIENTS = [
     "Fonds de pension Helven", "Family Office Drax", "Assureur Norvik",
     "Fondation Maray", "Hedge Fund Cyrl", "Trésorerie Ostia", "Dotation Veles",
@@ -317,7 +324,8 @@ def maybe_offer(player, rng=None, market=None):
         "max_beta": max_beta,
         "reward_cash": round(capital * fee_pct * tracks.perk(player, "mandate_reward_mult")
                              * archetypes.perk(player, "mandate_reward_mult")
-                             * firms.perk(player, "mandate_reward_mult"), 2),
+                             * firms.perk(player, "mandate_reward_mult")
+                             * _cfa_mult(player), 2),
         "reward_rep": round(rng.randint(6, 11) * (3 if transformant else 1)
                             * client_profile["reward_rep_mult"]),
         "penalty_rep": round(rng.randint(4, 8) * client_profile["penalty_rep_mult"]),

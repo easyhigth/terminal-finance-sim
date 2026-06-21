@@ -73,3 +73,37 @@ def test_run_all_returns_pairs_in_order():
     e2 = O.add_screen(p, "etf", {"theme": "esg"})
     results = O.run_all(p, m, limit=5)
     assert [s["id"] for s, _ in results] == [e1["id"], e2["id"]]
+
+
+def test_check_alerts_pushes_one_inbox_message_per_matching_screen():
+    p, m = _setup()
+    O.add_screen(p, "stock", {"pe_max": 9999.0}, label="Large net")
+    before = len(p.inbox)
+    pushed = O.check_alerts(p, m)
+    assert len(pushed) == 1
+    assert len(p.inbox) == before + 1
+    assert p.inbox[-1]["kind"] == "research"
+
+
+def test_check_alerts_does_not_renotify_same_tickers():
+    p, m = _setup()
+    O.add_screen(p, "stock", {"pe_max": 9999.0})
+    first = O.check_alerts(p, m)
+    assert first  # premier passage : nouveaux résultats
+    second = O.check_alerts(p, m)
+    assert second == []  # rien de nouveau au second passage
+
+
+def test_check_alerts_no_matches_pushes_nothing():
+    p, m = _setup()
+    O.add_screen(p, "stock", {"pe_max": -1.0})  # aucune action n'a un P/E négatif
+    assert O.check_alerts(p, m) == []
+    assert p.inbox == []
+
+
+def test_check_alerts_handles_etf_screens_with_id_key():
+    p, m = _setup()
+    O.add_screen(p, "etf", {"theme": "esg"})
+    pushed = O.check_alerts(p, m)
+    if pushed:  # dépend du roster ETF disponible, mais ne doit jamais planter
+        assert pushed[0]["screen"]["kind"] == "etf"

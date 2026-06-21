@@ -1,6 +1,8 @@
 """Tests des mandats clients (core/mandates.py)."""
 import random
 
+import pytest
+
 from core import mandates, market
 from core.game_state import PlayerState
 
@@ -31,6 +33,21 @@ def test_maybe_offer_creates_offer_with_expected_fields():
                 "reward_cash", "reward_rep", "penalty_rep"):
         assert key in offer
     assert offer in p.mandate_offers
+
+
+def test_cfa_certification_boosts_mandate_reward_cash():
+    p_plain, _ = _mk()
+    p_cfa, _ = _mk()
+    p_cfa.certs["CFA"] = 3  # niveau max (cf. certifications.PROGRAMS["CFA"]["levels"])
+    rng_plain, rng_cfa = random.Random(1), random.Random(1)
+    offer_plain = offer_cfa = None
+    for _ in range(50):
+        offer_plain = offer_plain or mandates.maybe_offer(p_plain, rng_plain)
+        offer_cfa = offer_cfa or mandates.maybe_offer(p_cfa, rng_cfa)
+        if offer_plain and offer_cfa:
+            break
+    assert offer_plain is not None and offer_cfa is not None
+    assert offer_cfa["reward_cash"] == pytest.approx(offer_plain["reward_cash"] * mandates.CFA_REWARD_BONUS)
 
 
 def test_accept_moves_offer_to_active_with_snapshot():

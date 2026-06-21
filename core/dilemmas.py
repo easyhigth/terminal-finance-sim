@@ -255,14 +255,40 @@ def maybe_trigger(player, rng=None, base_prob=0.10):
 
 def apply_choice(player, dilemma, option_index):
     """Applique l'option choisie. Retourne l'option (avec son issue)."""
-    from core import archetypes, firms
+    from core import archetypes, certifications, firms
     opt = dilemma["options"][option_index]
     player.adjust_cash(opt["cash"])
     player.adjust_reputation(opt["rep"], reason=f"Décision : {dilemma['title']} → {opt['label']}")
     heat_delta = opt["heat"]
     if heat_delta > 0:
         heat_delta *= archetypes.perk(player, "heat_gain_mult") * firms.perk(player, "heat_gain_mult")
+        if certifications.is_complete(player, "FRM"):
+            # un Financial Risk Manager certifié anticipe et désamorce mieux
+            # le scrutin réglementaire généré par ses propres décisions
+            heat_delta *= 0.85
     player.heat = max(0, min(100, player.heat + heat_delta))
+    # certaines décisions ont un effet TANGIBLE sur l'état du jeu, pas
+    # seulement cosmétique : décliner le mandat prestigieux le fait perdre
+    # pour de bon (un rival le récupère) ; débaucher le talent rival affaiblit
+    # réellement ce rival (cf. core/rivals.py, déjà utilisé pour le sniping).
+    if dilemma["id"] == "mandate" and option_index == 1:
+        offers = getattr(player, "mandate_offers", None)
+        if offers:
+            from core import rivals as _rivals
+            o = offers.pop(0)
+            _rivals.ensure(player)
+            r = random.choice(player.rivals)
+            r["score"] += o.get("capital", 0) * 0.02
+            r["last"] = f"décroche un mandat décliné par vous ({o.get('client', '?')})"
+            r["mood"] = "up"
+    elif dilemma["id"] == "poach" and option_index == 0:
+        from core import rivals as _rivals
+        _rivals.ensure(player)
+        r = random.choice(player.rivals)
+        r["score"] = max(1000.0, r["score"] * 0.97)
+        r["last"] = "perd un talent débauché par vous"
+        r["mood"] = "down"
+
     # retire le dilemme de la file
     player.pending_dilemmas = [d for d in player.pending_dilemmas
                                if d.get("id") != dilemma.get("id")]

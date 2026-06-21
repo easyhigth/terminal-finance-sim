@@ -1,6 +1,8 @@
 """Tests des rivaux actifs (core/rivals.py)."""
 import random
 
+import pytest
+
 from core import career, ma, market, rivals
 from core.game_state import PlayerState
 
@@ -230,6 +232,74 @@ def test_rival_events_populated_and_capped():
     assert p.rival_events  # au moins une action a dû se produire en 400 tours
     for entry in p.rival_events:
         assert "text" in entry and "type" in entry
+
+
+def test_contestable_targets_empty_by_default():
+    p, _ = _mk()
+    assert rivals.contestable_targets(p) == []
+
+
+def test_contestable_targets_lists_rival_owned_tickers():
+    p, m = _mk()
+    target = ma.all_targets()[0]
+    p.rival_owned_targets = [target["ticker"]]
+    out = rivals.contestable_targets(p)
+    assert [t["ticker"] for t in out] == [target["ticker"]]
+
+
+def test_contest_target_not_claimed_is_rejected():
+    p, _ = _mk()
+    res = rivals.contest_target(p, "ZZZNOPE")
+    assert res == {"ok": False, "reason": "not_claimed"}
+
+
+def test_contest_target_insufficient_cash_is_rejected():
+    p, m = _mk()
+    target = ma.all_targets()[0]
+    p.rival_owned_targets = [target["ticker"]]
+    p.cash = 0.0
+    res = rivals.contest_target(p, target["ticker"], rng=random.Random(0))
+    assert res["ok"] is False
+    assert res["reason"] == "cash"
+    assert res["cost"] > 0
+    assert p.rival_owned_targets == [target["ticker"]]  # inchangé
+
+
+def test_contest_target_success_removes_target_and_weakens_rival():
+    p, m = _mk()
+    target = ma.all_targets()[0]
+    p.rival_owned_targets = [target["ticker"]]
+    p.cash = 10_000_000.0
+    rng = random.Random(0)
+    res = None
+    for seed in range(100):
+        p.rival_owned_targets = [target["ticker"]]
+        p.cash = 10_000_000.0
+        rivals.ensure(p)
+        scores_before = {r["name"]: r["score"] for r in p.rivals}
+        res = rivals.contest_target(p, target["ticker"], rng=random.Random(seed))
+        if res["ok"] and res["success"]:
+            assert target["ticker"] not in p.rival_owned_targets
+            rival = next(r for r in p.rivals if r["name"] == res["rival"])
+            assert rival["score"] <= scores_before[res["rival"]]
+            break
+    assert res is not None and res["ok"] and res["success"]
+
+
+def test_contest_target_failure_costs_cash_without_reclaiming():
+    p, m = _mk()
+    target = ma.all_targets()[0]
+    res = None
+    for seed in range(100):
+        p.rival_owned_targets = [target["ticker"]]
+        p.cash = 10_000_000.0
+        cash_before = p.cash
+        res = rivals.contest_target(p, target["ticker"], rng=random.Random(seed))
+        if res["ok"] and not res["success"]:
+            assert target["ticker"] in p.rival_owned_targets
+            assert p.cash == pytest.approx(cash_before - res["cost"])
+            break
+    assert res is not None and res["ok"] and not res["success"]
 
 
 def test_recent_activity_respects_limit():

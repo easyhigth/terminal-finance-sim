@@ -89,3 +89,31 @@ def performance_stats(player, group_by="regime"):
         g["avg_pnl"] = g["total_pnl"] / g["count"]
     out.sort(key=lambda g: g["count"], reverse=True)
     return out
+
+
+def discipline_score(player):
+    """Score de discipline (0-100) du journal : moitié pour la part de trades
+    clôturés documentés (raison renseignée), moitié pour leur taux de réussite
+    (celui des trades documentés s'il y en a, sinon celui de l'ensemble) — un
+    score élevé signale un joueur qui documente ses décisions ET dont cette
+    discipline paie. Ignore les positions encore ouvertes (`realized is None`).
+    Retourne None si aucun trade clôturé."""
+    closed = [e for e in player.trade_journal if e["realized"] is not None]
+    if not closed:
+        return None
+    reasoned = [e for e in closed if e.get("reason", "").strip()]
+    impulsive = [e for e in closed if not e.get("reason", "").strip()]
+    reasoned_share = len(reasoned) / len(closed) * 100.0
+
+    def _win_rate(entries):
+        if not entries:
+            return None
+        return sum(1 for e in entries if e["realized"] > 0) / len(entries) * 100.0
+
+    wr_reasoned = _win_rate(reasoned)
+    wr_impulsive = _win_rate(impulsive)
+    effectiveness = wr_reasoned if wr_reasoned is not None else _win_rate(closed)
+    score = round(0.5 * reasoned_share + 0.5 * effectiveness, 1)
+    return {"score": score, "reasoned_share": round(reasoned_share, 1),
+            "win_rate_reasoned": wr_reasoned, "win_rate_impulsive": wr_impulsive,
+            "n_closed": len(closed)}

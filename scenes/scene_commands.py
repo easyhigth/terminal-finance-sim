@@ -40,6 +40,7 @@ CATALOG = [
         ("INBOX / MAIL", "Messagerie (manager, clients, conformité, desk)"),
         ("DECIDE / DILEMMA", "Trancher un dilemme en attente (éthique/régl.)"),
         ("RIVALS", "Rivaux : classement, némésis, dernières actions"),
+        ("RECLAIM [ticker]", "Contre-offre sur une cible M&A raflée par un rival"),
         ("MANDATES", "Voir offres et mandats clients en cours"),
         ("MANDATE ACCEPT <id>", "Accepter un mandat (objectif + risque)"),
         ("MANDATE DECLINE <id>", "Refuser une offre de mandat"),

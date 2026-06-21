@@ -23,9 +23,12 @@ def max_leverage(grade_index):
 
 
 def _max_leverage(player):
-    """Levier maximal effectif (bonus de voie Risk + ADN de firme inclus)."""
+    """Levier maximal effectif (bonus de voie Risk + ADN de firme + rigueur
+    quantitative certifiée CQF inclus)."""
+    from core import certifications
+    bonus = 0.25 if certifications.is_complete(player, "CQF") else 0.0
     return (max_leverage(player.grade_index) + tracks.perk(player, "max_leverage_add")
-            + firms.perk(player, "max_leverage_add"))
+            + firms.perk(player, "max_leverage_add") + bonus)
 
 
 def _maint_margin(player):

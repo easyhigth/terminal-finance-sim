@@ -111,3 +111,36 @@ def test_performance_stats_groups_by_reason():
     momentum = next(g for g in stats if g["label"] == "momentum")
     assert momentum["count"] == 2
     assert momentum["total_pnl"] == 15.0
+
+
+def test_discipline_score_none_without_closed_trades():
+    p, m = _setup()
+    J.log_trade(p, m, asset_class="Action", key="ABC", label="ABC",
+                side="achat", qty=1, price=1.0)  # position ouverte, pas de realized
+    assert J.discipline_score(p) is None
+
+
+def test_discipline_score_full_marks_when_all_reasoned_and_winning():
+    p, m = _setup()
+    for i in range(3):
+        J.log_trade(p, m, asset_class="Action", key=f"T{i}", label=f"T{i}",
+                    side="vente", qty=1, price=1.0, realized=10.0, reason="thèse documentée")
+    d = J.discipline_score(p)
+    assert d["reasoned_share"] == 100.0
+    assert d["win_rate_reasoned"] == 100.0
+    assert d["win_rate_impulsive"] is None
+    assert d["score"] == 100.0
+
+
+def test_discipline_score_rewards_reasoned_trades_winning_more_than_impulsive():
+    p, m = _setup()
+    J.log_trade(p, m, asset_class="Action", key="A", label="A",
+                side="vente", qty=1, price=1.0, realized=10.0, reason="thèse")
+    J.log_trade(p, m, asset_class="Action", key="B", label="B",
+                side="vente", qty=1, price=1.0, realized=-5.0)  # sans raison, perdant
+    d = J.discipline_score(p)
+    assert d["reasoned_share"] == 50.0
+    assert d["win_rate_reasoned"] == 100.0
+    assert d["win_rate_impulsive"] == 0.0
+    assert 0.0 < d["score"] < 100.0
+    assert d["n_closed"] == 2

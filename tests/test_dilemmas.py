@@ -147,3 +147,48 @@ def test_maybe_investigate_never_triggers_below_threshold():
         assert result is None
         if p.heat == 0:
             break
+
+
+def test_apply_choice_frm_certification_reduces_heat_gain():
+    d = {"id": "z", "category": "ethique", "title": "Test",
+         "options": [{"label": "A", "cash": 0, "rep": 0, "heat": 50, "outcome": "x"}]}
+    p_plain = _player(grade_index=2, heat=0)
+    dilemmas.apply_choice(p_plain, d, 0)
+    p_frm = _player(grade_index=2, heat=0)
+    p_frm.certs["FRM"] = 2  # niveau max (cf. certifications.PROGRAMS["FRM"]["levels"])
+    dilemmas.apply_choice(p_frm, d, 0)
+    assert p_frm.heat < p_plain.heat
+    assert p_frm.heat == pytest.approx(50 * 0.85)
+
+
+def _generate_with_id(p, dilemma_id, category):
+    """generate() pioche au hasard dans la catégorie : on boucle jusqu'à
+    obtenir le dilemme voulu pour disposer de ses options déjà mises à
+    l'échelle (champ `cash`, pas le `cash_k` brut du template)."""
+    for seed in range(200):
+        d = dilemmas.generate(p, rng=random.Random(seed), category=category)
+        if d is not None and d["id"] == dilemma_id:
+            return d
+    raise AssertionError(f"dilemme {dilemma_id} jamais généré")
+
+
+def test_apply_choice_decline_mandate_removes_offer_and_boosts_a_rival():
+    p = _player(grade_index=3)
+    p.mandate_offers = [{"id": 1, "client": "Caisse XYZ", "capital": 1_000_000}]
+    d = _generate_with_id(p, "mandate", "strategie")
+    before = [r["score"] for r in (p.rivals or [])]
+    dilemmas.apply_choice(p, d, 1)  # "Décliner pour rester concentré"
+    assert p.mandate_offers == []
+    after = [r["score"] for r in p.rivals]
+    assert any(a > b for a, b in zip(after, before)) or not before
+
+
+def test_apply_choice_accept_poach_weakens_a_rival():
+    p = _player(grade_index=6)
+    from core import rivals as rivals_mod
+    rivals_mod.ensure(p)
+    before = [r["score"] for r in p.rivals]
+    d = _generate_with_id(p, "poach", "strategie")
+    dilemmas.apply_choice(p, d, 0)  # "Le recruter"
+    after = [r["score"] for r in p.rivals]
+    assert any(a < b for a, b in zip(after, before))

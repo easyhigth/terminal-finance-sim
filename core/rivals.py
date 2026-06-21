@@ -263,3 +263,54 @@ def act(player, market, rng=None):
             _log_rival_event(player, ev)
 
     return events
+
+
+# ---------------------------------------------------------------------------
+# CONTRE-ATTAQUE — le joueur peut reprendre une cible M&A raflée (act(),
+# branche "claim_target") plutôt que de la perdre définitivement : un
+# levier offensif face à la pression concurrentielle subie passivement.
+# ---------------------------------------------------------------------------
+CONTEST_COST_PCT = 0.05   # frais de contre-offre (% du prix demandé de la cible)
+CONTEST_BASE_PROB = 0.45  # probabilité de succès
+
+
+def contestable_targets(player):
+    """Cibles M&A actuellement détenues par un rival, donc contestables."""
+    from core import ma
+    tickers = getattr(player, "rival_owned_targets", None) or []
+    return [ma.get_target(t) for t in tickers if ma.get_target(t)]
+
+
+def contest_target(player, ticker, rng=None):
+    """Tente de reprendre une cible M&A raflée par un rival : coûte des frais
+    de contre-offre (non remboursés en cas d'échec), succès non garanti. En
+    cas de succès, la cible redevient acquérable (cf. core/ma.py::is_taken)
+    et le rival concerné en pâtit (score réduit)."""
+    rng = rng or random
+    from core import ma
+    owned = getattr(player, "rival_owned_targets", None) or []
+    if ticker not in owned:
+        return {"ok": False, "reason": "not_claimed"}
+    target = ma.get_target(ticker)
+    if not target:
+        return {"ok": False, "reason": "target"}
+    cost = round(ma.ask_price(target) * CONTEST_COST_PCT, 2)
+    if player.cash < cost:
+        return {"ok": False, "reason": "cash", "cost": cost}
+    player.adjust_cash(-cost)
+    ensure(player, rng)
+    r = _rival_of_track(player, "M&A", rng)
+    success = rng.random() < CONTEST_BASE_PROB
+    if success:
+        player.rival_owned_targets = [t for t in owned if t != ticker]
+        r["score"] = max(1000.0, r["score"] - target.get("revenue", 0) * 0.3)
+        _set_action(r, _L(f"perd « {target['name']} » face à votre contre-offre",
+                          f"loses “{target['name']}” to your counter-bid"), "down")
+        player.adjust_reputation(3, reason=_L(
+            f"Cible M&A reprise sur {r['name']} : {target['name']}",
+            f"M&A target reclaimed from {r['name']}: {target['name']}"))
+    else:
+        player.adjust_reputation(-1, reason=_L(
+            f"Contre-offre échouée sur {target['name']}",
+            f"Failed counter-bid on {target['name']}"))
+    return {"ok": True, "success": success, "cost": cost, "rival": r["name"], "target": target["name"]}

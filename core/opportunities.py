@@ -48,3 +48,32 @@ def run_all(player, market, limit=10):
     """Exécute tous les critères sauvegardés et retourne une liste de
     `(screen, résultats)`, dans l'ordre de sauvegarde."""
     return [(s, run_screen(market, s, limit=limit)) for s in player.saved_screens]
+
+
+ALERT_LIMIT = 5  # nb max de nouveaux résultats remontés par alerte/critère
+
+
+def check_alerts(player, market):
+    """Évalue chaque critère sauvegardé contre le marché courant et notifie
+    (inbox) les résultats NOUVEAUX depuis la dernière vérification — la liste
+    des clés déjà vues est mémorisée sur le critère (`_seen`) pour qu'un même
+    titre ne déclenche qu'une seule alerte. Retourne la liste des alertes
+    poussées ce tour (pour tests), [] si rien de nouveau."""
+    from core import inbox
+    pushed = []
+    for screen in player.saved_screens:
+        seen = screen.setdefault("_seen", [])
+        key_field = "ticker" if screen["kind"] == "stock" else "id"
+        results = run_screen(market, screen, limit=ALERT_LIMIT)
+        new = [r for r in results if r.get(key_field) not in seen]
+        if not new:
+            continue
+        seen.extend(r.get(key_field) for r in new)
+        names = ", ".join(f"{r.get('name', '?')} ({r.get(key_field, '?')})" for r in new)
+        msg = inbox.push(
+            player, "research", "Veille marché",
+            f"Nouveau résultat : {screen['label']}",
+            f"Votre critère sauvegardé « {screen['label']} » trouve {len(new)} "
+            f"nouvelle(s) correspondance(s) : {names}.")
+        pushed.append({"screen": screen, "new": new, "message": msg})
+    return pushed

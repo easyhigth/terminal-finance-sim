@@ -42,6 +42,13 @@ def test_private_max_leverage_includes_risk_track_perk():
     assert pm._max_leverage(p_risk) == pytest.approx(pm._max_leverage(p_general) + 0.5)
 
 
+def test_private_max_leverage_includes_cqf_bonus():
+    p, _ = _setup(grade_index=4, track="General")
+    base = pm._max_leverage(p)
+    p.certs["CQF"] = 1  # niveau max (cf. certifications.PROGRAMS["CQF"]["levels"])
+    assert pm._max_leverage(p) == pytest.approx(base + 0.25)
+
+
 def test_private_maint_margin_default_vs_risk_perk():
     p_general, _ = _setup(track="General")
     p_risk, _ = _setup(track="Risk")

@@ -345,6 +345,13 @@ class TerminalTradingMixin:
             self._log(_L("  Aucun trade clôturé avec P&L réalisé pour le moment.",
                          "  No closed trade with realized P&L yet."))
             return
+        disc = journal_mod.discipline_score(p)
+        if disc is not None:
+            self._log(_L(
+                f"  Discipline : {disc['score']:.0f}/100  "
+                f"(trades documentés : {disc['reasoned_share']:.0f}%).",
+                f"  Discipline: {disc['score']:.0f}/100  "
+                f"(documented trades: {disc['reasoned_share']:.0f}%)."))
         rows = [(g["label"], str(g["count"]), f"{g['win_rate']:.0f}%",
                  f"{g['avg_pnl']:+.0f}", f"{g['total_pnl']:+.0f}") for g in stats]
         title = (_L("BILAN PAR RÉGIME", "STATS BY REGIME") if group_by == "regime"

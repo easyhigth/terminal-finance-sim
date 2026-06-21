@@ -428,6 +428,12 @@ class GameState:
                     p.adjust_reputation(-2, reason=reason)
             else:
                 p.flags["risk_breach_streak"] = 0
+            # veille marché : critères sauvegardés (core/opportunities.py) ->
+            # notification inbox dès qu'un nouveau titre matche (une seule fois
+            # par titre/critère, cf. `_seen` mémorisé sur le critère)
+            if getattr(p, "saved_screens", None):
+                from core import opportunities as _opportunities
+                _opportunities.check_alerts(p, market)
             # produits structurés arrivés à échéance
             if getattr(p, "structured", None):
                 from core import structured as _struct

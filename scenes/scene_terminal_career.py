@@ -11,8 +11,10 @@ from core import career as career_mod
 from core import config
 from core import deals as deals_mod
 from core import legacy as legacy_mod
+from core import ma as ma_mod
 from core import mandates as mandates_mod
 from core import market as market_mod
+from core import rivals as rivals_mod
 from core import scenarios as scenarios_mod
 from core.i18n import get_lang
 from ui import widgets
@@ -63,6 +65,50 @@ class TerminalCareerMixin:
                 p.flags["can_choose_track"] = True
             self._log(_L(f"  ⊕ Grade max ({config.GRADES[-1]}) : toutes les actions débloquées.", f"  ⊕ Top grade ({config.GRADES[-1]}): all actions unlocked."))
             self._check_badges()
+
+    def _cmd_reclaim(self, args):
+        """RECLAIM : liste les cibles M&A raflées par un rival (act(), branche
+        claim_target) et donc contestables. RECLAIM <ticker> : tente une
+        contre-offre (frais non remboursés en cas d'échec, succès non garanti)."""
+        p = self.app.gs.player
+        targets = rivals_mod.contestable_targets(p)
+        if not args:
+            if not targets:
+                self._log(_L("  Aucune cible M&A contestable pour le moment.",
+                             "  No contestable M&A target right now."))
+                return
+            rows = [((t["ticker"], config.COL_AMBER), t["name"],
+                     widgets.format_money(ma_mod.ask_price(t) * rivals_mod.CONTEST_COST_PCT, self._cur()))
+                    for t in targets]
+            self._open_window(_L("CIBLES CONTESTABLES", "CONTESTABLE TARGETS"),
+                              [("Tk", 60), ("Nom", 160), (_L("Frais", "Fee"), 120)], rows)
+            self._log(_L("  RECLAIM <ticker> pour tenter une contre-offre.",
+                         "  RECLAIM <ticker> to attempt a counter-bid."))
+            return
+        ticker = args[0].upper()
+        res = rivals_mod.contest_target(p, ticker)
+        if not res["ok"]:
+            reasons = {
+                "not_claimed": _L("  Cette cible n'est pas détenue par un rival.",
+                                  "  This target isn't held by a rival."),
+                "target": _L("  Cible inconnue.", "  Unknown target."),
+                "cash": _L(f"  Trésorerie insuffisante (frais : {widgets.format_money(res.get('cost', 0), self._cur())}).",
+                           f"  Insufficient cash (fee: {widgets.format_money(res.get('cost', 0), self._cur())})."),
+            }
+            self._log(reasons.get(res["reason"], _L("  Échec.", "  Failed.")))
+            return
+        if res["success"]:
+            self._log(_L(
+                f"  ✓ Contre-offre réussie : {res['target']} reprise sur {res['rival']} "
+                f"(frais {widgets.format_money(res['cost'], self._cur())}).",
+                f"  ✓ Counter-bid succeeded: {res['target']} reclaimed from {res['rival']} "
+                f"(fee {widgets.format_money(res['cost'], self._cur())})."))
+        else:
+            self._log(_L(
+                f"  ✗ Contre-offre échouée face à {res['rival']} sur {res['target']} "
+                f"(frais perdus : {widgets.format_money(res['cost'], self._cur())}).",
+                f"  ✗ Counter-bid failed against {res['rival']} on {res['target']} "
+                f"(fee lost: {widgets.format_money(res['cost'], self._cur())})."))
 
     def _cmd_crisis(self, args):
         """Déclenche un scénario de crise/stress test ad hoc — mode bac à sable

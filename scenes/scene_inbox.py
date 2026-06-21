@@ -16,6 +16,7 @@ _KIND = {
     "desk": ("DESK", config.COL_TEXT),
     "hr": ("RH", config.COL_UP),
     "country": ("PAYS", config.COL_PRESTIGE),
+    "research": ("VEILLE", config.COL_CYAN),
 }
 FILTER_CHIPS = [(None, "TOUS")] + [(k, v[0]) for k, v in _KIND.items()]
 ROW_H = 46

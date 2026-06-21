@@ -2,10 +2,13 @@
 scene_analytics.py — Analyse DÉTAILLÉE du portefeuille (toutes classes d'actifs).
 
 Tableau de bord complet : indicateurs clés (valeur nette, P&L, bêta, levier,
-volatilité, drawdown, concentration), table des positions avec poids et P&L,
-répartitions (classe / secteur / région), matrice de corrélation des actions et
-frontière efficiente estimée sur l'historique réel avec la position courante.
-Ouvert via la commande PA (ou le bouton ANALYSE du livre de positions).
+volatilité, drawdown, concentration), indicateurs de risque avancés (Sharpe,
+Sortino, Treynor, Calmar, VaR 95%, CVaR 95%, tracking error, rendement
+annualisé), table des positions (toutes classes, cliquables) avec poids et
+P&L, répartitions (classe / secteur / région / liquidité), matrice de
+corrélation des actions et frontière efficiente estimée sur l'historique réel
+avec la position courante. Ouvert via la commande PA (ou le bouton ANALYSE du
+livre de positions).
 """
 import pygame
 
@@ -15,7 +18,9 @@ from ui import fonts, widgets
 from ui.popups import PopupMixin
 
 _CLASS_COL = {"Actions": config.COL_AMBER, "Obligations": config.COL_CYAN,
-              "Matières": config.COL_WARN, "Crypto": config.COL_PRESTIGE}
+              "Matières": config.COL_WARN, "Crypto": config.COL_PRESTIGE,
+              "ETF": config.COL_PRESTIGE, "Structurés": config.COL_PRESTIGE,
+              "Crédit": config.COL_PRESTIGE}
 
 
 class AnalyticsScene(Scene, PopupMixin):
@@ -25,10 +30,32 @@ class AnalyticsScene(Scene, PopupMixin):
         self.init_popups()
         self.back_btn = widgets.Button(
             config.back_button_rect(180), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
-        self._holding_rects = {}    # ticker -> Rect (clic → fiche flottante)
-        self._chart_rects = {}      # ticker -> Rect (clic → graphe flottant, rendement)
+        self.book_btn = widgets.Button(
+            (240, config.SCREEN_HEIGHT - 50, 170, 42), "📒 PORTEFEUILLE", config.COL_AMBER)
+        self.stress_btn = widgets.Button(
+            (420, config.SCREEN_HEIGHT - 50, 170, 42), "⚠ STRESS TEST", config.COL_DOWN)
+        self._holding_rects = {}    # label -> Rect (clic → fiche flottante, toutes classes)
+        self._chart_rects = {}      # ticker -> Rect (clic → graphe flottant, actions uniquement)
+        self._row_cls = {}
         self._frontier_rect = None
         self._corr_rect = None
+
+    def _open_holding(self, label):
+        kind = self._row_cls.get(label)
+        if kind == "Actions":
+            self.open_company(label)
+        elif kind == "ETF":
+            self.open_etf(label)
+        elif kind == "Obligations":
+            self.open_bond(label)
+        elif kind == "Matières":
+            self.open_commodity(label)
+        elif kind == "Crypto":
+            self.open_crypto(label)
+        elif kind == "Structurés":
+            self.open_structured(label)
+        elif kind == "Crédit":
+            self.open_credit(label)
 
     def handle_event(self, event):
         if self.popups_handle_event(event):
@@ -39,10 +66,17 @@ class AnalyticsScene(Scene, PopupMixin):
             return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+            return
+        if self.book_btn.handle(event):
+            self.app.scenes.go("book", return_to="analytics")
+            return
+        if self.stress_btn.handle(event):
+            self.app.scenes.go("stresstest", return_to="analytics")
+            return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for tk, rect in self._holding_rects.items():
                 if rect.collidepoint(event.pos):
-                    self.open_company(tk)
+                    self._open_holding(tk)
                     return
             for tk, rect in self._chart_rects.items():
                 if rect.collidepoint(event.pos):
@@ -62,7 +96,10 @@ class AnalyticsScene(Scene, PopupMixin):
                 return
 
     def update(self, dt):
-        self.back_btn.update(pygame.mouse.get_pos(), dt)
+        mp = pygame.mouse.get_pos()
+        self.back_btn.update(mp, dt)
+        self.book_btn.update(mp, dt)
+        self.stress_btn.update(mp, dt)
 
     # -------------------------------------------------------------- draw
     def draw(self, surf):
@@ -87,7 +124,8 @@ class AnalyticsScene(Scene, PopupMixin):
             return
 
         self._draw_tiles(surf, s, cur)
-        top = 176
+        self._draw_risk_tiles(surf, s)
+        top = 232
         M = config.MARGIN
         bottom = config.footer_y() - 8
         h = bottom - top
@@ -102,7 +140,20 @@ class AnalyticsScene(Scene, PopupMixin):
         self._draw_allocations(surf, pygame.Rect(x2, top, mw, h), s, cur)
         self._draw_risk_charts(surf, pygame.Rect(x3, top, rw, h), p, m, s)
         self.back_btn.draw(surf)
+        self.book_btn.draw(surf)
+        self.stress_btn.draw(surf)
         self.popups_draw(surf)
+
+    def _draw_tile_row(self, surf, y, tiles, row_h=52):
+        n = len(tiles)
+        gap = 8
+        tw = (config.SCREEN_WIDTH - 2 * config.MARGIN - gap * (n - 1)) // n
+        x = config.MARGIN
+        for label, val, col in tiles:
+            widgets.draw_tile(surf, pygame.Rect(x, y, tw, row_h), label, "", config.COL_AMBER)
+            widgets.draw_text(surf, widgets.fit_text(val, fonts.body(bold=True), tw - 14),
+                              (x + 8, y + 24), fonts.body(bold=True), col)
+            x += tw + gap
 
     def _draw_tiles(self, surf, s, cur):
         fm = lambda v: widgets.format_money(v, cur)
@@ -123,15 +174,28 @@ class AnalyticsScene(Scene, PopupMixin):
             ("Exposition nette", fm(s["net_exposure"]),
              config.COL_UP if s["net_exposure"] >= 0 else config.COL_DOWN),
         ]
-        n = len(tiles)
-        gap = 8
-        tw = (config.SCREEN_WIDTH - 2 * config.MARGIN - gap * (n - 1)) // n
-        x = config.MARGIN
-        for label, val, col in tiles:
-            widgets.draw_tile(surf, pygame.Rect(x, 96, tw, 64), label, "", config.COL_AMBER)
-            widgets.draw_text(surf, widgets.fit_text(val, fonts.body(bold=True), tw - 14),
-                              (x + 8, 96 + 30), fonts.body(bold=True), col)
-            x += tw + gap
+        self._draw_tile_row(surf, 92, tiles)
+
+    def _draw_risk_tiles(self, surf, s):
+        tiles = [
+            ("Rdt annualisé", f"{s['annualized_return']:+.1f}%",
+             config.COL_UP if s["annualized_return"] >= 0 else config.COL_DOWN),
+            ("Sharpe", f"{s['sharpe']:.2f}",
+             config.COL_UP if s["sharpe"] >= 0 else config.COL_DOWN),
+            ("Sortino", f"{s['sortino']:.2f}",
+             config.COL_UP if s["sortino"] >= 0 else config.COL_DOWN),
+            ("Treynor", f"{s['treynor']:.2f}",
+             config.COL_UP if s["treynor"] >= 0 else config.COL_DOWN),
+            ("Calmar", f"{s['calmar']:.2f}",
+             config.COL_UP if s["calmar"] >= 0 else config.COL_DOWN),
+            ("VaR 95%", f"{s['var95']:.1f}%", config.COL_DOWN),
+            ("CVaR 95%", f"{s['cvar95']:.1f}%", config.COL_DOWN),
+            ("Tracking error", f"{s['tracking_error']:.1f}%", config.COL_TEXT),
+            ("Récup. (pas)", "—" if s["recovery_time"] is None else f"{s['recovery_time']}",
+             config.COL_WARN if s["recovery_time"] is None else config.COL_TEXT),
+            ("Lignes effectives", f"{s['effective_positions']:.1f}", config.COL_TEXT),
+        ]
+        self._draw_tile_row(surf, 148, tiles)
 
     def _draw_holdings(self, surf, rect, s, cur):
         inner = widgets.draw_panel(surf, rect, "Positions détaillées", config.COL_CYAN)
@@ -147,17 +211,19 @@ class AnalyticsScene(Scene, PopupMixin):
         mp = pygame.mouse.get_pos()
         self._holding_rects = {}
         self._chart_rects = {}
+        self._row_cls = {}
         for h in s["rows"][:maxrows]:
             ccol = _CLASS_COL.get(h["cls"], config.COL_TEXT)
-            clickable = h["cls"] == "Actions"     # tickers d'actions = sociétés du marché
-            if clickable:
-                tk = h["label"]
-                name_rect = pygame.Rect(inner.x, y - 2, 300, row_h - 2)
+            tk = h["label"]
+            self._row_cls[tk] = h["cls"]
+            name_rect = pygame.Rect(inner.x, y - 2, 300, row_h - 2)
+            self._holding_rects[tk] = name_rect
+            if h["cls"] == "Actions":      # graphe de cours dispo seulement pour les actions
                 value_rect = pygame.Rect(inner.x + 300, y - 2, inner.w - 300, row_h - 2)
-                self._holding_rects[tk] = name_rect
                 self._chart_rects[tk] = value_rect
-                if name_rect.collidepoint(mp) or value_rect.collidepoint(mp):
-                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, (inner.x, y - 2, inner.w, row_h - 2))
+            if name_rect.collidepoint(mp) or (h["cls"] == "Actions" and
+                                              self._chart_rects[tk].collidepoint(mp)):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, (inner.x, y - 2, inner.w, row_h - 2))
             pygame.draw.rect(surf, ccol, (inner.x, y + 2, 6, 14))
             tag = "S" if h["short"] else " "
             widgets.draw_text(surf, tag, (inner.x + 10, y), fonts.tiny(bold=True), config.COL_DOWN)
@@ -188,7 +254,7 @@ class AnalyticsScene(Scene, PopupMixin):
         if len(s["rows"]) > maxrows:
             widgets.draw_text(surf, f"… +{len(s['rows'])-maxrows} autres",
                               (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
-        widgets.draw_text(surf, "clic action → fiche · clic cours/valeur/P&L → graphe",
+        widgets.draw_text(surf, "clic actif → fiche d'analyse · clic cours/valeur/P&L (actions) → graphe",
                           (inner.x, inner.bottom - 12), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_allocations(self, surf, rect, s, cur):

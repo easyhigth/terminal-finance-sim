@@ -84,6 +84,33 @@ def holdings_table(player, market):
                          "pnl_pct": (h.get("pnl", 0) / base * 100) if base else 0.0,
                          "short": False, "liquidity": liq.crypto_tier(cid),
                          "ann_vol": float(cc[4]) if cc else 0.0})
+    if getattr(player, "etfs", None):
+        from core import etfs
+        for h in etfs.holdings(player, market):
+            base = h["avg"] * h["qty"]
+            rows.append({"label": h["id"], "name": h["name"], "cls": "ETF",
+                         "qty": h["qty"], "avg": h["avg"], "price": h["price"],
+                         "value": h["value"], "pnl": h["pnl"],
+                         "pnl_pct": (h["pnl"] / base * 100) if base else 0.0,
+                         "short": False,
+                         "liquidity": "Illiquide" if h.get("risk") == "Levier" else "Peu liquide",
+                         "ann_vol": abs(etfs.beta_world(etfs._BY_ID[h["id"]])) * _market.VOL_WORLD
+                         * np.sqrt(STEPS_PER_YEAR) if h["id"] in etfs._BY_ID else 0.0})
+    if getattr(player, "structured", None):
+        from core import structured
+        for h in structured.holdings(player, market):
+            rows.append({"label": h.get("tpl_id", h["name"]), "name": h["name"],
+                         "cls": "Structurés", "qty": 1, "avg": h["notional"],
+                         "price": h["notional"], "value": h["notional"],
+                         "pnl": 0.0, "pnl_pct": 0.0, "short": False,
+                         "liquidity": "Illiquide", "ann_vol": 0.0})
+    if getattr(player, "securitised", None):
+        from core import securitisation
+        for h in securitisation.holdings(player, market):
+            rows.append({"label": h["name"], "name": h["name"], "cls": "Crédit",
+                         "qty": 1, "avg": h["notional"], "price": h["notional"],
+                         "value": h["notional"], "pnl": 0.0, "pnl_pct": 0.0,
+                         "short": False, "liquidity": "Illiquide", "ann_vol": 0.0})
     gross = sum(abs(r["value"]) for r in rows) or 1.0
     risk_base = sum(abs(r["value"]) * r["ann_vol"] for r in rows) or 1.0
     for r in rows:
@@ -229,19 +256,35 @@ def summary(player, market):
     hhi = sum(w * w for w in weights)
     eff_n = (1.0 / hhi) if hhi else 0.0           # nombre effectif de lignes
     ms = pf.margin_status(player, market)
+    hist = getattr(player, "cash_history", [])
+    rets = charts.simple_returns(hist) if len(hist) >= 3 else []
+    beta = pf.portfolio_beta(player, market)
+    mdd = max_drawdown(hist)
+    ann_ret = (rets and float(np.mean(rets)) * STEPS_PER_YEAR) or 0.0
+    sharpe = (finmath.sharpe_ratio(np.array([1.0]),
+                                   np.array([float(np.mean(rets)) * STEPS_PER_YEAR]),
+                                   np.array([[float(np.var(rets)) * STEPS_PER_YEAR]]))
+              if len(rets) >= 5 else 0.0)
+    sortino = finmath.sortino_ratio(rets) * STEPS_PER_YEAR if len(rets) >= 5 else 0.0
+    var95 = finmath.value_at_risk(rets) * 100.0 if len(rets) >= 5 else 0.0
+    cvar95 = finmath.conditional_var(rets) * 100.0 if len(rets) >= 5 else 0.0
+    treynor = finmath.treynor_ratio(ann_ret, beta) if beta else 0.0
+    calmar = finmath.calmar_ratio(ann_ret, mdd / 100.0) if mdd else 0.0
     return {
         "rows": rows,
         "net_worth": nw, "cash": cash, "invested": invested,
         "unrealized_pnl": upnl, "realized_pnl": getattr(player, "realized_pnl", 0.0),
-        "beta": pf.portfolio_beta(player, market),
+        "beta": beta,
         "leverage": ms["leverage"], "gross": ms["gross"], "net_exposure": net_exposure,
         "buying_power": ms["buying_power"], "margin_call": ms["margin_call"],
         "volatility": equity_volatility(player, market),
-        "max_drawdown": max_drawdown(getattr(player, "cash_history", [])),
-        "recovery_time": recovery_time(getattr(player, "cash_history", [])),
+        "max_drawdown": mdd,
+        "recovery_time": recovery_time(hist),
         "tracking_error": tracking_error(player, market),
         "by_class": by_class, "by_sector": by_sector, "by_region": by_region,
         "by_liquidity": by_liquidity,
         "top_weight": (max(weights) * 100 if weights else 0.0),
         "hhi": hhi, "effective_positions": eff_n, "n_positions": len(rows),
+        "sharpe": sharpe, "sortino": sortino, "var95": var95, "cvar95": cvar95,
+        "treynor": treynor, "calmar": calmar, "annualized_return": ann_ret * 100.0,
     }

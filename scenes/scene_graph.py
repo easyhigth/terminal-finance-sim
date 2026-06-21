@@ -20,14 +20,30 @@ Ouvrable depuis la console (GP/GPC/COMP/...), ou via le bouton GRAPHE des fiches
 """
 import pygame
 
+from core import bonds as BND
 from core import charts, config, indicators
+from core import commodities as CMD
+from core import crypto as CRY
 from core import etfs as ETF
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
 
 def _asset_exists(market, tk):
-    return tk in market.ticker_idx or ETF.exists(tk)
+    return (tk in market.ticker_idx or ETF.exists(tk) or tk in BND._BY_ID
+            or tk in CMD._BY_ID or tk in CRY._BY_ID)
+
+
+def _asset_kind(tk):
+    if tk in BND._BY_ID:
+        return "bond"
+    if tk in CMD._BY_ID:
+        return "commodity"
+    if tk in CRY._BY_ID:
+        return "crypto"
+    if ETF.exists(tk):
+        return "etf"
+    return "stock"
 
 # (code, libellé court, kind, multi-actifs ?)
 TYPES = [
@@ -80,6 +96,7 @@ class GraphScene(Scene):
         self._suggest_rects = []
         self._chip_rects = []
         self._quickadd_rects = []
+        self._info_name_rect = None
         self._controls_bottom = 168
         self.back_btn = widgets.Button(
             config.back_button_rect(180), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
@@ -131,6 +148,9 @@ class GraphScene(Scene):
             for steps, rect in self._period_rects.items():
                 if rect.collidepoint(event.pos):
                     self.period = steps
+            if self._info_name_rect and self._info_name_rect.collidepoint(event.pos) and self.tickers:
+                self.app.scenes.go("explorer", return_to=self.return_to, search=self.tickers[0])
+                return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
         if self.kind == "spread" and self.mode_btn.handle(event):
@@ -172,8 +192,57 @@ class GraphScene(Scene):
                 btn.update(mp, dt)
 
     # -------------------------------------------------------------- data
+    def _info_for(self, tk):
+        """Infos clés de l'actif `tk` pour la barre au-dessus des onglets de
+        graphe : type, région, secteur et valeurs clés — None si non disponible."""
+        kind = _asset_kind(tk)
+        if kind == "stock":
+            mt = self.market.metrics(tk)
+            if not mt:
+                return None
+            return {"type": "Action", "region": mt["region"], "sector": mt["sector"],
+                    "values": [("Cours", f"{mt['price']:,.2f}"), ("Var.", f"{mt['change_pct']:+.2f}%"),
+                               ("Bêta", f"{mt['beta']:.2f}")]}
+        if kind == "etf":
+            q = ETF.quote(self.market, tk)
+            if not q:
+                return None
+            return {"type": "ETF", "region": None, "sector": q["category_label"],
+                    "values": [("VL", f"{q['price']:,.2f}"), ("Var.", f"{q['change_pct']:+.2f}%"),
+                               ("Bêta monde", f"{q['beta']:+.2f}")]}
+        if kind == "bond":
+            q = BND.quote(self.market, tk)
+            if not q:
+                return None
+            return {"type": "Obligation", "region": q["region"], "sector": q["kind"],
+                    "values": [("Prix", f"{q['price']:.1f}"), ("YTM", f"{q['ytm']*100:.2f}%"),
+                               ("Duration", f"{q['mod_duration']:.2f}")]}
+        if kind == "commodity":
+            q = CMD.quote(self.market, tk)
+            if not q:
+                return None
+            return {"type": "Commodity", "region": None, "sector": q["category"],
+                    "values": [("Spot", f"{q['spot']:,.2f}"), ("Roll yield", f"{q['roll_yield']*100:+.1f}%"),
+                               ("Vol.", f"{q['vol']*100:.0f}%")]}
+        if kind == "crypto":
+            q = CRY.quote(self.market, tk)
+            if not q:
+                return None
+            return {"type": "Crypto", "region": None,
+                    "sector": "Stablecoin" if q["stable"] else "Crypto-actif",
+                    "values": [("Spot", f"{q['spot']:,.4f}" if q["spot"] < 10 else f"{q['spot']:,.2f}"),
+                               ("Vol.", f"{q['vol']*100:.0f}%")]}
+        return None
+
     def _series(self, tk):
-        if ETF.exists(tk):
+        kind = _asset_kind(tk)
+        if kind == "bond":
+            return BND.price_history(self.market, tk, self.period)
+        if kind == "commodity":
+            return CMD.history(self.market, tk, self.period)
+        if kind == "crypto":
+            return CRY.history(self.market, tk, self.period)
+        if kind == "etf":
             return ETF.nav_history(self.market, tk, self.period)
         return self.market.history_of(tk, self.period)
 
@@ -195,6 +264,7 @@ class GraphScene(Scene):
         widgets.draw_text(surf, f"{assets}    ·    période {per}", (42, 62),
                           fonts.small(), config.COL_TEXT_DIM)
 
+        self._draw_info_bar(surf)
         self._draw_type_tabs(surf)
         self._draw_controls(surf)
 
@@ -219,9 +289,37 @@ class GraphScene(Scene):
             self.mode_btn.draw(surf)
         self._draw_suggestions(surf)   # overlay : au-dessus du graphe
 
+    def _draw_info_bar(self, surf):
+        """Barre d'infos clés de l'actif principal sélectionné, affichée
+        au-dessus du sélecteur de type de graphe. Clic sur le nom -> Explorer
+        pré-rempli avec ce nom."""
+        self._info_name_rect = None
+        if self.kind in _NO_ASSET or not self.tickers:
+            return
+        info = self._info_for(self.tickers[0])
+        if not info:
+            return
+        y = 80
+        x = 40
+        self._info_name_rect = pygame.Rect(x, y, 90, 18)
+        widgets.draw_text(surf, self.tickers[0], (x, y), fonts.small(bold=True), config.COL_CYAN)
+        x += 96
+        widgets.draw_badge(surf, info["type"], (x, y - 2), config.COL_TEXT_DIM)
+        x += 100
+        if info["region"]:
+            widgets.draw_badge(surf, info["region"], (x, y - 2), config.COL_AMBER)
+            x += 110
+        if info["sector"]:
+            widgets.draw_badge(surf, info["sector"], (x, y - 2), config.COL_WARN)
+            x += 140
+        vx = x + 10
+        for label, val in info["values"]:
+            widgets.draw_text(surf, f"{label} {val}", (vx, y), fonts.tiny(), config.COL_TEXT_DIM)
+            vx += 130
+
     def _draw_type_tabs(self, surf):
         self._type_rects = {}
-        x, y, h = 40, 92, 30
+        x, y, h = 40, 108, 30
         w = (config.SCREEN_WIDTH - 80 - (len(TYPES) - 1) * 4) // len(TYPES)
         for code, _, kind, _ in TYPES:
             rect = pygame.Rect(x, y, w, h)
@@ -237,7 +335,7 @@ class GraphScene(Scene):
     def _draw_controls(self, surf):
         # sélecteur de période (gauche)
         self._period_rects = {}
-        x, y = 40, 130
+        x, y = 40, 146
         for plabel, steps in PERIODS:
             rect = pygame.Rect(x, y, 56, 26)
             self._period_rects[steps] = rect

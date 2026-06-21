@@ -62,11 +62,11 @@ class MarketExplorerScene(Scene, PopupMixin):
         self.market = self.app.ensure_market()
         self.init_popups()
         self.rows = self._build_dataset()
-        self.search = ""
+        self.search = kwargs.get("search", "")
         self._t = 0.0
-        self.type_filter = None
-        self.region_filter = None
-        self.sub_filter = None
+        self.type_filter = kwargs.get("type_filter")
+        self.region_filter = kwargs.get("region_filter")
+        self.sub_filter = kwargs.get("sub_filter")
         self.sort_key = "value"
         self.sort_dir = -1
         self.selected = set()
@@ -87,6 +87,8 @@ class MarketExplorerScene(Scene, PopupMixin):
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.add_btn = widgets.Button((220, config.SCREEN_HEIGHT - 50, 220, 42),
                                       "+ AJOUTER", config.COL_UP, enabled=False)
+        self.shop_btn = widgets.Button((460, config.SCREEN_HEIGHT - 50, 180, 42),
+                                       "🛒 SHOP", config.COL_CYAN)
 
     # ------------------------------------------------------------- dataset
     def _build_dataset(self):
@@ -307,6 +309,10 @@ class MarketExplorerScene(Scene, PopupMixin):
         if self.add_btn.handle(event):
             self._bulk_add()
             return
+        if self.shop_btn.handle(event):
+            self.app.scenes.go("shop", return_to="explorer", search=self.search,
+                               type_filter=self.type_filter)
+            return
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
             if self._list_rect and self._list_rect.collidepoint(event.pos):
@@ -402,6 +408,7 @@ class MarketExplorerScene(Scene, PopupMixin):
         self.add_btn.label = f"+ AJOUTER ({len(self.selected)})" if self.selected else "+ AJOUTER"
         self.add_btn.enabled = bool(self.selected)
         self.add_btn.update(mp, dt)
+        self.shop_btn.update(mp, dt)
 
     # ----------------------------------------------------------------- draw
     def draw(self, surf):
@@ -520,6 +527,7 @@ class MarketExplorerScene(Scene, PopupMixin):
 
         self.back_btn.draw(surf)
         self.add_btn.draw(surf)
+        self.shop_btn.draw(surf)
         self.popups_draw(surf)
 
     def _draw_row(self, surf, r, y, inner, cols, cur, mp, cursor=False):

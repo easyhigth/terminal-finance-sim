@@ -103,8 +103,13 @@ class CompanyPopup(DataWindow):
         self.kind = "line"
         self.expand_requested = False
         self.open_ticker = None
+        self.nav_request = None
         self._kind_rects = {}
         self._expand_rect = None
+        self._name_rect = None
+        self._sector_rect = None
+        self._region_rect = None
+        self._type_rect = None
         mt = market.metrics(self.ticker) if market else None
         if accent is None:
             accent = config.CONTINENTS.get(mt["region"], {}).get("color", config.COL_AMBER) \
@@ -121,6 +126,20 @@ class CompanyPopup(DataWindow):
         if self._expand_rect and self._expand_rect.collidepoint(pos):
             self.expand_requested = True
             return True
+        if self._name_rect and self._name_rect.collidepoint(pos):
+            self.nav_request = {"to": "graph", "tickers": [self.ticker], "kind": "line"}
+            return True
+        mt = self.market.metrics(self.ticker) if self.market else None
+        if mt:
+            if self._sector_rect and self._sector_rect.collidepoint(pos):
+                self.nav_request = {"to": "explorer", "type_filter": "Action", "sub_filter": mt["sector"]}
+                return True
+            if self._region_rect and self._region_rect.collidepoint(pos):
+                self.nav_request = {"to": "explorer", "region_filter": mt["region"]}
+                return True
+            if self._type_rect and self._type_rect.collidepoint(pos):
+                self.nav_request = {"to": "explorer", "type_filter": "Action"}
+                return True
         return False
 
     def draw(self, surf):
@@ -134,6 +153,7 @@ class CompanyPopup(DataWindow):
             return
         cur = config.CONTINENTS.get(mt["region"], {}).get("currency", "$")
         y = content.y
+        self._name_rect = pygame.Rect(content.x, y, 90, 20)
         widgets.draw_text(surf, mt["ticker"], (content.x, y), fonts.body(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, f"{mt['price']:,.2f} {cur}", (content.right, y),
                           fonts.body(bold=True), config.COL_WHITE, align="right")
@@ -145,8 +165,9 @@ class CompanyPopup(DataWindow):
         widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.2f}%", (content.right, y),
                           fonts.small(bold=True), chg_col, align="right")
         y += 22
-        widgets.draw_badge(surf, mt["sector"], (content.x, y), self.accent)
-        widgets.draw_badge(surf, mt["region"], (content.x + 100, y), self.accent)
+        self._sector_rect = widgets.draw_badge(surf, mt["sector"], (content.x, y), self.accent)
+        self._region_rect = widgets.draw_badge(surf, mt["region"], (content.x + 100, y), self.accent)
+        self._type_rect = widgets.draw_badge(surf, "Action", (content.x + 200, y), config.COL_TEXT_DIM)
         y += 28
         # fondamentaux compacts (2 colonnes x 3 lignes)
         col_a = [("P/E", f"{mt['pe']:.1f}x" if mt["pe"] else "n.m."),
@@ -236,7 +257,11 @@ class CommodityPopup(DataWindow):
         self.kind = "line"
         self.expand_requested = False
         self.open_ticker = None
+        self.nav_request = None
         self._kind_rects = {}
+        self._name_rect = None
+        self._sector_rect = None
+        self._type_rect = None
         q = commodities_mod.quote(market, self.cid) if market else None
         accent = accent or config.COL_WARN
         title = f"{self.cid} — {q['name']}" if q else self.cid
@@ -247,6 +272,17 @@ class CommodityPopup(DataWindow):
         for k, rr in self._kind_rects.items():
             if rr.collidepoint(pos):
                 self.kind = k
+                return True
+        if self._name_rect and self._name_rect.collidepoint(pos):
+            self.nav_request = {"to": "graph", "tickers": [self.cid], "kind": "line"}
+            return True
+        q = commodities_mod.quote(self.market, self.cid) if self.market else None
+        if q:
+            if self._sector_rect and self._sector_rect.collidepoint(pos):
+                self.nav_request = {"to": "explorer", "type_filter": "Commodity", "sub_filter": q["category"]}
+                return True
+            if self._type_rect and self._type_rect.collidepoint(pos):
+                self.nav_request = {"to": "explorer", "type_filter": "Commodity"}
                 return True
         return False
 
@@ -260,6 +296,7 @@ class CommodityPopup(DataWindow):
                               (content.x, content.y), fonts.small(), config.COL_DOWN)
             return
         y = content.y
+        self._name_rect = pygame.Rect(content.x, y, 90, 20)
         widgets.draw_text(surf, self.cid, (content.x, y), fonts.body(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, f"{q['spot']:,.2f}", (content.right, y),
                           fonts.body(bold=True), config.COL_WHITE, align="right")
@@ -270,6 +307,8 @@ class CommodityPopup(DataWindow):
                           fonts.tiny(), config.COL_TEXT_DIM, align="right")
         y += 26
         widgets.draw_badge(surf, q["structure"], (content.x, y), self.accent)
+        self._sector_rect = widgets.draw_badge(surf, q["category"], (content.x + 100, y), self.accent)
+        self._type_rect = widgets.draw_badge(surf, "Commodity", (content.x + 230, y), config.COL_TEXT_DIM)
         y += 28
         col_a = [("Future 1M", f"{q['front']:,.2f}"), ("Roll yield", f"{q['roll_yield']*100:+.1f}%")]
         col_b = [("Vol. annualisée", f"{q['vol']*100:.0f}%"), ("Pente courbe", f"{q['slope']*100:+.1f}%/an")]
@@ -306,7 +345,10 @@ class CryptoPopup(DataWindow):
         self.kind = "line"
         self.expand_requested = False
         self.open_ticker = None
+        self.nav_request = None
         self._kind_rects = {}
+        self._name_rect = None
+        self._type_rect = None
         q = crypto_mod.quote(market, self.cid) if market else None
         accent = accent or (config.COL_CYAN if (q and (q["stable"] or q["cbdc"])) else config.COL_DOWN)
         title = f"{self.cid} — {q['name']}" if q else self.cid
@@ -318,6 +360,12 @@ class CryptoPopup(DataWindow):
             if rr.collidepoint(pos):
                 self.kind = k
                 return True
+        if self._name_rect and self._name_rect.collidepoint(pos):
+            self.nav_request = {"to": "graph", "tickers": [self.cid], "kind": "line"}
+            return True
+        if self._type_rect and self._type_rect.collidepoint(pos):
+            self.nav_request = {"to": "explorer", "type_filter": "Crypto"}
+            return True
         return False
 
     def draw(self, surf):
@@ -330,6 +378,7 @@ class CryptoPopup(DataWindow):
                               (content.x, content.y), fonts.small(), config.COL_DOWN)
             return
         y = content.y
+        self._name_rect = pygame.Rect(content.x, y, 90, 20)
         widgets.draw_text(surf, self.cid, (content.x, y), fonts.body(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, f"{q['spot']:,.4f}" if q["spot"] < 10 else f"{q['spot']:,.2f}",
                           (content.right, y), fonts.body(bold=True), config.COL_WHITE, align="right")
@@ -339,9 +388,10 @@ class CryptoPopup(DataWindow):
         y += 26
         status = "CBDC" if q["cbdc"] else ("Stablecoin" if q["stable"] else "Volatil")
         widgets.draw_badge(surf, status, (content.x, y), self.accent)
+        self._type_rect = widgets.draw_badge(surf, "Crypto", (content.x + 110, y), config.COL_TEXT_DIM)
         risk = crypto_mod.contagion_risk(self.market, self.cid) if self.market else 0.0
         if risk > 0.01:
-            widgets.draw_badge(surf, f"Contagion {risk*100:.0f}%", (content.x + 110, y), config.COL_DOWN)
+            widgets.draw_badge(surf, f"Contagion {risk*100:.0f}%", (content.x + 210, y), config.COL_DOWN)
         y += 28
         col_a = [("Vol. annualisée", f"{q['vol']*100:.0f}%")]
         col_b = [("Rendement", f"{q['yield']*100:.1f}%")] if q["cbdc"] else [("Type", status)]
@@ -377,7 +427,12 @@ class BondPopup(DataWindow):
         self.kind = "line"
         self.expand_requested = False
         self.open_ticker = None
+        self.nav_request = None
         self._kind_rects = {}
+        self._name_rect = None
+        self._sector_rect = None
+        self._region_rect = None
+        self._type_rect = None
         q = bonds_mod.quote(market, bond_id) if market else None
         accent = accent or config.COL_CYAN
         title = q["name"] if q else bond_id
@@ -388,6 +443,20 @@ class BondPopup(DataWindow):
         for k, rr in self._kind_rects.items():
             if rr.collidepoint(pos):
                 self.kind = k
+                return True
+        if self._name_rect and self._name_rect.collidepoint(pos):
+            self.nav_request = {"to": "graph", "tickers": [self.bond_id], "kind": "line"}
+            return True
+        q = bonds_mod.quote(self.market, self.bond_id) if self.market else None
+        if q:
+            if self._sector_rect and self._sector_rect.collidepoint(pos):
+                self.nav_request = {"to": "explorer", "type_filter": "Obligation", "sub_filter": q["kind"]}
+                return True
+            if self._region_rect and self._region_rect.collidepoint(pos):
+                self.nav_request = {"to": "explorer", "region_filter": q["region"]}
+                return True
+            if self._type_rect and self._type_rect.collidepoint(pos):
+                self.nav_request = {"to": "explorer", "type_filter": "Obligation"}
                 return True
         return False
 
@@ -401,6 +470,7 @@ class BondPopup(DataWindow):
                               (content.x, content.y), fonts.small(), config.COL_DOWN)
             return
         y = content.y
+        self._name_rect = pygame.Rect(content.x, y, content.w - 90, 20)
         widgets.draw_text(surf, widgets.fit_text(q["name"], fonts.body(bold=True), content.w - 90),
                           (content.x, y), fonts.body(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, f"{q['price']:.1f}", (content.right, y),
@@ -411,8 +481,9 @@ class BondPopup(DataWindow):
         widgets.draw_text(surf, q["rating"], (content.right, y),
                           fonts.small(bold=True), self.accent, align="right")
         y += 26
-        widgets.draw_badge(surf, q["kind"], (content.x, y), self.accent)
-        widgets.draw_badge(surf, q["region"], (content.x + 100, y), self.accent)
+        self._sector_rect = widgets.draw_badge(surf, q["kind"], (content.x, y), self.accent)
+        self._region_rect = widgets.draw_badge(surf, q["region"], (content.x + 100, y), self.accent)
+        self._type_rect = widgets.draw_badge(surf, "Obligation", (content.x + 200, y), config.COL_TEXT_DIM)
         y += 28
         col_a = [("YTM", f"{q['ytm']*100:.2f}%"), ("Coupon", f"{q['coupon']*100:.1f}%")]
         col_b = [("Duration mod.", f"{q['mod_duration']:.2f}"), ("Maturité", f"{q['years']} ans")]
@@ -451,7 +522,11 @@ class ETFPopup(DataWindow):
         self.kind = "line"
         self.expand_requested = False
         self.open_ticker = None
+        self.nav_request = None
         self._kind_rects = {}
+        self._name_rect = None
+        self._sector_rect = None
+        self._type_rect = None
         q = etfs_mod.quote(market, self.eid) if market else None
         accent = accent or (config.COL_DOWN if (q and q["leveraged"]) else config.COL_PRESTIGE)
         title = f"{self.eid} — {q['name']}" if q else self.eid
@@ -462,6 +537,17 @@ class ETFPopup(DataWindow):
         for k, rr in self._kind_rects.items():
             if rr.collidepoint(pos):
                 self.kind = k
+                return True
+        if self._name_rect and self._name_rect.collidepoint(pos):
+            self.nav_request = {"to": "graph", "tickers": [self.eid], "kind": "line"}
+            return True
+        q = etfs_mod.quote(self.market, self.eid) if self.market else None
+        if q:
+            if self._sector_rect and self._sector_rect.collidepoint(pos):
+                self.nav_request = {"to": "explorer", "type_filter": "ETF", "sub_filter": q["category_label"]}
+                return True
+            if self._type_rect and self._type_rect.collidepoint(pos):
+                self.nav_request = {"to": "explorer", "type_filter": "ETF"}
                 return True
         return False
 
@@ -475,6 +561,7 @@ class ETFPopup(DataWindow):
                               (content.x, content.y), fonts.small(), config.COL_DOWN)
             return
         y = content.y
+        self._name_rect = pygame.Rect(content.x, y, 90, 20)
         widgets.draw_text(surf, self.eid, (content.x, y), fonts.body(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, f"{q['price']:,.2f}", (content.right, y),
                           fonts.body(bold=True), config.COL_WHITE, align="right")
@@ -486,9 +573,10 @@ class ETFPopup(DataWindow):
         widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.2f}%", (content.right, y),
                           fonts.small(bold=True), chg_col, align="right")
         y += 22
-        widgets.draw_badge(surf, q["category_label"], (content.x, y), self.accent)
+        self._sector_rect = widgets.draw_badge(surf, q["category_label"], (content.x, y), self.accent)
+        self._type_rect = widgets.draw_badge(surf, "ETF", (content.x + 130, y), config.COL_TEXT_DIM)
         if q["leveraged"]:
-            widgets.draw_badge(surf, "RISQUE ÉLEVÉ", (content.x + 130, y), config.COL_DOWN)
+            widgets.draw_badge(surf, "RISQUE ÉLEVÉ", (content.x + 180, y), config.COL_DOWN)
         y += 26
         widgets.draw_text(surf, "Exposition : " + widgets.fit_text(q["exposure"], fonts.tiny(), content.w - 80),
                           (content.x, y), fonts.tiny(), config.COL_TEXT_DIM)
@@ -517,6 +605,104 @@ class ETFPopup(DataWindow):
         if legend:
             widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4),
                               fonts.tiny(), config.COL_TEXT_DIM)
+
+
+class StructuredPopup(DataWindow):
+    """Fiche produit structuré compacte : famille, payoff, sous-jacent et
+    performance courante (équivalent de CompanyPopup pour les structurés)."""
+
+    def __init__(self, template_id, market, pos=(160, 120), accent=None):
+        from core import structured as structured_mod
+        self.template_id = template_id
+        self.market = market
+        self.nav_request = None
+        self._type_rect = None
+        t = structured_mod.template_quote(template_id, market) if template_id in structured_mod._BY_ID else None
+        accent = accent or config.COL_AMBER
+        title = t["name"] if t else template_id
+        super().__init__(title, [], [], pos=pos, accent=accent,
+                         size=(360, 260), resizable=True, min_size=(300, 200))
+
+    def _handle_body(self, pos):
+        if self._type_rect and self._type_rect.collidepoint(pos):
+            self.nav_request = {"to": "shop", "type_filter": "Structuré"}
+            return True
+        return False
+
+    def draw(self, surf):
+        from core import structured as structured_mod
+        content = self._draw_chrome(surf)
+        if content is None:
+            return
+        t = structured_mod.template_quote(self.template_id, self.market) \
+            if self.template_id in structured_mod._BY_ID else None
+        if not t:
+            widgets.draw_text(surf, f"Produit introuvable : {self.template_id}",
+                              (content.x, content.y), fonts.small(), config.COL_DOWN)
+            return
+        y = content.y
+        widgets.draw_text(surf, widgets.fit_text(t["name"], fonts.body(bold=True), content.w),
+                          (content.x, y), fonts.body(bold=True), config.COL_AMBER)
+        y += 24
+        widgets.draw_badge(surf, t["family"], (content.x, y), self.accent)
+        self._type_rect = widgets.draw_badge(surf, "Structuré", (content.x + 110, y), config.COL_TEXT_DIM)
+        y += 28
+        widgets.draw_text(surf, f"Maturité : {t['years']} ans", (content.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+        y += 24
+        widgets.draw_text_wrapped(surf, t["desc"], (content.x, y), fonts.small(),
+                                  config.COL_TEXT, content.w, line_gap=3)
+
+
+class CreditPopup(DataWindow):
+    """Fiche tranche de titrisation compacte : attache/détache, coupon, rating
+    et perte attendue du pool (équivalent de CompanyPopup pour le crédit)."""
+
+    def __init__(self, tranche_id, market, pos=(160, 120), accent=None):
+        from core import securitisation as sec_mod
+        self.tranche_id = tranche_id
+        self.market = market
+        self.nav_request = None
+        self._type_rect = None
+        q = sec_mod.tranche_quote(tranche_id, market) if tranche_id in sec_mod._BY_ID else None
+        accent = accent or config.COL_CYAN
+        title = q["name"] if q else tranche_id
+        super().__init__(title, [], [], pos=pos, accent=accent,
+                         size=(340, 240), resizable=True, min_size=(280, 180))
+
+    def _handle_body(self, pos):
+        if self._type_rect and self._type_rect.collidepoint(pos):
+            self.nav_request = {"to": "shop", "type_filter": "Crédit"}
+            return True
+        return False
+
+    def draw(self, surf):
+        from core import securitisation as sec_mod
+        content = self._draw_chrome(surf)
+        if content is None:
+            return
+        q = sec_mod.tranche_quote(self.tranche_id, self.market) if self.tranche_id in sec_mod._BY_ID else None
+        if not q:
+            widgets.draw_text(surf, f"Tranche introuvable : {self.tranche_id}",
+                              (content.x, content.y), fonts.small(), config.COL_DOWN)
+            return
+        y = content.y
+        widgets.draw_text(surf, q["name"], (content.x, y), fonts.body(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, q["rating"], (content.right, y),
+                          fonts.body(bold=True), self.accent, align="right")
+        y += 24
+        self._type_rect = widgets.draw_badge(surf, "Crédit", (content.x, y), config.COL_TEXT_DIM)
+        y += 28
+        col_a = [("Attache", f"{q['attach']*100:.0f}%"), ("Détache", f"{q['detach']*100:.0f}%")]
+        col_b = [("Coupon", f"{q['coupon']*100:.1f}%"), ("Perte att.", f"{q['exp_loss']*100:.1f}%")]
+        cw = content.w // 2
+        for ci, col in enumerate((col_a, col_b)):
+            fx = content.x + ci * cw
+            fy = y
+            for label, val in col:
+                widgets.draw_text(surf, label, (fx, fy), fonts.tiny(), config.COL_TEXT_DIM)
+                widgets.draw_text(surf, val, (fx + cw - 16, fy), fonts.tiny(bold=True),
+                                  config.COL_WHITE, align="right")
+                fy += 15
 
 
 class QuickAccessWindow(DataWindow):
@@ -633,6 +819,13 @@ class PopupMixin:
         if tk:
             w.open_ticker = None
             self.open_company(tk)
+        nav = getattr(w, "nav_request", None)
+        if nav:
+            w.nav_request = None
+            nav = dict(nav)
+            target = nav.pop("to")
+            nav["return_to"] = getattr(self.app.scenes, "current_name", None) or "terminal"
+            self.app.scenes.go(target, **nav)
 
     def _popup_pos(self):
         n = len(self.popups)
@@ -703,6 +896,30 @@ class PopupMixin:
         if not market or etfs_mod.quote(market, eid.upper()) is None:
             return None
         w = ETFPopup(eid, market, pos=self._popup_pos(), accent=accent)
+        self.popups.append(w)
+        if len(self.popups) > self._MAX_POPUPS:
+            self.popups.pop(0)
+        return w
+
+    def open_structured(self, template_id, accent=None):
+        """Ouvre (ou met au premier plan) la fiche flottante d'un produit structuré."""
+        from core import structured as structured_mod
+        if template_id not in structured_mod._BY_ID:
+            return None
+        market = self._popup_market()
+        w = StructuredPopup(template_id, market, pos=self._popup_pos(), accent=accent)
+        self.popups.append(w)
+        if len(self.popups) > self._MAX_POPUPS:
+            self.popups.pop(0)
+        return w
+
+    def open_credit(self, tranche_id, accent=None):
+        """Ouvre (ou met au premier plan) la fiche flottante d'une tranche de titrisation."""
+        from core import securitisation as sec_mod
+        if tranche_id not in sec_mod._BY_ID:
+            return None
+        market = self._popup_market()
+        w = CreditPopup(tranche_id, market, pos=self._popup_pos(), accent=accent)
         self.popups.append(w)
         if len(self.popups) > self._MAX_POPUPS:
             self.popups.pop(0)

@@ -7,7 +7,7 @@ apprentissage, système. Ouvert via le bouton PLUS du rail ou la commande MORE.
 """
 import pygame
 
-from core import config
+from core import config, fuzzy
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
@@ -96,12 +96,11 @@ class MoreScene(Scene):
         return pygame.Rect(40, 100, 320, 24)
 
     def _filtered_sections(self):
-        q = self.search.strip().lower()
-        if not q:
+        if not self.search.strip():
             return SECTIONS
         out = []
         for title, items in SECTIONS:
-            kept = [(label, scene, kw) for label, scene, kw in items if q in label.lower()]
+            kept = fuzzy.filter_sorted(self.search, items, key=lambda e: e[0])
             if kept:
                 out.append((title, kept))
         return out

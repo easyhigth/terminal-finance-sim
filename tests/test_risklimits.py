@@ -50,3 +50,43 @@ def test_beta_limit_breach_detected():
     p, m = _player_with_concentrated_position()
     result = risklimits.check_limits(p, m, {"beta_max": 0.01})
     assert any(b["type"] == "beta" for b in result["breaches"])
+
+
+def test_effective_limits_defaults_to_default_profile():
+    p = PlayerState()
+    assert risklimits.effective_limits(p) == risklimits.DEFAULT_LIMITS
+
+
+def test_set_profile_changes_effective_limits():
+    p = PlayerState()
+    assert risklimits.set_profile(p, "strict") is True
+    assert p.risk_limit_profile == "strict"
+    assert risklimits.effective_limits(p) == risklimits.LIMIT_PROFILES["strict"]
+
+
+def test_set_profile_rejects_unknown_name():
+    p = PlayerState()
+    assert risklimits.set_profile(p, "yolo") is False
+    assert p.risk_limit_profile == "default"
+
+
+def test_strict_profile_breaches_sooner_than_souple():
+    p, m = _player_with_concentrated_position()
+    risklimits.set_profile(p, "strict")
+    strict_result = risklimits.check_limits(p, m)
+    risklimits.set_profile(p, "souple")
+    souple_result = risklimits.check_limits(p, m)
+    assert len(strict_result["breaches"]) >= len(souple_result["breaches"])
+
+
+def test_persistent_breach_costs_reputation_after_three_steps():
+    from core.game_state import GameState
+
+    p, m = _player_with_concentrated_position()
+    risklimits.set_profile(p, "strict")
+    gs = GameState(player=p)
+    for _ in range(3):
+        gs.advance_step(market=m)
+    assert p.flags.get("risk_breach_streak", 0) >= 3
+    assert any(reason == "Dépassement persistant des limites de risque"
+               for reason, _ in p.rep_log)

@@ -81,6 +81,7 @@ CATALOG = [
         ("IDEAS [id]", "Remonte les actifs correspondant à vos critères sauvegardés"),
         ("TRADES [classe]", "Journal de trading : date, taille, P&L, contexte macro"),
         ("NOTE <id> <texte>", "Annoter une entrée du journal de trading"),
+        ("JSTATS [regime|reason]", "Bilan du journal : P&L réalisé par régime/raison"),
     ]),
     ("Graphes analytiques (5 ans d'historique dès le jour 1)", [
         ("GP <tk>", "Ligne de prix + moyennes mobiles MM20/MM50"),

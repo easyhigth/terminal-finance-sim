@@ -125,6 +125,8 @@ class PlayerState:
     # ----- idées/opportunités (core/opportunities.py) -----
     saved_screens: list = field(default_factory=list)  # critères de recherche sauvegardés
     next_screen_id: int = 1             # compteur d'identifiants de critères sauvegardés
+    # ----- profil de limites de risque (core/risklimits.py) -----
+    risk_limit_profile: str = "default"  # "strict" / "default" / "souple"
 
     @property
     def grade(self):
@@ -412,6 +414,20 @@ class GameState:
             # grade) : utilisé par career.risk_profile() pour moduler les mandats proposés.
             if portfolio.leverage(p, market) >= 2.5:
                 p.flags["high_leverage_steps"] = p.flags.get("high_leverage_steps", 0) + 1
+            # dépassement persistant des limites de risque (cf. core/risklimits.py,
+            # scenes/scene_risk.py) : un dépassement isolé ne coûte rien, mais le
+            # laisser filer pénalise la réputation (mandataire qui tolère le
+            # risque non maîtrisé) tant qu'il n'est pas corrigé.
+            from core import risklimits as _risklimits
+            if _risklimits.check_limits(p, market)["breaches"]:
+                p.flags["risk_breach_streak"] = p.flags.get("risk_breach_streak", 0) + 1
+                if p.flags["risk_breach_streak"] >= 3:
+                    from core.i18n import get_lang
+                    reason = ("Persistent risk limit breach" if get_lang() == "en"
+                              else "Dépassement persistant des limites de risque")
+                    p.adjust_reputation(-2, reason=reason)
+            else:
+                p.flags["risk_breach_streak"] = 0
             # produits structurés arrivés à échéance
             if getattr(p, "structured", None):
                 from core import structured as _struct

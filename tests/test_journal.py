@@ -70,3 +70,44 @@ def test_list_entries_filters_and_orders_most_recent_first():
     limited = J.list_entries(p, limit=1)
     assert len(limited) == 1
     assert limited[0]["id"] == 3
+
+
+def test_performance_stats_ignores_open_positions():
+    p, m = _setup()
+    J.log_trade(p, m, asset_class="Action", key="ABC", label="ABC",
+                side="achat", qty=10, price=25.0)  # pas de realized -> ignoré
+    stats = J.performance_stats(p)
+    assert stats == []
+
+
+def test_performance_stats_groups_by_regime_and_computes_rates():
+    p, m = _setup()
+    regime = m.regime_label()
+    J.log_trade(p, m, asset_class="Action", key="ABC", label="ABC",
+                side="vente", qty=10, price=25.0, realized=100.0)
+    J.log_trade(p, m, asset_class="Action", key="DEF", label="DEF",
+                side="vente", qty=5, price=10.0, realized=-40.0)
+    stats = J.performance_stats(p, group_by="regime")
+    assert len(stats) == 1
+    g = stats[0]
+    assert g["label"] == regime
+    assert g["count"] == 2
+    assert g["wins"] == 1
+    assert g["win_rate"] == 50.0
+    assert g["total_pnl"] == 60.0
+    assert g["avg_pnl"] == 30.0
+
+
+def test_performance_stats_groups_by_reason():
+    p, m = _setup()
+    J.log_trade(p, m, asset_class="Action", key="ABC", label="ABC",
+                side="vente", qty=1, price=1.0, realized=10.0, reason="momentum")
+    J.log_trade(p, m, asset_class="Action", key="DEF", label="DEF",
+                side="vente", qty=1, price=1.0, realized=5.0, reason="momentum")
+    J.log_trade(p, m, asset_class="Action", key="GHI", label="GHI",
+                side="vente", qty=1, price=1.0, realized=-2.0, reason="value")
+    stats = J.performance_stats(p, group_by="reason")
+    assert {g["label"] for g in stats} == {"momentum", "value"}
+    momentum = next(g for g in stats if g["label"] == "momentum")
+    assert momentum["count"] == 2
+    assert momentum["total_pnl"] == 15.0

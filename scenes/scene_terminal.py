@@ -106,7 +106,7 @@ CMD_NAMES = [
     "TEAM", "EQUIPE", "STRESS", "TIMELINE",
     "GP", "GPC", "GPO", "GPCH", "COMP", "HS", "HVOL", "BETA", "CORR",
     "GEG", "GC", "RV", "ECO", "DEFINE", "PA", "ATTR",
-    "TRADES", "NOTE", "IDEAS", "CRITERIA",
+    "TRADES", "NOTE", "IDEAS", "CRITERIA", "JSTATS",
 ]
 
 SAMPLE_NEWS = {
@@ -880,6 +880,8 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             self._cmd_trades(parts[1:])
         elif cmd == "NOTE":
             self._cmd_note(parts[1:])
+        elif cmd in ("JSTATS", "BILAN"):
+            self._cmd_jstats(parts[1:])
         elif cmd in ("RANKING", "RANK"):
             self._cmd_top(arg)
         elif cmd in ("BENCHMARK", "BENCH"):

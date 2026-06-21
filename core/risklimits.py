@@ -21,12 +21,44 @@ DEFAULT_LIMITS = {
     "illiquid_pct": 30.0,
 }
 
+# Profils de limites sélectionnables par le joueur (cf. scenes/scene_risk.py).
+# "default" == DEFAULT_LIMITS ; "strict" resserre les bornes (style mandat
+# institutionnel) ; "souple" les desserre (style book prop discrétionnaire).
+LIMIT_PROFILES = {
+    "strict": {
+        "position_pct": 15.0, "sector_pct": 25.0, "region_pct": 35.0,
+        "class_pct": 50.0, "beta_max": 1.2, "illiquid_pct": 15.0,
+    },
+    "default": dict(DEFAULT_LIMITS),
+    "souple": {
+        "position_pct": 40.0, "sector_pct": 60.0, "region_pct": 70.0,
+        "class_pct": 90.0, "beta_max": 3.0, "illiquid_pct": 50.0,
+    },
+}
+
+
+def effective_limits(player):
+    """Retourne les limites actives du joueur selon son profil sélectionné
+    (`player.risk_limit_profile`), DEFAULT_LIMITS si profil inconnu."""
+    profile = getattr(player, "risk_limit_profile", "default")
+    return dict(LIMIT_PROFILES.get(profile, DEFAULT_LIMITS))
+
+
+def set_profile(player, name):
+    """Change le profil de limites actif du joueur. Retourne True si `name`
+    est un profil connu, False sinon (aucun changement dans ce cas)."""
+    if name not in LIMIT_PROFILES:
+        return False
+    player.risk_limit_profile = name
+    return True
+
 
 def check_limits(player, market, limits=None):
-    """Vérifie les expositions du book réel contre des limites (ou
-    DEFAULT_LIMITS si non précisées). Retourne {ok, breaches}, `breaches`
-    étant une liste de dicts {type, label, value, limit}."""
-    lim = dict(DEFAULT_LIMITS)
+    """Vérifie les expositions du book réel contre les limites du profil actif
+    du joueur (cf. `effective_limits`), ou contre `limits` si précisées.
+    Retourne {ok, breaches}, `breaches` étant une liste de dicts
+    {type, label, value, limit}."""
+    lim = effective_limits(player)
     if limits:
         lim.update(limits)   # une valeur explicite à None désactive ce contrôle
     s = analytics.summary(player, market)

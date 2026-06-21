@@ -7,7 +7,7 @@ Ctrl+K ouvre par-dessus la scène courante une palette de navigation globale
 """
 import pygame
 
-from core import config
+from core import config, fuzzy
 from ui import fonts, widgets
 
 PALETTE_W, PALETTE_H = 560, 360
@@ -68,11 +68,10 @@ class SceneManager:
         return [(label, scene, kw) for _, items in SECTIONS for (label, scene, kw) in items]
 
     def _palette_filtered(self):
-        q = self.palette_query.strip().lower()
         entries = self._palette_entries()
-        if not q:
+        if not self.palette_query.strip():
             return entries
-        return [(label, scene, kw) for label, scene, kw in entries if q in label.lower()]
+        return fuzzy.filter_sorted(self.palette_query, entries, key=lambda e: e[0])
 
     def open_palette(self):
         self.palette_open = True

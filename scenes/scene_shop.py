@@ -289,6 +289,9 @@ class ShopScene(Scene, PopupMixin):
             elif event.key == pygame.K_PAGEDOWN:
                 self.scroll = min(self._max_scroll, self.scroll + 200)
                 return
+            elif event.key == pygame.K_TAB:
+                self.text_focus = "qty" if self.text_focus == "search" else "search"
+                return
             elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER) \
                     and self.text_focus != "qty":
                 self.row_cursor, activate = widgets.list_key_nav(
@@ -361,6 +364,11 @@ class ShopScene(Scene, PopupMixin):
                 if rect.collidepoint(event.pos):
                     self._do_sell(*ident)
                     return
+
+    def _focus_hints(self):
+        if self.text_focus == "qty":
+            return [("TAB", "recherche"), ("chiffres", "quantité"), ("ÉCHAP", "recherche")]
+        return [("↑↓", "actifs"), ("ENTRÉE", "ouvrir"), ("TAB", "quantité"), ("lettres", "filtrer")]
 
     def update(self, dt):
         self._t += dt
@@ -489,6 +497,7 @@ class ShopScene(Scene, PopupMixin):
             widgets.draw_text(surf, "⊘ Trading débloqué au grade Associate.",
                               (inner.x, inner.bottom - 4), fonts.tiny(), config.COL_TEXT_DIM)
 
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14), self._focus_hints())
         self.back_btn.draw(surf)
         self.popups_draw(surf)
 

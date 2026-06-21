@@ -155,7 +155,7 @@ class App:
         pygame.display.set_icon(make_icon_surface(64))
         self.fullscreen = False
         self.screen = pygame.display.set_mode(
-            (config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
+            (config.SCREEN_WIDTH, config.WINDOW_HEIGHT))
         self.clock = pygame.time.Clock()
         self.running = True
         self.cheats = False           # activé par main_cheat.py (commandes de test)
@@ -187,7 +187,7 @@ class App:
         self.fullscreen = not self.fullscreen
         flags = pygame.FULLSCREEN if self.fullscreen else 0
         self.screen = pygame.display.set_mode(
-            (config.SCREEN_WIDTH, config.SCREEN_HEIGHT), flags)
+            (config.SCREEN_WIDTH, config.WINDOW_HEIGHT), flags)
 
     def ensure_market(self):
         """Crée/synchronise le moteur de marché avec l'état du joueur.

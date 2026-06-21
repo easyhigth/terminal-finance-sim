@@ -15,7 +15,7 @@ from core.spreadsheet_engine import Spreadsheet, idx_to_col
 from ui import fonts, widgets
 
 CELL_W = 138
-CELL_H = 26
+CELL_H = 22
 HEAD_W = 44       # largeur colonne des numéros de ligne
 GRID_X = 40
 GRID_Y = 172

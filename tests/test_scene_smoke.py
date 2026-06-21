@@ -78,7 +78,7 @@ _KNOWN_SCENES = [
     "news", "more", "structured", "credit", "alm", "swaps", "hedge",
     "options", "ipo", "fx", "review", "calendar", "graph", "rivals",
     "analytics", "performance", "explorer", "tutorials", "splash", "markethub", "shop",
-    "examcert", "stresstest", "history", "team", "alerts",
+    "examcert", "stresstest", "history", "team", "alerts", "frontier_lab",
 ]
 
 

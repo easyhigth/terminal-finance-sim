@@ -98,16 +98,16 @@ class MAScene(Scene):
         if not self._can_ma():
             g = unlocks.effective_required_grade(self.app.gs.player, "ma")
             widgets.draw_text(surf, f"⊘ M&A débloqué au grade {config.GRADES[g]}.",
-                              (42, 56), fonts.small(), config.COL_TEXT_DIM)
+                              (42, 72), fonts.small(), config.COL_TEXT_DIM)
         else:
             widgets.draw_text(surf, "Cibles privées non cotées : analyse complète, financement "
                                     "cash + dette (LBO), pilotage et sortie.",
-                              (42, 56), fonts.small(), config.COL_TEXT_DIM)
+                              (42, 72), fonts.small(), config.COL_TEXT_DIM)
 
         # ---- onglets ----
         self._tab_rects = {}
         tx = 40
-        ty = 80
+        ty = 96
         for name in TABS:
             w = fonts.small(bold=True).size(name)[0] + 28
             rect = pygame.Rect(tx, ty, w, 28)

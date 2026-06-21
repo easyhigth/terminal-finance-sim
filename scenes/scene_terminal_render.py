@@ -250,9 +250,10 @@ class TerminalRenderMixin:
                           fonts.small(), config.COL_AMBER_DIM)
 
     def _draw_indices(self, surf, rect):
-        inner = widgets.draw_panel(surf, rect,
-                                   f'{_t("term.indices")} · {self.market.regime_label()}', config.COL_AMBER)
         self._indices_header_rect = pygame.Rect(rect.x, rect.y, rect.w, 26)
+        hover = self._indices_header_rect.collidepoint(pygame.mouse.get_pos())
+        title = f'{_t("term.indices")} · {self.market.regime_label()}' + (" ▸" if hover else "")
+        inner = widgets.draw_panel(surf, rect, title, config.COL_CYAN if hover else config.COL_AMBER)
         self._indices_panel_rect = rect
         self._index_rects = {}
         defs = self.market.index_defs
@@ -326,8 +327,10 @@ class TerminalRenderMixin:
                               (inner.x, inner.y + 162), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_feed(self, surf, rect, info):
-        inner = widgets.draw_panel(surf, rect, _t("term.feed"), config.COL_CYAN)
         self._feed_header_rect = pygame.Rect(rect.x, rect.y, rect.w, 26)
+        hover = self._feed_header_rect.collidepoint(pygame.mouse.get_pos())
+        title = _t("term.feed") + (" ▸" if hover else "")
+        inner = widgets.draw_panel(surf, rect, title, config.COL_CYAN if hover else config.COL_AMBER)
         y = inner.y
         cur = info["currency"]
         for e in self.recent_events[:3]:
@@ -351,9 +354,11 @@ class TerminalRenderMixin:
 
     def _draw_top_companies(self, surf, rect, p):
         watch = [tk for tk in p.watchlist if self.market.price_of(tk) is not None]
-        title = f'{_t("term.topco")} ({len(watch)} suivies)' if watch else f'{_t("term.topco")} — {p.continent}'
-        inner = widgets.draw_panel(surf, rect, title, config.COL_CYAN)
         self._topco_header_rect = pygame.Rect(rect.x, rect.y, rect.w, 26)
+        hover = self._topco_header_rect.collidepoint(pygame.mouse.get_pos())
+        title = f'{_t("term.topco")} ({len(watch)} suivies)' if watch else f'{_t("term.topco")} — {p.continent}'
+        title += " ▸" if hover else ""
+        inner = widgets.draw_panel(surf, rect, title, config.COL_CYAN if hover else config.COL_AMBER)
         self._topco_panel_rect = rect
         cur = config.CONTINENTS[p.continent]["currency"]
         self._topco_rects = {}

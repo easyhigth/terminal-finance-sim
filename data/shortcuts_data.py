@@ -7,6 +7,9 @@ Volontairement condensé : les patrons de navigation communs à la plupart des
 écrans (listes, grilles, recherche) sont expliqués une seule fois au global
 plutôt que répétés scène par scène ; seules les vraies exceptions sont
 détaillées. Garder ce fichier à jour quand un raccourci est ajouté/retiré.
+
+Couche EN dédiée dans data/shortcuts_data_en.py (cf. lessons.py/lessons_en.py) ;
+utiliser `localized(lang)` pour récupérer la version dans la langue courante.
 """
 
 SECTIONS = [
@@ -97,3 +100,11 @@ SECTIONS = [
                      "✕ pour fermer ; molette pour défiler"),
     ]),
 ]
+
+
+def localized(lang):
+    """Renvoie les sections de raccourcis dans la langue demandée, repli FR."""
+    if lang == "en":
+        from data.shortcuts_data_en import SECTIONS_EN
+        return SECTIONS_EN
+    return SECTIONS

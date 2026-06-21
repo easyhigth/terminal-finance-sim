@@ -492,10 +492,14 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         z = self.zones.zone
         if z == "console" and self.zones.inside:
             return []
+        enter_key = _L("ENTRÉE", "ENTER")
+        esc_key = _L("ÉCHAP", "ESC")
         if not self.zones.inside:
-            return [("↑↓←→", "blocs"), ("ENTRÉE", "entrer"), ("TAB", "suivant"), ("ÉCHAP", "menu")]
+            return [("↑↓←→", _L("blocs", "blocks")), (enter_key, _L("entrer", "enter")),
+                    ("TAB", _L("suivant", "next")), (esc_key, _L("menu", "menu"))]
         if z in ("rail", "indices", "topco"):
-            return [("↑↓←→", "items"), ("ENTRÉE", "activer"), ("ÉCHAP", "bloc")]
+            return [("↑↓←→", _L("items", "items")), (enter_key, _L("activer", "activate")),
+                    (esc_key, _L("bloc", "block"))]
         return []
 
     def _activate_zone(self):

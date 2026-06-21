@@ -8,7 +8,8 @@ SHORTCUTS/KEYS.
 import pygame
 
 from core import config
-from data.shortcuts_data import SECTIONS
+from core.i18n import get_lang, t
+from data.shortcuts_data import localized
 from ui import fonts, widgets
 
 TITLE_H = 28
@@ -85,7 +86,7 @@ class ShortcutsPanel:
         tr = self._title_rect()
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, tr,
                          border_top_left_radius=6, border_top_right_radius=6)
-        widgets.draw_text(surf, "⌨ RACCOURCIS CLAVIER — jouer sans la souris", (tr.x + 10, tr.y + 6),
+        widgets.draw_text(surf, t("shortcuts.title"), (tr.x + 10, tr.y + 6),
                           fonts.small(bold=True), config.COL_CYAN)
         widgets.draw_text(surf, "✕", (self._close_rect().centerx, tr.y + 6),
                           fonts.small(bold=True), config.COL_TEXT_DIM, align="center")
@@ -96,7 +97,7 @@ class ShortcutsPanel:
         prev_clip = surf.get_clip()
         surf.set_clip(content)
         y = content.y - self.scroll
-        for title, rows in SECTIONS:
+        for title, rows in localized(get_lang()):
             if content.top - 22 < y < content.bottom:
                 widgets.draw_text(surf, f"— {title}", (content.x + PADX, y),
                                   fonts.small(bold=True), config.COL_AMBER)

@@ -12,7 +12,7 @@ import pygame
 from core import config
 from core.scene_manager import Scene
 from data import tutorials as T
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 _IMG_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "tutorials")
@@ -119,7 +119,7 @@ class TutorialsScene(Scene):
             if sel:
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect)
                 pygame.draw.rect(surf, config.COL_AMBER, (linner.x - 4, y - 2, 3, 34))
-            widgets.draw_row_selection(surf, rect, i == self.cursor)
+            keynav.draw_focus_ring(surf, rect, i == self.cursor)
             widgets.draw_text(surf, widgets.fit_text(t["title"], fonts.small(bold=sel), linner.w),
                               (linner.x + 6, y + 6), fonts.small(bold=sel),
                               config.COL_WHITE if sel else config.COL_TEXT)

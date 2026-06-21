@@ -9,7 +9,7 @@ import pygame
 
 from core import config, unlocks
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 ROW_H = 24
 
@@ -329,7 +329,7 @@ class AlertsScene(Scene):
         if tk == self.sel_ticker:
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect)
             pygame.draw.rect(surf, config.COL_AMBER, (row_rect.x, row_rect.y, 3, row_rect.h))
-        widgets.draw_row_selection(surf, row_rect, cursor)
+        keynav.draw_focus_ring(surf, row_rect, cursor)
         self._name_rects[tk] = row_rect
         widgets.draw_text(surf, tk, (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, widgets.fit_text(r["name"], fonts.small(), 220),

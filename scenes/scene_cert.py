@@ -9,7 +9,7 @@ import pygame
 from core import certifications as C
 from core import config
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 
 class CertScene(Scene):
@@ -87,7 +87,7 @@ class CertScene(Scene):
             accent = config.COL_PRESTIGE if relevant else config.COL_BORDER
             pygame.draw.rect(surf, config.COL_PANEL, rect)
             pygame.draw.rect(surf, accent, rect, 2 if relevant else 1)
-            widgets.draw_row_selection(surf, rect, pos == self.cursor)
+            keynav.draw_focus_ring(surf, rect, pos == self.cursor)
             if relevant:
                 pygame.draw.rect(surf, config.COL_PRESTIGE, (rect.x, rect.y, 3, rect.h))
             widgets.draw_text(surf, f"{prog['name']} — {prog['full']}", (rect.x+16, rect.y+12),

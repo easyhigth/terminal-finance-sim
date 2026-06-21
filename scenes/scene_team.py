@@ -10,7 +10,7 @@ import pygame
 from core import config, unlocks
 from core import team as TEAM
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 ROW_H = 70        # hauteur de ligne "équipe actuelle" (pas de description longue)
 CAT_ROW_H = 92    # hauteur de ligne "profils disponibles" (laisse la place à la description)
@@ -134,7 +134,7 @@ class TeamScene(Scene):
             pygame.draw.rect(surf, config.COL_PANEL, row, border_radius=4)
             pygame.draw.rect(surf, config.COL_BORDER, row, 1, border_radius=4)
             if self.focus == "hire":
-                widgets.draw_row_selection(surf, row, i == self.hire_cursor)
+                keynav.draw_focus_ring(surf, row, i == self.hire_cursor)
             hire_btn = pygame.Rect(row.right - 90, row.y + 8, 80, 26)
             widgets.draw_text(surf, profile["label"], (row.x + 10, row.y + 6),
                               fonts.small(bold=True), config.COL_TEXT)
@@ -169,7 +169,7 @@ class TeamScene(Scene):
                 pygame.draw.rect(surf, config.COL_PANEL, row, border_radius=4)
                 pygame.draw.rect(surf, config.COL_BORDER, row, 1, border_radius=4)
                 if self.focus == "fire":
-                    widgets.draw_row_selection(surf, row, idx == self.fire_cursor)
+                    keynav.draw_focus_ring(surf, row, idx == self.fire_cursor)
                 widgets.draw_text(surf, profile.get("label", a.get("profile_id", "?")),
                                   (row.x + 10, row.y + 6), fonts.small(bold=True), config.COL_TEXT)
                 widgets.draw_text(surf, f"Coût : {widgets.format_money(profile.get('cost_per_step', 0), cur)}/tour",

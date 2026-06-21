@@ -35,7 +35,7 @@ from core import fx as FX
 from core import governments as GOV
 from core import unlocks as unlocks_mod
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 from ui.popups import PopupMixin
 
 ROW_H = 24
@@ -532,7 +532,7 @@ class MarketExplorerScene(Scene, PopupMixin):
             pygame.draw.rect(surf, config.COL_UP, row_rect, 1, border_radius=3)
         elif row_rect.collidepoint(mp):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect, border_radius=3)
-        widgets.draw_row_selection(surf, row_rect, cursor)
+        keynav.draw_focus_ring(surf, row_rect, cursor)
         kcol = KIND_COLOR.get(kind, config.COL_TEXT)
         c0 = cols[0][1]
         widgets.draw_text(surf, widgets.fit_text(r["name"], fonts.small(bold=True), 260),

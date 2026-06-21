@@ -9,7 +9,7 @@ import pygame
 from core import config, unlocks
 from core import mandates as MD
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 ROW_H = 26
 
@@ -193,7 +193,7 @@ class MandatesScene(Scene):
                 row = pygame.Rect(inner.x, y, inner.w, 72)
                 pygame.draw.rect(surf, config.COL_PANEL, row, border_radius=4)
                 pygame.draw.rect(surf, config.COL_CYAN, row, 1, border_radius=4)
-                widgets.draw_row_selection(surf, row, i == self.offer_cursor)
+                keynav.draw_focus_ring(surf, row, i == self.offer_cursor)
                 r = widgets.draw_text(surf, f"#{o['id']} {o['client']}", (row.x + 12, row.y + 6),
                                       fonts.small(bold=True), config.COL_AMBER)
                 if o.get("client_profile"):

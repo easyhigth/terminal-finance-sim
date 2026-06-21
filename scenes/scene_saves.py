@@ -11,7 +11,7 @@ import pygame
 from core import config
 from core.game_state import GameState
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 
 class SavesScene(Scene):
@@ -109,7 +109,7 @@ class SavesScene(Scene):
         accent = config.COL_CYAN if is_auto else config.COL_AMBER
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL, rect)
         pygame.draw.rect(surf, accent if meta else config.COL_BORDER, rect, 1)
-        widgets.draw_row_selection(surf, rect, cursor)
+        keynav.draw_focus_ring(surf, rect, cursor)
 
         label = "AUTOSAVE" if is_auto else slot.upper()
         widgets.draw_text(surf, label, (rect.x + 16, rect.y + 12),

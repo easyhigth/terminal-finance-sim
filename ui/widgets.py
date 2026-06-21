@@ -42,13 +42,6 @@ def hover_accent(active, base=config.COL_AMBER, hover_color=config.COL_CYAN):
     return hover_color if active else base
 
 
-def draw_row_selection(surf, rect, selected, accent=config.COL_AMBER):
-    """Surligne `rect` quand un item est navigué au clavier (sans le cliquer),
-    pour donner un retour visuel cohérent avec la sélection à la souris."""
-    if selected:
-        pygame.draw.rect(surf, hover_accent(True, accent), rect, 1, border_radius=3)
-
-
 # ---------------------------------------------------------------------------
 # TEXTE
 # ---------------------------------------------------------------------------

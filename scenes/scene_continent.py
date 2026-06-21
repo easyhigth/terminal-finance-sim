@@ -9,7 +9,7 @@ import pygame
 from core import config
 from core.i18n import t
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 from ui.globe import Globe
 
 
@@ -85,7 +85,7 @@ class ContinentScene(Scene):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if selected else config.COL_PANEL, rect)
             pygame.draw.rect(surf, accent if selected else config.COL_BORDER,
                              rect, 2 if selected else 1)
-            widgets.draw_row_selection(surf, rect, i == self.card_cursor)
+            keynav.draw_focus_ring(surf, rect, i == self.card_cursor)
             widgets.draw_text(surf, name.upper(), (x+12, y+8),
                               fonts.body(bold=True), accent)
             widgets.draw_text(surf, info["regulator"], (x+12, y+34),

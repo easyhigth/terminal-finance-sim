@@ -9,7 +9,7 @@ import pygame
 from core import config
 from core.scene_manager import Scene
 from data import lessons as L
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 _TOPIC_COL = {
     "Valorisation": config.COL_AMBER, "Risque": config.COL_DOWN,
@@ -134,7 +134,7 @@ class AcademyScene(Scene):
                 read = lesson["id"] in p.learned
                 if sel:
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect)
-                widgets.draw_row_selection(surf, rect, pos == self.cursor)
+                keynav.draw_focus_ring(surf, rect, pos == self.cursor)
                 mark = "✓" if read else "•"
                 col = config.COL_UP if read else config.COL_TEXT
                 font = fonts.small(bold=sel)

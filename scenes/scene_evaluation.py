@@ -264,7 +264,8 @@ class EvaluationScene(Scene):
             self.new_title = res.get("title") if res else None
             self.app.notify(_L(f"{name} : niveau réussi", f"{name}: level passed"), "prestige")
             for b in badges.check_new(p, self.app.market):
-                self.app.notify(_L(f"✶ Badge : {b['name']}", f"✶ Badge: {b['name']}"), "prestige")
+                bname = badges.badge_name(b)
+                self.app.notify(_L(f"✶ Badge : {bname}", f"✶ Badge: {bname}"), "prestige")
         else:
             ratio = self.score / max(1, len(self.items))
             pct = int(ratio * 100)

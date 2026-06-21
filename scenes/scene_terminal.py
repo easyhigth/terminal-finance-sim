@@ -442,7 +442,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         kcol = {"good": config.COL_UP, "bad": config.COL_DOWN, "info": config.COL_CYAN}
         rows = []
         for e in items:
-            cat = news_mod.CATEGORY_LABEL.get(e["cat"], e["cat"])
+            cat = news_mod.category_label(e["cat"])
             rows.append(((cat, kcol.get(e["kind"], config.COL_TEXT)), e["text"]))
         if not rows:
             rows = [("—", _L("Aucune actualité détaillée.", "No detailed news."))]

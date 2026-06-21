@@ -18,6 +18,11 @@ retourne pour affichage (toast + journal), sur le même modèle que `core.badges
 Stockés dans player.legacy (liste d'ids).
 """
 
+def _L(fr, en):
+    from core.i18n import get_lang
+    return en if get_lang() == "en" else fr
+
+
 RANK_STREAK_TARGET = 4        # trimestres consécutifs en tête du classement
 PROFIT_STREAK_TARGET = 6      # trimestres consécutifs de valeur nette croissante
 INTEGRITY_STREAK_TARGET = 4   # trimestres consécutifs intègre ET performant
@@ -40,39 +45,53 @@ def _performant_threshold(player):
 
 GOALS = [
     {
-        "id": "desk_no1", "name": "Numéro 1 du desk",
-        "desc": f"Dominer le classement des rivaux {RANK_STREAK_TARGET} trimestres de suite.",
+        "id": "desk_no1", "name": ("Numéro 1 du desk", "Desk #1"),
+        "desc": (f"Dominer le classement des rivaux {RANK_STREAK_TARGET} trimestres de suite.",
+                 f"Dominate the rivals leaderboard for {RANK_STREAK_TARGET} quarters in a row."),
         "progress": lambda p, m: (p.flags.get("top_rank_streak", 0), RANK_STREAK_TARGET),
         "test": lambda p, m: p.flags.get("top_rank_streak", 0) >= RANK_STREAK_TARGET,
     },
     {
-        "id": "major_crisis_survivor", "name": "Rescapé d'une crise majeure",
-        "desc": "Traverser une crise de marché sévère sans que la firme ne coule.",
+        "id": "major_crisis_survivor", "name": ("Rescapé d'une crise majeure", "Major crisis survivor"),
+        "desc": ("Traverser une crise de marché sévère sans que la firme ne coule.",
+                 "Weather a severe market crisis without the firm going under."),
         "progress": lambda p, m: (min(1, p.flags.get("major_crises", 0)), 1),
         "test": lambda p, m: p.flags.get("major_crises", 0) >= 1,
     },
     {
-        "id": "track_record", "name": "Track record",
-        "desc": f"Faire croître votre valeur nette {PROFIT_STREAK_TARGET} trimestres de suite.",
+        "id": "track_record", "name": ("Track record", "Track record"),
+        "desc": (f"Faire croître votre valeur nette {PROFIT_STREAK_TARGET} trimestres de suite.",
+                 f"Grow your net worth for {PROFIT_STREAK_TARGET} quarters in a row."),
         "progress": lambda p, m: (p.flags.get("profit_streak", 0), PROFIT_STREAK_TARGET),
         "test": lambda p, m: p.flags.get("profit_streak", 0) >= PROFIT_STREAK_TARGET,
     },
     {
-        "id": "transformant_mandate", "name": "Mandat transformant",
-        "desc": "Remporter un mandat client hors-norme, capable de transformer la firme.",
+        "id": "transformant_mandate", "name": ("Mandat transformant", "Transformative mandate"),
+        "desc": ("Remporter un mandat client hors-norme, capable de transformer la firme.",
+                 "Win an extraordinary client mandate capable of transforming the firm."),
         "progress": lambda p, m: (min(1, p.flags.get("mandates_transformant_won", 0)), 1),
         "test": lambda p, m: p.flags.get("mandates_transformant_won", 0) >= 1,
     },
     {
-        "id": "integrity_performant", "name": "Intégrité et performance",
-        "desc": (f"Tenir réputation ≥ {INTEGRITY_MIN_REP}, scrutin ≤ {INTEGRITY_MAX_HEAT} ET "
-                 f"valeur nette élevée, {INTEGRITY_STREAK_TARGET} trimestres de suite."),
+        "id": "integrity_performant", "name": ("Intégrité et performance", "Integrity and performance"),
+        "desc": ((f"Tenir réputation ≥ {INTEGRITY_MIN_REP}, scrutin ≤ {INTEGRITY_MAX_HEAT} ET "
+                  f"valeur nette élevée, {INTEGRITY_STREAK_TARGET} trimestres de suite."),
+                 (f"Maintain reputation ≥ {INTEGRITY_MIN_REP}, scrutiny ≤ {INTEGRITY_MAX_HEAT} AND "
+                  f"high net worth, for {INTEGRITY_STREAK_TARGET} quarters in a row.")),
         "progress": lambda p, m: (p.flags.get("integrity_streak", 0), INTEGRITY_STREAK_TARGET),
         "test": lambda p, m: p.flags.get("integrity_streak", 0) >= INTEGRITY_STREAK_TARGET,
     },
 ]
 
 _BY_ID = {g["id"]: g for g in GOALS}
+
+
+def goal_name(goal):
+    return _L(*goal["name"])
+
+
+def goal_desc(goal):
+    return _L(*goal["desc"])
 
 
 def on_quarter_close(player, market):

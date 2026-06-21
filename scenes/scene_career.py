@@ -105,7 +105,7 @@ class CareerScene(Scene):
                 b = badges_mod.get(bid)
                 if not b:
                     continue
-                r = widgets.draw_badge(surf, b["name"], (x, y), config.COL_PRESTIGE)
+                r = widgets.draw_badge(surf, badges_mod.badge_name(b), (x, y), config.COL_PRESTIGE)
                 x = r.right + 6
                 if x > inner.right - 90:
                     x = inner.x

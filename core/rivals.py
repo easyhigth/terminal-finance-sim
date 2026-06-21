@@ -11,6 +11,12 @@ valeur nette du joueur, pour permettre la comparaison.
 import random
 
 from core import config
+from core.i18n import get_lang
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
 
 RIVAL_PROFILES = [
     {"name": "Marcus Vale", "firm": "Vale & Co.", "track": "M&A"},
@@ -31,7 +37,8 @@ def ensure(player, rng=None):
         player.rivals.append({
             "name": prof["name"], "firm": prof["firm"], "track": prof["track"],
             "score": round(config.START_CASH * rng.uniform(0.7, 1.7), 2),
-            "last": "se positionne sur le marché", "mood": "flat",
+            "last": _L("se positionne sur le marché", "positions itself in the market"),
+            "mood": "flat",
         })
 
 
@@ -62,7 +69,8 @@ def leaderboard(player, market):
     ensure(player)
     rows = [{"name": r["name"], "firm": r["firm"], "score": r["score"],
              "is_player": False} for r in player.rivals]
-    rows.append({"name": player.name + " (vous)", "firm": player.firm_name or "vous",
+    rows.append({"name": player.name + _L(" (vous)", " (you)"),
+                 "firm": player.firm_name or _L("vous", "you"),
                  "score": player_score(player, market), "is_player": True})
     rows.sort(key=lambda x: x["score"], reverse=True)
     for i, row in enumerate(rows):
@@ -86,7 +94,7 @@ def snipe(player, deal, rng=None):
     rival = rng.choice(same) if same else rng.choice(player.rivals)
     # un deal raflé profite au rival, mais sans le faire exploser (fraction)
     rival["score"] += deal.get("reward_cash", 0) * 0.3
-    _set_action(rival, f"rafle « {deal.get('title','?')} »", "up")
+    _set_action(rival, _L(f"rafle « {deal.get('title','?')} »", f"snags “{deal.get('title','?')}”"), "up")
     return rival["name"]
 
 
@@ -182,10 +190,12 @@ def act(player, market, rng=None):
         before = r["score"]
         r["score"] = before * (1.0 + rng.uniform(0.10, 0.28))
         passed = before <= pscore < r["score"]
-        _set_action(r, "conclut une opération majeure", "up")
-        txt = f"{r['name']} ({r['firm']}) conclut une opération de premier plan"
+        _set_action(r, _L("conclut une opération majeure", "closes a major deal"), "up")
+        txt = _L(f"{r['name']} ({r['firm']}) conclut une opération de premier plan",
+                 f"{r['name']} ({r['firm']}) closes a top-tier deal")
         ev = {"type": "surge", "rival": r["name"], "kind": "bad" if passed else "info",
-              "text": txt + (" et vous double au classement." if passed else ".")}
+              "text": txt + (_L(" et vous double au classement.", " and overtakes you in the rankings.")
+                              if passed else ".")}
         events.append(ev)
         _log_rival_event(player, ev)
 
@@ -197,13 +207,17 @@ def act(player, market, rng=None):
             r = _rival_of_track(player, d.get("kind"), rng)
             player.deals = [x for x in player.deals if x["id"] != d["id"]]
             r["score"] += d.get("reward_cash", 0) * 0.3
-            player.adjust_reputation(-2, reason=f"Deal raflé par {r['name']} : « {d['title']} »")
-            _set_action(r, f"vous coiffe sur « {d['title']} »", "up")
+            player.adjust_reputation(-2, reason=_L(f"Deal raflé par {r['name']} : « {d['title']} »",
+                                                     f"Deal snagged by {r['name']}: “{d['title']}”"))
+            _set_action(r, _L(f"vous coiffe sur « {d['title']} »", f"beats you to “{d['title']}”"), "up")
             ev = {"type": "snipe", "rival": r["name"], "kind": "bad",
                   "deal": d, "title": d["title"],
-                  "text": f"{r['name']} vous coiffe au poteau sur « {d['title']} » : il ne "
-                          f"restait que {d['days_left']}j avant expiration et vous n'aviez pas "
-                          f"encore tranché (−2 réputation)."}
+                  "text": _L(
+                      f"{r['name']} vous coiffe au poteau sur « {d['title']} » : il ne "
+                      f"restait que {d['days_left']}j avant expiration et vous n'aviez pas "
+                      f"encore tranché (−2 réputation).",
+                      f"{r['name']} beats you to “{d['title']}”: only {d['days_left']}d "
+                      f"were left before expiry and you hadn't decided yet (−2 reputation).")}
             events.append(ev)
             _log_rival_event(player, ev)
 
@@ -213,11 +227,14 @@ def act(player, market, rng=None):
         player.mandate_offers = [x for x in player.mandate_offers if x.get("id") != o.get("id")]
         r = rng.choice(player.rivals)
         r["score"] += o.get("capital", 0) * 0.02
-        client = o.get("client", "un client")
-        _set_action(r, f"décroche le mandat {client}", "up")
+        client = o.get("client", _L("un client", "a client"))
+        _set_action(r, _L(f"décroche le mandat {client}", f"lands the {client} mandate"), "up")
         ev = {"type": "poach", "rival": r["name"], "kind": "bad", "client": client,
-              "text": f"{r['name']} décroche le mandat de {client} : l'offre traînait dans "
-                      f"votre file d'attente sans réponse, le temps a joué contre vous."}
+              "text": _L(
+                  f"{r['name']} décroche le mandat de {client} : l'offre traînait dans "
+                  f"votre file d'attente sans réponse, le temps a joué contre vous.",
+                  f"{r['name']} lands the {client} mandate: the offer sat unanswered "
+                  f"in your queue and time worked against you.")}
         events.append(ev)
         _log_rival_event(player, ev)
 
@@ -234,11 +251,14 @@ def act(player, market, rng=None):
             player.rival_owned_targets.append(t["ticker"])
             r = _rival_of_track(player, "M&A", rng)
             r["score"] += t.get("revenue", 0) * 0.5
-            _set_action(r, f"s'empare de « {t['name']} »", "up")
+            _set_action(r, _L(f"s'empare de « {t['name']} »", f"snaps up “{t['name']}”"), "up")
             ev = {"type": "claim_target", "rival": r["name"], "kind": "bad",
                   "target": t["name"], "ticker": t["ticker"],
-                  "text": f"{r['name']} s'empare de la cible M&A « {t['name']} » "
-                          f"que vous auriez pu viser."}
+                  "text": _L(
+                      f"{r['name']} s'empare de la cible M&A « {t['name']} » "
+                      f"que vous auriez pu viser.",
+                      f"{r['name']} snaps up the M&A target “{t['name']}” "
+                      f"that you could have pursued.")}
             events.append(ev)
             _log_rival_event(player, ev)
 

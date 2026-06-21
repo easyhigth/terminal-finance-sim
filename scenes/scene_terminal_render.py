@@ -108,13 +108,14 @@ class TerminalRenderMixin:
         pygame.draw.rect(surf, config.COL_CYAN, (rect.x, rect.y, 3, rect.h))
         skip = pygame.Rect(rect.right - 90, rect.y + (rect.h - 22) // 2, 80, 22)
         self._onboarding_skip_rect = skip
-        title = f"PARCOURS — Étape {idx}/{n} : {step['title']}"
+        title = _L(f"PARCOURS — Étape {idx}/{n} : {onboarding_mod.step_title(step)}",
+                   f"ONBOARDING — Step {idx}/{n}: {onboarding_mod.step_title(step)}")
         widgets.draw_text(surf, title, (rect.x + 12, rect.y + 4), fonts.tiny(bold=True), config.COL_CYAN)
-        widgets.draw_text(surf, widgets.fit_text(step["hint"], fonts.tiny(), rect.w - 220),
+        widgets.draw_text(surf, widgets.fit_text(onboarding_mod.step_hint(step), fonts.tiny(), rect.w - 220),
                           (rect.x + 12, rect.y + 20), fonts.tiny(), config.COL_TEXT_DIM)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, skip, border_radius=3)
         pygame.draw.rect(surf, config.COL_BORDER, skip, 1, border_radius=3)
-        widgets.draw_text(surf, "✕ Passer", skip.center, fonts.tiny(bold=True),
+        widgets.draw_text(surf, _L("✕ Passer", "✕ Skip"), skip.center, fonts.tiny(bold=True),
                           config.COL_TEXT_DIM, align="center")
 
     def _draw_rail(self, surf, rect, p):

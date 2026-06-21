@@ -1,0 +1,92 @@
+"""
+shortcuts_data_en.py — English keyboard shortcuts catalogue (mirror of
+data/shortcuts_data.SECTIONS). Accessed via data.shortcuts_data.localized("en").
+"""
+
+SECTIONS_EN = [
+    ("General — everywhere in the game", [
+        ("ESC", "Go up one level: leaves a focused block, closes a floating "
+                "window, clears a search, or returns to the previous screen"),
+        ("TAB / SHIFT+TAB", "Move to the next/previous interactive block or zone"),
+        ("↑ / ↓ / ← / →", "Move the focus based on the real on-screen position of "
+                           "the blocks or list/grid items"),
+        ("ENTER", "Enter the focused block (1st press) then activate the focused "
+                  "inner item (2nd press) — equivalent to a click"),
+        ("Letters/digits", "Type into the active search field (blinking cursor = "
+                            "editable field) ; filters the displayed list live"),
+        ("BACKSPACE", "Delete the last character of the search field"),
+        ("Mouse wheel", "Scroll a list or panel under the cursor"),
+        ("Keyboard focus", "WHITE bracketed outline = keyboard focus (distinct from "
+                            "the cyan mouse hover and the amber selection)"),
+    ]),
+    ("Lists, grids and catalogues — most screens", [
+        ("↑ / ↓ / ← / →", "Select the previous/next item (row, card or grid cell "
+                           "depending on the screen: Inbox, Explorer, Academy/Tutorials/"
+                           "Certifications, Glossary, Deals, Mandates, Continent picker, "
+                           "MORE, command palette…)"),
+        ("ENTER", "Activate the selected item: open, buy, load, accept or launch "
+                   "depending on the screen — always equivalent to a click"),
+        ("Letters/digits", "Filter the list when the screen has a search field"),
+        ("ESC", "Clear the current search, otherwise return to the previous screen"),
+    ]),
+    ("Per-screen exceptions", [
+        ("Shop — TAB", "Toggles the input focus between search and quantity"),
+        ("Team — TAB", "Toggles the focus between the recruitment catalogue and the "
+                        "current team ; ENTER hires or fires depending on the active pane"),
+        ("Exam / Cert — TAB or ← / →", "Toggles the focus between the exam card and "
+                                        "the certification card"),
+        ("Mandates — D", "Decline the selected mandate offer (ENTER accepts it)"),
+        ("Saves — (mouse only)", "Deleting a save remains intentionally mouse-only, "
+            "to avoid accidentally losing a career"),
+    ]),
+    ("Terminal (main hub) — hierarchical navigation", [
+        ("Letters/digits (console focus)", "Type a command on the CMD> line "
+            "— the focus is in the console by default, so typing works "
+            "immediately as before"),
+        ("ENTER (console focus)", "Run the typed command"),
+        ("↑ / ↓ (console focus)", "Recall previous/next commands from history"),
+        ("TAB (console focus)", "Auto-complete the current command"),
+        ("PAGE UP / PAGE DOWN", "Scroll the console history"),
+        ("ESC (console focus)", "Goes up to block level (the console stays selected, "
+            "white outline visible) — a 2nd ESC at block level opens the menu"),
+        ("TAB (block level)", "Moves to the next block: CONSOLE → RAIL → INDICES → "
+            "HEALTH → COMPANIES → CAREER → FEED (SHIFT+TAB to go back)"),
+        ("↑ / ↓ / ← / → (block level)", "Moves the focus to the nearest block in "
+            "that direction, based on its real position on screen"),
+        ("ENTER (RAIL/INDICES/COMPANIES block)", "Enters the block: the arrow keys "
+            "then navigate its inner rows (commands, indices, followed companies)"),
+        ("ENTER (HEALTH/CAREER/FEED block)", "Opens the associated scene directly "
+            "(these blocks have no navigable inner content)"),
+        ("ENTER (inner item)", "Activates the item: runs the rail command, opens "
+            "an index's chart, opens a followed company's sheet"),
+        ("ESC (block level, inside a block)", "Goes back up from the inner content "
+            "to block level (e.g. leaves the rail list without leaving the terminal)"),
+        ("Worked example", "Focus on the CONSOLE block (empty) → ESC to go up to "
+            "block level → ↓ to reach the block below (RAIL) → ENTER to enter it "
+            "→ ↑/↓ to pick a command → ENTER to run it"),
+    ]),
+    ("Direct CTRL+letter shortcuts (terminal)", [
+        ("Click rail / COMMAND_NAME", "Each rail button corresponds to a typeable "
+                                       "command (e.g. SHOP, INBOX, NEWS, MORE, SHORTCUTS…)"),
+        ("CTRL+M / P / I / N / J", "Market / Portfolio / Inbox / News / Mission"),
+        ("CTRL+A / D / F / E / V", "Mandates / Deals / M&A / Decide / ADV (advance time)"),
+        ("CTRL+X / B / T / L / G", "Exam-Cert / Shop / Spreadsheet / Academy / Glossary"),
+        ("CTRL+O / S / H / K", "More (all pages) / Save / Help / Command palette"),
+        ("CTRL+SHIFT+letter", "Pages only available from MORE (e.g. CTRL+SHIFT+E "
+            "Explorer, +C Career, +B Detailed book, +H History, +T Team, "
+            "+R Risk/VaR, +A Macro calendar, +V Annual review, +L Rivals, +S Stress test, "
+            "+W Saves, +O Track/specialization) — see the MORE panel (CTRL+O) for "
+            "the full list and search by name"),
+        ("Other pages", "Always reachable via CTRL+O (MORE) then arrows/search, "
+            "or by typing their command directly (ETF, BONDS, CMDTY, CRYPTO, STRUCT, "
+            "CREDIT, SWAP, GOV, FX, OPTIONS, IPO, GP, PA, ATTR, ALERT, QUANT, FRONTIER, "
+            "HEDGE, ALM, TUTO, CERT…)"),
+    ]),
+    ("Floating windows and this panel", [
+        ("ESC", "Closes the most recent floating window, or this panel if it's open"),
+        ("↑ / ↓ / PAGE UP / PAGE DOWN", "Scroll the content (chart, sheet, "
+                                        "shortcuts list…)"),
+        ("(mouse)", "Drag the title bar to move the window/panel ; "
+                    "✕ to close ; wheel to scroll"),
+    ]),
+]

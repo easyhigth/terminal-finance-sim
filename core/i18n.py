@@ -175,6 +175,8 @@ TR = {
         "rail.RIVALS": "RIVAUX",
         "rail.SAVE": "SAUVER",
         "rail.COMMANDS": "AIDE",
+        # panneau raccourcis clavier
+        "shortcuts.title": "⌨ RACCOURCIS CLAVIER — jouer sans la souris",
     },
     "en": {
         # menu
@@ -284,6 +286,8 @@ TR = {
         "rail.RIVALS": "RIVALS",
         "rail.SAVE": "SAVE",
         "rail.COMMANDS": "HELP",
+        # keyboard shortcuts panel
+        "shortcuts.title": "⌨ KEYBOARD SHORTCUTS — play without a mouse",
     },
 }
 

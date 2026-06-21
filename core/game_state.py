@@ -203,14 +203,24 @@ class GameState:
 
     @classmethod
     def from_dict(cls, d):
+        """Reconstruit un GameState depuis un dict JSON. Tolérant aux
+        sauvegardes incomplètes ou d'une version antérieure du jeu : tout
+        champ absent, du mauvais type ou inconnu retombe sur le défaut de
+        PlayerState plutôt que de lever — une sauvegarde ancienne/partielle
+        ne doit jamais empêcher le joueur de continuer."""
+        if not isinstance(d, dict):
+            d = {}
         gs = cls()
         gs.created_at = d.get("created_at", time.time())
         gs.last_saved = d.get("last_saved", 0.0)
         gs.version = d.get("version", "0.1.0")
         p = d.get("player", {})
+        if not isinstance(p, dict):
+            p = {}
+        defaults = PlayerState()
         gs.player = PlayerState(**{
-            k: p.get(k, getattr(PlayerState(), k))
-            for k in PlayerState().__dataclass_fields__
+            k: p.get(k, getattr(defaults, k))
+            for k in defaults.__dataclass_fields__
         })
         # sauvegardes antérieures au parcours d'intégration : pas de clé du tout
         # -> partie déjà en cours, on ne l'impose pas après coup.
@@ -240,6 +250,11 @@ class GameState:
 
     @classmethod
     def load(cls, slot="manual"):
+        """Charge un slot de sauvegarde. Retourne None (jamais d'exception)
+        si le fichier est absent, illisible, corrompu (JSON invalide) ou
+        d'une structure inattendue — les appelants (scene_menu, scene_saves)
+        traitent déjà ce cas comme un échec de chargement affiché au joueur,
+        plutôt que de faire planter le jeu sur une sauvegarde abîmée."""
         logger.info("load: début (slot=%s)", slot)
         path = os.path.join(config.SAVE_DIR, f"{slot}.json")
         if not os.path.exists(path):
@@ -250,7 +265,7 @@ class GameState:
                 gs = cls.from_dict(json.load(f))
         except Exception:
             logger.warning("load: échec (slot=%s, path=%s)", slot, path, exc_info=True)
-            raise
+            return None
         logger.info("load: succès (slot=%s, path=%s)", slot, path)
         return gs
 

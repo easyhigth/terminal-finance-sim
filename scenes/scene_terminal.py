@@ -566,17 +566,17 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         elif cmd in ("BONDS", "BOND", "OBLIGATIONS", "FI"):
             self.app.scenes.go("bonds", return_to="terminal")
         elif cmd in ("BUYBOND", "SELLBOND"):
-            self._cmd_bond_trade(cmd, parts[1:])
+            self._cmd_trade("bonds", cmd, parts[1:])
         elif cmd in ("CMDTY", "COMMODITIES", "COMMO", "MATIERES"):
             self.app.scenes.go("commodities", return_to="terminal")
         elif cmd in ("BUYCMDTY", "SELLCMDTY"):
-            self._cmd_alt_trade("commodities", cmd, parts[1:])
+            self._cmd_trade("commodities", cmd, parts[1:])
         elif cmd in ("CRYPTO", "COIN"):
             self.app.scenes.go("crypto", return_to="terminal")
         elif cmd in ("ETF", "ETFS", "FUNDS", "FONDS"):
             self.app.scenes.go("etfs", return_to="terminal")
         elif cmd in ("BUYETF", "SELLETF"):
-            self._cmd_alt_trade("etfs", cmd, parts[1:])
+            self._cmd_trade("etfs", cmd, parts[1:])
         elif cmd in ("STRUCT", "STRUCTURED", "STRUCTURES"):
             self.app.scenes.go("structured", return_to="terminal")
         elif cmd in ("SWAP", "SWAPS"):
@@ -604,7 +604,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         elif cmd in ("ALM", "BANKING"):
             self.app.scenes.go("alm", return_to="terminal")
         elif cmd in ("BUYCRYPTO", "SELLCRYPTO"):
-            self._cmd_alt_trade("crypto", cmd, parts[1:])
+            self._cmd_trade("crypto", cmd, parts[1:])
         elif cmd in ("GP", "CHART", "GRAPH"):
             self._cmd_graph("line", parts[1:])
         elif cmd in ("GPC", "CANDLE", "CANDLES"):

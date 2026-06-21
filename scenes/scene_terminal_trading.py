@@ -19,57 +19,31 @@ def _L(fr, en):
     return en if get_lang() == "en" else fr
 
 
-class TerminalTradingMixin:
-    def _cmd_bond_trade(self, cmd, args):
-        """BUYBOND/SELLBOND <id> <qté>."""
-        import core.bonds as bonds_mod
-        if not unlocks_mod.unlocked(self.app.gs.player, "trade"):
-            self._log(_L("  ⊘ Trading débloqué au grade Associate.","  ⊘ Trading unlocked at Associate grade."))
-            return
-        if len(args) < 1:
-            self._log(_L(f"  Usage : {cmd} <id> <qté>  (voir BONDS).", f"  Usage: {cmd} <id> <qty>  (see BONDS)."))
-            return
-        bid = args[0].upper()
-        qty = "ALL"
-        if len(args) > 1 and args[1].upper() != "ALL":
-            if not args[1].isdigit():
-                self._log(_L("  Quantité invalide.","  Invalid quantity."))
-                return
-            qty = int(args[1])
-        p, m = self.app.gs.player, self.market
-        if cmd == "BUYBOND":
-            if qty == "ALL":
-                self._log(_L("  Précisez une quantité pour l'achat.","  Specify a quantity to buy."))
-                return
-            r = bonds_mod.buy_bond(p, m, bid, qty)
-            if r["ok"]:
-                self._log(_L(f"  ✓ Achat {qty} × {bid} @ {r['price']:.2f} = "
-                          f"{widgets.format_money(r['total'], self._cur())}.",
-                          f"  ✓ Bought {qty} × {bid} @ {r['price']:.2f} = "
-                          f"{widgets.format_money(r['total'], self._cur())}."))
-                journal_mod.log_trade(p, m, asset_class="Obligation", key=bid, label=bid,
-                                      side="achat", qty=r["qty"], price=r["price"],
-                                      fee=r.get("fee", 0.0))
-            else:
-                self._log(_L(f"  Achat refusé ({r['reason']}).", f"  Buy rejected ({r['reason']})."))
-        else:
-            r = bonds_mod.sell_bond(p, m, bid, qty)
-            if r["ok"]:
-                self._log(_L(f"  ✓ Vente {int(r['qty'])} × {bid} (P&L réalisé "
-                          f"{r['realized']:+.0f}).",
-                          f"  ✓ Sold {int(r['qty'])} × {bid} (realised P&L "
-                          f"{r['realized']:+.0f})."))
-                journal_mod.log_trade(p, m, asset_class="Obligation", key=bid, label=bid,
-                                      side="vente", qty=r["qty"], price=r["price"],
-                                      fee=r.get("fee", 0.0), realized=r["realized"])
-            else:
-                self._log(_L(f"  Vente refusée ({r['reason']}).", f"  Sell rejected ({r['reason']})."))
-        self._after_trade()
+# Config par classe d'actif des commandes BUYxxx/SELLxxx génériques (cf.
+# _cmd_trade) : nom du module core.*, noms des fonctions buy/sell (le module
+# obligations s'appelle buy_bond/sell_bond plutôt que buy/sell) et le libellé
+# de classe d'actif attendu par core.journal.log_trade.
+ASSET_TRADE_CONFIG = {
+    "bonds": {"module": "core.bonds", "buy_fn": "buy_bond", "sell_fn": "sell_bond",
+              "asset_class": "Obligation"},
+    "commodities": {"module": "core.commodities", "buy_fn": "buy", "sell_fn": "sell",
+                     "asset_class": "Commodity"},
+    "crypto": {"module": "core.crypto", "buy_fn": "buy", "sell_fn": "sell",
+               "asset_class": "Crypto"},
+    "etfs": {"module": "core.etfs", "buy_fn": "buy", "sell_fn": "sell",
+             "asset_class": "ETF"},
+}
 
-    def _cmd_alt_trade(self, asset, cmd, args):
-        """Trading générique commodities/crypto : BUY/SELL <id> <qté>."""
+
+class TerminalTradingMixin:
+    def _cmd_trade(self, asset, cmd, args):
+        """Trading générique BUY<X>/SELL<X> <id> <qté> pour bonds/commodities/
+        crypto/etfs (cf. ASSET_TRADE_CONFIG) : même validation, mêmes messages
+        et même journalisation pour les 4 classes d'actifs, qui ne diffèrent
+        que par le module core.* et le nom de leurs fonctions buy/sell."""
+        conf = ASSET_TRADE_CONFIG[asset]
         import importlib
-        mod = importlib.import_module(f"core.{asset}")
+        mod = importlib.import_module(conf["module"])
         if not unlocks_mod.unlocked(self.app.gs.player, "trade"):
             self._log(_L("  ⊘ Trading débloqué au grade Associate.","  ⊘ Trading unlocked at Associate grade."))
             return
@@ -84,26 +58,34 @@ class TerminalTradingMixin:
                 return
             qty = int(args[1])
         p, m = self.app.gs.player, self.market
-        asset_class = "Crypto" if asset == "crypto" else "Commodity"
+        asset_class = conf["asset_class"]
         if cmd.startswith("BUY"):
             if qty == "ALL":
                 self._log(_L("  Précisez une quantité pour l'achat.","  Specify a quantity to buy."))
                 return
-            r = mod.buy(p, m, cid, qty)
-            self._log(_L(f"  ✓ Achat {qty} {cid} @ {r['price']:.2f}.", f"  ✓ Bought {qty} {cid} @ {r['price']:.2f}.") if r["ok"]
-                      else _L(f"  Achat refusé ({r['reason']}).", f"  Buy rejected ({r['reason']})."))
+            r = getattr(mod, conf["buy_fn"])(p, m, cid, qty)
             if r["ok"]:
+                self._log(_L(f"  ✓ Achat {qty} × {cid} @ {r['price']:.2f} = "
+                          f"{widgets.format_money(r['total'], self._cur())}.",
+                          f"  ✓ Bought {qty} × {cid} @ {r['price']:.2f} = "
+                          f"{widgets.format_money(r['total'], self._cur())}."))
                 journal_mod.log_trade(p, m, asset_class=asset_class, key=cid, label=cid,
-                                      side="achat", qty=qty, price=r["price"],
+                                      side="achat", qty=r["qty"], price=r["price"],
                                       fee=r.get("fee", 0.0))
+            else:
+                self._log(_L(f"  Achat refusé ({r['reason']}).", f"  Buy rejected ({r['reason']})."))
         else:
-            r = mod.sell(p, m, cid, qty)
-            self._log(_L(f"  ✓ Vente {cid} (P&L réalisé {r['realized']:+.0f}).", f"  ✓ Sold {cid} (realised P&L {r['realized']:+.0f}).") if r["ok"]
-                      else _L(f"  Vente refusée ({r['reason']}).", f"  Sell rejected ({r['reason']})."))
+            r = getattr(mod, conf["sell_fn"])(p, m, cid, qty)
             if r["ok"]:
+                self._log(_L(f"  ✓ Vente {int(r['qty'])} × {cid} (P&L réalisé "
+                          f"{r['realized']:+.0f}).",
+                          f"  ✓ Sold {int(r['qty'])} × {cid} (realised P&L "
+                          f"{r['realized']:+.0f})."))
                 journal_mod.log_trade(p, m, asset_class=asset_class, key=cid, label=cid,
-                                      side="vente", qty=r.get("qty", qty), price=r["price"],
+                                      side="vente", qty=r["qty"], price=r["price"],
                                       fee=r.get("fee", 0.0), realized=r["realized"])
+            else:
+                self._log(_L(f"  Vente refusée ({r['reason']}).", f"  Sell rejected ({r['reason']})."))
         self._after_trade()
 
     def _cur(self):

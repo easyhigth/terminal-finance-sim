@@ -146,7 +146,7 @@ class SceneManager:
             row = pygame.Rect(box.x+10, list_y + i*PALETTE_ROW_H, box.w-20, PALETTE_ROW_H)
             if i == self.palette_sel:
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, row)
-                pygame.draw.rect(surf, config.COL_AMBER, row, 1)
+                pygame.draw.rect(surf, config.COL_CYAN, row, 1)
             widgets.draw_text(surf, label, (row.x+8, row.y+6), fonts.small(), config.COL_TEXT)
         if len(filtered) > max_rows:
             widgets.draw_text(surf, f"… et {len(filtered)-max_rows} autre(s)",

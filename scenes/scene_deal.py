@@ -117,7 +117,7 @@ class DealScene(Scene):
             rect = pygame.Rect(inner.x, y, inner.w, 46)
             self._choice_rects[i] = rect
             hover = rect.collidepoint(pygame.mouse.get_pos()) and self.state == "question"
-            border = config.COL_AMBER if hover else config.COL_BORDER
+            border = config.COL_CYAN if hover else config.COL_AMBER
             fill = config.COL_PANEL_HEAD if hover else config.COL_PANEL
             # en résultat : surligner le choix retenu (vert/orange/rouge)
             if self.state == "result" and i == self.chosen:

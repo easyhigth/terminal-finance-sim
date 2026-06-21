@@ -113,7 +113,7 @@ class DilemmaScene(Scene):
             hover = rect.collidepoint(mp)
             focused = (i == self.focus)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if (hover or focused) else config.COL_PANEL, rect)
-            pygame.draw.rect(surf, config.COL_CYAN if (hover or focused) else config.COL_BORDER, rect,
+            pygame.draw.rect(surf, config.COL_CYAN if (hover or focused) else config.COL_AMBER, rect,
                              3 if focused else (2 if hover else 1))
             widgets.draw_text(surf, f"{chr(65+i)}. {o['label']}", (rect.x + 16, rect.y + 12),
                               fonts.body(bold=True), config.COL_WHITE)

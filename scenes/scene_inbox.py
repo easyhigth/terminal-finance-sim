@@ -7,7 +7,7 @@ import pygame
 
 from core import config
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 _KIND = {
     "manager": ("MANAGER", config.COL_AMBER),
@@ -192,7 +192,7 @@ class InboxScene(Scene):
                     sel = (idx == self.sel)
                     if sel:
                         pygame.draw.rect(surf, config.COL_PANEL_HEAD, row)
-                    widgets.draw_row_selection(surf, row, pos == self.cursor)
+                    keynav.draw_focus_ring(surf, row, pos == self.cursor)
                     tag, tcol = _KIND.get(m["kind"], ("•", config.COL_TEXT))
                     bold = not m.get("read")
                     widgets.draw_text(surf, tag, (linner.x, y), fonts.tiny(bold=True), tcol)

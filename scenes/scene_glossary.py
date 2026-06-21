@@ -9,7 +9,7 @@ from core import config
 from core.i18n import get_lang
 from core.scene_manager import Scene
 from data import glossary_data
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 
 class GlossaryScene(Scene):
@@ -143,7 +143,7 @@ class GlossaryScene(Scene):
             sel = (term == self.selected_term)
             if sel:
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect)
-            widgets.draw_row_selection(surf, rect, pos == self.cursor)
+            keynav.draw_focus_ring(surf, rect, pos == self.cursor)
             col = config.COL_AMBER if sel else config.COL_TEXT
             font = fonts.small(bold=sel)
             widgets.draw_text(surf, widgets.fit_text(

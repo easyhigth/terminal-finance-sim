@@ -18,7 +18,7 @@ from core import portfolio as PF
 from core import securitisation as SEC
 from core import structured as S
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 from ui.popups import PopupMixin
 
 ROW_H = 26
@@ -498,7 +498,7 @@ class ShopScene(Scene, PopupMixin):
         row_rect = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, ROW_H)
         if row_rect.collidepoint(mp):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect, border_radius=3)
-        widgets.draw_row_selection(surf, row_rect, cursor)
+        keynav.draw_focus_ring(surf, row_rect, cursor)
         kcol = KIND_COLOR.get(kind, config.COL_TEXT)
         name_w = min(290, fonts.small(bold=True).size(r["name"])[0])
         self._name_rects[ident] = pygame.Rect(inner.x - 2, y - 2, name_w + 4, ROW_H - 4)

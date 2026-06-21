@@ -9,7 +9,7 @@ import pygame
 from core import config, unlocks
 from core import deals as D
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 ROW_H = 92
 KINDS = ["M&A", "Portfolio", "Risk", "Quant", "Advisory", "General"]
@@ -193,7 +193,7 @@ class DealsScene(Scene):
                 row = pygame.Rect(inner.x, y, inner.w, ROW_H - 8)
                 pygame.draw.rect(surf, config.COL_PANEL, row, border_radius=4)
                 pygame.draw.rect(surf, config.COL_BORDER, row, 1, border_radius=4)
-                widgets.draw_row_selection(surf, row, i == self.row_cursor)
+                keynav.draw_focus_ring(surf, row, i == self.row_cursor)
                 self._row_rects[d["id"]] = row
 
                 widgets.draw_text(surf, f"#{d['id']} {d['title']}", (row.x + 12, row.y + 6),

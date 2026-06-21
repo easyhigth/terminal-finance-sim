@@ -112,6 +112,46 @@ def test_from_dict_fills_missing_fields_with_defaults():
     assert gs.player.portfolio == {}
 
 
+def test_from_dict_ignores_unknown_keys_forward_compat():
+    """Une sauvegarde produite par une version FUTURE du jeu peut contenir des
+    clés inconnues de cette version : elles doivent être ignorées sans lever,
+    pas faire planter le chargement d'une partie plus ancienne."""
+    gs = GameState.from_dict({
+        "player": {"name": "Future", "feature_from_next_version": {"x": 1}},
+        "feature_top_level": True,
+    })
+    assert gs.player.name == "Future"
+    assert not hasattr(gs.player, "feature_from_next_version")
+
+
+def test_from_dict_tolerates_non_dict_top_level():
+    gs = GameState.from_dict(["not", "a", "dict"])
+    assert gs.player.name == "Trainee"
+
+
+def test_from_dict_tolerates_non_dict_player_section():
+    gs = GameState.from_dict({"player": "corrupted"})
+    assert gs.player.name == "Trainee"
+    assert gs.player.cash == 0.0
+
+
+def test_load_corrupted_json_returns_none_without_raising(isolated_save_dir):
+    path = isolated_save_dir / "broken.json"
+    path.write_text("{not valid json", encoding="utf-8")
+    assert GameState.load(slot="broken") is None
+
+
+def test_load_unexpected_top_level_structure_falls_back_to_defaults(isolated_save_dir):
+    """JSON valide mais de structure inattendue (ex. sauvegarde d'un format
+    radicalement différent) : ne doit jamais lever, retombe sur un état par
+    défaut plutôt que de planter."""
+    path = isolated_save_dir / "weird.json"
+    path.write_text("[1, 2, 3]", encoding="utf-8")
+    gs = GameState.load(slot="weird")
+    assert gs is not None
+    assert gs.player.name == "Trainee"
+
+
 def test_delete_removes_existing_slot(isolated_save_dir):
     gs, _ = _populated_state()
     gs.save(slot="to_delete")

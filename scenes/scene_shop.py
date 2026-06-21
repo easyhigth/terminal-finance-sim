@@ -3,9 +3,11 @@ scene_shop.py — Boutique unifiée : achat de tout actif investissable en un
 seul écran (actions, ETF, obligations souveraines/corporate, commodities,
 crypto, produits structurés/titrisation). Recherche, filtre par type, tri,
 quantité libre (pas seulement des paquets fixes), indicateurs clés par
-ligne. Cliquer sur le NOM d'un actif ouvre sa vraie fiche d'analyse (popup
-flottante pour ETF/obligations/commodities, scène COMPANY pour les actions,
-scène CRYPTO pour les crypto-actifs). Ouvert via SHOP.
+ligne (dont la quantité déjà possédée). Cliquer sur le NOM d'un actif
+ouvre uniquement sa fiche d'analyse en popup, jamais une scène dédiée.
+Une rangée de boutons en bas mène vers les scènes dédiées par type
+d'actif, et un bouton permet d'aller/revenir vers l'EXPLORATEUR en
+conservant la recherche et le filtre de type. Ouvert via SHOP.
 """
 import pygame
 
@@ -40,6 +42,8 @@ KIND_LABEL = {"Action": "Action", "ETF": "ETF", "Obligation": "Oblig.",
               "Commodity": "Cmdty", "Crypto": "Crypto", "Structuré": "Struct.",
               "Crédit": "Crédit"}
 QTY_PRESETS = [1, 5, 10, 25, 100]
+SCENE_LINKS = [("etfs", "📊 ETF"), ("bonds", "📜 OBLIGATIONS"), ("commodities", "🛢 COMMODITIES"),
+               ("crypto", "₿ CRYPTO"), ("structured", "🧩 STRUCTURÉS"), ("credit", "🏦 CRÉDIT")]
 
 
 class ShopScene(Scene, PopupMixin):
@@ -48,11 +52,11 @@ class ShopScene(Scene, PopupMixin):
         self.market = self.app.ensure_market()
         self.init_popups()
         self.rows = self._build_dataset()
-        self.search = ""
+        self.search = kwargs.get("search", "")
         self.text_focus = "search"     # "search" ou "qty"
         self.qty_text = "10"
         self._t = 0.0
-        self.type_filter = None
+        self.type_filter = kwargs.get("type_filter")
         self.sort_key = "value"
         self.sort_dir = -1
         self.scroll = 0
@@ -70,9 +74,13 @@ class ShopScene(Scene, PopupMixin):
         self._qty_plus = None
         self._preset_rects = {}
         self._search_clear_rect = None
+        self._scene_link_rects = {}
         self.msg = ""
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
+        self.explorer_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
+                                            config.back_button_rect(160)[1], 170, 42),
+                                           "🔍 EXPLORATEUR", config.COL_CYAN)
 
     # --------------------------------------------------------------- helpers
     def _can_trade(self):
@@ -152,7 +160,7 @@ class ShopScene(Scene, PopupMixin):
     # --------------------------------------------------------------- actions
     def _open_detail(self, kind, key):
         if kind == "Action":
-            self.app.scenes.go("company", ticker=key, return_to="shop")
+            self.open_company(key)
         elif kind == "ETF":
             self.open_etf(key)
         elif kind == "Obligation":
@@ -160,11 +168,11 @@ class ShopScene(Scene, PopupMixin):
         elif kind == "Commodity":
             self.open_commodity(key)
         elif kind == "Crypto":
-            self.app.scenes.go("crypto", return_to="shop")
+            self.open_crypto(key)
         elif kind == "Structuré":
-            self.app.scenes.go("structured", return_to="shop")
+            self.open_structured(key)
         elif kind == "Crédit":
-            self.app.scenes.go("credit", return_to="shop")
+            self.open_credit(key)
 
     def _held_qty(self, kind, key):
         p = self.app.gs.player
@@ -319,6 +327,16 @@ class ShopScene(Scene, PopupMixin):
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
             return
+        if self.explorer_btn.handle(event):
+            self.app.scenes.go("explorer", return_to="shop", search=self.search,
+                               type_filter=self.type_filter)
+            return
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for scene_name, rect in self._scene_link_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.app.scenes.go(scene_name, return_to="shop")
+                    return
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
             if self._list_rect and self._list_rect.collidepoint(event.pos):
@@ -382,6 +400,7 @@ class ShopScene(Scene, PopupMixin):
     def update(self, dt):
         self._t += dt
         self.back_btn.update(pygame.mouse.get_pos(), dt)
+        self.explorer_btn.update(pygame.mouse.get_pos(), dt)
 
     # ----------------------------------------------------------------- draw
     def draw(self, surf):
@@ -474,13 +493,14 @@ class ShopScene(Scene, PopupMixin):
         y += 28
 
         rows = self._filtered_sorted()
-        panel = pygame.Rect(x0, y, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - y)
+        panel_bottom_reserve = 8 + 34  # place pour la rangée de boutons "scènes liées"
+        panel = pygame.Rect(x0, y, config.SCREEN_WIDTH - 80,
+                            config.footer_y() - panel_bottom_reserve - y)
         inner = widgets.draw_panel(surf, panel, f"Catalogue ({len(rows)})", config.COL_CYAN)
-        cols = [("NOM", 0), ("TYPE", 300), ("SECTEUR / CAT.", 375), ("COURS", 660),
-                ("VALEUR", 750), ("RENDEMENT", 860), ("VAR %", 970)]
+        cols = [("NOM", 0), ("TYPE", 240), ("SECTEUR / CAT.", 310), ("POSSÉDÉ", 470),
+                ("COURS", 560), ("VALEUR", 650), ("RENDEMENT", 750), ("VAR %", 860)]
         for lbl, dx in cols:
             widgets.draw_text(surf, lbl, (inner.x + dx, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
-        widgets.draw_text(surf, "ACHAT", (inner.x + 1075, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
 
         list_top = inner.y + 22
         list_area = pygame.Rect(inner.x - 6, list_top, inner.w + 12, inner.bottom - list_top - 22)
@@ -506,8 +526,23 @@ class ShopScene(Scene, PopupMixin):
             widgets.draw_text(surf, "⊘ Trading débloqué au grade Associate.",
                               (inner.x, inner.bottom - 4), fonts.tiny(), config.COL_TEXT_DIM)
 
+        # ---- rangée de liens vers les scènes dédiées par type d'actif ----
+        link_y = panel.bottom + 4
+        lx = x0
+        self._scene_link_rects = {}
+        for scene_name, label in SCENE_LINKS:
+            w = fonts.tiny(bold=True).size(label)[0] + 18
+            rect = pygame.Rect(lx, link_y, w, 24)
+            self._scene_link_rects[scene_name] = rect
+            hov = rect.collidepoint(mp)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL, rect, border_radius=4)
+            pygame.draw.rect(surf, config.COL_CYAN, rect, 1, border_radius=4)
+            widgets.draw_text(surf, label, rect.center, fonts.tiny(bold=True), config.COL_CYAN, align="center")
+            lx += w + 8
+
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14), self._focus_hints())
         self.back_btn.draw(surf)
+        self.explorer_btn.draw(surf)
         self.popups_draw(surf)
 
     def _draw_row(self, surf, r, y, inner, cols, cur, mp, cursor=False):
@@ -518,36 +553,39 @@ class ShopScene(Scene, PopupMixin):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect, border_radius=3)
         keynav.draw_focus_ring(surf, row_rect, cursor)
         kcol = KIND_COLOR.get(kind, config.COL_TEXT)
-        name_w = min(290, fonts.small(bold=True).size(r["name"])[0])
+        name_w = min(225, fonts.small(bold=True).size(r["name"])[0])
         self._name_rects[ident] = pygame.Rect(inner.x - 2, y - 2, name_w + 4, ROW_H - 4)
-        widgets.draw_text(surf, widgets.fit_text(r["name"], fonts.small(bold=True), 290),
+        widgets.draw_text(surf, widgets.fit_text(r["name"], fonts.small(bold=True), 225),
                           (inner.x, y), fonts.small(bold=True), kcol)
         widgets.draw_text(surf, KIND_LABEL.get(kind, kind), (inner.x + cols[1][1], y),
                           fonts.tiny(bold=True), kcol)
-        widgets.draw_text(surf, widgets.fit_text(str(r["sub"]), fonts.tiny(), 270),
+        widgets.draw_text(surf, widgets.fit_text(str(r["sub"]), fonts.tiny(), 150),
                           (inner.x + cols[2][1], y + 1), fonts.tiny(), config.COL_TEXT_DIM)
+        held = self._held_qty(kind, key)
+        held_txt = f"{held:g}" if held else "—"
+        widgets.draw_text(surf, held_txt, (inner.x + cols[3][1], y), fonts.small(bold=held > 0),
+                          config.COL_AMBER if held > 0 else config.COL_TEXT_DIM)
         price_txt = f"{r['price']:,.2f}".replace(",", " ") if r["price"] is not None else "—"
-        widgets.draw_text(surf, price_txt, (inner.x + cols[3][1], y), fonts.small(), config.COL_WHITE)
+        widgets.draw_text(surf, price_txt, (inner.x + cols[4][1], y), fonts.small(), config.COL_WHITE)
         value_txt = widgets.format_money(r["value"], cur) if r["value"] is not None else "—"
-        widgets.draw_text(surf, value_txt, (inner.x + cols[4][1], y), fonts.small(bold=True), config.COL_TEXT)
+        widgets.draw_text(surf, value_txt, (inner.x + cols[5][1], y), fonts.small(bold=True), config.COL_TEXT)
         if r["yield_pct"] is not None:
             ycol = config.COL_UP if r["yield_pct"] >= 0 else config.COL_DOWN
-            widgets.draw_text(surf, f"{r['yield_pct']:+.2f}%", (inner.x + cols[5][1], y), fonts.small(), ycol)
-        else:
-            widgets.draw_text(surf, "—", (inner.x + cols[5][1], y), fonts.small(), config.COL_TEXT_DIM)
-        if r["change_pct"] is not None:
-            vcol = config.COL_UP if r["change_pct"] >= 0 else config.COL_DOWN
-            widgets.draw_text(surf, f"{r['change_pct']:+.1f}%", (inner.x + cols[6][1], y), fonts.small(bold=True), vcol)
+            widgets.draw_text(surf, f"{r['yield_pct']:+.2f}%", (inner.x + cols[6][1], y), fonts.small(), ycol)
         else:
             widgets.draw_text(surf, "—", (inner.x + cols[6][1], y), fonts.small(), config.COL_TEXT_DIM)
+        if r["change_pct"] is not None:
+            vcol = config.COL_UP if r["change_pct"] >= 0 else config.COL_DOWN
+            widgets.draw_text(surf, f"{r['change_pct']:+.1f}%", (inner.x + cols[7][1], y), fonts.small(bold=True), vcol)
+        else:
+            widgets.draw_text(surf, "—", (inner.x + cols[7][1], y), fonts.small(), config.COL_TEXT_DIM)
         if self._can_trade():
-            held = self._held_qty(kind, key)
             if held > 0:
-                sr = pygame.Rect(inner.x + 995, y - 2, 72, 20)
+                sr = pygame.Rect(inner.right - 138, y - 2, 60, 20)
                 self._sell_rects[ident] = sr
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, sr, border_radius=3)
                 widgets.draw_text(surf, "VENDRE", sr.center, fonts.tiny(bold=True), config.COL_DOWN, align="center")
-            br = pygame.Rect(inner.x + 1075, y - 2, 80, 20)
+            br = pygame.Rect(inner.right - 70, y - 2, 70, 20)
             self._buy_rects[ident] = br
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, br, border_radius=3)
             widgets.draw_text(surf, "ACHETER", br.center, fonts.tiny(bold=True), config.COL_UP, align="center")

@@ -1,17 +1,38 @@
 """
 scene_book.py — Livre de positions (portefeuille réel).
 
-Affiche les positions détenues (P&L latent par ligne), la valeur nette, la
-répartition par secteur et le bêta. Le trading se fait au clavier depuis le
-terminal (BUY / SELL / ALLOCATE / HEDGE / REBALANCE).
+Affiche TOUTES les positions détenues, toutes classes d'actifs confondues
+(actions, ETF, obligations, matières premières, crypto, structurés, crédit)
+via la table unifiée core.analytics.holdings_table. Clic sur le nom d'une
+ligne → fiche d'analyse en popup (clic sur la valeur/P&L d'une action →
+graphe). Une barre de trading rapide permet d'acheter/vendre une quantité
+exacte de n'importe quel actif directement depuis cette scène, en plus du
+trading au clavier depuis le terminal (BUY / SELL / ALLOCATE / HEDGE /
+REBALANCE).
 """
 import pygame
 
+from core import analytics
+from core import bonds as B
+from core import commodities as CM
 from core import config
+from core import crypto as K
+from core import etfs as ETF
 from core import portfolio as pf
+from core import securitisation as SEC
+from core import structured as S
 from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.popups import PopupMixin
+
+KIND_CHIPS = ["Action", "ETF", "Obligation", "Commodity", "Crypto", "Structuré", "Crédit"]
+CLS_TO_KIND = {"Actions": "Action", "ETF": "ETF", "Obligations": "Obligation",
+               "Matières": "Commodity", "Crypto": "Crypto", "Structurés": "Structuré",
+               "Crédit": "Crédit"}
+KIND_COLOR = {"Action": config.COL_AMBER, "ETF": config.COL_PRESTIGE,
+              "Obligation": config.COL_CYAN, "Commodity": config.COL_WARN,
+              "Crypto": config.COL_DOWN, "Structuré": config.COL_PRESTIGE,
+              "Crédit": config.COL_PRESTIGE}
 
 
 class BookScene(Scene, PopupMixin):
@@ -23,24 +44,167 @@ class BookScene(Scene, PopupMixin):
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.analytics_btn = widgets.Button(
             (250, config.SCREEN_HEIGHT - 50, 230, 42), "ANALYSE DÉTAILLÉE (PA)", config.COL_CYAN)
-        self._name_rects = {}     # ticker -> Rect (clic → fiche flottante)
-        self._chart_rects = {}    # ticker -> Rect (clic → graphe flottant)
+        self.shop_btn = widgets.Button(
+            (490, config.SCREEN_HEIGHT - 50, 160, 42), "🛒 SHOP", config.COL_AMBER)
+        self._name_rects = {}     # label -> Rect (clic → fiche flottante)
+        self._chart_rects = {}    # ticker -> Rect (clic → graphe, actions uniquement)
+        self._row_cls = {}
+        # ---- barre de trading rapide ----
+        self.trade_kind = "Action"
+        self.trade_key = ""
+        self.qty_text = "10"
+        self.text_focus = None    # None / "key" / "qty"
+        self._kind_rects = {}
+        self._key_box = None
+        self._qty_box = None
+        self._buy_btn = None
+        self._sell_btn = None
+        self.msg = ""
+        self._t = 0.0
 
+    # --------------------------------------------------------------- trading
+    def _qty(self):
+        try:
+            return float(self.qty_text)
+        except ValueError:
+            return 0.0
+
+    def _do_buy(self):
+        p, m, kind, key = self.app.gs.player, self.market, self.trade_kind, self.trade_key.strip()
+        qty = self._qty()
+        if not key or qty <= 0:
+            self.msg = "Indiquez un identifiant d'actif et une quantité positive."
+            return
+        if kind == "Action":
+            r = pf.buy(p, m, key.upper(), qty)
+        elif kind == "ETF":
+            r = ETF.buy(p, m, key.upper(), qty)
+        elif kind == "Obligation":
+            r = B.buy_bond(p, m, key.upper(), qty)
+        elif kind == "Commodity":
+            r = CM.buy(p, m, key.upper(), qty)
+        elif kind == "Crypto":
+            r = K.buy(p, m, key.upper(), qty)
+        elif kind == "Structuré":
+            r = S.invest(p, m, key, qty * S.LOT)
+        elif kind == "Crédit":
+            r = SEC.invest(p, m, key, qty * SEC.LOT)
+        else:
+            return
+        if r["ok"]:
+            self.msg = f"Acheté {qty:g} × {key.upper()} @ {r['price']:.2f}."
+            if not p.hardcore:
+                self.app.gs.save(config.AUTOSAVE_SLOT)
+        else:
+            self.msg = f"Achat refusé ({r['reason']})."
+
+    def _do_sell(self):
+        p, m, kind, key = self.app.gs.player, self.market, self.trade_kind, self.trade_key.strip()
+        qty = self._qty()
+        if not key or qty <= 0:
+            self.msg = "Indiquez un identifiant d'actif et une quantité positive."
+            return
+        if kind == "Action":
+            r = pf.sell(p, m, key.upper(), qty)
+        elif kind == "ETF":
+            r = ETF.sell(p, m, key.upper(), qty)
+        elif kind == "Obligation":
+            r = B.sell_bond(p, m, key.upper(), qty)
+        elif kind == "Commodity":
+            r = CM.sell(p, m, key.upper(), qty)
+        elif kind == "Crypto":
+            r = K.sell(p, m, key.upper(), qty)
+        elif kind == "Structuré":
+            r = S.sell_by_type(p, m, key, qty * S.LOT)
+        elif kind == "Crédit":
+            r = SEC.sell(p, m, key, qty * SEC.LOT)
+        else:
+            return
+        if r["ok"]:
+            self.msg = f"Vendu {r['qty']:g} × {key.upper()} @ {r['price']:.2f} (P&L {r['realized']:+.0f})."
+            if not p.hardcore:
+                self.app.gs.save(config.AUTOSAVE_SLOT)
+        else:
+            self.msg = f"Vente refusée ({r['reason']})."
+
+    def _open_for(self, cls, label):
+        kind = CLS_TO_KIND.get(cls)
+        if kind == "Action":
+            self.open_company(label)
+        elif kind == "ETF":
+            self.open_etf(label)
+        elif kind == "Obligation":
+            self.open_bond(label)
+        elif kind == "Commodity":
+            self.open_commodity(label)
+        elif kind == "Crypto":
+            self.open_crypto(label)
+        elif kind == "Structuré":
+            self.open_structured(label)
+        elif kind == "Crédit":
+            self.open_credit(label)
+
+    # ----------------------------------------------------------------- events
     def handle_event(self, event):
         if self.popups_handle_event(event):
             return
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            if not self.popups_close_top():
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                if self.popups_close_top():
+                    return
+                if self.text_focus:
+                    self.text_focus = None
+                    return
                 self.app.scenes.go(self.return_to)
-            return
+                return
+            if self.text_focus == "key":
+                if event.key == pygame.K_BACKSPACE:
+                    self.trade_key = self.trade_key[:-1]
+                elif event.key == pygame.K_TAB:
+                    self.text_focus = "qty"
+                elif event.unicode and event.unicode.isprintable():
+                    self.trade_key += event.unicode
+                return
+            if self.text_focus == "qty":
+                if event.key == pygame.K_BACKSPACE:
+                    self.qty_text = self.qty_text[:-1]
+                elif event.key == pygame.K_TAB:
+                    self.text_focus = "key"
+                elif event.unicode.isdigit() or (event.unicode == "." and "." not in self.qty_text):
+                    self.qty_text += event.unicode
+                return
+
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+            return
         if self.analytics_btn.handle(event):
             self.app.scenes.go("analytics", return_to="book")
+            return
+        if self.shop_btn.handle(event):
+            self.app.scenes.go("shop", return_to="book")
+            return
+
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            for tk, rect in self._name_rects.items():
+            for kind, rect in self._kind_rects.items():
                 if rect.collidepoint(event.pos):
-                    self.open_company(tk)
+                    self.trade_kind = kind
+                    return
+            if self._key_box and self._key_box.collidepoint(event.pos):
+                self.text_focus = "key"
+                return
+            if self._qty_box and self._qty_box.collidepoint(event.pos):
+                self.text_focus = "qty"
+                return
+            if self._buy_btn and self._buy_btn.collidepoint(event.pos):
+                self._do_buy()
+                return
+            if self._sell_btn and self._sell_btn.collidepoint(event.pos):
+                self._do_sell()
+                return
+            self.text_focus = None
+            for label, rect in self._name_rects.items():
+                if rect.collidepoint(event.pos):
+                    self._open_for(self._row_cls.get(label), label)
                     return
             for tk, rect in self._chart_rects.items():
                 if rect.collidepoint(event.pos):
@@ -48,10 +212,13 @@ class BookScene(Scene, PopupMixin):
                     return
 
     def update(self, dt):
+        self._t += dt
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp, dt)
         self.analytics_btn.update(mp, dt)
+        self.shop_btn.update(mp, dt)
 
+    # ----------------------------------------------------------------- draw
     def draw(self, surf):
         surf.fill(config.COL_BG)
         p = self.app.gs.player
@@ -59,10 +226,9 @@ class BookScene(Scene, PopupMixin):
         cur = config.CONTINENTS[p.continent]["currency"]
         widgets.draw_text(surf, "PORTEFEUILLE", (40, 22), fonts.title(bold=True), config.COL_AMBER)
 
-        pos_val = pf.positions_value(p, m)
-        nw = pf.net_worth(p, m)        # valeur nette TOTALE (toutes classes d'actifs)
+        nw = pf.net_worth(p, m)
         beta = pf.portfolio_beta(p, m)
-        # bandeau de synthèse
+        pos_val = nw - p.cash
         widgets.draw_text(surf, f"Valeur nette {widgets.format_money(nw, cur)}",
                           (config.SCREEN_WIDTH - 40, 26), fonts.head(bold=True),
                           config.COL_WHITE, align="right")
@@ -70,23 +236,6 @@ class BookScene(Scene, PopupMixin):
                f"bêta {beta:.2f} · P&L réalisé {widgets.format_money(p.realized_pnl, cur)}")
         widgets.draw_text(surf, sub, (config.SCREEN_WIDTH - 40, 70), fonts.small(),
                           config.COL_TEXT_DIM, align="right")
-        # ventilation des autres classes d'actifs (obligataire / cmdty / crypto / ETF)
-        from core import bonds as _b
-        from core import commodities as _c
-        from core import crypto as _cr
-        from core import etfs as _e
-        alt_bits = []
-        for label, val in (("Oblig.", _b.holdings_value(p, m) if p.bonds else 0.0),
-                           ("Cmdty", _c.holdings_value(p, m) if p.commodities else 0.0),
-                           ("Crypto", _cr.holdings_value(p, m) if getattr(p, "crypto", None) else 0.0),
-                           ("ETF", _e.holdings_value(p, m) if getattr(p, "etfs", None) else 0.0)):
-            if val:
-                alt_bits.append(f"{label} {widgets.format_money(val, cur)}")
-        if alt_bits:
-            widgets.draw_text(surf, "Autres actifs : " + " · ".join(alt_bits),
-                              (config.SCREEN_WIDTH - 40, 104), fonts.tiny(),
-                              config.COL_TEXT_DIM, align="right")
-        # ligne de marge / levier
         st = pf.margin_status(p, m)
         lev = "∞" if st["leverage"] == float("inf") else f"{st['leverage']:.2f}x"
         lev_col = config.COL_DOWN if st["margin_call"] else (
@@ -99,53 +248,113 @@ class BookScene(Scene, PopupMixin):
         widgets.draw_text(surf, marg, (config.SCREEN_WIDTH - 40, 88), fonts.tiny(),
                           lev_col, align="right")
 
-        # table des positions
-        ph = config.footer_y() - 8 - 100
-        table = pygame.Rect(40, 100, 900, ph)
-        inner = widgets.draw_panel(surf, table, "Positions", config.COL_CYAN)
-        holds = pf.holdings(p, m)
-        if not holds:
+        # ---- barre de trading rapide ----
+        bar_y = 100
+        widgets.draw_text(surf, "TRADING RAPIDE :", (40, bar_y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        bx = 196
+        self._kind_rects = {}
+        for kind in KIND_CHIPS:
+            w = fonts.tiny(bold=True).size(kind)[0] + 14
+            rect = pygame.Rect(bx, bar_y, w, 20)
+            self._kind_rects[kind] = rect
+            sel = (kind == self.trade_kind)
+            kcol = KIND_COLOR.get(kind, config.COL_TEXT)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect, border_radius=3)
+            pygame.draw.rect(surf, kcol if sel else config.COL_BORDER, rect, 1, border_radius=3)
+            widgets.draw_text(surf, kind, rect.center, fonts.tiny(bold=sel),
+                              kcol if sel else config.COL_TEXT_DIM, align="center")
+            bx += w + 6
+        bx += 10
+        self._key_box = pygame.Rect(bx, bar_y - 2, 130, 24)
+        pygame.draw.rect(surf, config.COL_PANEL, self._key_box, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN if self.text_focus == "key" else config.COL_BORDER,
+                          self._key_box, 1, border_radius=4)
+        kcursor = "_" if (self.text_focus == "key" and int(self._t * 2) % 2 == 0) else ""
+        klabel = (self.trade_key + kcursor) if self.trade_key else (kcursor + "ticker/ID…")
+        kcol2 = config.COL_TEXT if self.trade_key else config.COL_TEXT_DIM
+        widgets.draw_text(surf, widgets.fit_text(klabel, fonts.small(), self._key_box.w - 12),
+                          (self._key_box.x + 6, self._key_box.y + 4), fonts.small(), kcol2)
+        bx = self._key_box.right + 10
+        self._qty_box = pygame.Rect(bx, bar_y - 2, 64, 24)
+        pygame.draw.rect(surf, config.COL_PANEL, self._qty_box, border_radius=4)
+        pygame.draw.rect(surf, config.COL_AMBER if self.text_focus == "qty" else config.COL_BORDER,
+                          self._qty_box, 1, border_radius=4)
+        qcursor = "_" if (self.text_focus == "qty" and int(self._t * 2) % 2 == 0) else ""
+        widgets.draw_text(surf, (self.qty_text or "0") + qcursor, (self._qty_box.x + 6, self._qty_box.y + 4),
+                          fonts.small(), config.COL_TEXT)
+        bx = self._qty_box.right + 10
+        self._sell_btn = pygame.Rect(bx, bar_y - 2, 70, 24)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._sell_btn, border_radius=4)
+        widgets.draw_text(surf, "VENDRE", self._sell_btn.center, fonts.tiny(bold=True),
+                          config.COL_DOWN, align="center")
+        bx = self._sell_btn.right + 8
+        self._buy_btn = pygame.Rect(bx, bar_y - 2, 70, 24)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._buy_btn, border_radius=4)
+        widgets.draw_text(surf, "ACHETER", self._buy_btn.center, fonts.tiny(bold=True),
+                          config.COL_UP, align="center")
+        if self.msg:
+            widgets.draw_text(surf, self.msg, (40, bar_y + 26), fonts.tiny(), config.COL_TEXT_DIM)
+
+        # ---- table des positions (toutes classes) ----
+        table_top = bar_y + 48
+        ph = config.footer_y() - 8 - table_top
+        table = pygame.Rect(40, table_top, 900, ph)
+        inner = widgets.draw_panel(surf, table, "Positions (toutes classes)", config.COL_CYAN)
+        rows = analytics.holdings_table(p, m)
+        if not rows:
             widgets.draw_text_wrapped(
-                surf, "Aucune position. Depuis le terminal : BUY <ticker> <qté> "
-                "(ex: BUY MVC 100). SELL pour vendre, ALLOCATE pour viser un %.",
+                surf, "Aucune position. Utilisez la barre de trading rapide ci-dessus, le "
+                "SHOP, ou le terminal (BUY <ticker> <qté>).",
                 (inner.x, inner.y), fonts.body(), config.COL_TEXT_DIM, inner.w)
         else:
-            # en-têtes
-            cols = [("TICKER", inner.x), ("QTÉ", inner.x + 130), ("PRU", inner.x + 220),
-                    ("COURS", inner.x + 320), ("VALEUR", inner.x + 440), ("P&L", inner.x + 600)]
+            cols = [("ACTIF", inner.x), ("TYPE", inner.x + 220), ("QTÉ", inner.x + 290),
+                    ("PRU", inner.x + 360), ("COURS", inner.x + 440), ("VALEUR", inner.x + 530),
+                    ("P&L", inner.x + 660)]
             for label, x in cols:
                 widgets.draw_text(surf, label, (x, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
             y = inner.y + 22
             mp = pygame.mouse.get_pos()
             self._name_rects = {}
             self._chart_rects = {}
-            for h in holds:
-                tk = h["ticker"]
-                pcol = config.COL_UP if h["pnl"] >= 0 else config.COL_DOWN
-                name_rect = pygame.Rect(inner.x - 4, y - 2, cols[1][1] - inner.x + 80, 22)
-                chart_rect = pygame.Rect(cols[4][1] - 60, y - 2, inner.right - cols[4][1] + 60 + 4, 22)
-                self._name_rects[tk] = name_rect
-                self._chart_rects[tk] = chart_rect
-                if name_rect.collidepoint(mp) or chart_rect.collidepoint(mp):
+            self._row_cls = {}
+            for r in rows:
+                label = r["label"]
+                kind = CLS_TO_KIND.get(r["cls"], r["cls"])
+                kcol = KIND_COLOR.get(kind, config.COL_TEXT)
+                pcol = config.COL_UP if r["pnl"] >= 0 else config.COL_DOWN
+                name_rect = pygame.Rect(inner.x - 4, y - 2, cols[1][1] - inner.x + 4, 22)
+                self._name_rects[label] = name_rect
+                self._row_cls[label] = r["cls"]
+                is_stock = (r["cls"] == "Actions")
+                if is_stock:
+                    chart_rect = pygame.Rect(cols[5][1] - 40, y - 2,
+                                             inner.right - cols[5][1] + 44, 22)
+                    self._chart_rects[label] = chart_rect
+                else:
+                    chart_rect = None
+                hov = name_rect.collidepoint(mp) or (chart_rect and chart_rect.collidepoint(mp))
+                if hov:
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, (inner.x - 4, y - 2, inner.w + 8, 22))
-                tk_label = tk + (" (S)" if h["short"] else "")
-                tk_col = config.COL_DOWN if h["short"] else config.COL_AMBER
-                widgets.draw_text(surf, tk_label, (cols[0][1], y), fonts.small(bold=True), tk_col)
-                widgets.draw_text(surf, f"{h['shares']:.0f}", (cols[1][1], y), fonts.small(), config.COL_TEXT)
-                widgets.draw_text(surf, f"{h['avg']:.2f}", (cols[2][1], y), fonts.small(), config.COL_TEXT_DIM)
-                widgets.draw_text(surf, f"{h['price']:.2f}", (cols[3][1], y), fonts.small(), config.COL_WHITE)
-                widgets.draw_text(surf, widgets.format_money(h["value"], cur), (cols[4][1], y),
+                name_label = widgets.fit_text(r["name"], fonts.small(bold=True), 200) \
+                    + (" (S)" if r["short"] else "")
+                name_col = config.COL_DOWN if r["short"] else kcol
+                widgets.draw_text(surf, name_label, (cols[0][1], y), fonts.small(bold=True), name_col)
+                widgets.draw_text(surf, kind, (cols[1][1], y), fonts.tiny(bold=True), kcol)
+                widgets.draw_text(surf, f"{r['qty']:.0f}", (cols[2][1], y), fonts.small(), config.COL_TEXT)
+                widgets.draw_text(surf, f"{r['avg']:.2f}", (cols[3][1], y), fonts.small(), config.COL_TEXT_DIM)
+                widgets.draw_text(surf, f"{r['price']:.2f}", (cols[4][1], y), fonts.small(), config.COL_WHITE)
+                widgets.draw_text(surf, widgets.format_money(r["value"], cur), (cols[5][1], y),
                                   fonts.small(), config.COL_TEXT)
-                widgets.draw_text(surf, f"{'+' if h['pnl']>=0 else ''}{widgets.format_money(h['pnl'], cur)} "
-                                        f"({h['pnl_pct']:+.1f}%)", (cols[5][1], y), fonts.small(bold=True), pcol)
+                widgets.draw_text(surf, f"{'+' if r['pnl']>=0 else ''}{widgets.format_money(r['pnl'], cur)} "
+                                        f"({r['pnl_pct']:+.1f}%)", (cols[6][1], y), fonts.small(bold=True), pcol)
                 y += 26
                 if y > inner.bottom - 20:
                     break
-            widgets.draw_text(surf, "clic société → fiche · clic valeur/P&L → graphe",
+            widgets.draw_text(surf, "clic nom → fiche d'analyse · clic valeur/P&L (actions) → graphe",
                               (inner.x, inner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
 
         # répartition par secteur
-        alloc = pygame.Rect(960, 100, config.SCREEN_WIDTH - 1000, ph)
+        alloc = pygame.Rect(960, table_top, config.SCREEN_WIDTH - 1000, ph)
         ainner = widgets.draw_panel(surf, alloc, "Répartition par secteur", config.COL_AMBER)
         by_sector = pf.allocation_by(p, m, "sector")
         if not by_sector:
@@ -160,7 +369,6 @@ class BookScene(Scene, PopupMixin):
                                   fonts.small(bold=True), config.COL_WHITE, align="right")
                 widgets.draw_progress(surf, (ainner.x, y + 18, ainner.w, 6), ratio, config.COL_CYAN)
                 y += 36
-            # concentration : alerte si une ligne > 40%
             top = max(by_sector.values()) / total
             if top > 0.4:
                 widgets.draw_text(surf, "⚠ Forte concentration sectorielle.",
@@ -168,4 +376,5 @@ class BookScene(Scene, PopupMixin):
 
         self.back_btn.draw(surf)
         self.analytics_btn.draw(surf)
+        self.shop_btn.draw(surf)
         self.popups_draw(surf)

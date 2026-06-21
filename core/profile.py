@@ -12,6 +12,7 @@ import json
 import os
 
 from core import config
+from core.applog import logger
 
 VETERAN_GRADE = 4   # grade déjà atteint une fois -> les parties suivantes démarrent "vétéran"
 
@@ -29,7 +30,10 @@ def load():
     try:
         with open(_path(), "r", encoding="utf-8") as f:
             return json.load(f)
-    except (OSError, ValueError):
+    except FileNotFoundError:
+        return {"best_grade_reached": 0}
+    except (OSError, ValueError) as exc:
+        logger.warning("profile.json illisible (%s), profil réinitialisé", exc)
         return {"best_grade_reached": 0}
 
 

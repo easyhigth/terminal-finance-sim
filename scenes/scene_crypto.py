@@ -19,9 +19,7 @@ class CryptoScene(Scene, PopupMixin):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
         self.msg = ""
-        self.search = ""
-        self._search_clear_rect = None
-        self._t = 0.0
+        self.search_box = widgets.SearchBox((40, 100, 280, 24), "Rechercher un actif…")
         self.buy_rects, self.sell_rects = {}, {}
         self.name_rects = {}
         self.init_popups()
@@ -34,24 +32,21 @@ class CryptoScene(Scene, PopupMixin):
     def _can_trade(self):
         return unlocks.unlocked(self.app.gs.player, "trade")
 
-    def _search_rect(self):
-        return pygame.Rect(40, 100, 280, 24)
-
     def handle_event(self, event):
         if self.popups_handle_event(event):
             return
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
-                if self.search:
-                    self.search = ""
+                if self.search_box.text:
+                    self.search_box.text = ""
                     return
                 self.app.scenes.go(self.return_to)
                 return
             elif event.key == pygame.K_BACKSPACE:
-                self.search = self.search[:-1]
+                self.search_box.handle_typing(event)
                 return
             elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
-                self.search += event.unicode
+                self.search_box.handle_typing(event)
                 return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
@@ -60,8 +55,7 @@ class CryptoScene(Scene, PopupMixin):
             self.app.scenes.go("tutorials", tid="crypto", return_to="crypto")
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
-                self.search = ""
+            if self.search_box.handle_clear_click(event):
                 return
             for cid, rect in self.name_rects.items():
                 if rect.collidepoint(event.pos):
@@ -84,7 +78,7 @@ class CryptoScene(Scene, PopupMixin):
                         self.app.gs.save(config.AUTOSAVE_SLOT)
 
     def update(self, dt):
-        self._t += dt
+        self.search_box.update(dt)
         self.back_btn.update(pygame.mouse.get_pos(), dt)
         self.tuto_btn.update(pygame.mouse.get_pos(), dt)
 
@@ -106,22 +100,8 @@ class CryptoScene(Scene, PopupMixin):
         widgets.draw_text(surf, warn, (42, 74), fonts.small(), wcol)
 
         # ---- recherche ----
-        search_rect = self._search_rect()
-        pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
-        pygame.draw.rect(surf, config.COL_CYAN, search_rect, 1, border_radius=4)
-        cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        slabel = (self.search + cursor) if self.search else (cursor + "Rechercher un actif…")
-        scol = config.COL_TEXT if self.search else config.COL_TEXT_DIM
-        widgets.draw_text(surf, widgets.fit_text(slabel, fonts.small(), search_rect.w - 30),
-                          (search_rect.x + 8, search_rect.y + 4), fonts.small(), scol)
-        self._search_clear_rect = None
-        if self.search:
-            self._search_clear_rect = pygame.Rect(search_rect.right - 22, search_rect.y,
-                                                   22, search_rect.h)
-            widgets.draw_text(surf, "✕", self._search_clear_rect.center, fonts.small(bold=True),
-                              config.COL_TEXT_DIM, align="center")
-
-        top = search_rect.bottom + 8
+        self.search_box.draw(surf)
+        top = self.search_box.rect.bottom + 8
         ph = config.footer_y() - 8 - top
         panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, ph)
         inner = widgets.draw_panel(surf, panel, "Marché crypto", config.COL_CYAN)
@@ -132,7 +112,7 @@ class CryptoScene(Scene, PopupMixin):
         self.buy_rects, self.sell_rects = {}, {}
         self.name_rects = {}
         y = inner.y + 26
-        q_filter = self.search.strip().lower()
+        q_filter = self.search_box.query
         quotes = [q for q in K.all_quotes(m)
                   if not q_filter or q_filter in q["name"].lower() or q_filter in q["id"].lower()]
         for q in quotes:

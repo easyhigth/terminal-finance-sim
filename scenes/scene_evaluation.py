@@ -22,6 +22,9 @@ def _L(fr, en):
 
 
 class EvaluationScene(Scene):
+    # examen en cours : pas de page dédiée, changement d'onglet bloqué (anti-triche)
+    pageable = False
+
     def on_enter(self, **kwargs):
         self.t = 0.0
         p = self.app.gs.player

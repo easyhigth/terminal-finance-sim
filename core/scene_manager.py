@@ -17,11 +17,24 @@ PALETTE_ROW_H = 30
 class Scene:
     """Classe de base. À hériter pour chaque écran."""
 
+    # Si False, la scène ne peut pas être ouverte dans une page dédiée
+    # (onglet) et bloque le changement d'onglet tant qu'elle est active.
+    # Utilisé pour les scènes d'examen/certification (anti-triche).
+    pageable = True
+
     def __init__(self, app):
         self.app = app          # référence à l'application (accès global)
 
     def on_enter(self, **kwargs):
         """Appelé quand la scène devient active."""
+        pass
+
+    def refresh_data(self):
+        """Appelé quand la page contenant cette scène redevient active
+        (changement d'onglet), pour rafraîchir les données mises en cache
+        à l'on_enter (ex: catalogue boutique) sans réinitialiser l'état
+        d'interface (scroll, recherche, filtres...). No-op par défaut :
+        la plupart des scènes recalculent déjà tout en direct dans draw()."""
         pass
 
     def handle_event(self, event):

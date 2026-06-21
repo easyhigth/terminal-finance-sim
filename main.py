@@ -11,6 +11,7 @@ import pygame
 from core import config
 from core.game_state import GameState
 from core.market import Market
+from core.pages import PageManager
 from core.scene_manager import SceneManager
 from scenes.scene_academy import AcademyScene
 from scenes.scene_alerts import AlertsScene
@@ -77,6 +78,76 @@ from ui.logo import make_icon_surface
 from ui.notifications import NotificationCenter
 
 
+def build_scene_manager(app):
+    """Crée un SceneManager flambant neuf avec une instance dédiée de
+    chaque scène — utilisé pour le SceneManager principal de l'app et pour
+    chaque nouvelle page (onglet), afin que chaque page ait son propre état
+    (scroll, recherche, filtres...) totalement isolé des autres."""
+    m = SceneManager(app)
+    m.register("menu", MenuScene(app))
+    m.register("continent", ContinentScene(app))
+    m.register("runsetup", RunSetupScene(app))
+    m.register("sandbox", SandboxScene(app))
+    m.register("terminal", TerminalScene(app))
+    m.register("glossary", GlossaryScene(app))
+    m.register("evaluation", EvaluationScene(app))
+    m.register("portfolio", PortfolioScene(app))
+    m.register("ma", MAScene(app))
+    m.register("ma_target", MATargetScene(app))
+    m.register("mandates", MandatesScene(app))
+    m.register("deals", DealsScene(app))
+    m.register("track", TrackScene(app))
+    m.register("risk", RiskScene(app))
+    m.register("quant", QuantScene(app))
+    m.register("spreadsheet", SpreadsheetScene(app))
+    m.register("saves", SavesScene(app))
+    m.register("gameover", GameOverScene(app))
+    m.register("company", CompanyScene(app))
+    m.register("commands", CommandsScene(app))
+    m.register("mission", MissionScene(app))
+    m.register("career", CareerScene(app))
+    m.register("book", BookScene(app))
+    m.register("inbox", InboxScene(app))
+    m.register("dilemma", DilemmaScene(app))
+    m.register("intro", IntroScene(app))
+    m.register("academy", AcademyScene(app))
+    m.register("cert", CertScene(app))
+    m.register("deal", DealScene(app))
+    m.register("financials", FinancialsScene(app))
+    m.register("bonds", BondsScene(app))
+    m.register("governments", GovernmentsScene(app))
+    m.register("commodities", CommoditiesScene(app))
+    m.register("crypto", CryptoScene(app))
+    m.register("etfs", ETFScene(app))
+    m.register("news", NewsScene(app))
+    m.register("more", MoreScene(app))
+    m.register("structured", StructuredScene(app))
+    m.register("credit", CreditScene(app))
+    m.register("alm", AlmScene(app))
+    m.register("swaps", SwapsScene(app))
+    m.register("hedge", HedgeScene(app))
+    m.register("options", OptionsScene(app))
+    m.register("ipo", IPOScene(app))
+    m.register("fx", FXScene(app))
+    m.register("review", ReviewScene(app))
+    m.register("calendar", CalendarScene(app))
+    m.register("graph", GraphScene(app))
+    m.register("rivals", RivalsScene(app))
+    m.register("analytics", AnalyticsScene(app))
+    m.register("performance", PerformanceScene(app))
+    m.register("explorer", MarketExplorerScene(app))
+    m.register("tutorials", TutorialsScene(app))
+    m.register("alerts", AlertsScene(app))
+    m.register("splash", SplashScene(app))
+    m.register("markethub", MarketHubScene(app))
+    m.register("shop", ShopScene(app))
+    m.register("examcert", ExamCertScene(app))
+    m.register("stresstest", StressTestScene(app))
+    m.register("history", HistoryScene(app))
+    m.register("team", TeamScene(app))
+    return m
+
+
 class App:
     def __init__(self):
         pygame.init()
@@ -96,70 +167,16 @@ class App:
         self.market = None  # moteur de marché (créé/synchronisé à l'entrée du terminal)
         self.notes = NotificationCenter()   # centre de notifications (toasts)
 
-        # gestionnaire de scènes
-        self.scenes = SceneManager(self)
-        self.scenes.register("menu", MenuScene(self))
-        self.scenes.register("continent", ContinentScene(self))
-        self.scenes.register("runsetup", RunSetupScene(self))
-        self.scenes.register("sandbox", SandboxScene(self))
-        self.scenes.register("terminal", TerminalScene(self))
-        self.scenes.register("glossary", GlossaryScene(self))
-        self.scenes.register("evaluation", EvaluationScene(self))
-        self.scenes.register("portfolio", PortfolioScene(self))
-        self.scenes.register("ma", MAScene(self))
-        self.scenes.register("ma_target", MATargetScene(self))
-        self.scenes.register("mandates", MandatesScene(self))
-        self.scenes.register("deals", DealsScene(self))
-        self.scenes.register("track", TrackScene(self))
-        self.scenes.register("risk", RiskScene(self))
-        self.scenes.register("quant", QuantScene(self))
-        self.scenes.register("spreadsheet", SpreadsheetScene(self))
-        self.scenes.register("saves", SavesScene(self))
-        self.scenes.register("gameover", GameOverScene(self))
-        self.scenes.register("company", CompanyScene(self))
-        self.scenes.register("commands", CommandsScene(self))
-        self.scenes.register("mission", MissionScene(self))
-        self.scenes.register("career", CareerScene(self))
-        self.scenes.register("book", BookScene(self))
-        self.scenes.register("inbox", InboxScene(self))
-        self.scenes.register("dilemma", DilemmaScene(self))
-        self.scenes.register("intro", IntroScene(self))
-        self.scenes.register("academy", AcademyScene(self))
-        self.scenes.register("cert", CertScene(self))
-        self.scenes.register("deal", DealScene(self))
-        self.scenes.register("financials", FinancialsScene(self))
-        self.scenes.register("bonds", BondsScene(self))
-        self.scenes.register("governments", GovernmentsScene(self))
-        self.scenes.register("commodities", CommoditiesScene(self))
-        self.scenes.register("crypto", CryptoScene(self))
-        self.scenes.register("etfs", ETFScene(self))
-        self.scenes.register("news", NewsScene(self))
-        self.scenes.register("more", MoreScene(self))
-        self.scenes.register("structured", StructuredScene(self))
-        self.scenes.register("credit", CreditScene(self))
-        self.scenes.register("alm", AlmScene(self))
-        self.scenes.register("swaps", SwapsScene(self))
-        self.scenes.register("hedge", HedgeScene(self))
-        self.scenes.register("options", OptionsScene(self))
-        self.scenes.register("ipo", IPOScene(self))
-        self.scenes.register("fx", FXScene(self))
-        self.scenes.register("review", ReviewScene(self))
-        self.scenes.register("calendar", CalendarScene(self))
-        self.scenes.register("graph", GraphScene(self))
-        self.scenes.register("rivals", RivalsScene(self))
-        self.scenes.register("analytics", AnalyticsScene(self))
-        self.scenes.register("performance", PerformanceScene(self))
-        self.scenes.register("explorer", MarketExplorerScene(self))
-        self.scenes.register("tutorials", TutorialsScene(self))
-        self.scenes.register("alerts", AlertsScene(self))
-        self.scenes.register("splash", SplashScene(self))
-        self.scenes.register("markethub", MarketHubScene(self))
-        self.scenes.register("shop", ShopScene(self))
-        self.scenes.register("examcert", ExamCertScene(self))
-        self.scenes.register("stresstest", StressTestScene(self))
-        self.scenes.register("history", HistoryScene(self))
-        self.scenes.register("team", TeamScene(self))
-        self.scenes.go("splash")
+        # gestionnaire de scènes de l'onglet principal + système de pages
+        main_manager = build_scene_manager(self)
+        main_manager.go("splash")
+        self.pages = PageManager(self, main_manager, main_scene_name="splash")
+
+    @property
+    def scenes(self):
+        """SceneManager de l'onglet (page) actif. Toute la navigation
+        existante (self.app.scenes.go(...)) agit donc sur la page courante."""
+        return self.pages.manager
 
     def notify(self, text, kind="info"):
         """Pousse une notification (toast) affichée en overlay."""
@@ -194,9 +211,9 @@ class App:
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
                     self.toggle_fullscreen()
                     continue
-                self.scenes.handle_event(event)
-            self.scenes.update(dt)
-            self.scenes.draw(self.screen)
+                self.pages.handle_event(event)
+            self.pages.update(dt)
+            self.pages.draw(self.screen)
             pygame.display.flip()
 
         pygame.quit()

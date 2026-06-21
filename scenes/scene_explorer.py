@@ -90,6 +90,12 @@ class MarketExplorerScene(Scene, PopupMixin):
         self.shop_btn = widgets.Button((460, config.SCREEN_HEIGHT - 50, 180, 42),
                                        "🛒 SHOP", config.COL_CYAN)
 
+    def refresh_data(self):
+        """Reconstruit le catalogue (cours/positions à jour) sans toucher à
+        la recherche/aux filtres/au tri/au scroll en cours."""
+        self.market = self.app.ensure_market()
+        self.rows = self._build_dataset()
+
     # ------------------------------------------------------------- dataset
     def _build_dataset(self):
         m = self.market

@@ -21,6 +21,8 @@ def _L(fr, en):
 
 
 class ExamCertScene(Scene):
+    pageable = False
+
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
         self.msg = ""

@@ -82,6 +82,12 @@ class ShopScene(Scene, PopupMixin):
                                             config.back_button_rect(160)[1], 170, 42),
                                            "🔍 EXPLORATEUR", config.COL_CYAN)
 
+    def refresh_data(self):
+        """Reconstruit le catalogue (cours/positions à jour) sans toucher à
+        la recherche/au filtre/au tri/au scroll en cours."""
+        self.market = self.app.ensure_market()
+        self.rows = self._build_dataset()
+
     # --------------------------------------------------------------- helpers
     def _can_trade(self):
         return unlocks.unlocked(self.app.gs.player, "trade")

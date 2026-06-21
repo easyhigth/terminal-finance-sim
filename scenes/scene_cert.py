@@ -13,6 +13,8 @@ from ui import fonts, keynav, widgets
 
 
 class CertScene(Scene):
+    pageable = False
+
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
         self.msg = ""

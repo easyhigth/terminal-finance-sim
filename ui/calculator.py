@@ -1,11 +1,16 @@
 """
-calculator.py — Calculatrice déplaçable (pour les calculs des missions).
+calculator.py — Calculatrice scientifique déplaçable (pour les calculs des
+missions et l'usage courant : actualisation, taux composés, volatilité...).
 
 Boutons cliquables (pas de capture clavier → n'interfère pas avec la saisie des
 réponses). Évaluation sûre d'expressions arithmétiques via ast :
-  + - * / parenthèses, ^ (puissance), % (modulo), décimales, signe négatif.
+  + - * / parenthèses, ^ (puissance), décimales, signe négatif, et les
+  fonctions/constantes scientifiques courantes en finance : log (base 10),
+  ln (logarithme népérien, actualisation continue), exp (e^x, capitalisation
+  continue), sqrt (racine, volatilité annualisée √t), x² , 1/x, π et e.
 """
 import ast
+import math
 import operator
 
 import pygame
@@ -19,9 +24,14 @@ _OPS = {
     ast.USub: operator.neg, ast.UAdd: operator.pos,
 }
 
+# fonctions scientifiques whitelistées (1 argument) et constantes insérables
+_FUNCS = {"log": math.log10, "ln": math.log, "exp": math.exp, "sqrt": math.sqrt}
+_CONSTS = {"pi": math.pi, "e": math.e}
+
 
 def safe_eval(expr):
-    """Évalue une expression arithmétique simple. Retourne (valeur|None, ok)."""
+    """Évalue une expression arithmétique/scientifique simple. Retourne
+    (valeur|None, ok)."""
     expr = expr.replace("^", "**").replace("×", "*").replace("÷", "/")
     if not expr.strip():
         return None, False
@@ -41,12 +51,28 @@ def _ev(node):
         return _OPS[type(node.op)](_ev(node.left), _ev(node.right))
     if isinstance(node, ast.UnaryOp):
         return _OPS[type(node.op)](_ev(node.operand))
+    if isinstance(node, ast.Name):
+        if node.id in _CONSTS:
+            return _CONSTS[node.id]
+        raise ValueError
+    if isinstance(node, ast.Call):
+        if (not isinstance(node.func, ast.Name) or node.func.id not in _FUNCS
+                or len(node.args) != 1 or node.keywords):
+            raise ValueError
+        return _FUNCS[node.func.id](_ev(node.args[0]))
     raise ValueError
 
 
-# disposition des touches
+# disposition des touches : "label" affiché -> texte inséré dans l'expression
+# (identique au label sauf pour les fonctions/raccourcis ci-dessous)
+_INSERT = {
+    "log": "log(", "ln": "ln(", "exp": "exp(", "√": "sqrt(",
+    "x²": "**2", "1/x": "**-1", "π": "pi", "e": "e",
+}
 _KEYS = [
     ["C", "(", ")", "<"],
+    ["log", "ln", "exp", "√"],
+    ["x²", "1/x", "π", "e"],
     ["7", "8", "9", "/"],
     ["4", "5", "6", "*"],
     ["1", "2", "3", "-"],
@@ -66,7 +92,7 @@ class Calculator:
         self.closed = False
         self._drag_off = (0, 0)
         self._btn_rects = {}
-        self.rect = pygame.Rect(pos[0], pos[1], 232, 286)
+        self.rect = pygame.Rect(pos[0], pos[1], 260, 366)
 
     def _title_rect(self):
         return pygame.Rect(self.rect.x, self.rect.y, self.rect.w, TITLE_H)
@@ -88,7 +114,7 @@ class Calculator:
             else:
                 self.result = "erreur"
         else:
-            self.expr += key
+            self.expr += _INSERT.get(key, key)
 
     def handle(self, event):
         """Retourne True si l'event est consommé."""
@@ -153,13 +179,16 @@ class Calculator:
                 self._btn_rects[key] = r
                 hover = r.collidepoint(mp)
                 op = key in "+-*/^()=C<"
-                acc = config.COL_AMBER if key == "=" else (config.COL_CYAN if op else config.COL_BORDER)
+                sci = key in _INSERT
+                acc = (config.COL_AMBER if key == "=" else
+                       config.COL_CYAN if op else
+                       config.COL_PRESTIGE if sci else config.COL_BORDER)
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL,
                                  r, border_radius=4)
                 pygame.draw.rect(surf, acc, r, 1, border_radius=4)
                 label = {"<": "⌫"}.get(key, key)
                 img = fonts.small(bold=True).render(
-                    label, True, config.COL_WHITE if not op else acc)
+                    label, True, config.COL_WHITE if not (op or sci) else acc)
                 surf.blit(img, img.get_rect(center=r.center))
                 x += bw + 6
             gy += bh + 6

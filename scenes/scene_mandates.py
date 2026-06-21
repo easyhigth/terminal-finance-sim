@@ -8,8 +8,14 @@ import pygame
 
 from core import config, unlocks
 from core import mandates as MD
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
 
 ROW_H = 26
 
@@ -238,6 +244,9 @@ class MandatesScene(Scene):
         if not p.mandates:
             widgets.draw_text(surf, "Aucun mandat actif. Acceptez une offre ci-dessus.",
                               (ainner.x, list_top + 4), fonts.small(), config.COL_TEXT_DIM)
+            if offers:
+                hints = [("↑↓", _L("offre", "offer")), (_L("ENTRÉE", "ENTER"), _L("accepter", "accept")), ("D", _L("refuser", "decline"))]
+                widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14), hints)
             self.back_btn.draw(surf)
             self._draw_postmortem(surf)
             return
@@ -309,6 +318,9 @@ class MandatesScene(Scene):
         self.scroll = min(self.scroll, self._max_scroll)
         widgets.draw_scrollbar(surf, act_panel, list_area, self.scroll, self._max_scroll, content_h)
 
+        if offers:
+            hints = [("↑↓", _L("offre", "offer")), (_L("ENTRÉE", "ENTER"), _L("accepter", "accept")), ("D", _L("refuser", "decline"))]
+            widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14), hints)
         self.back_btn.draw(surf)
         self._draw_postmortem(surf)
 

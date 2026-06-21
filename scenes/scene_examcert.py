@@ -9,10 +9,15 @@ import pygame
 
 from core import career as career_mod
 from core import config
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
 CARD_KEYS = ["exam", "cert"]
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 
 class ExamCertScene(Scene):
@@ -86,7 +91,7 @@ class ExamCertScene(Scene):
 
         if self.msg:
             widgets.draw_text(surf, self.msg, (40, top + h + 24), fonts.small(), config.COL_WARN)
-        hints = [("TAB / ← →", "carte"), ("ENTRÉE", "ouvrir")]
+        hints = [("TAB / ← →", _L("carte", "card")), (_L("ENTRÉE", "ENTER"), _L("ouvrir", "open"))]
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14), hints)
         self.back_btn.draw(surf)
 

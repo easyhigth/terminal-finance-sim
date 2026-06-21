@@ -9,8 +9,13 @@ import pygame
 
 from core import config, unlocks
 from core import team as TEAM
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 ROW_H = 70        # hauteur de ligne "équipe actuelle" (pas de description longue)
 CAT_ROW_H = 92    # hauteur de ligne "profils disponibles" (laisse la place à la description)
@@ -99,8 +104,9 @@ class TeamScene(Scene):
                 self.app.gs.save(config.AUTOSAVE_SLOT)
 
     def _focus_hints(self):
-        action = "embaucher" if self.focus == "hire" else "licencier"
-        return [("↑↓", "analyste"), ("ENTRÉE", action), ("TAB", "volet")]
+        action = _L("embaucher", "hire") if self.focus == "hire" else _L("licencier", "fire")
+        return [("↑↓", _L("analyste", "analyst")), (_L("ENTRÉE", "ENTER"), action),
+                ("TAB", _L("volet", "panel"))]
 
     def update(self, dt):
         mp = pygame.mouse.get_pos()

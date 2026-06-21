@@ -8,7 +8,7 @@ SHORTCUTS/KEYS.
 import pygame
 
 from core import config
-from core.i18n import get_lang, t
+from core.i18n import get_lang, t, toggle_lang
 from data.shortcuts_data import localized
 from ui import fonts, widgets
 
@@ -18,6 +18,7 @@ KEY_COL_W = 240
 ROW_H = 17
 ROW_GAP = 4
 SECTION_GAP = 8
+LANG_BTN_W = 56
 
 
 class ShortcutsPanel:
@@ -35,6 +36,9 @@ class ShortcutsPanel:
 
     def _close_rect(self):
         return pygame.Rect(self.rect.right - TITLE_H, self.rect.y, TITLE_H, TITLE_H)
+
+    def _lang_rect(self):
+        return pygame.Rect(self.rect.right - TITLE_H - LANG_BTN_W - 4, self.rect.y, LANG_BTN_W, TITLE_H)
 
     def handle(self, event):
         """Retourne True si l'event est consommé (le panneau absorbe tout le
@@ -55,6 +59,9 @@ class ShortcutsPanel:
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._close_rect().collidepoint(event.pos):
                 self.closed = True
+                return True
+            if self._lang_rect().collidepoint(event.pos):
+                toggle_lang()
                 return True
             if self._title_rect().collidepoint(event.pos):
                 self.dragging = True
@@ -88,6 +95,9 @@ class ShortcutsPanel:
                          border_top_left_radius=6, border_top_right_radius=6)
         widgets.draw_text(surf, t("shortcuts.title"), (tr.x + 10, tr.y + 6),
                           fonts.small(bold=True), config.COL_CYAN)
+        lang_rect = self._lang_rect()
+        widgets.draw_text(surf, get_lang().upper(), (lang_rect.centerx, tr.y + 6),
+                          fonts.tiny(bold=True), config.COL_AMBER, align="center")
         widgets.draw_text(surf, "✕", (self._close_rect().centerx, tr.y + 6),
                           fonts.small(bold=True), config.COL_TEXT_DIM, align="center")
 

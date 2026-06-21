@@ -98,6 +98,10 @@ class TeamScene(Scene):
             if not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
 
+    def _focus_hints(self):
+        action = "embaucher" if self.focus == "hire" else "licencier"
+        return [("↑↓", "analyste"), ("ENTRÉE", action), ("TAB", "volet")]
+
     def update(self, dt):
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp, dt)
@@ -187,5 +191,6 @@ class TeamScene(Scene):
                           f"  ·  bonus réputation passif : +{total_rep:.2f}/tour",
                           (tinner.x, ty), fonts.small(bold=True), config.COL_AMBER)
 
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14), self._focus_hints())
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)

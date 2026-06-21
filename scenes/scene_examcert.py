@@ -86,6 +86,8 @@ class ExamCertScene(Scene):
 
         if self.msg:
             widgets.draw_text(surf, self.msg, (40, top + h + 24), fonts.small(), config.COL_WARN)
+        hints = [("TAB / ← →", "carte"), ("ENTRÉE", "ouvrir")]
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14), hints)
         self.back_btn.draw(surf)
 
     def _draw_exam_card(self, surf, rect, p, mp, focused):

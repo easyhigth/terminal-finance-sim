@@ -83,6 +83,19 @@ _KEYS = [
 TITLE_H = 22
 PADX = 10
 
+# touches du pavé numérique (le unicode n'est pas toujours fiable selon la
+# plateforme/le verrouillage numérique, donc mappage explicite par key code)
+_KP_MAP = {
+    pygame.K_KP_0: "0", pygame.K_KP_1: "1", pygame.K_KP_2: "2", pygame.K_KP_3: "3",
+    pygame.K_KP_4: "4", pygame.K_KP_5: "5", pygame.K_KP_6: "6", pygame.K_KP_7: "7",
+    pygame.K_KP_8: "8", pygame.K_KP_9: "9", pygame.K_KP_PERIOD: ".",
+    pygame.K_KP_PLUS: "+", pygame.K_KP_MINUS: "-", pygame.K_KP_MULTIPLY: "*",
+    pygame.K_KP_DIVIDE: "/",
+}
+# caractères imprimables acceptés tels quels dans l'expression (permet de
+# taper directement "log(100)", "sqrt(2)", "pi"... au clavier)
+_TYPABLE = "0123456789.()+-*/^"
+
 
 class Calculator:
     def __init__(self, pos=(900, 120)):
@@ -90,6 +103,10 @@ class Calculator:
         self.result = ""
         self.dragging = False
         self.closed = False
+        # focus clavier : actif à l'ouverture et tant qu'on clique dans la
+        # calculatrice, désactivé dès qu'on clique ailleurs — pour ne pas
+        # interférer avec la saisie des réponses du reste de l'écran.
+        self.focused = True
         self._drag_off = (0, 0)
         self._btn_rects = {}
         self.rect = pygame.Rect(pos[0], pos[1], 260, 366)
@@ -116,9 +133,32 @@ class Calculator:
         else:
             self.expr += _INSERT.get(key, key)
 
+    def _handle_key(self, event):
+        """Saisie clavier (uniquement quand la calculatrice a le focus, cf.
+        `handle`). Retourne True si la touche est consommée."""
+        if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            self._press("=")
+            return True
+        if event.key == pygame.K_BACKSPACE:
+            self._press("<")
+            return True
+        if event.key == pygame.K_ESCAPE:
+            # ne consomme pas ESCAPE : laisse l'écran gérer son propre retour,
+            # juste perdre le focus clavier de la calculatrice.
+            self.focused = False
+            return False
+        if event.key in _KP_MAP:
+            self.expr += _KP_MAP[event.key]
+            return True
+        if event.unicode and (event.unicode in _TYPABLE or event.unicode.isalpha()):
+            self.expr += event.unicode
+            return True
+        return False
+
     def handle(self, event):
         """Retourne True si l'event est consommé."""
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            self.focused = self.rect.collidepoint(event.pos)
             if self._close_rect().collidepoint(event.pos):
                 self.closed = True
                 return True
@@ -142,16 +182,22 @@ class Calculator:
             self.rect.y = max(config.TOPBAR_H, min(config.SCREEN_HEIGHT - 40,
                                                   event.pos[1] - self._drag_off[1]))
             return True
+        elif event.type == pygame.KEYDOWN:
+            if not self.focused:
+                return False
+            return self._handle_key(event)
         return False
 
     def draw(self, surf):
         pygame.draw.rect(surf, (0, 0, 0), self.rect.move(0, 3), border_radius=6)
         pygame.draw.rect(surf, config.COL_PANEL, self.rect, border_radius=6)
-        pygame.draw.rect(surf, config.COL_AMBER, self.rect, 1, border_radius=6)
+        pygame.draw.rect(surf, config.COL_AMBER if self.focused else config.COL_BORDER,
+                         self.rect, 1, border_radius=6)
         tr = self._title_rect()
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, tr,
                          border_top_left_radius=6, border_top_right_radius=6)
-        widgets.draw_text(surf, "CALCULATRICE", (tr.x + 8, tr.y + 4),
+        title = "CALCULATRICE" + (" ⌨" if self.focused else "")
+        widgets.draw_text(surf, title, (tr.x + 8, tr.y + 4),
                           fonts.tiny(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, "✕", (self._close_rect().centerx, tr.y + 4),
                           fonts.small(bold=True), config.COL_TEXT_DIM, align="center")

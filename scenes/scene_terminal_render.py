@@ -609,3 +609,5 @@ class TerminalRenderMixin:
             gx = gr.right
         widgets.draw_text(surf, cursor, (r.right if not ghost else gx, rect.bottom - 20),
                           fonts.small(bold=True), config.COL_AMBER)
+
+        widgets.draw_hint_bar(surf, (rect.right - 10, rect.bottom - 20), self._focus_hints())

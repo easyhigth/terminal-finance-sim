@@ -265,4 +265,7 @@ class MoreScene(Scene):
             bar_y = area.y + int((area.h - bar_h) * (self.scroll / self._max_scroll))
             pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 6, bar_h), border_radius=3)
 
+        hints = [("↑↓←→", "naviguer"), ("ENTRÉE", "ouvrir"), ("lettres", "filtrer"), ("ÉCHAP", "retour")]
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14), hints)
+
         self.back_btn.draw(surf)

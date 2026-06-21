@@ -27,6 +27,7 @@ from core import crypto as CRY
 from core import etfs as ETF
 from core.scene_manager import Scene
 from ui import fonts, widgets
+from ui.popups import PopupMixin
 
 
 def _asset_exists(market, tk):
@@ -68,11 +69,12 @@ SERIES_COLS = [config.COL_AMBER, config.COL_CYAN, config.COL_UP, config.COL_WARN
                config.COL_PRESTIGE, config.COL_DOWN]
 
 
-class GraphScene(Scene):
+class GraphScene(Scene, PopupMixin):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
         self.kind = kwargs.get("kind", "line")
         self.market = self.app.ensure_market()
+        self.init_popups()
         tickers = kwargs.get("tickers")
         self.error = None
         if not tickers:
@@ -97,7 +99,10 @@ class GraphScene(Scene):
         self._chip_rects = []
         self._quickadd_rects = []
         self._info_name_rect = None
-        self._controls_bottom = 168
+        self._type_badge_rect = None
+        self._region_badge_rect = None
+        self._sector_badge_rect = None
+        self._controls_bottom = 178
         self.back_btn = widgets.Button(
             config.back_button_rect(180), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.mode_btn = widgets.Button(
@@ -116,10 +121,30 @@ class GraphScene(Scene):
             ("show_bollinger", self.boll_btn, config.COL_TEXT_DIM),
             ("show_rsi", self.rsi_btn, config.COL_PRESTIGE))
 
+    def _open_popup_for(self, tk):
+        """Ouvre la fiche d'analyse flottante (persistante) de l'actif `tk`,
+        selon sa classe — même mécanisme que les autres scènes (analyse,
+        portefeuille...)."""
+        kind = _asset_kind(tk)
+        if kind == "stock":
+            self.open_company(tk)
+        elif kind == "etf":
+            self.open_etf(tk)
+        elif kind == "bond":
+            self.open_bond(tk)
+        elif kind == "commodity":
+            self.open_commodity(tk)
+        elif kind == "crypto":
+            self.open_crypto(tk)
+
     # ------------------------------------------------------------- events
     def handle_event(self, event):
+        if self.popups_handle_event(event):
+            return
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
+                if self.popups_close_top():
+                    return
                 self.app.scenes.go(self.return_to)
             elif event.key == pygame.K_BACKSPACE:
                 self.input = self.input[:-1]
@@ -127,6 +152,25 @@ class GraphScene(Scene):
                 self._commit_input()
             elif event.unicode and event.unicode.isprintable() and len(self.input) < 8:
                 self.input += event.unicode.upper()
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            # clic droit sur un nom affiché (suggestion / sélection / ajout
+            # rapide / actif principal) -> fiche d'analyse flottante persistante,
+            # sans perturber le clic gauche (ajout/retrait/sélection d'actif).
+            for rr, tk in self._suggest_rects:
+                if rr.collidepoint(event.pos):
+                    self._open_popup_for(tk)
+                    return
+            for rr, tk in self._chip_rects:
+                if rr.collidepoint(event.pos):
+                    self._open_popup_for(tk)
+                    return
+            for rr, tk in self._quickadd_rects:
+                if rr.collidepoint(event.pos):
+                    self._open_popup_for(tk)
+                    return
+            if self._info_name_rect and self._info_name_rect.collidepoint(event.pos) and self.tickers:
+                self._open_popup_for(self.tickers[0])
+                return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for rr, tk in self._suggest_rects:
                 if rr.collidepoint(event.pos):
@@ -150,6 +194,18 @@ class GraphScene(Scene):
                     self.period = steps
             if self._info_name_rect and self._info_name_rect.collidepoint(event.pos) and self.tickers:
                 self.app.scenes.go("explorer", return_to=self.return_to, search=self.tickers[0])
+                return
+            if self._type_badge_rect and self._type_badge_rect.collidepoint(event.pos):
+                info = self._info_for(self.tickers[0])
+                self.app.scenes.go("explorer", return_to=self.return_to, type_filter=info["type"])
+                return
+            if self._region_badge_rect and self._region_badge_rect.collidepoint(event.pos):
+                info = self._info_for(self.tickers[0])
+                self.app.scenes.go("explorer", return_to=self.return_to, region_filter=info["region"])
+                return
+            if self._sector_badge_rect and self._sector_badge_rect.collidepoint(event.pos):
+                info = self._info_for(self.tickers[0])
+                self.app.scenes.go("explorer", return_to=self.return_to, sub_filter=info["sector"])
                 return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
@@ -288,29 +344,36 @@ class GraphScene(Scene):
         if self.kind == "spread":
             self.mode_btn.draw(surf)
         self._draw_suggestions(surf)   # overlay : au-dessus du graphe
+        self.popups_draw(surf)
 
     def _draw_info_bar(self, surf):
         """Barre d'infos clés de l'actif principal sélectionné, affichée
-        au-dessus du sélecteur de type de graphe. Clic sur le nom -> Explorer
-        pré-rempli avec ce nom."""
+        au-dessus du sélecteur de type de graphe (avec une marge suffisante
+        sous le sous-titre noms/période pour ne jamais le chevaucher). Clic
+        sur le nom -> Explorer pré-rempli ; clic droit -> fiche d'analyse
+        flottante ; clic sur un badge (type/région/secteur) -> Explorer
+        pré-filtré sur ce critère."""
         self._info_name_rect = None
+        self._type_badge_rect = None
+        self._region_badge_rect = None
+        self._sector_badge_rect = None
         if self.kind in _NO_ASSET or not self.tickers:
             return
         info = self._info_for(self.tickers[0])
         if not info:
             return
-        y = 80
+        y = 90
         x = 40
         self._info_name_rect = pygame.Rect(x, y, 90, 18)
         widgets.draw_text(surf, self.tickers[0], (x, y), fonts.small(bold=True), config.COL_CYAN)
         x += 96
-        widgets.draw_badge(surf, info["type"], (x, y - 2), config.COL_TEXT_DIM)
+        self._type_badge_rect = widgets.draw_badge(surf, info["type"], (x, y - 2), config.COL_TEXT_DIM)
         x += 100
         if info["region"]:
-            widgets.draw_badge(surf, info["region"], (x, y - 2), config.COL_AMBER)
+            self._region_badge_rect = widgets.draw_badge(surf, info["region"], (x, y - 2), config.COL_AMBER)
             x += 110
         if info["sector"]:
-            widgets.draw_badge(surf, info["sector"], (x, y - 2), config.COL_WARN)
+            self._sector_badge_rect = widgets.draw_badge(surf, info["sector"], (x, y - 2), config.COL_WARN)
             x += 140
         vx = x + 10
         for label, val in info["values"]:
@@ -319,7 +382,7 @@ class GraphScene(Scene):
 
     def _draw_type_tabs(self, surf):
         self._type_rects = {}
-        x, y, h = 40, 108, 30
+        x, y, h = 40, 120, 30
         w = (config.SCREEN_WIDTH - 80 - (len(TYPES) - 1) * 4) // len(TYPES)
         for code, _, kind, _ in TYPES:
             rect = pygame.Rect(x, y, w, h)
@@ -335,7 +398,7 @@ class GraphScene(Scene):
     def _draw_controls(self, surf):
         # sélecteur de période (gauche)
         self._period_rects = {}
-        x, y = 40, 146
+        x, y = 40, 158
         for plabel, steps in PERIODS:
             rect = pygame.Rect(x, y, 56, 26)
             self._period_rects[steps] = rect

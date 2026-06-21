@@ -39,6 +39,13 @@ class AnalyticsScene(Scene, PopupMixin):
         self._row_cls = {}
         self._frontier_rect = None
         self._corr_rect = None
+        # défilement (molette) des blocs « positions détaillées » et « répartition »
+        self.scroll_holdings = 0
+        self.scroll_alloc = 0
+        self._holdings_list_rect = None
+        self._alloc_list_rect = None
+        self._holdings_max_scroll = 0
+        self._alloc_max_scroll = 0
 
     def _open_holding(self, label):
         kind = self._row_cls.get(label)
@@ -73,6 +80,14 @@ class AnalyticsScene(Scene, PopupMixin):
         if self.stress_btn.handle(event):
             self.app.scenes.go("stresstest", return_to="analytics")
             return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            delta = -32 if event.button == 4 else 32
+            if self._holdings_list_rect and self._holdings_list_rect.collidepoint(event.pos):
+                self.scroll_holdings = max(0, min(self._holdings_max_scroll, self.scroll_holdings + delta))
+                return
+            if self._alloc_list_rect and self._alloc_list_rect.collidepoint(event.pos):
+                self.scroll_alloc = max(0, min(self._alloc_max_scroll, self.scroll_alloc + delta))
+                return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for tk, rect in self._holding_rects.items():
                 if rect.collidepoint(event.pos):
@@ -205,61 +220,73 @@ class AnalyticsScene(Scene, PopupMixin):
         for label, cx, al in cols:
             widgets.draw_text(surf, label, (cx, inner.y), fonts.tiny(bold=True),
                               config.COL_TEXT_DIM, align=al)
-        y = inner.y + 20
+        list_top = inner.y + 20
         row_h = 26
-        maxrows = (inner.h - 28) // row_h
+        list_area = pygame.Rect(inner.x - 4, list_top, inner.w + 8, inner.bottom - list_top - 16)
+        self._holdings_list_rect = list_area
         mp = pygame.mouse.get_pos()
         self._holding_rects = {}
         self._chart_rects = {}
         self._row_cls = {}
-        for h in s["rows"][:maxrows]:
-            ccol = _CLASS_COL.get(h["cls"], config.COL_TEXT)
-            tk = h["label"]
-            self._row_cls[tk] = h["cls"]
-            name_rect = pygame.Rect(inner.x, y - 2, 300, row_h - 2)
-            self._holding_rects[tk] = name_rect
-            if h["cls"] == "Actions":      # graphe de cours dispo seulement pour les actions
-                value_rect = pygame.Rect(inner.x + 300, y - 2, inner.w - 300, row_h - 2)
-                self._chart_rects[tk] = value_rect
-            if name_rect.collidepoint(mp) or (h["cls"] == "Actions" and
-                                              self._chart_rects[tk].collidepoint(mp)):
-                pygame.draw.rect(surf, config.COL_PANEL_HEAD, (inner.x, y - 2, inner.w, row_h - 2))
-            pygame.draw.rect(surf, ccol, (inner.x, y + 2, 6, 14))
-            tag = "S" if h["short"] else " "
-            widgets.draw_text(surf, tag, (inner.x + 10, y), fonts.tiny(bold=True), config.COL_DOWN)
-            name = widgets.fit_text(f"{h['label']}", fonts.small(bold=True), 200)
-            widgets.draw_text(surf, name, (inner.x + 46, y), fonts.small(bold=True), config.COL_WHITE)
-            widgets.draw_text(surf, f"{h['qty']:,.0f}".replace(",", " "),
-                              (inner.x + 300, y), fonts.small(), config.COL_TEXT, align="right")
-            widgets.draw_text(surf, f"{h['price']:.2f}", (inner.x + 390, y),
-                              fonts.small(), config.COL_TEXT, align="right")
-            widgets.draw_text(surf, widgets.format_money(h["value"], cur),
-                              (inner.x + 490, y), fonts.small(bold=True), config.COL_WHITE, align="right")
-            pcol = config.COL_UP if h["pnl"] >= 0 else config.COL_DOWN
-            widgets.draw_text(surf, f"{h['weight']:.1f}%", (inner.right, y),
-                              fonts.small(), pcol, align="right")
-            # 2e ligne fine : nom + coût moyen + liquidité + P&L %
-            widgets.draw_text(surf, widgets.fit_text(h["name"], fonts.tiny(), 240),
-                              (inner.x + 46, y + 13), fonts.tiny(), config.COL_TEXT_DIM)
-            widgets.draw_text(surf, f"PM {h['avg']:.2f}", (inner.x + 390, y + 13),
-                              fonts.tiny(), config.COL_TEXT_DIM, align="right")
-            liq_col = {"Liquide": config.COL_UP, "Peu liquide": config.COL_WARN,
-                       "Illiquide": config.COL_DOWN}.get(h["liquidity"], config.COL_TEXT_DIM)
-            widgets.draw_text(surf, h["liquidity"], (inner.x + 490, y + 13),
-                              fonts.tiny(), liq_col, align="right")
-            sign = "+" if h["pnl_pct"] >= 0 else ""
-            widgets.draw_text(surf, f"{sign}{h['pnl_pct']:.1f}%", (inner.right, y + 13),
-                              fonts.tiny(), pcol, align="right")
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        y = list_top - self.scroll_holdings
+        for h in s["rows"]:
+            if list_area.top - row_h < y < list_area.bottom:
+                ccol = _CLASS_COL.get(h["cls"], config.COL_TEXT)
+                tk = h["label"]
+                self._row_cls[tk] = h["cls"]
+                name_rect = pygame.Rect(inner.x, y - 2, 300, row_h - 2)
+                self._holding_rects[tk] = name_rect
+                if h["cls"] == "Actions":      # graphe de cours dispo seulement pour les actions
+                    value_rect = pygame.Rect(inner.x + 300, y - 2, inner.w - 300, row_h - 2)
+                    self._chart_rects[tk] = value_rect
+                if name_rect.collidepoint(mp) or (h["cls"] == "Actions" and
+                                                  self._chart_rects[tk].collidepoint(mp)):
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, (inner.x, y - 2, inner.w, row_h - 2))
+                pygame.draw.rect(surf, ccol, (inner.x, y + 2, 6, 14))
+                tag = "S" if h["short"] else " "
+                widgets.draw_text(surf, tag, (inner.x + 10, y), fonts.tiny(bold=True), config.COL_DOWN)
+                name = widgets.fit_text(f"{h['label']}", fonts.small(bold=True), 200)
+                widgets.draw_text(surf, name, (inner.x + 46, y), fonts.small(bold=True), config.COL_WHITE)
+                widgets.draw_text(surf, f"{h['qty']:,.0f}".replace(",", " "),
+                                  (inner.x + 300, y), fonts.small(), config.COL_TEXT, align="right")
+                widgets.draw_text(surf, f"{h['price']:.2f}", (inner.x + 390, y),
+                                  fonts.small(), config.COL_TEXT, align="right")
+                widgets.draw_text(surf, widgets.format_money(h["value"], cur),
+                                  (inner.x + 490, y), fonts.small(bold=True), config.COL_WHITE, align="right")
+                pcol = config.COL_UP if h["pnl"] >= 0 else config.COL_DOWN
+                widgets.draw_text(surf, f"{h['weight']:.1f}%", (inner.right, y),
+                                  fonts.small(), pcol, align="right")
+                # 2e ligne fine : nom + coût moyen + liquidité + P&L %
+                widgets.draw_text(surf, widgets.fit_text(h["name"], fonts.tiny(), 240),
+                                  (inner.x + 46, y + 13), fonts.tiny(), config.COL_TEXT_DIM)
+                widgets.draw_text(surf, f"PM {h['avg']:.2f}", (inner.x + 390, y + 13),
+                                  fonts.tiny(), config.COL_TEXT_DIM, align="right")
+                liq_col = {"Liquide": config.COL_UP, "Peu liquide": config.COL_WARN,
+                           "Illiquide": config.COL_DOWN}.get(h["liquidity"], config.COL_TEXT_DIM)
+                widgets.draw_text(surf, h["liquidity"], (inner.x + 490, y + 13),
+                                  fonts.tiny(), liq_col, align="right")
+                sign = "+" if h["pnl_pct"] >= 0 else ""
+                widgets.draw_text(surf, f"{sign}{h['pnl_pct']:.1f}%", (inner.right, y + 13),
+                                  fonts.tiny(), pcol, align="right")
             y += row_h
-        if len(s["rows"]) > maxrows:
-            widgets.draw_text(surf, f"… +{len(s['rows'])-maxrows} autres",
-                              (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+        surf.set_clip(prev_clip)
+        content_h = (y + self.scroll_holdings) - list_top
+        self._holdings_max_scroll = max(0, content_h - list_area.h)
+        self.scroll_holdings = max(0, min(self._holdings_max_scroll, self.scroll_holdings))
+        widgets.draw_scrollbar(surf, rect, list_area, self.scroll_holdings,
+                               self._holdings_max_scroll, content_h)
         widgets.draw_text(surf, "clic actif → fiche d'analyse · clic cours/valeur/P&L (actions) → graphe",
                           (inner.x, inner.bottom - 12), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_allocations(self, surf, rect, s, cur):
         inner = widgets.draw_panel(surf, rect, "Répartition & diversification", config.COL_AMBER)
-        y = inner.y
+        self._alloc_list_rect = inner
+        prev_clip = surf.get_clip()
+        surf.set_clip(inner)
+        y0 = inner.y - self.scroll_alloc
+        y = y0
         y = self._alloc_block(surf, inner, y, "Par classe d'actifs", s["by_class"],
                               lambda k: _CLASS_COL.get(k, config.COL_TEXT))
         y += 6
@@ -296,6 +323,11 @@ class AnalyticsScene(Scene, PopupMixin):
                 widgets.draw_text(surf, f"{r['risk_contribution_pct']:.0f}%",
                                   (inner.right, y), fonts.tiny(bold=True), config.COL_WARN, align="right")
                 y += 14
+        surf.set_clip(prev_clip)
+        content_h = y - y0
+        self._alloc_max_scroll = max(0, content_h - inner.h)
+        self.scroll_alloc = max(0, min(self._alloc_max_scroll, self.scroll_alloc))
+        widgets.draw_scrollbar(surf, rect, inner, self.scroll_alloc, self._alloc_max_scroll, content_h)
 
     def _alloc_block(self, surf, inner, y, title, data, colfn, limit=None):
         widgets.draw_text(surf, title, (inner.x, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)

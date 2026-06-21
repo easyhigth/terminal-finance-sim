@@ -31,9 +31,8 @@ class BondsScene(Scene, PopupMixin):
         self.scroll = 0
         self._max_scroll = 0
         self._list_rect = None
-        self.search = ""
-        self._search_clear_rect = None
-        self._t = 0.0
+        self.search_box = widgets.SearchBox((40, 100, 280, 24),
+                                             "Tapez pour rechercher (nom, émetteur)…")
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.gov_btn = widgets.Button((220, config.SCREEN_HEIGHT - 50, 160, 42),
@@ -49,13 +48,13 @@ class BondsScene(Scene, PopupMixin):
             if event.key == pygame.K_ESCAPE:
                 if self.popups_close_top():
                     return
-                if self.search:
-                    self.search = ""
+                if self.search_box.text:
+                    self.search_box.text = ""
                     return
                 self.app.scenes.go(self.return_to)
                 return
             elif event.key == pygame.K_BACKSPACE:
-                self.search = self.search[:-1]
+                self.search_box.handle_typing(event)
                 return
             elif event.key == pygame.K_PAGEUP:
                 self.scroll = max(0, self.scroll - 200)
@@ -64,7 +63,7 @@ class BondsScene(Scene, PopupMixin):
                 self.scroll = min(self._max_scroll, self.scroll + 200)
                 return
             elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
-                self.search += event.unicode
+                self.search_box.handle_typing(event)
                 self.scroll = 0
                 return
         if self.back_btn.handle(event):
@@ -79,8 +78,7 @@ class BondsScene(Scene, PopupMixin):
                                          self.scroll + (-48 if event.button == 4 else 48)))
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
-                self.search = ""
+            if self.search_box.handle_clear_click(event):
                 return
             for bid, rect in self.name_rects.items():
                 if rect.collidepoint(event.pos):
@@ -105,7 +103,7 @@ class BondsScene(Scene, PopupMixin):
                         self.app.gs.save(config.AUTOSAVE_SLOT)
 
     def update(self, dt):
-        self._t += dt
+        self.search_box.update(dt)
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp, dt)
         self.gov_btn.update(mp, dt)
@@ -124,22 +122,8 @@ class BondsScene(Scene, PopupMixin):
                           (42, 74), fonts.small(), config.COL_TEXT_DIM)
 
         # ---- recherche ----
-        search_rect = pygame.Rect(40, 100, 280, 24)
-        pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
-        pygame.draw.rect(surf, config.COL_CYAN, search_rect, 1, border_radius=4)
-        cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        label = (self.search + cursor) if self.search else (cursor + "Tapez pour rechercher (nom, émetteur)…")
-        scol = config.COL_TEXT if self.search else config.COL_TEXT_DIM
-        widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
-                          (search_rect.x + 8, search_rect.y + 4), fonts.small(), scol)
-        self._search_clear_rect = None
-        if self.search:
-            self._search_clear_rect = pygame.Rect(search_rect.right - 22, search_rect.y,
-                                                   22, search_rect.h)
-            widgets.draw_text(surf, "✕", self._search_clear_rect.center, fonts.small(bold=True),
-                              config.COL_TEXT_DIM, align="center")
-
-        top = search_rect.bottom + 8
+        self.search_box.draw(surf)
+        top = self.search_box.rect.bottom + 8
         ph = config.footer_y() - 8 - top
         panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, ph)
         inner = widgets.draw_panel(surf, panel, "Obligations", config.COL_CYAN)
@@ -168,7 +152,7 @@ class BondsScene(Scene, PopupMixin):
         surf.set_clip(list_area)
 
         quotes = B.all_quotes(m)
-        q_filter = self.search.strip().lower()
+        q_filter = self.search_box.query
         if q_filter:
             quotes = [q for q in quotes
                       if q_filter in q["name"].lower() or q_filter in q["issuer"].lower()]

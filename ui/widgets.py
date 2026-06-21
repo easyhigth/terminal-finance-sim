@@ -242,6 +242,66 @@ class Button:
 
 
 # ---------------------------------------------------------------------------
+# CHAMP DE RECHERCHE — saisie filtrante avec curseur clignotant + bouton ✕
+# ---------------------------------------------------------------------------
+class SearchBox:
+    """Champ de recherche texte autonome (état + saisie + dessin), pour
+    factoriser le pattern répété à l'identique dans les écrans de trading à
+    liste filtrable (scene_bonds/commodities/crypto). L'appelant garde la
+    main sur le reset de scroll / la priorité ESC (souvent partagée avec la
+    fermeture de popups), seuls saisie/effacement/dessin sont internalisés."""
+
+    def __init__(self, rect, placeholder="Tapez pour rechercher…"):
+        self.rect = pygame.Rect(rect)
+        self.placeholder = placeholder
+        self.text = ""
+        self.clear_rect = None
+        self._t = 0.0
+
+    def update(self, dt):
+        self._t += dt
+
+    def handle_typing(self, event):
+        """Gère KEYDOWN backspace/caractère imprimable. Retourne True si
+        consommé (l'appelant gère ESCAPE et les autres touches lui-même)."""
+        if event.type != pygame.KEYDOWN:
+            return False
+        if event.key == pygame.K_BACKSPACE:
+            self.text = self.text[:-1]
+            return True
+        if event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
+            self.text += event.unicode
+            return True
+        return False
+
+    def handle_clear_click(self, event):
+        """Gère le clic sur le bouton ✕. Retourne True si géré."""
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.clear_rect and self.clear_rect.collidepoint(event.pos):
+                self.text = ""
+                return True
+        return False
+
+    @property
+    def query(self):
+        return self.text.strip().lower()
+
+    def draw(self, surf, accent=config.COL_CYAN):
+        pygame.draw.rect(surf, config.COL_PANEL, self.rect, border_radius=4)
+        pygame.draw.rect(surf, accent, self.rect, 1, border_radius=4)
+        cursor = "_" if int(self._t * 2) % 2 == 0 else " "
+        label = (self.text + cursor) if self.text else (cursor + self.placeholder)
+        col = config.COL_TEXT if self.text else config.COL_TEXT_DIM
+        draw_text(surf, fit_text(label, fonts.small(), self.rect.w - 30),
+                  (self.rect.x + 8, self.rect.y + 4), fonts.small(), col)
+        self.clear_rect = None
+        if self.text:
+            self.clear_rect = pygame.Rect(self.rect.right - 22, self.rect.y, 22, self.rect.h)
+            draw_text(surf, "✕", self.clear_rect.center, fonts.small(bold=True),
+                      config.COL_TEXT_DIM, align="center")
+
+
+# ---------------------------------------------------------------------------
 # PIED DE CARTE — rangée de bouton(s) d'action alignée en bas d'une carte
 # ---------------------------------------------------------------------------
 def draw_card_footer(surf, card_rect, label, accent=config.COL_AMBER,

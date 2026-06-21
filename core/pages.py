@@ -20,17 +20,40 @@ onglet en popup = visible simultanément, redimensionné, par-dessus.
 Anti-triche : tant que la scène active de l'onglet courant a
 `pageable = False` (examen / certification), tout changement d'onglet
 (bouton, clic, raccourci) est bloqué — voir can_switch().
+
+La fenêtre réelle (app.screen) fait SCREEN_HEIGHT + TAB_BAR_H de haut :
+la barre d'onglets occupe la bande du haut (0..TAB_BAR_H) et les scènes
+sont dessinées, intouchées, dans une sous-surface de taille
+SCREEN_WIDTH x SCREEN_HEIGHT juste en dessous — donc jamais cachées par
+la barre. Les coordonnées souris (en repère fenêtre) sont translatées de
+-TAB_BAR_H avant d'être transmises aux scènes/popups (en repère canvas).
 """
 import pygame
 
 from core import config
 from ui import fonts, widgets
 
-TAB_BAR_H = 26
+TAB_BAR_H = config.TAB_BAR_H
 TAB_W = 168
 TAB_GAP = 2
 NEW_TAB_W = 28
 POPUP_TITLE_H = 24
+
+# Beaucoup de scènes lisent directement pygame.mouse.get_pos() (survol au
+# draw(), hors handle_event()) en repère canvas (0..SCREEN_HEIGHT). Comme la
+# fenêtre réelle est maintenant plus haute de TAB_BAR_H (barre d'onglets),
+# on corrige UNE FOIS ici, globalement, sans toucher aux ~50 fichiers de
+# scène : tout appel à pygame.mouse.get_pos() renvoie désormais la position
+# déjà translatée en repère canvas.
+_real_mouse_get_pos = pygame.mouse.get_pos
+
+
+def _canvas_mouse_get_pos():
+    x, y = _real_mouse_get_pos()
+    return (x, y - TAB_BAR_H)
+
+
+pygame.mouse.get_pos = _canvas_mouse_get_pos
 
 
 class Page:
@@ -165,55 +188,26 @@ class PageManager:
         return rects, new_rect
 
     def handle_event(self, event):
-        # déplacement d'un popup en cours : prioritaire sur tout le reste
-        if event.type == pygame.MOUSEMOTION and self._drag_page is not None:
-            self._drag_page.popup_rect.topleft = (event.pos[0] - self._drag_off[0],
-                                                   event.pos[1] - self._drag_off[1])
-            return
-        if event.type == pygame.MOUSEBUTTONUP and self._drag_page is not None:
-            self._drag_page = None
-            return
+        raw_pos = getattr(event, "pos", None)
 
-        # popups : la souris au-dessus d'un popup a priorité sur la barre/onglet actif
-        if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION):
-            for i, page in enumerate(self.pages):
-                if i == self.active or not page.popup or page.popup_rect is None:
-                    continue
-                title_rect = pygame.Rect(page.popup_rect.x, page.popup_rect.y,
-                                         page.popup_rect.w, POPUP_TITLE_H)
-                close_rect = pygame.Rect(page.popup_rect.right - 22, page.popup_rect.y + 2, 18, 18)
-                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    if close_rect.collidepoint(event.pos):
-                        page.popup = False
-                        return
-                    if title_rect.collidepoint(event.pos):
-                        self._drag_page = page
-                        self._drag_off = (event.pos[0] - page.popup_rect.x,
-                                          event.pos[1] - page.popup_rect.y)
-                        return
-                body_rect = pygame.Rect(page.popup_rect.x, page.popup_rect.y + POPUP_TITLE_H,
-                                        page.popup_rect.w, page.popup_rect.h - POPUP_TITLE_H)
-                if body_rect.collidepoint(getattr(event, "pos", (-1, -1))):
-                    self._forward_to_popup(page, body_rect, event)
-                    return
-
-        # barre d'onglets (toujours visible, en haut de l'écran)
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and event.pos[1] < TAB_BAR_H:
+        # barre d'onglets (toujours visible, en haut de la fenêtre, en repère
+        # fenêtre non translaté) — prioritaire sur tout le reste
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and raw_pos and raw_pos[1] < TAB_BAR_H:
             tab_rects, new_rect = self._tab_rects()
-            if new_rect.collidepoint(event.pos):
+            if new_rect.collidepoint(raw_pos):
                 if self.can_switch():
                     self.duplicate_current()
                 return
             for i, rect in enumerate(tab_rects):
                 close_rect = pygame.Rect(rect.right - 18, rect.y + 4, 14, 14)
                 pop_rect = pygame.Rect(rect.right - 36, rect.y + 4, 14, 14)
-                if close_rect.collidepoint(event.pos):
+                if close_rect.collidepoint(raw_pos):
                     self.close_page(i)
                     return
-                if i != self.active and pop_rect.collidepoint(event.pos):
+                if i != self.active and pop_rect.collidepoint(raw_pos):
                     self.toggle_popup(i)
                     return
-                if rect.collidepoint(event.pos):
+                if rect.collidepoint(raw_pos):
                     self.switch_to(i)
                     return
             return
@@ -233,6 +227,45 @@ class PageManager:
                     self.next_page()
                 return
 
+        # à partir d'ici, on travaille en repère "canvas de jeu" (sous la
+        # barre d'onglets) : on translate les coordonnées souris une fois.
+        if raw_pos is not None:
+            attrs = {k: getattr(event, k) for k in event.dict}
+            attrs["pos"] = (raw_pos[0], raw_pos[1] - TAB_BAR_H)
+            event = pygame.event.Event(event.type, attrs)
+
+        # déplacement d'un popup en cours : prioritaire sur tout le reste
+        if event.type == pygame.MOUSEMOTION and self._drag_page is not None:
+            self._drag_page.popup_rect.topleft = (event.pos[0] - self._drag_off[0],
+                                                   event.pos[1] - self._drag_off[1])
+            return
+        if event.type == pygame.MOUSEBUTTONUP and self._drag_page is not None:
+            self._drag_page = None
+            return
+
+        # popups : la souris au-dessus d'un popup a priorité sur la page active
+        if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION):
+            for i, page in enumerate(self.pages):
+                if i == self.active or not page.popup or page.popup_rect is None:
+                    continue
+                title_rect = pygame.Rect(page.popup_rect.x, page.popup_rect.y,
+                                         page.popup_rect.w, POPUP_TITLE_H)
+                close_rect = pygame.Rect(page.popup_rect.right - 22, page.popup_rect.y + 2, 18, 18)
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if close_rect.collidepoint(event.pos):
+                        page.popup = False
+                        return
+                    if title_rect.collidepoint(event.pos):
+                        self._drag_page = page
+                        self._drag_off = (event.pos[0] - page.popup_rect.x,
+                                          event.pos[1] - page.popup_rect.y)
+                        return
+                body_rect = pygame.Rect(page.popup_rect.x, page.popup_rect.y + POPUP_TITLE_H,
+                                        page.popup_rect.w, page.popup_rect.h - POPUP_TITLE_H)
+                if body_rect.collidepoint(event.pos):
+                    self._forward_to_popup(page, body_rect, event)
+                    return
+
         self.manager.handle_event(event)
 
     def _forward_to_popup(self, page, body_rect, event):
@@ -249,10 +282,12 @@ class PageManager:
 
     # ------------------------------------------------------------ rendu
     def draw(self, surf):
-        self.manager.draw(surf)
+        # canvas de jeu : sous-surface sous la barre d'onglets, jamais cachée
+        game_surf = surf.subsurface((0, TAB_BAR_H, config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
+        self.manager.draw(game_surf)
         for i, page in enumerate(self.pages):
             if i != self.active and page.popup:
-                self._draw_popup(surf, page)
+                self._draw_popup(game_surf, page)
         self._draw_tab_bar(surf)
 
     def _draw_popup(self, surf, page):

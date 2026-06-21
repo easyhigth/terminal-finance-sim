@@ -72,6 +72,13 @@ TICKER_H        = 20     # hauteur du bandeau ticker
 ROW_H           = 24     # hauteur d'une ligne de liste standard
 FOOTER_H        = 54     # bande basse réservée (boutons retour) — anti-chevauchement
 
+# Barre d'onglets (pages) : bande supplémentaire AU-DESSUS du canvas de jeu
+# (SCREEN_WIDTH x SCREEN_HEIGHT), pour ne jamais chevaucher le bandeau
+# d'info de chaque scène (TOPBAR_H, dessiné à partir de y=0 dans son repère
+# propre). La fenêtre réelle fait donc SCREEN_HEIGHT + TAB_BAR_H de haut.
+TAB_BAR_H       = 26
+WINDOW_HEIGHT   = SCREEN_HEIGHT + TAB_BAR_H
+
 # Helpers de zones standard (calculés depuis la résolution)
 def content_top():
     """Y de départ du contenu sous le titre d'une scène (modules/écrans)."""

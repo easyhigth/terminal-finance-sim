@@ -295,7 +295,8 @@ class TerminalRenderMixin:
                 widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.2f}%", (inner.right, y),
                                   fonts.small(bold=True), col, align="right")
                 widgets.draw_series(surf, pygame.Rect(inner.x, y + 16, inner.w, spark_h),
-                                    self.market.index_history(name), col, baseline=False)
+                                    self.market.index_history(name), col, baseline=False,
+                                    mouse_pos=mp, y_fmt=lambda v: f"{v:,.0f}")
                 if self.zones.zone == "indices" and self.zones.inside and self.zones.item == name:
                     keynav.draw_focus_ring(surf, row, True)
             y += step
@@ -332,7 +333,9 @@ class TerminalRenderMixin:
             pcol = config.COL_UP if upnl >= 0 else config.COL_DOWN
             widgets.draw_text(surf, f"P&L latent {'+' if upnl>=0 else ''}{widgets.format_money(upnl, cur)}",
                               (inner.x, inner.y + 62), fonts.tiny(), pcol)
-        self.networth_spark.draw(surf, pygame.Rect(inner.x, inner.y + 80, inner.w, 40))
+        self.networth_spark.draw(surf, pygame.Rect(inner.x, inner.y + 80, inner.w, 40),
+                                 mouse_pos=pygame.mouse.get_pos(),
+                                 y_fmt=lambda v: widgets.format_money(v, cur))
         widgets.draw_text(surf, f"Réputation {p.reputation}/100", (inner.x, inner.y + 126),
                           fonts.small(), config.COL_TEXT_DIM)
         rep_col = config.COL_UP if p.reputation >= 50 else (config.COL_DOWN if p.reputation < 25 else config.COL_WARN)

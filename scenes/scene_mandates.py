@@ -298,7 +298,9 @@ class MandatesScene(Scene):
                 pygame.draw.rect(surf, config.COL_BG, spark)
                 pygame.draw.rect(surf, config.COL_BORDER, spark, 1)
                 hist = (p.cash_history or [])[-24:]
-                widgets.draw_series(surf, spark.inflate(-4, -4), hist)
+                widgets.draw_series(surf, spark.inflate(-4, -4), hist,
+                                    mouse_pos=pygame.mouse.get_pos(),
+                                    y_fmt=lambda v: widgets.format_money(v, cur))
                 widgets.draw_text(surf, "Net worth (tendance)", (spark.x, spark.y - 14),
                                   fonts.tiny(), config.COL_TEXT_DIM)
 

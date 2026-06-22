@@ -231,7 +231,9 @@ class GameOverScene(Scene):
         lo, hi, span = widgets.draw_chart_axes(
             surf, chart_rect, lo, hi,
             y_fmt=lambda v: widgets.format_money(v, cur), rows=2)
-        widgets.draw_series(surf, chart_rect, hist, config.COL_CYAN, baseline=False)
+        widgets.draw_series(surf, chart_rect, hist, config.COL_CYAN, baseline=False,
+                            mouse_pos=pygame.mouse.get_pos(),
+                            y_fmt=lambda v: widgets.format_money(v, cur))
 
         # repère du meilleur et du pire point de la série
         i_max = max(range(len(hist)), key=lambda i: hist[i])

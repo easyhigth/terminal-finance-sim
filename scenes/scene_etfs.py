@@ -172,6 +172,7 @@ class ETFScene(Scene, PopupMixin):
                                 + (self.msg if self.msg else ""),
                           (42, 72), fonts.small(), config.COL_TEXT_DIM)
         mp = pygame.mouse.get_pos()
+        self._tooltip = None
         x0 = 40
         top = config.content_top()
 
@@ -262,6 +263,14 @@ class ETFScene(Scene, PopupMixin):
         self.back_btn.draw(surf)
         self.explore_btn.draw(surf)
         self.popups_draw(surf)
+        if self._tooltip:
+            widgets.draw_tooltip(surf, *self._tooltip)
+
+    def _truncated_hover(self, text, font, max_width, rect, mp):
+        fitted = widgets.fit_text(text, font, max_width)
+        if fitted != text and rect.collidepoint(mp):
+            self._tooltip = (text, mp)
+        return fitted
 
     def _draw_row(self, surf, q, y, p, mp):
         cols = self.cols
@@ -275,10 +284,12 @@ class ETFScene(Scene, PopupMixin):
         widgets.draw_text(surf, widgets.fit_text(q["name"], fonts.small(bold=True), 225),
                           (cols["name"], y), fonts.small(bold=True), ncol)
         widgets.draw_text(surf, q["id"], (cols["tk"], y), fonts.tiny(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, widgets.fit_text(q["category_label"], fonts.tiny(), 110),
-                          (cols["cat"], y + 1), fonts.tiny(), config.COL_PRESTIGE)
-        widgets.draw_text(surf, widgets.fit_text(q["exposure"], fonts.tiny(), 230),
-                          (cols["expo"], y + 1), fonts.tiny(), config.COL_TEXT_DIM)
+        cat_rect = pygame.Rect(cols["cat"], y + 1, 110, ROW_H - 4)
+        cat_label = self._truncated_hover(q["category_label"], fonts.tiny(), 110, cat_rect, mp)
+        widgets.draw_text(surf, cat_label, (cols["cat"], y + 1), fonts.tiny(), config.COL_PRESTIGE)
+        expo_rect = pygame.Rect(cols["expo"], y + 1, 230, ROW_H - 4)
+        expo_label = self._truncated_hover(q["exposure"], fonts.tiny(), 230, expo_rect, mp)
+        widgets.draw_text(surf, expo_label, (cols["expo"], y + 1), fonts.tiny(), config.COL_TEXT_DIM)
         rcol = (config.COL_UP if q["risk"] <= 2 else config.COL_WARN if q["risk"] == 3 else config.COL_DOWN)
         widgets.draw_text(surf, "●" * q["risk"], (cols["risk"], y), fonts.tiny(bold=True), rcol)
         widgets.draw_text(surf, f"{q['price']:,.1f}".replace(",", " "), (cols["nav"], y),

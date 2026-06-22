@@ -164,6 +164,7 @@ class BondsScene(Scene, PopupMixin):
         sov = sorted([q for q in quotes if q["kind"] == "Souverain"], key=lambda q: (q["region"], q["years"]))
         corp = sorted([q for q in quotes if q["kind"] == "Corporate"], key=lambda q: (q["region"], q["name"]))
         mp = pygame.mouse.get_pos()
+        self._tooltip = None
         y = list_top - self.scroll
         y = self._draw_group(surf, "SOUVERAINS", sov, y, p, list_area, mp)
         y = self._draw_group(surf, "CORPORATE", corp, y, p, list_area, mp)
@@ -183,6 +184,8 @@ class BondsScene(Scene, PopupMixin):
         self.back_btn.draw(surf)
         self.gov_btn.draw(surf)
         self.popups_draw(surf)
+        if self._tooltip:
+            widgets.draw_tooltip(surf, *self._tooltip)
 
     def _draw_group(self, surf, title, quotes, y, p, list_area, mp):
         cols = self.cols
@@ -203,6 +206,10 @@ class BondsScene(Scene, PopupMixin):
                 widgets.draw_text(surf, "Souv." if q["kind"] == "Souverain" else "Corp.",
                                   (cols["type"], y), fonts.tiny(bold=True), tcol)
                 issuer = widgets.fit_text(q["issuer"], fonts.tiny(), 200)
+                if issuer != q["issuer"]:
+                    issuer_rect = pygame.Rect(cols["issuer"], y + 1, 200, ROW_H - 4)
+                    if issuer_rect.collidepoint(mp):
+                        self._tooltip = (q["issuer"], mp)
                 widgets.draw_text(surf, issuer, (cols["issuer"], y + 1), fonts.tiny(), config.COL_TEXT_DIM)
                 rc = (config.COL_UP if q["rating"] in ("AAA", "AA", "A") else
                       config.COL_WARN if q["rating"] == "BBB" else config.COL_DOWN)

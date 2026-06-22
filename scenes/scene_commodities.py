@@ -180,6 +180,7 @@ class CommoditiesScene(Scene, PopupMixin):
             all_q = [r for r in all_q if q in f"{r['name']} {r['id']} {r['category']}".lower()]
         cats = [self.cat_filter] if self.cat_filter else CATEGORY_ORDER
         mp = pygame.mouse.get_pos()
+        self._tooltip = None
         y = list_top - self.scroll
         for cat in cats:
             q_cat = [q for q in all_q if q["category"] == cat]
@@ -206,6 +207,8 @@ class CommoditiesScene(Scene, PopupMixin):
                           config.COL_UP if hv else config.COL_TEXT_DIM)
         self.back_btn.draw(surf)
         self.popups_draw(surf)
+        if self._tooltip:
+            widgets.draw_tooltip(surf, *self._tooltip)
 
     def _draw_group(self, surf, title, quotes, y, p, list_area, cols, cur, mp):
         widgets.draw_text(surf, f"— {title} ({len(quotes)})", (cols[0][1], y),
@@ -221,7 +224,10 @@ class CommoditiesScene(Scene, PopupMixin):
                 held = pos["qty"] if pos else 0
                 name_w = min(260, fonts.small(bold=True).size(q["name"])[0])
                 self.name_rects[q["id"]] = pygame.Rect(cols[0][1] - 2, y - 2, name_w + 4, ROW_H - 4)
-                widgets.draw_text(surf, widgets.fit_text(q["name"], fonts.small(bold=True), 260),
+                fitted_name = widgets.fit_text(q["name"], fonts.small(bold=True), 260)
+                if fitted_name != q["name"] and self.name_rects[q["id"]].collidepoint(mp):
+                    self._tooltip = (q["name"], mp)
+                widgets.draw_text(surf, fitted_name,
                                   (cols[0][1], y), fonts.small(bold=True), config.COL_TEXT)
                 widgets.draw_text(surf, f"{q['spot']:,.2f}".replace(",", " "), (cols[1][1], y), fonts.small(), config.COL_WHITE)
                 widgets.draw_text(surf, f"{q['front']:,.2f}".replace(",", " "), (cols[2][1], y), fonts.small(bold=True), config.COL_WHITE)

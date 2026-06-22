@@ -61,7 +61,10 @@ class BookScene(Scene, PopupMixin):
         self._sell_btn = None
         self.msg = ""
         self._t = 0.0
-        self._key_suggest_rects = []   # (Rect, ticker) — suggestions sous le champ d'actif
+        self._key_suggest_rects = []   # (Rect, ticker, nom) — suggestions sous le champ d'actif
+        self._suggest_list_rect = None
+        self.suggest_scroll = 0
+        self._suggest_max_scroll = 0
         # défilement (molette) de la table de positions et du panneau secteur
         self.scroll_positions = 0
         self.scroll_sector = 0
@@ -166,24 +169,49 @@ class BookScene(Scene, PopupMixin):
             self.open_credit(label)
 
     def _draw_key_suggestions(self, surf):
-        """Menu déroulant de recherche intelligente (nom déformé → ticker) sous le
-        champ d'actif de la barre de trading rapide — uniquement pour les actions,
-        seule classe dont les ~320 noms ne se mémorisent pas facilement."""
+        """Menu déroulant de recherche intelligente (ticker OU nom déformé, partiel)
+        sous le champ d'actif de la barre de trading rapide — uniquement pour les
+        actions, seule classe dont les ~320 noms ne se mémorisent pas facilement.
+        Défilable à la molette dès que plus de lignes que la hauteur visible
+        (clic droit sur une ligne → fiche d'analyse en aperçu, sans la sélectionner)."""
         self._key_suggest_rects = []
         if self.trade_kind != "Action" or self.text_focus != "key" or not self.trade_key.strip():
+            self._suggest_list_rect = None
+            self._suggest_max_scroll = 0
             return
         box = self._key_box
-        sy = box.bottom + 2
-        for tk, nm in self.market.suggest(self.trade_key, 8):
-            rr = pygame.Rect(box.x, sy, 260, 22)
-            self._key_suggest_rects.append((rr, tk))
-            hov = rr.collidepoint(pygame.mouse.get_pos())
-            pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL, rr)
-            pygame.draw.rect(surf, config.COL_CYAN if hov else config.COL_BORDER, rr, 1)
-            widgets.draw_text(surf, tk, (rr.x + 8, rr.y + 3), fonts.small(bold=True), config.COL_AMBER)
-            widgets.draw_text(surf, widgets.fit_text(nm, fonts.tiny(), rr.w - 90),
-                              (rr.x + 80, rr.y + 4), fonts.tiny(), config.COL_TEXT_DIM)
-            sy += 22
+        results = self.market.suggest(self.trade_key, 40)
+        if not results:
+            self._suggest_list_rect = None
+            self._suggest_max_scroll = 0
+            return
+        row_h = 22
+        max_visible = 8
+        list_area = pygame.Rect(box.x, box.bottom + 2, 260, min(len(results), max_visible) * row_h)
+        self._suggest_list_rect = list_area
+        content_h = len(results) * row_h
+        self._suggest_max_scroll = max(0, content_h - list_area.h)
+        self.suggest_scroll = max(0, min(self._suggest_max_scroll, self.suggest_scroll))
+        pygame.draw.rect(surf, config.COL_PANEL, list_area)
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        mp = pygame.mouse.get_pos()
+        sy = list_area.y - self.suggest_scroll
+        for tk, nm in results:
+            if list_area.top - row_h < sy < list_area.bottom:
+                rr = pygame.Rect(box.x, sy, 260, row_h)
+                self._key_suggest_rects.append((rr, tk, nm))
+                hov = rr.collidepoint(mp)
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL, rr)
+                pygame.draw.rect(surf, config.COL_CYAN if hov else config.COL_BORDER, rr, 1)
+                widgets.draw_text(surf, tk, (rr.x + 8, rr.y + 3), fonts.small(bold=True), config.COL_AMBER)
+                widgets.draw_text(surf, widgets.fit_text(nm, fonts.tiny(), rr.w - 90),
+                                  (rr.x + 80, rr.y + 4), fonts.tiny(), config.COL_TEXT_DIM)
+            sy += row_h
+        surf.set_clip(prev_clip)
+        pygame.draw.rect(surf, config.COL_BORDER, list_area, 1)
+        widgets.draw_scrollbar(surf, list_area, list_area, self.suggest_scroll,
+                               self._suggest_max_scroll, content_h)
 
     # ----------------------------------------------------------------- events
     def handle_event(self, event):
@@ -227,6 +255,9 @@ class BookScene(Scene, PopupMixin):
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
             delta = -32 if event.button == 4 else 32
+            if self._suggest_list_rect and self._suggest_list_rect.collidepoint(event.pos):
+                self.suggest_scroll = max(0, min(self._suggest_max_scroll, self.suggest_scroll + delta))
+                return
             if self._positions_list_rect and self._positions_list_rect.collidepoint(event.pos):
                 self.scroll_positions = max(0, min(self._positions_max_scroll, self.scroll_positions + delta))
                 return
@@ -234,8 +265,18 @@ class BookScene(Scene, PopupMixin):
                 self.scroll_sector = max(0, min(self._sector_max_scroll, self.scroll_sector + delta))
                 return
 
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            for rr, tk, nm in self._key_suggest_rects:
+                if rr.collidepoint(event.pos):
+                    self.open_company(nm)
+                    return
+            for label, rect in self._name_rects.items():
+                if rect.collidepoint(event.pos):
+                    self._open_for(self._row_cls.get(label), label)
+                    return
+
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            for rr, tk in self._key_suggest_rects:
+            for rr, tk, nm in self._key_suggest_rects:
                 if rr.collidepoint(event.pos):
                     self.trade_key = tk
                     self.text_focus = "qty"
@@ -325,7 +366,7 @@ class BookScene(Scene, PopupMixin):
         pygame.draw.rect(surf, config.COL_CYAN if self.text_focus == "key" else config.COL_BORDER,
                           self._key_box, 1, border_radius=4)
         kcursor = "_" if (self.text_focus == "key" and int(self._t * 2) % 2 == 0) else ""
-        klabel = (self.trade_key + kcursor) if self.trade_key else (kcursor + "ticker/ID…")
+        klabel = (self.trade_key + kcursor) if self.trade_key else (kcursor + "ticker/nom/ID…")
         kcol2 = config.COL_TEXT if self.trade_key else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(klabel, fonts.small(), self._key_box.w - 12),
                           (self._key_box.x + 6, self._key_box.y + 4), fonts.small(), kcol2)
@@ -416,7 +457,7 @@ class BookScene(Scene, PopupMixin):
             self.scroll_positions = max(0, min(self._positions_max_scroll, self.scroll_positions))
             widgets.draw_scrollbar(surf, table, list_area, self.scroll_positions,
                                    self._positions_max_scroll, content_h)
-            widgets.draw_text(surf, "clic nom → fiche d'analyse · clic valeur/P&L (actions) → graphe",
+            widgets.draw_text(surf, "clic/clic droit nom → fiche d'analyse · clic valeur/P&L (actions) → graphe",
                               (inner.x, inner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
 
         # répartition par secteur

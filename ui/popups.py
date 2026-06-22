@@ -73,10 +73,11 @@ def _draw_series_plot(surf, rect, s, kind):
     if kind == "candles":
         widgets.draw_candles(surf, rect, s, n_candles=min(48, len(s)))
         return None
+    mp = pygame.mouse.get_pos()
     if kind == "change":
         pct = _charts.normalize(s)
         col = config.COL_UP if pct[-1] >= 0 else config.COL_DOWN
-        widgets.draw_series(surf, rect, pct, col)
+        widgets.draw_series(surf, rect, pct, col, mouse_pos=mp, y_fmt=lambda v: f"{v:+.1f}%")
         return f"variation cumulée {pct[-1]:+.1f}%"
     if kind == "vol":
         vol = [v for v in _charts.rolling_vol(s, 20) if v is not None]
@@ -84,11 +85,12 @@ def _draw_series_plot(surf, rect, s, kind):
             widgets.draw_text(surf, "Historique insuffisant.", (rect.x, rect.y),
                               fonts.tiny(), config.COL_TEXT_DIM)
             return None
-        widgets.draw_series(surf, rect, vol, config.COL_WARN, baseline=False)
+        widgets.draw_series(surf, rect, vol, config.COL_WARN, baseline=False,
+                            mouse_pos=mp, y_fmt=lambda v: f"{v:.1f}%")
         return f"vol. annualisée (20 pas) {vol[-1]:.1f}%"
     # ligne (défaut)
     col = config.COL_UP if s[-1] >= s[0] else config.COL_DOWN
-    widgets.draw_series(surf, rect, s, col)
+    widgets.draw_series(surf, rect, s, col, mouse_pos=mp, y_fmt=lambda v: f"{v:,.2f}")
     chg = (s[-1] / s[0] - 1) * 100 if s[0] else 0.0
     return f"{s[-1]:,.2f}  ({'+' if chg>=0 else ''}{chg:.1f}%)"
 

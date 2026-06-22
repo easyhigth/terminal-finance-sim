@@ -539,13 +539,15 @@ class GraphScene(Scene, PopupMixin):
         """Grille horizontale + libellés d'axe Y. Retourne (lo, hi, span)."""
         return widgets.draw_chart_axes(surf, rect, lo, hi, y_fmt, rows)
 
-    def _polyline(self, surf, rect, series, lo, span, color):
+    def _polyline(self, surf, rect, series, lo, span, color, y_fmt=None):
         n = len(series)
         if n < 2:
             return
         pts = [(rect.x + int(i / (n - 1) * rect.w),
                 rect.bottom - int((v - lo) / span * rect.h)) for i, v in enumerate(series)]
         pygame.draw.aalines(surf, color, False, pts)
+        widgets.draw_chart_crosshair(surf, rect, series, lo, span, pygame.mouse.get_pos(),
+                                     y_fmt=y_fmt, color=color)
 
     def _empty(self, surf, rect, msg="Aucune donnée. Saisissez un ticker."):
         widgets.draw_text(surf, msg, (rect.x, rect.y), fonts.small(), config.COL_TEXT_DIM)
@@ -575,7 +577,7 @@ class GraphScene(Scene, PopupMixin):
             self._overlay_aligned(surf, rect, lower, lo, span, (150, 150, 160), width=1)
             self._overlay_aligned(surf, rect, upper, lo, span, (150, 150, 160), width=1)
             legend.append(("Bollinger 20·2σ", (150, 150, 160)))
-        self._polyline(surf, rect, s, lo, span, config.COL_AMBER)
+        self._polyline(surf, rect, s, lo, span, config.COL_AMBER, y_fmt=lambda v: f"{v:,.2f}")
         for ma, col in ((ma20, config.COL_CYAN), (ma50, config.COL_TEXT_DIM)):
             seg = [v for v in ma if v is not None]
             if len(seg) >= 2:
@@ -623,6 +625,8 @@ class GraphScene(Scene, PopupMixin):
             pygame.draw.line(surf, col, (rect.x, yy), (rect.right, yy), 1)
         if any(v is not None for v in vals):
             self._overlay_aligned(surf, rect, vals, lo, span, config.COL_PRESTIGE, width=2)
+            widgets.draw_chart_crosshair(surf, rect, vals, lo, span, pygame.mouse.get_pos(),
+                                         y_fmt=lambda v: f"{v:.1f}", color=config.COL_PRESTIGE)
             last = next((v for v in reversed(vals) if v is not None), None)
             if last is not None:
                 self._legend(surf, rect, [(f"RSI(14) = {last:.1f}", config.COL_PRESTIGE)])
@@ -670,7 +674,7 @@ class GraphScene(Scene, PopupMixin):
         lo, hi, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:+.0f}%")
         self._zero_line(surf, rect, lo, span)
         col = config.COL_UP if pct[-1] >= 0 else config.COL_DOWN
-        self._polyline(surf, rect, pct, lo, span, col)
+        self._polyline(surf, rect, pct, lo, span, col, y_fmt=lambda v: f"{v:+.1f}%")
 
     # ----------------------------------------------------- multi-actifs
     def _draw_compare(self, surf, rect):
@@ -685,7 +689,7 @@ class GraphScene(Scene, PopupMixin):
         legend = []
         for i, (tk, s) in enumerate(series):
             col = SERIES_COLS[i % len(SERIES_COLS)]
-            self._polyline(surf, rect, s, lo, span, col)
+            self._polyline(surf, rect, s, lo, span, col, y_fmt=lambda v: f"{v:+.1f}%")
             legend.append((f"{tk} {s[-1]:+.1f}%", col))
         self._legend(surf, rect, legend)
 
@@ -699,7 +703,7 @@ class GraphScene(Scene, PopupMixin):
         lo, hi = min(sp), max(sp)
         fmt = (lambda v: f"{v:.2f}") if self.spread_mode == "ratio" else (lambda v: f"{v:.0f}")
         lo, hi, span = self._plot_axes(surf, rect, lo, hi, fmt)
-        self._polyline(surf, rect, sp, lo, span, config.COL_PRESTIGE)
+        self._polyline(surf, rect, sp, lo, span, config.COL_PRESTIGE, y_fmt=fmt)
         op = "/" if self.spread_mode == "ratio" else "−"
         self._legend(surf, rect, [(f"{self.tickers[0]} {op} {self.tickers[1]} = {sp[-1]:.2f}",
                                    config.COL_PRESTIGE)])
@@ -714,7 +718,7 @@ class GraphScene(Scene, PopupMixin):
             return self._empty(surf, rect, "Historique insuffisant.")
         lo, hi = min(vol), max(vol)
         lo, hi, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:.0f}%")
-        self._polyline(surf, rect, vol, lo, span, config.COL_WARN)
+        self._polyline(surf, rect, vol, lo, span, config.COL_WARN, y_fmt=lambda v: f"{v:.1f}%")
         self._legend(surf, rect, [(f"Vol. annualisée (20 pas) = {vol[-1]:.1f}%", config.COL_WARN)])
 
     def _draw_beta(self, surf, rect):
@@ -804,7 +808,7 @@ class GraphScene(Scene, PopupMixin):
         legend = []
         for i, (lab, s) in enumerate(series):
             col = SERIES_COLS[i % len(SERIES_COLS)]
-            self._polyline(surf, rect, s, min(allv), span, col)
+            self._polyline(surf, rect, s, min(allv), span, col, y_fmt=lambda v: f"{v:.1f}%")
             legend.append((f"{lab} {s[-1]:.1f}%", col))
         self._legend(surf, rect, legend)
 

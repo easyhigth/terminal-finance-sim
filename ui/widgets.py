@@ -393,12 +393,16 @@ class Sparkline:
         if len(self.values) > self.maxlen:
             self.values.pop(0)
 
-    def draw(self, surf, rect, color=None, baseline=True):
-        draw_series(surf, rect, self.values, color, baseline)
+    def draw(self, surf, rect, color=None, baseline=True, mouse_pos=None, y_fmt=None):
+        draw_series(surf, rect, self.values, color, baseline, mouse_pos=mouse_pos, y_fmt=y_fmt)
 
 
-def draw_series(surf, rect, vals, color=None, baseline=True):
-    """Trace une polyligne à partir d'une liste de valeurs, dans `rect`."""
+def draw_series(surf, rect, vals, color=None, baseline=True, mouse_pos=None, y_fmt=None):
+    """Trace une polyligne à partir d'une liste de valeurs, dans `rect`.
+
+    Si `mouse_pos` est fourni et survole `rect`, affiche un curseur (ligne
+    pointillée verticale + point + étiquette de la valeur Y) à l'abscisse la
+    plus proche du curseur — cf. `draw_chart_crosshair`."""
     rect = pygame.Rect(rect)
     if not vals or len(vals) < 2:
         return
@@ -419,6 +423,8 @@ def draw_series(surf, rect, vals, color=None, baseline=True):
     if len(pts) >= 2:
         pygame.draw.aalines(surf, col, False, pts)
     pygame.draw.circle(surf, col, pts[-1], 2)
+    if mouse_pos is not None:
+        draw_chart_crosshair(surf, rect, vals, lo, span, mouse_pos, y_fmt=y_fmt, color=col)
 
 
 def _aggregate_ohlc(closes, n_candles):
@@ -633,6 +639,52 @@ def draw_chart_zero_line(surf, rect, lo, span, color=None):
         rect = pygame.Rect(rect)
         zy = rect.bottom - int((0 - lo) / span * rect.h)
         pygame.draw.line(surf, color or config.COL_TEXT_DIM, (rect.x, zy), (rect.right, zy), 1)
+
+
+def draw_chart_crosshair(surf, rect, series, lo, span, mouse_pos, x_fmt=None, y_fmt=None,
+                          color=config.COL_AMBER):
+    """Curseur de lecture pour un graphe en ligne : si `mouse_pos` survole
+    `rect`, trace une ligne pointillée verticale jusqu'au point de `series`
+    (valeurs Y, indexées 0..n-1 et réparties uniformément sur `rect.w` — même
+    mapping que `draw_series`/`_polyline`) le plus proche du curseur, avec un
+    point sur la courbe et une étiquette affichant la valeur Y (et, si
+    `x_fmt` est fourni, le libellé d'abscisse correspondant à cet index).
+    `lo`/`span` sont les bornes Y déjà utilisées pour convertir `series` en
+    pixels (cf. retour de `draw_chart_axes`), pour rester exactement aligné
+    sur la courbe tracée par l'appelant."""
+    rect = pygame.Rect(rect)
+    n = len(series)
+    if n < 2 or not rect.collidepoint(mouse_pos):
+        return
+    mx, _ = mouse_pos
+    i = round((mx - rect.x) / rect.w * (n - 1))
+    i = max(0, min(n - 1, i))
+    v = series[i]
+    if v is None:
+        return
+    px = rect.x + int(i / (n - 1) * rect.w)
+    py = rect.bottom - int((v - lo) / span * rect.h)
+    yy = rect.top
+    while yy < rect.bottom:
+        pygame.draw.line(surf, config.COL_TEXT_DIM, (px, yy), (px, min(yy + 4, rect.bottom)), 1)
+        yy += 8
+    pygame.draw.circle(surf, config.COL_WHITE, (px, py), 4)
+    pygame.draw.circle(surf, color, (px, py), 4, 1)
+    label = y_fmt(v) if y_fmt else f"{v:,.2f}"
+    if x_fmt:
+        label = f"{x_fmt(i)}   {label}"
+    font = fonts.tiny(bold=True)
+    w, h = font.size(label)
+    bx = px + 10
+    if bx + w + 10 > rect.right:
+        bx = px - w - 18
+    by = py - h - 14
+    if by < rect.top:
+        by = py + 12
+    box = pygame.Rect(bx, by, w + 10, h + 8)
+    pygame.draw.rect(surf, config.COL_PANEL_HEAD, box, border_radius=4)
+    pygame.draw.rect(surf, color, box, 1, border_radius=4)
+    draw_text(surf, label, (box.x + 5, box.y + 4), font, config.COL_TEXT)
 
 
 def draw_chart_legend(surf, rect, items):

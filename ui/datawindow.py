@@ -176,7 +176,8 @@ class DataWindow:
             vals = self.chart
             if len(vals) >= 2:
                 col = config.COL_UP if vals[-1] >= vals[0] else config.COL_DOWN
-                widgets.draw_series(surf, area, vals, col, baseline=True)
+                widgets.draw_series(surf, area, vals, col, baseline=True,
+                                    mouse_pos=pygame.mouse.get_pos(), y_fmt=lambda v: f"{v:,.0f}")
                 perf = (vals[-1] / vals[0] - 1) * 100 if vals[0] else 0.0
                 widgets.draw_text(surf, f"{vals[-1]:,.0f}", (area.x, area.bottom + 6),
                                   fonts.small(bold=True), config.COL_WHITE)

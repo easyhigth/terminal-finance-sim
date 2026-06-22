@@ -207,6 +207,13 @@ class QuantScene(Scene):
             pts = [to_px(x, y) for x, y in zip(xs, data)]
             if len(pts) > 1:
                 pygame.draw.lines(surf, col, False, pts, 2)
+        # curseur de lecture (valeur Y au survol, abscisse = sous-jacent xs)
+        plot_rect = pygame.Rect(x0, y0 - h, w, h)
+        for data, col, label in series:
+            widgets.draw_chart_crosshair(surf, plot_rect, data, ymin, ymax - ymin,
+                                         pygame.mouse.get_pos(),
+                                         x_fmt=lambda i: f"x={xs[i]:.2f}",
+                                         y_fmt=lambda v: f"{v:.2f}", color=col)
         # ligne verticale (spot)
         if vline is not None and xmin <= vline <= xmax:
             vx = x0 + (vline-xmin)/(xmax-xmin)*w

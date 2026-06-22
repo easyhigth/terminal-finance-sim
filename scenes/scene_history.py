@@ -92,7 +92,9 @@ class HistoryScene(Scene):
         lo, hi, span = widgets.draw_chart_axes(
             surf, chart_rect, lo, hi,
             y_fmt=lambda v: widgets.format_money(v, cur), rows=4)
-        widgets.draw_series(surf, chart_rect, hist, config.COL_CYAN, baseline=False)
+        widgets.draw_series(surf, chart_rect, hist, config.COL_CYAN, baseline=False,
+                            mouse_pos=pygame.mouse.get_pos(),
+                            y_fmt=lambda v: widgets.format_money(v, cur))
 
         i_max = max(range(len(hist)), key=lambda i: hist[i])
         i_min = min(range(len(hist)), key=lambda i: hist[i])

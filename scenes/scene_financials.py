@@ -325,7 +325,8 @@ class FinancialsScene(Scene):
         if len(hist) >= 2:
             plot = pygame.Rect(plot_rect.x, plot_rect.y + 4, plot_rect.w, plot_rect.h - 20)
             col = config.COL_UP if hist[-1] >= hist[0] else config.COL_DOWN
-            widgets.draw_series(surf, plot, hist, col)
+            widgets.draw_series(surf, plot, hist, col, mouse_pos=pygame.mouse.get_pos(),
+                                y_fmt=lambda v: f"{v:,.2f} {self.cur}")
             chg = (hist[-1] / hist[0] - 1) * 100 if hist[0] else 0.0
             widgets.draw_text(surf, f"{hist[-1]:,.2f} {self.cur}  ({chg:+.1f}% sur 5 ans)",
                               (plot_rect.x, plot_rect.bottom - 14), fonts.tiny(),

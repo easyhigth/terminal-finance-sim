@@ -296,7 +296,8 @@ class TerminalRenderMixin:
                                   fonts.small(bold=True), col, align="right")
                 widgets.draw_series(surf, pygame.Rect(inner.x, y + 16, inner.w, spark_h),
                                     self.market.index_history(name), col, baseline=False,
-                                    mouse_pos=mp, y_fmt=lambda v: f"{v:,.0f}")
+                                    mouse_pos=mp, y_fmt=lambda v: f"{v:,.0f}", show_pct=True,
+                                    show_extrema=False)
                 if self.zones.zone == "indices" and self.zones.inside and self.zones.item == name:
                     keynav.draw_focus_ring(surf, row, True)
             y += step
@@ -335,7 +336,8 @@ class TerminalRenderMixin:
                               (inner.x, inner.y + 62), fonts.tiny(), pcol)
         self.networth_spark.draw(surf, pygame.Rect(inner.x, inner.y + 80, inner.w, 40),
                                  mouse_pos=pygame.mouse.get_pos(),
-                                 y_fmt=lambda v: widgets.format_money(v, cur))
+                                 y_fmt=lambda v: widgets.format_money(v, cur), show_pct=True,
+                                 show_extrema=False)
         widgets.draw_text(surf, f"Réputation {p.reputation}/100", (inner.x, inner.y + 126),
                           fonts.small(), config.COL_TEXT_DIM)
         rep_col = config.COL_UP if p.reputation >= 50 else (config.COL_DOWN if p.reputation < 25 else config.COL_WARN)
@@ -387,18 +389,33 @@ class TerminalRenderMixin:
         mp = pygame.mouse.get_pos()
         list_area = pygame.Rect(inner.x, inner.y, inner.w, inner.h - 16)
         row_h = 28
+        if watch:
+            for k, label in enumerate(("30j", "7j", "1j")):
+                hx = inner.right - k * 56
+                widgets.draw_text(surf, label, (hx, inner.y), fonts.tiny(bold=True),
+                                  config.COL_TEXT_DIM, align="right")
+            list_area.y += 14
+            list_area.h -= 14
         n = max(len(watch), 20) if watch else 20
         if watch:
             companies = []
             for tk in watch[:n]:
                 mt = self.market.metrics(tk)
                 if mt:
-                    companies.append({"ticker": tk, "name": mt["name"], "mktcap": mt["mktcap"]})
+                    hist = self.market.history_of(tk, 31)
+                    var = {}
+                    for label, lookback in (("1j", 1), ("7j", 7), ("30j", 30)):
+                        if len(hist) > lookback and hist[-1 - lookback]:
+                            var[label] = (hist[-1] / hist[-1 - lookback] - 1) * 100
+                        else:
+                            var[label] = None
+                    companies.append({"ticker": tk, "name": mt["name"], "mktcap": mt["mktcap"],
+                                      "var": var})
         else:
             companies = self.market.top_companies(region=p.continent, n=n)
         prev_clip = surf.get_clip()
         surf.set_clip(list_area)
-        y = inner.y - self._topco_scroll
+        y = list_area.y - self._topco_scroll
         for c in companies:
             visible = (list_area.top - row_h) < y < list_area.bottom
             if visible:
@@ -407,14 +424,27 @@ class TerminalRenderMixin:
                 if row.collidepoint(mp):
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
                 widgets.draw_text(surf, c["ticker"], (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
-                widgets.draw_text(surf, c["name"][:16], (inner.x + 58, y), fonts.small(), config.COL_TEXT)
-                widgets.draw_text(surf, widgets.format_money(c["mktcap"] * 1e6, cur), (inner.right, y),
-                                  fonts.tiny(bold=True), config.COL_WHITE, align="right")
+                if watch:
+                    widgets.draw_text(surf, c["name"][:10], (inner.x + 58, y), fonts.small(), config.COL_TEXT)
+                    var = c["var"]
+                    for k, label in enumerate(("30j", "7j", "1j")):
+                        vx = inner.right - k * 56
+                        pct = var.get(label)
+                        if pct is None:
+                            txt, col = "—", config.COL_TEXT_DIM
+                        else:
+                            txt = f"{'+' if pct >= 0 else ''}{pct:.1f}%"
+                            col = config.COL_UP if pct >= 0 else config.COL_DOWN
+                        widgets.draw_text(surf, txt, (vx, y), fonts.tiny(bold=True), col, align="right")
+                else:
+                    widgets.draw_text(surf, c["name"][:16], (inner.x + 58, y), fonts.small(), config.COL_TEXT)
+                    widgets.draw_text(surf, widgets.format_money(c["mktcap"] * 1e6, cur), (inner.right, y),
+                                      fonts.tiny(bold=True), config.COL_WHITE, align="right")
                 if self.zones.zone == "topco" and self.zones.inside and self.zones.item == c["ticker"]:
                     keynav.draw_focus_ring(surf, row, True)
             y += row_h
         surf.set_clip(prev_clip)
-        content_h = (y + self._topco_scroll) - inner.y
+        content_h = (y + self._topco_scroll) - list_area.y
         self._topco_max_scroll = max(0, content_h - list_area.h)
         self._topco_scroll = min(self._topco_scroll, self._topco_max_scroll)
         if self._topco_max_scroll > 0:

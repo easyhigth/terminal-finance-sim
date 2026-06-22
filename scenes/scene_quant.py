@@ -214,6 +214,8 @@ class QuantScene(Scene):
                                          pygame.mouse.get_pos(),
                                          x_fmt=lambda i: f"x={xs[i]:.2f}",
                                          y_fmt=lambda v: f"{v:.2f}", color=col)
+            widgets.draw_chart_extrema(surf, plot_rect, data, ymin, ymax - ymin,
+                                       y_fmt=lambda v: f"{v:.2f}", color=col)
         # ligne verticale (spot)
         if vline is not None and xmin <= vline <= xmax:
             vx = x0 + (vline-xmin)/(xmax-xmin)*w

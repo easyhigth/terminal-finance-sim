@@ -92,6 +92,7 @@ class GraphScene(Scene, PopupMixin):
             tickers = valid
         self.tickers = [t.upper() for t in tickers][:_MAX_TICKERS]
         self.period = kwargs.get("period", 365)
+        self._cursor = widgets.ChartCursor()
         self.spread_mode = "ratio"
         self.input = ""
         self._type_rects = {}
@@ -141,6 +142,15 @@ class GraphScene(Scene, PopupMixin):
     # ------------------------------------------------------------- events
     def handle_event(self, event):
         if self.popups_handle_event(event):
+            return
+        if self._cursor.handle_event(event):
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            idx = next((i for i, (_, s) in enumerate(PERIODS) if s == self.period), 2)
+            if event.button == 4 and idx > 0:
+                self.period = PERIODS[idx - 1][1]
+            elif event.button == 5 and idx < len(PERIODS) - 1:
+                self.period = PERIODS[idx + 1][1]
             return
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
@@ -539,15 +549,21 @@ class GraphScene(Scene, PopupMixin):
         """Grille horizontale + libellés d'axe Y. Retourne (lo, hi, span)."""
         return widgets.draw_chart_axes(surf, rect, lo, hi, y_fmt, rows)
 
-    def _polyline(self, surf, rect, series, lo, span, color, y_fmt=None):
+    def _polyline(self, surf, rect, series, lo, span, color, y_fmt=None, cursor=None,
+                  show_pct=False):
         n = len(series)
         if n < 2:
             return
         pts = [(rect.x + int(i / (n - 1) * rect.w),
                 rect.bottom - int((v - lo) / span * rect.h)) for i, v in enumerate(series)]
         pygame.draw.aalines(surf, color, False, pts)
-        widgets.draw_chart_crosshair(surf, rect, series, lo, span, pygame.mouse.get_pos(),
-                                     y_fmt=y_fmt, color=color)
+        if cursor is not None:
+            cursor.draw(surf, rect, series, lo, span, mouse_pos=pygame.mouse.get_pos(),
+                       y_fmt=y_fmt, color=color, show_pct=show_pct)
+        else:
+            widgets.draw_chart_crosshair(surf, rect, series, lo, span, pygame.mouse.get_pos(),
+                                         y_fmt=y_fmt, color=color)
+            widgets.draw_chart_extrema(surf, rect, series, lo, span, y_fmt=y_fmt)
 
     def _empty(self, surf, rect, msg="Aucune donnée. Saisissez un ticker."):
         widgets.draw_text(surf, msg, (rect.x, rect.y), fonts.small(), config.COL_TEXT_DIM)
@@ -577,7 +593,8 @@ class GraphScene(Scene, PopupMixin):
             self._overlay_aligned(surf, rect, lower, lo, span, (150, 150, 160), width=1)
             self._overlay_aligned(surf, rect, upper, lo, span, (150, 150, 160), width=1)
             legend.append(("Bollinger 20·2σ", (150, 150, 160)))
-        self._polyline(surf, rect, s, lo, span, config.COL_AMBER, y_fmt=lambda v: f"{v:,.2f}")
+        self._polyline(surf, rect, s, lo, span, config.COL_AMBER, y_fmt=lambda v: f"{v:,.2f}",
+                       cursor=self._cursor, show_pct=True)
         for ma, col in ((ma20, config.COL_CYAN), (ma50, config.COL_TEXT_DIM)):
             seg = [v for v in ma if v is not None]
             if len(seg) >= 2:
@@ -627,6 +644,8 @@ class GraphScene(Scene, PopupMixin):
             self._overlay_aligned(surf, rect, vals, lo, span, config.COL_PRESTIGE, width=2)
             widgets.draw_chart_crosshair(surf, rect, vals, lo, span, pygame.mouse.get_pos(),
                                          y_fmt=lambda v: f"{v:.1f}", color=config.COL_PRESTIGE)
+            widgets.draw_chart_extrema(surf, rect, vals, lo, span, y_fmt=lambda v: f"{v:.1f}",
+                                       color=config.COL_PRESTIGE)
             last = next((v for v in reversed(vals) if v is not None), None)
             if last is not None:
                 self._legend(surf, rect, [(f"RSI(14) = {last:.1f}", config.COL_PRESTIGE)])
@@ -674,7 +693,8 @@ class GraphScene(Scene, PopupMixin):
         lo, hi, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:+.0f}%")
         self._zero_line(surf, rect, lo, span)
         col = config.COL_UP if pct[-1] >= 0 else config.COL_DOWN
-        self._polyline(surf, rect, pct, lo, span, col, y_fmt=lambda v: f"{v:+.1f}%")
+        self._polyline(surf, rect, pct, lo, span, col, y_fmt=lambda v: f"{v:+.1f}%",
+                       cursor=self._cursor)
 
     # ----------------------------------------------------- multi-actifs
     def _draw_compare(self, surf, rect):
@@ -703,7 +723,8 @@ class GraphScene(Scene, PopupMixin):
         lo, hi = min(sp), max(sp)
         fmt = (lambda v: f"{v:.2f}") if self.spread_mode == "ratio" else (lambda v: f"{v:.0f}")
         lo, hi, span = self._plot_axes(surf, rect, lo, hi, fmt)
-        self._polyline(surf, rect, sp, lo, span, config.COL_PRESTIGE, y_fmt=fmt)
+        self._polyline(surf, rect, sp, lo, span, config.COL_PRESTIGE, y_fmt=fmt,
+                       cursor=self._cursor)
         op = "/" if self.spread_mode == "ratio" else "−"
         self._legend(surf, rect, [(f"{self.tickers[0]} {op} {self.tickers[1]} = {sp[-1]:.2f}",
                                    config.COL_PRESTIGE)])
@@ -718,7 +739,8 @@ class GraphScene(Scene, PopupMixin):
             return self._empty(surf, rect, "Historique insuffisant.")
         lo, hi = min(vol), max(vol)
         lo, hi, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:.0f}%")
-        self._polyline(surf, rect, vol, lo, span, config.COL_WARN, y_fmt=lambda v: f"{v:.1f}%")
+        self._polyline(surf, rect, vol, lo, span, config.COL_WARN, y_fmt=lambda v: f"{v:.1f}%",
+                       cursor=self._cursor)
         self._legend(surf, rect, [(f"Vol. annualisée (20 pas) = {vol[-1]:.1f}%", config.COL_WARN)])
 
     def _draw_beta(self, surf, rect):

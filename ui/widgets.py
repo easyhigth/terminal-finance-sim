@@ -393,16 +393,22 @@ class Sparkline:
         if len(self.values) > self.maxlen:
             self.values.pop(0)
 
-    def draw(self, surf, rect, color=None, baseline=True, mouse_pos=None, y_fmt=None):
-        draw_series(surf, rect, self.values, color, baseline, mouse_pos=mouse_pos, y_fmt=y_fmt)
+    def draw(self, surf, rect, color=None, baseline=True, mouse_pos=None, y_fmt=None,
+             show_pct=False, show_extrema=True):
+        draw_series(surf, rect, self.values, color, baseline, mouse_pos=mouse_pos, y_fmt=y_fmt,
+                   show_pct=show_pct, show_extrema=show_extrema)
 
 
-def draw_series(surf, rect, vals, color=None, baseline=True, mouse_pos=None, y_fmt=None):
+def draw_series(surf, rect, vals, color=None, baseline=True, mouse_pos=None, y_fmt=None,
+                show_pct=False, show_extrema=True):
     """Trace une polyligne à partir d'une liste de valeurs, dans `rect`.
 
     Si `mouse_pos` est fourni et survole `rect`, affiche un curseur (ligne
-    pointillée verticale + point + étiquette de la valeur Y) à l'abscisse la
-    plus proche du curseur — cf. `draw_chart_crosshair`."""
+    pointillée verticale + point + étiquette de la valeur Y, et si `show_pct`
+    la variation en % depuis le début) à l'abscisse la plus proche du curseur
+    — cf. `draw_chart_crosshair`. Marque aussi les extrêmes de la série
+    (cf. `draw_chart_extrema`), sauf si `show_extrema=False` (l'appelant
+    annote déjà ses propres extrêmes, p. ex. record/plus bas d'une carrière)."""
     rect = pygame.Rect(rect)
     if not vals or len(vals) < 2:
         return
@@ -423,8 +429,11 @@ def draw_series(surf, rect, vals, color=None, baseline=True, mouse_pos=None, y_f
     if len(pts) >= 2:
         pygame.draw.aalines(surf, col, False, pts)
     pygame.draw.circle(surf, col, pts[-1], 2)
+    if show_extrema:
+        draw_chart_extrema(surf, rect, vals, lo, span, y_fmt=y_fmt, color=config.COL_TEXT_DIM)
     if mouse_pos is not None:
-        draw_chart_crosshair(surf, rect, vals, lo, span, mouse_pos, y_fmt=y_fmt, color=col)
+        draw_chart_crosshair(surf, rect, vals, lo, span, mouse_pos, y_fmt=y_fmt, color=col,
+                             show_pct=show_pct)
 
 
 def _aggregate_ohlc(closes, n_candles):
@@ -642,16 +651,18 @@ def draw_chart_zero_line(surf, rect, lo, span, color=None):
 
 
 def draw_chart_crosshair(surf, rect, series, lo, span, mouse_pos, x_fmt=None, y_fmt=None,
-                          color=config.COL_AMBER):
+                          color=config.COL_AMBER, show_pct=False):
     """Curseur de lecture pour un graphe en ligne : si `mouse_pos` survole
     `rect`, trace une ligne pointillée verticale jusqu'au point de `series`
     (valeurs Y, indexées 0..n-1 et réparties uniformément sur `rect.w` — même
     mapping que `draw_series`/`_polyline`) le plus proche du curseur, avec un
     point sur la courbe et une étiquette affichant la valeur Y (et, si
     `x_fmt` est fourni, le libellé d'abscisse correspondant à cet index).
-    `lo`/`span` sont les bornes Y déjà utilisées pour convertir `series` en
-    pixels (cf. retour de `draw_chart_axes`), pour rester exactement aligné
-    sur la courbe tracée par l'appelant."""
+    Si `show_pct` est vrai, ajoute la variation en % depuis le début de la
+    série affichée (utile pour situer un point intermédiaire, pas seulement
+    les deux extrémités). `lo`/`span` sont les bornes Y déjà utilisées pour
+    convertir `series` en pixels (cf. retour de `draw_chart_axes`), pour
+    rester exactement aligné sur la courbe tracée par l'appelant."""
     rect = pygame.Rect(rect)
     n = len(series)
     if n < 2 or not rect.collidepoint(mouse_pos):
@@ -671,6 +682,11 @@ def draw_chart_crosshair(surf, rect, series, lo, span, mouse_pos, x_fmt=None, y_
     pygame.draw.circle(surf, config.COL_WHITE, (px, py), 4)
     pygame.draw.circle(surf, color, (px, py), 4, 1)
     label = y_fmt(v) if y_fmt else f"{v:,.2f}"
+    if show_pct:
+        v0 = next((x for x in series if x is not None), None)
+        if v0:
+            pct = (v - v0) / v0 * 100
+            label = f"{label}  ({'+' if pct >= 0 else ''}{pct:.1f}% depuis le début)"
     if x_fmt:
         label = f"{x_fmt(i)}   {label}"
     font = fonts.tiny(bold=True)
@@ -685,6 +701,195 @@ def draw_chart_crosshair(surf, rect, series, lo, span, mouse_pos, x_fmt=None, y_
     pygame.draw.rect(surf, config.COL_PANEL_HEAD, box, border_radius=4)
     pygame.draw.rect(surf, color, box, 1, border_radius=4)
     draw_text(surf, label, (box.x + 5, box.y + 4), font, config.COL_TEXT)
+
+
+def draw_chart_extrema(surf, rect, series, lo, span, y_fmt=None, color=config.COL_TEXT_DIM):
+    """Repère le plus haut et le plus bas d'une série affichée dans `rect`
+    (même mapping que `draw_series`/`_polyline`) par un petit triangle et une
+    étiquette de valeur, pour situer les extrêmes d'un coup d'œil sans avoir
+    à survoler toute la courbe. N'affiche rien sur les graphes trop étroits
+    (sparklines) où l'étiquette surchargerait le tracé."""
+    rect = pygame.Rect(rect)
+    n = len(series)
+    if n < 3 or rect.w < 130:
+        return
+    idx_vals = [(i, v) for i, v in enumerate(series) if v is not None]
+    if len(idx_vals) < 3:
+        return
+    i_max, v_max = max(idx_vals, key=lambda t: t[1])
+    i_min, v_min = min(idx_vals, key=lambda t: t[1])
+    if i_max == i_min:
+        return
+    for i, v, up in ((i_max, v_max, True), (i_min, v_min, False)):
+        px = rect.x + int(i / (n - 1) * rect.w)
+        py = rect.bottom - int((v - lo) / span * rect.h)
+        tip = (px, py - 7) if up else (px, py + 7)
+        base = [(px - 4, py - 1 if up else py + 1), (px + 4, py - 1 if up else py + 1)]
+        pygame.draw.polygon(surf, color, [tip] + base)
+        label = y_fmt(v) if y_fmt else f"{v:,.2f}"
+        font = fonts.tiny()
+        lw, lh = font.size(label)
+        lx = max(rect.x, min(px - lw // 2, rect.right - lw))
+        ly = py - lh - 10 if up else py + 10
+        draw_text(surf, label, (lx, ly), font, color)
+
+
+_hover_sync = {"frac": None, "source": None}
+
+
+def sync_chart_hover(windows, mouse_pos):
+    """Repère, parmi une liste de fenêtres-graphes (`DataWindow` en mode
+    `chart`), celle survolée par la souris, et mémorise sa position relative
+    sur l'axe X (0..1) afin que les AUTRES fenêtres ouvertes affichent un
+    curseur fantôme au même instant — pratique pour comparer plusieurs actifs
+    d'un coup d'œil sans déplacer la souris d'une fenêtre à l'autre. À appeler
+    une fois par frame, avant de dessiner les fenêtres (cf. `PopupMixin.popups_draw`)."""
+    _hover_sync["frac"] = None
+    _hover_sync["source"] = None
+    for w in windows:
+        area = getattr(w, "_chart_area", None)
+        chart = getattr(w, "chart", None)
+        if area is None or not chart or len(chart) < 2 or getattr(w, "minimized", False):
+            continue
+        if area.collidepoint(mouse_pos):
+            n = len(chart)
+            i = max(0, min(n - 1, round((mouse_pos[0] - area.x) / area.w * (n - 1))))
+            _hover_sync["frac"] = i / (n - 1)
+            _hover_sync["source"] = id(w)
+            return
+
+
+def draw_chart_ghost(surf, rect, series, lo, span, frac, y_fmt=None, color=config.COL_TEXT_DIM):
+    """Curseur fantôme (sans interaction directe) à la position relative
+    `frac` (0..1) de l'axe X — utilisé pour répercuter le survol d'une autre
+    fenêtre-graphe ouverte, cf. `sync_chart_hover`."""
+    rect = pygame.Rect(rect)
+    n = len(series)
+    if frac is None or n < 2:
+        return
+    i = max(0, min(n - 1, round(frac * (n - 1))))
+    v = series[i]
+    if v is None:
+        return
+    px = rect.x + int(i / (n - 1) * rect.w)
+    py = rect.bottom - int((v - lo) / span * rect.h)
+    pygame.draw.line(surf, color, (px, rect.top), (px, rect.bottom), 1)
+    pygame.draw.circle(surf, color, (px, py), 3, 1)
+    label = y_fmt(v) if y_fmt else f"{v:,.2f}"
+    font = fonts.tiny()
+    w, h = font.size(label)
+    bx = max(rect.x, min(px + 6, rect.right - w - 4))
+    by = max(rect.top + 2, min(py - h - 6, rect.bottom - h - 2))
+    draw_text(surf, label, (bx, by), font, color)
+
+
+class ChartCursor:
+    """État interactif persistant pour UN graphe en ligne — à instancier une
+    fois par graphe (sur la scène, pas par frame) et réutiliser à chaque appel
+    de `draw()`. Ajoute, par-dessus le curseur de lecture (`draw_chart_crosshair`)
+    et les marqueurs d'extrêmes (`draw_chart_extrema`) :
+
+      - clic droit sur la courbe : épingle/désépingle une ligne de référence
+        horizontale au niveau cliqué, avec l'écart en % par rapport à la
+        dernière valeur affiché en continu ;
+      - clic gauche + glisser : sélectionne une plage de l'axe X et affiche
+        la variation en % et la durée (en pas) entre les deux bornes.
+
+    Usage :
+        self._cursor = widgets.ChartCursor()              # dans on_enter
+        if self._cursor.handle_event(event): return        # dans handle_event
+        self._cursor.draw(surf, rect, series, lo, span,     # dans draw, après
+                          mouse_pos=pygame.mouse.get_pos()) # avoir tracé la ligne
+
+    La géométrie (rect/lo/span/series) utilisée par `handle_event` est celle
+    mémorisée lors du DERNIER appel à `draw` (mise en page stable d'une frame
+    à l'autre, comme `DataWindow._row_rects`) : pas besoin de dupliquer le
+    calcul de mise en page de l'appelant pour traiter les clics.
+    """
+
+    def __init__(self):
+        self.pin = None
+        self._drag_from = None
+        self._drag_to = None
+        self._rect = None
+        self._series = None
+
+    def _index_at(self, mx):
+        n = len(self._series)
+        i = round((mx - self._rect.x) / self._rect.w * (n - 1))
+        return max(0, min(n - 1, i))
+
+    def handle_event(self, event):
+        if self._rect is None or not self._series or len(self._series) < 2:
+            return False
+        if event.type == pygame.MOUSEBUTTONDOWN and self._rect.collidepoint(event.pos):
+            if event.button == 3:
+                if self.pin is None:
+                    self.pin = self._series[self._index_at(event.pos[0])]
+                else:
+                    self.pin = None
+                return True
+            if event.button == 1:
+                self._drag_from = self._index_at(event.pos[0])
+                self._drag_to = self._drag_from
+                return True
+        elif event.type == pygame.MOUSEMOTION and self._drag_from is not None:
+            if self._rect.collidepoint(event.pos):
+                self._drag_to = self._index_at(event.pos[0])
+            return True
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if self._drag_from is not None and self._drag_from == self._drag_to:
+                self._drag_from = self._drag_to = None
+            return False
+        return False
+
+    def draw(self, surf, rect, series, lo, span, mouse_pos=None, x_fmt=None, y_fmt=None,
+             color=config.COL_AMBER, show_pct=False):
+        self._rect = pygame.Rect(rect)
+        self._series = series
+        if mouse_pos is not None:
+            draw_chart_crosshair(surf, rect, series, lo, span, mouse_pos,
+                                 x_fmt=x_fmt, y_fmt=y_fmt, color=color, show_pct=show_pct)
+        draw_chart_extrema(surf, rect, series, lo, span, y_fmt=y_fmt)
+        if self.pin is not None:
+            self._draw_pin(surf, rect, lo, span, y_fmt, series)
+        if (self._drag_from is not None and self._drag_to is not None
+                and self._drag_from != self._drag_to):
+            self._draw_range(surf, rect, series)
+
+    def _draw_pin(self, surf, rect, lo, span, y_fmt, series):
+        rect = pygame.Rect(rect)
+        py = max(rect.top, min(rect.bottom, rect.bottom - int((self.pin - lo) / span * rect.h)))
+        pygame.draw.line(surf, config.COL_WARN, (rect.x, py), (rect.right, py), 1)
+        last = next((v for v in reversed(series) if v is not None), None)
+        diff = (last - self.pin) / self.pin * 100 if (last is not None and self.pin) else 0.0
+        pin_label = y_fmt(self.pin) if y_fmt else f"{self.pin:,.2f}"
+        label = f"Réf. {pin_label}  ({'+' if diff >= 0 else ''}{diff:.1f}% vs actuel)"
+        font = fonts.tiny(bold=True)
+        ly = py - font.get_height() - 4 if py - font.get_height() - 4 > rect.top else py + 4
+        draw_text(surf, label, (rect.x + 4, ly), font, config.COL_WARN)
+
+    def _draw_range(self, surf, rect, series):
+        rect = pygame.Rect(rect)
+        n = len(series)
+        i0, i1 = sorted((self._drag_from, self._drag_to))
+        x0 = rect.x + int(i0 / (n - 1) * rect.w)
+        x1 = rect.x + int(i1 / (n - 1) * rect.w)
+        shade = pygame.Surface((max(1, x1 - x0), rect.h), pygame.SRCALPHA)
+        shade.fill((*config.COL_CYAN[:3], 40))
+        surf.blit(shade, (x0, rect.top))
+        v0, v1 = series[i0], series[i1]
+        if v0 is None or v1 is None or not v0:
+            return
+        pct = (v1 - v0) / v0 * 100
+        label = f"{'+' if pct >= 0 else ''}{pct:.1f}%  sur {i1 - i0} pas"
+        font = fonts.tiny(bold=True)
+        w, h = font.size(label)
+        bx = max(rect.x, min(x0, rect.right - w - 10))
+        box = pygame.Rect(bx, rect.top + 4, w + 10, h + 8)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, box, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN, box, 1, border_radius=4)
+        draw_text(surf, label, (box.x + 5, box.y + 4), font, config.COL_TEXT)
 
 
 def draw_chart_legend(surf, rect, items):

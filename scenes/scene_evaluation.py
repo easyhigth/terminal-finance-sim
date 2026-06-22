@@ -388,7 +388,8 @@ class EvaluationScene(Scene):
                 continue
             col = CHART_COLORS.get(nm, config.COL_CYAN)
             widgets.draw_series(surf, plot, s, col, baseline=False,
-                                mouse_pos=pygame.mouse.get_pos(), y_fmt=lambda v: f"{v:.0f}")
+                                mouse_pos=pygame.mouse.get_pos(), y_fmt=lambda v: f"{v:.0f}",
+                                show_pct=True)
             x0, x1 = plot.x, plot.right
             y0 = plot.bottom - int((s[0] - lo) / span * plot.h)
             y1 = plot.bottom - int((s[-1] - lo) / span * plot.h)

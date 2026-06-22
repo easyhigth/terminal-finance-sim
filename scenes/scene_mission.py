@@ -253,7 +253,8 @@ class MissionScene(Scene):
             if series:
                 widgets.draw_series(surf, pygame.Rect(inner.x, inner.y + 10, inner.w, inner.h - 40),
                                     series, CHART_COLORS.get(name, config.COL_CYAN), baseline=False,
-                                    mouse_pos=pygame.mouse.get_pos(), y_fmt=lambda v: f"{v:.0f}")
+                                    mouse_pos=pygame.mouse.get_pos(), y_fmt=lambda v: f"{v:.0f}",
+                                    show_pct=True)
         # légende
         lx = inner.x
         for name in names:

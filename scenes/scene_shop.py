@@ -350,6 +350,12 @@ class ShopScene(Scene, PopupMixin):
                                          self.scroll + (-48 if event.button == 4 else 48)))
             return
 
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            for ident, rect in self._name_rects.items():
+                if rect.collidepoint(event.pos):
+                    self._open_detail(*ident)
+                    return
+
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
                 self.search = ""

@@ -75,6 +75,11 @@ class CommoditiesScene(Scene, PopupMixin):
             if self._list_rect and self._list_rect.collidepoint(event.pos):
                 self.scroll = max(0, min(self._max_scroll,
                                          self.scroll + (-48 if event.button == 4 else 48)))
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            for cid, rect in self.name_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.open_commodity(cid)
+                    return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.search_box.handle_clear_click(event):
                 return

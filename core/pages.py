@@ -72,7 +72,10 @@ class Page:
         self.popup_rect = None
 
     def label(self):
-        return f"{self.id}·{self.scene_name.upper()}"
+        """Le libellé d'onglet suit la scène COURANTE (navigation interne
+        comprise), pas la scène d'ouverture initiale de la page."""
+        name = self.manager.current_name or self.scene_name
+        return f"{self.id}·{name.upper()}"
 
 
 class PageManager:
@@ -138,6 +141,16 @@ class PageManager:
         if sc is not None:
             sc.refresh_data()
         return page
+
+    def close_other_pages(self):
+        """Ferme tous les onglets sauf celui actif (et annule son éventuel
+        mode popup) — utilisé en fin de partie (game over) pour repartir
+        d'un état d'onglets totalement vierge à la prochaine partie."""
+        keep = self.current_page
+        keep.popup = False
+        keep.popup_rect = None
+        self.pages = [keep]
+        self.active = 0
 
     def duplicate_current(self):
         cur = self.current_page

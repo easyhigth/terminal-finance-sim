@@ -128,6 +128,8 @@ class PlayerState:
     next_screen_id: int = 1             # compteur d'identifiants de critères sauvegardés
     # ----- profil de limites de risque (core/risklimits.py) -----
     risk_limit_profile: str = "default"  # "strict" / "default" / "souple"
+    # ----- espace de travail (fenêtres flottantes du terminal) -----
+    workspace: list = field(default_factory=list)  # [{"cls","ticker"/"kind","pos":[x,y]}]
 
     @property
     def grade(self):

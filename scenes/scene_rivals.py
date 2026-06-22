@@ -86,7 +86,7 @@ class RivalsScene(Scene):
         col_right = pygame.Rect(col_left.right + 10, rect.y, rect.right - col_left.right - 10, rect.h)
 
         inner = widgets.draw_panel(surf, col_left, "Journal d'activité des rivaux", config.COL_DOWN)
-        log_events = R.recent_activity(player, limit=6)
+        log_events = R.recent_activity(player, limit=max(1, inner.h // 16))
         if not log_events:
             widgets.draw_text(surf, "Aucune activité rivale récente. Avancez le temps (ADV) pour en générer.",
                               (inner.x, inner.y + 2), fonts.tiny(), config.COL_TEXT_DIM)
@@ -102,7 +102,8 @@ class RivalsScene(Scene):
                 y += row_h
 
         inner2 = widgets.draw_panel(surf, col_right, "Coups récents", config.COL_AMBER)
-        recent = list(reversed(getattr(player, "rival_events", None) or []))[:6]
+        max_recent = max(1, inner2.h // 16)
+        recent = list(reversed(getattr(player, "rival_events", None) or []))[:max_recent]
         if not recent:
             widgets.draw_text(surf, "Rien à signaler pour l'instant.",
                               (inner2.x, inner2.y + 2), fonts.tiny(), config.COL_TEXT_DIM)

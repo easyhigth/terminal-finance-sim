@@ -30,6 +30,9 @@ class HistoryScene(Scene):
             (config.back_button_rect(200)[0] + 220,
              config.back_button_rect(200)[1], 150, 42),
             "📘 TUTO", config.COL_CYAN)
+        self.scroll_timeline = 0
+        self._timeline_max_scroll = 0
+        self._timeline_list_rect = None
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -38,6 +41,11 @@ class HistoryScene(Scene):
             self.app.scenes.go(self.return_to)
         if self.tuto_btn.handle(event):
             self.app.scenes.go("tutorials", tid="history", return_to="history")
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            if self._timeline_list_rect and self._timeline_list_rect.collidepoint(event.pos):
+                delta = -48 if event.button == 4 else 48
+                self.scroll_timeline = max(0, min(self._timeline_max_scroll,
+                                                  self.scroll_timeline + delta))
 
     def update(self, dt):
         mp = pygame.mouse.get_pos()
@@ -112,10 +120,12 @@ class HistoryScene(Scene):
 
     def _draw_timeline(self, surf, rect, p):
         inner = widgets.draw_panel(surf, rect, "Timeline des évènements", config.COL_AMBER)
-        entries = format_timeline(p.journal, limit=80)
+        entries = format_timeline(p.journal, limit=len(p.journal))
         if not entries:
             widgets.draw_text(surf, "Votre histoire s'écrira ici : promotions, deals, crises…",
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
+            self._timeline_list_rect = None
+            self._timeline_max_scroll = 0
             return
 
         # on retrouve le 'kind' d'origine (pour la couleur) en ré-associant par
@@ -125,18 +135,33 @@ class HistoryScene(Scene):
 
         line_h = 22
         rows_per_col = max(1, inner.h // line_h)
-        ncols = max(1, (len(entries) + rows_per_col - 1) // rows_per_col)
-        ncols = min(ncols, 4)
+        ncols = max(1, min(4, inner.w // 260))
+        per_page = rows_per_col * ncols
         colw = inner.w // ncols - 10
-        for i, (label, text) in enumerate(entries):
-            col = i // rows_per_col
-            if col >= ncols:
+
+        list_area = pygame.Rect(inner.x - 4, inner.y, inner.w + 8, inner.h)
+        self._timeline_list_rect = list_area
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        page_off = (self.scroll_timeline // line_h) * ncols
+        for i, (label, text) in enumerate(entries[page_off:]):
+            idx = page_off + i
+            if i >= per_page:
                 break
-            row = i % rows_per_col
+            row = i // ncols
+            col = i % ncols
             x = inner.x + col * (colw + 20)
             y = inner.y + row * line_h
-            tag = _KIND_COLORS.get(kinds[i] if i < len(kinds) else "info", config.COL_TEXT_DIM)
+            tag = _KIND_COLORS.get(kinds[idx] if idx < len(kinds) else "info", config.COL_TEXT_DIM)
             widgets.draw_text(surf, label, (x, y), fonts.tiny(bold=True), tag)
             font = fonts.tiny()
             widgets.draw_text(surf, widgets.fit_text(text, font, colw - 46),
                               (x + 46, y), font, config.COL_TEXT)
+        surf.set_clip(prev_clip)
+
+        n_pages_rows = -(-len(entries) // ncols)   # lignes nécessaires, ncols par ligne
+        content_h = n_pages_rows * line_h
+        self._timeline_max_scroll = max(0, content_h - inner.h)
+        self.scroll_timeline = max(0, min(self._timeline_max_scroll, self.scroll_timeline))
+        widgets.draw_scrollbar(surf, rect, list_area, self.scroll_timeline,
+                               self._timeline_max_scroll, content_h)

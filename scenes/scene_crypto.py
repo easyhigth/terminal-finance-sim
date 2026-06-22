@@ -61,6 +61,11 @@ class CryptoScene(Scene, PopupMixin):
                 if rect.collidepoint(event.pos):
                     self.open_crypto(cid)
                     return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            for cid, rect in self.name_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.open_crypto(cid)
+                    return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self._can_trade():
             p, m = self.app.gs.player, self.app.market
             for cid, rect in self.buy_rects.items():

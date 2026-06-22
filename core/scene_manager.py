@@ -8,10 +8,16 @@ Ctrl+K ouvre par-dessus la scène courante une palette de navigation globale
 import pygame
 
 from core import config, fuzzy
+from core.i18n import get_lang
 from ui import fonts, widgets
 
 PALETTE_W, PALETTE_H = 560, 360
 PALETTE_ROW_H = 30
+
+
+def _L(fr, en):
+    """Renvoie la version FR ou EN selon la langue courante (chrome UI)."""
+    return en if get_lang() == "en" else fr
 
 
 class Scene:
@@ -207,7 +213,55 @@ class SceneManager:
             widgets.draw_text(surf, f"… et {len(filtered)-max_rows} autre(s)",
                               (box.x+14, box.bottom-22), fonts.tiny(), config.COL_TEXT_DIM)
 
+    # touches 1/2/3 -> SAVE_SLOTS[0..2] (CTRL+chiffre = sauvegarder,
+    # CTRL+SHIFT+chiffre = charger), accessibles depuis n'importe quel écran
+    # pageable (mêmes raccourcis que SAVE/scene_saves, juste plus rapides).
+    QUICKSLOT_KEYS = {
+        pygame.K_1: 0, pygame.K_KP1: 0,
+        pygame.K_2: 1, pygame.K_KP2: 1,
+        pygame.K_3: 2, pygame.K_KP3: 2,
+    }
+
+    def _handle_quickslot(self, event):
+        idx = self.QUICKSLOT_KEYS.get(event.key)
+        if idx is None or not (event.mod & pygame.KMOD_CTRL):
+            return False
+        cur = self.current
+        if cur is not None and not getattr(cur, "pageable", True):
+            return False
+        slot = config.SAVE_SLOTS[idx]
+        if event.mod & pygame.KMOD_SHIFT:
+            self._quickslot_load(slot)
+        else:
+            self._quickslot_save(slot)
+        return True
+
+    def _quickslot_save(self, slot):
+        p = self.app.gs.player
+        if p.hardcore:
+            self.app.notify(_L("Mode hardcore : sauvegarde manuelle désactivée.",
+                               "Hardcore mode: manual save disabled."), "warn")
+            return
+        self.app.gs.save(slot)
+        self.app.notify(_L(f"Sauvegardé sur {slot.upper()}.", f"Saved to {slot.upper()}."), "good")
+
+    def _quickslot_load(self, slot):
+        from core.game_state import GameState
+        gs = GameState.load(slot)
+        if not gs:
+            self.app.notify(_L(f"Aucune sauvegarde sur {slot.upper()}.",
+                               f"No save on {slot.upper()}."), "warn")
+            return
+        self.app.gs = gs
+        self.app.ensure_market()
+        self.close_palette()
+        self.go("gameover" if gs.player.game_over else "terminal")
+        self.app.notify(_L(f"Chargé depuis {slot.upper()}.", f"Loaded from {slot.upper()}."), "good")
+
     def handle_event(self, event):
+        if event.type == pygame.KEYDOWN and event.key in self.QUICKSLOT_KEYS:
+            if self._handle_quickslot(event):
+                return
         if (event.type == pygame.KEYDOWN and event.key == pygame.K_k
                 and (event.mod & pygame.KMOD_CTRL)):
             if self.palette_open:

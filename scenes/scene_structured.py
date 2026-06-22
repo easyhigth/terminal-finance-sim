@@ -10,7 +10,7 @@ import pygame
 from core import config, unlocks
 from core import structured as S
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 LOT = S.LOT     # notionnel souscrit par clic
 FAMILY_CHIPS = [(None, "TOUTES"), ("Classique", "CLASSIQUE"),
@@ -31,6 +31,10 @@ class StructuredScene(Scene):
         self.scroll = 0
         self._max_scroll = 0
         self._list_rect = None
+        self.row_cursor = 0
+        self._row_list = []
+        self._row_rects = {}
+        self._row_offsets = {}
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
@@ -43,6 +47,30 @@ class StructuredScene(Scene):
     def _search_rect(self):
         return pygame.Rect(40, 100, 280, 24)
 
+    def _scroll_to_cursor(self):
+        if not self._list_rect or not self._row_list:
+            return
+        tid = self._row_list[self.row_cursor]
+        row_top = self._row_offsets.get(tid)
+        if row_top is None:
+            return
+        row_bottom = row_top + 90
+        if row_top < self.scroll:
+            self.scroll = row_top
+        elif row_bottom > self.scroll + self._list_rect.h:
+            self.scroll = row_bottom - self._list_rect.h
+        self.scroll = max(0, min(self._max_scroll, self.scroll))
+
+    def _activate_cursor(self):
+        if not self._row_list or not self._can_trade():
+            return
+        tid = self._row_list[self.row_cursor]
+        r = S.invest(self.app.gs.player, self.app.market, tid, LOT)
+        self.msg = ("Souscrit pour " + widgets.format_money(LOT, self._cur())
+                    if r["ok"] else f"Refusé ({r['reason']}).")
+        if r["ok"] and not self.app.gs.player.hardcore:
+            self.app.gs.save(config.AUTOSAVE_SLOT)
+
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
@@ -54,6 +82,14 @@ class StructuredScene(Scene):
             elif event.key == pygame.K_BACKSPACE:
                 self.search = self.search[:-1]
                 self.scroll = 0
+                return
+            elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
+                self.row_cursor, activate = widgets.list_key_nav(
+                    event, self.row_cursor, len(self._row_list))
+                if self._row_list:
+                    self._scroll_to_cursor()
+                if activate:
+                    self._activate_cursor()
                 return
             elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
                 self.search += event.unicode
@@ -160,11 +196,18 @@ class StructuredScene(Scene):
                      if (not self.family_filter or tpl["family"] == self.family_filter)
                      and (not q_filter or q_filter in tpl["name"].lower() or q_filter in tpl["desc"].lower())]
         templates.sort(key=lambda tpl: not tpl["featured"])
+        self._row_list = [tpl["id"] for tpl in templates]
+        self._row_offsets = {}
+        self._row_rects = {}
+        self.row_cursor = min(self.row_cursor, len(self._row_list) - 1) if self._row_list else 0
+        cursor_id = self._row_list[self.row_cursor] if self._row_list else None
         prev_clip = surf.get_clip()
         surf.set_clip(list_area)
         y = inner.y - self.scroll
         for tpl in templates:
+            row_y0 = y
             visible = (list_area.top - 100) < y < list_area.bottom
+            self._row_offsets[tpl["id"]] = row_y0 - inner.y + self.scroll
             name = ("★ " + tpl["name"]) if tpl["featured"] else tpl["name"]
             widgets.draw_text(surf, name, (inner.x, y), fonts.small(bold=True),
                               config.COL_UP if tpl["featured"] else config.COL_AMBER)
@@ -190,6 +233,10 @@ class StructuredScene(Scene):
                     widgets.draw_text(surf, "VENDRE", srect.center, fonts.tiny(bold=True),
                                       config.COL_DOWN, align="center")
             y += 40
+            if visible:
+                row_rect = pygame.Rect(inner.x - 4, row_y0 - 2, inner.w + 8, y - row_y0 - 8)
+                self._row_rects[tpl["id"]] = row_rect
+                keynav.draw_focus_ring(surf, row_rect, tpl["id"] == cursor_id)
         surf.set_clip(prev_clip)
 
         content_h = (y + self.scroll) - inner.y
@@ -217,5 +264,7 @@ class StructuredScene(Scene):
                                         f"sous-jacent {h['perf']:+.1f}% · échéance {h['years_left']:.1f} an",
                                   (pinner.x, y + 18), fonts.tiny(), pcol)
                 y += 44
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("↑↓", "naviguer"), ("ENTRÉE", "investir/vendre")])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)

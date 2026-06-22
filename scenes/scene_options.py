@@ -11,7 +11,7 @@ import pygame
 from core import config, unlocks
 from core import options as O
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 CONTRACTS_STEP = 10
 
@@ -37,6 +37,8 @@ class OptionsScene(Scene):
         self.years_rects = {}
         self.contract_minus_btn = None
         self.contract_plus_btn = None
+        self._all_rects = {}
+        self.focus = "buy"
 
     def _can(self):
         return unlocks.unlocked(self.app.gs.player, "options")
@@ -62,6 +64,38 @@ class OptionsScene(Scene):
         i = min(self.ticker_idx, len(tickers) - 1)
         return tickers[i]
 
+    def _activate_focus(self):
+        key = self.focus
+        if key is None:
+            return
+        if isinstance(key, tuple) and key[0] == "ticker":
+            self.ticker_idx = key[1]
+        elif isinstance(key, tuple) and key[0] == "type":
+            self.type_idx = key[1]
+        elif isinstance(key, tuple) and key[0] == "strike":
+            self.strike_idx = key[1]
+        elif isinstance(key, tuple) and key[0] == "years":
+            self.years_idx = key[1]
+        elif key == "contracts:minus":
+            self.contracts = max(CONTRACTS_STEP, self.contracts - CONTRACTS_STEP)
+        elif key == "contracts:plus":
+            self.contracts += CONTRACTS_STEP
+        elif key == "buy" and self.buy_btn:
+            p, m = self.app.gs.player, self.app.market
+            ticker = self._ticker()
+            if ticker is None:
+                self.msg = "Aucun titre suivi (ajoutez-en un à la watchlist)."
+                return
+            option_type = "call" if self.type_idx == 0 else "put"
+            strike_pct = O.STRIKE_CHOICES[self.strike_idx]
+            years = O.MATURITY_CHOICES[self.years_idx]
+            r = O.buy(p, m, ticker, option_type, strike_pct, years, self.contracts)
+            self.msg = (f"{self.contracts} {option_type} {ticker} achetés "
+                        f"(prime {widgets.format_money(r['premium'], self._cur())})."
+                        if r["ok"] else f"Refusé ({r['reason']}).")
+            if r["ok"] and not p.hardcore:
+                self.app.gs.save(config.AUTOSAVE_SLOT)
+
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.go(self.return_to)
@@ -74,6 +108,13 @@ class OptionsScene(Scene):
             return
         if not self._can():
             return
+        if event.type == pygame.KEYDOWN:
+            self.focus, activate = keynav.grid_nav(event, self._all_rects, self.focus)
+            if activate:
+                self._activate_focus()
+                return
+            if event.key in keynav.DIRECTIONS:
+                return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for i, rect in self.ticker_rects.items():
                 if rect.collidepoint(event.pos):
@@ -147,6 +188,7 @@ class OptionsScene(Scene):
                           fonts.small(), config.COL_TEXT)
         y += 22
         self.ticker_rects = {}
+        self._all_rects = {}
         if not tickers:
             widgets.draw_text(surf, "Aucun titre suivi — ajoutez-en via WATCH <ticker>.",
                               (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
@@ -161,6 +203,9 @@ class OptionsScene(Scene):
                 widgets.draw_text(surf, tk, rect.center, fonts.tiny(bold=True),
                                   config.COL_CYAN if sel else config.COL_TEXT, align="center")
                 self.ticker_rects[i] = rect
+                fk = ("ticker", i)
+                self._all_rects[fk] = rect
+                keynav.draw_focus_ring(surf, rect, self.focus == fk)
                 x += 76
                 if x + 76 > inner.right:
                     x = inner.x
@@ -186,6 +231,9 @@ class OptionsScene(Scene):
             widgets.draw_text(surf, label, rect.center, fonts.small(bold=True),
                               col if sel else config.COL_TEXT, align="center")
             self.type_rects[i] = rect
+            fk = ("type", i)
+            self._all_rects[fk] = rect
+            keynav.draw_focus_ring(surf, rect, self.focus == fk)
             x += 100
         y += 40
 
@@ -201,6 +249,9 @@ class OptionsScene(Scene):
             widgets.draw_text(surf, f"{pct*100:.0f}%", rect.center, fonts.small(bold=True),
                               config.COL_CYAN if sel else config.COL_TEXT, align="center")
             self.strike_rects[i] = rect
+            fk = ("strike", i)
+            self._all_rects[fk] = rect
+            keynav.draw_focus_ring(surf, rect, self.focus == fk)
             x += 100
         y += 40
 
@@ -217,6 +268,9 @@ class OptionsScene(Scene):
             widgets.draw_text(surf, label, rect.center, fonts.small(bold=True),
                               config.COL_CYAN if sel else config.COL_TEXT, align="center")
             self.years_rects[i] = rect
+            fk = ("years", i)
+            self._all_rects[fk] = rect
+            keynav.draw_focus_ring(surf, rect, self.focus == fk)
             x += 100
         y += 40
 
@@ -228,10 +282,14 @@ class OptionsScene(Scene):
         pygame.draw.rect(surf, config.COL_BORDER, self.contract_minus_btn, 1, border_radius=4)
         widgets.draw_text(surf, "-", self.contract_minus_btn.center, fonts.small(bold=True),
                           config.COL_TEXT, align="center")
+        self._all_rects["contracts:minus"] = self.contract_minus_btn
+        keynav.draw_focus_ring(surf, self.contract_minus_btn, self.focus == "contracts:minus")
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self.contract_plus_btn, border_radius=4)
         pygame.draw.rect(surf, config.COL_BORDER, self.contract_plus_btn, 1, border_radius=4)
         widgets.draw_text(surf, "+", self.contract_plus_btn.center, fonts.small(bold=True),
                           config.COL_TEXT, align="center")
+        self._all_rects["contracts:plus"] = self.contract_plus_btn
+        keynav.draw_focus_ring(surf, self.contract_plus_btn, self.focus == "contracts:plus")
         widgets.draw_text(surf, str(self.contracts), (inner.x + 60, y + 4),
                           fonts.small(bold=True), config.COL_TEXT)
         y += 40
@@ -261,6 +319,8 @@ class OptionsScene(Scene):
                 pygame.draw.rect(surf, config.COL_UP, self.buy_btn, 1, border_radius=4)
                 widgets.draw_text(surf, "ACHETER", self.buy_btn.center, fonts.small(bold=True),
                                   config.COL_UP, align="center")
+                self._all_rects["buy"] = self.buy_btn
+                keynav.draw_focus_ring(surf, self.buy_btn, self.focus == "buy")
             else:
                 self.buy_btn = None
         else:
@@ -291,5 +351,7 @@ class OptionsScene(Scene):
                                   (pinner.x, yy + 34), fonts.tiny(), config.COL_TEXT_DIM)
                 yy += 56
 
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("↑↓", "paramètres"), ("ENTRÉE", "ouvrir")])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)

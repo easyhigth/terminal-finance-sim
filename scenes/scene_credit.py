@@ -11,7 +11,7 @@ import pygame
 from core import config, unlocks
 from core import securitisation as SEC
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 LOT = SEC.LOT
 
@@ -25,6 +25,9 @@ class CreditScene(Scene):
         self._t = 0.0
         self.invest_rects = {}
         self.sell_rects = {}
+        self.row_cursor = 0
+        self._row_list = []
+        self._row_rects = {}
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
@@ -37,6 +40,15 @@ class CreditScene(Scene):
     def _search_rect(self):
         return pygame.Rect(40, 100, 280, 24)
 
+    def _activate_cursor(self):
+        if not self._row_list or not self._can_trade():
+            return
+        tid = self._row_list[self.row_cursor]
+        r = SEC.invest(self.app.gs.player, self.app.market, tid, LOT)
+        self.msg = ("Investi dans " + tid if r["ok"] else f"Refusé ({r['reason']}).")
+        if r["ok"] and not self.app.gs.player.hardcore:
+            self.app.gs.save(config.AUTOSAVE_SLOT)
+
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
@@ -47,6 +59,12 @@ class CreditScene(Scene):
                 return
             elif event.key == pygame.K_BACKSPACE:
                 self.search = self.search[:-1]
+                return
+            elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
+                self.row_cursor, activate = widgets.list_key_nav(
+                    event, self.row_cursor, len(self._row_list))
+                if activate:
+                    self._activate_cursor()
                 return
             elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
                 self.search += event.unicode
@@ -127,7 +145,14 @@ class CreditScene(Scene):
         q_filter = self.search.strip().lower()
         quotes = [q for q in SEC.all_quotes(m)
                   if not q_filter or q_filter in q["name"].lower() or q_filter in q["rating"].lower()]
+        self._row_list = [q["id"] for q in quotes]
+        self._row_rects = {}
+        self.row_cursor = min(self.row_cursor, len(self._row_list) - 1) if self._row_list else 0
+        cursor_id = self._row_list[self.row_cursor] if self._row_list else None
         for q in quotes:
+            row_rect = pygame.Rect(inner.x - 6, y - 4, inner.w + 12, 30)
+            self._row_rects[q["id"]] = row_rect
+            keynav.draw_focus_ring(surf, row_rect, q["id"] == cursor_id)
             widgets.draw_text(surf, q["name"], (cols[0][1], y), fonts.small(bold=True), config.COL_TEXT)
             widgets.draw_text(surf, f"{q['attach']*100:.0f}% – {q['detach']*100:.0f}%",
                               (cols[1][1], y), fonts.small(), config.COL_TEXT)
@@ -163,5 +188,7 @@ class CreditScene(Scene):
             sub = f"⊘ trading débloqué au grade {config.GRADES[g]}."
         widgets.draw_text(surf, sub, (inner.x, inner.bottom - 22), fonts.small(bold=True),
                           config.COL_UP if hv else config.COL_TEXT_DIM)
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("↑↓", "naviguer"), ("ENTRÉE", "investir/vendre")])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)

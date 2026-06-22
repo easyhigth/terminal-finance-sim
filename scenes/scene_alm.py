@@ -148,5 +148,7 @@ class AlmScene(Scene):
             "(asset-sensitive) ; un duration gap positif fait perdre de la valeur "
             "économique des fonds propres quand les taux montent.",
             (rinner.x, y + 6), fonts.tiny(), config.COL_TEXT_DIM, rinner.w)
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("↑↓", "choc de taux")])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)

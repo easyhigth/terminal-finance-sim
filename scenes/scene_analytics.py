@@ -156,6 +156,8 @@ class AnalyticsScene(Scene, PopupMixin):
         self._draw_holdings(surf, pygame.Rect(x1, top, lw, h), s, cur)
         self._draw_allocations(surf, pygame.Rect(x2, top, mw, h), s, cur)
         self._draw_risk_charts(surf, pygame.Rect(x3, top, rw, h), p, m, s)
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("souris", "cliquer une position")])
         self.back_btn.draw(surf)
         self.book_btn.draw(surf)
         self.stress_btn.draw(surf)

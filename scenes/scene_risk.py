@@ -187,6 +187,8 @@ class RiskScene(Scene):
         self._draw_metrics(surf)
         self._draw_stress(surf)
         self._draw_limits(surf)
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("souris", "ajuster les expositions")])
         self.back_btn.draw(surf)
         self.mode_btn.draw(surf)
         self.tuto_btn.draw(surf)

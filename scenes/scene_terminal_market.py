@@ -238,62 +238,8 @@ class TerminalMarketMixin:
                           "  Usage: COMPARE <t1> <t2> [...] [t6]  (stocks OR ETFs, up to 6)"))
             return
         terms = [a.upper() for a in args[:6]]
-        # comparaison d'ETF (paniers) si tous les termes sont des ETF
-        if all(etfs_mod.exists(t) for t in terms):
-            quotes = screener_mod.compare_etfs(self.market, terms)
-            if len(quotes) < 2:
-                self._log(_L("  Au moins un ETF est introuvable.", "  At least one ETF has no match."))
-                return
-            fields = [
-                ("NAV", "price", lambda v: f"{v:.2f}"),
-                ("Catégorie", "category_label", lambda v: str(v)),
-                ("Var 1 an", "change_1y", lambda v: f"{v:+.1f}%"),
-                ("Rendement", "yield", lambda v: f"{v*100:.1f}%"),
-                ("Frais", "expense", lambda v: f"{v*100:.2f}%"),
-                ("Bêta monde", "beta", lambda v: f"{v:+.2f}"),
-                ("Risque", "risk", lambda v: "●" * v),
-            ]
-            cols = [("Métrique", 110)] + [(q["id"], 100) for q in quotes]
-            rows = [tuple([lbl] + [fmt(q[key]) for q in quotes]) for lbl, key, fmt in fields]
-            self._open_window("COMPARER " + " / ".join(q["id"] for q in quotes), cols, rows)
-            return
-        tickers = [self.market.resolve(t) or t for t in terms]
-        metrics = screener_mod.compare_stocks(self.market, tickers)
-        if len(metrics) < 2:
-            self._log(_L("  Au moins un terme est introuvable.", "  At least one term has no match."))
-            return
-        def fmt(v, f):
-            return f(v) if v is not None else "n.m."
-        for m in metrics:
-            hist = self.market.history_of(m["ticker"], 31)
-            for label, lookback in (("var_1j", 1), ("var_7j", 7), ("var_30j", 30)):
-                if len(hist) > lookback and hist[-1 - lookback]:
-                    m[label] = (hist[-1] / hist[-1 - lookback] - 1) * 100
-                else:
-                    m[label] = None
-        def vcol(v):
-            return (config.COL_UP if v >= 0 else config.COL_DOWN) if v is not None else config.COL_TEXT_DIM
-        fields = [
-            ("Prix", "price", lambda v: f"{v:.2f}"),
-            ("Capi(M)", "mktcap", lambda v: f"{v:,.0f}"),
-            ("P/E", "pe", lambda v: f"{v:.1f}"),
-            ("EV/EBITDA", "ev_ebitda", lambda v: f"{v:.1f}"),
-            ("Marge nette", "net_margin", lambda v: f"{v*100:.0f}%"),
-            ("Bêta", "beta", lambda v: f"{v:.2f}"),
-            ("Var 1j", "var_1j", lambda v: f"{v:+.1f}%"),
-            ("Var 7j", "var_7j", lambda v: f"{v:+.1f}%"),
-            ("Var 30j", "var_30j", lambda v: f"{v:+.1f}%"),
-        ]
-        cols = [("Métrique", 110)] + [(m["ticker"], 90) for m in metrics]
-        rows = []
-        for lbl, key, f in fields:
-            cells = [lbl]
-            for m in metrics:
-                v = m[key]
-                txt = fmt(v, f)
-                cells.append((txt, vcol(v)) if key.startswith("var_") else txt)
-            rows.append(tuple(cells))
-        self._open_window("COMPARER " + " / ".join(m["ticker"] for m in metrics), cols, rows)
+        self._log(_L("  Comparateur ouvert.", "  Compare screen opened."))
+        self.app.scenes.go("compare", tickers=terms, return_to="terminal")
 
     def _cmd_sector(self, name):
         if not name:

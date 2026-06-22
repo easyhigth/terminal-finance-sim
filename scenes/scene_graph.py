@@ -351,6 +351,8 @@ class GraphScene(Scene, PopupMixin):
             widgets.draw_panel(surf, rsi_canvas, None)
             self._draw_rsi_panel(surf, rsi_canvas.inflate(-24, -16))
 
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("PAGE PRÉC/SUIV", "défiler"), ("ESC", "retour")])
         self.back_btn.draw(surf)
         if self.kind == "spread":
             self.mode_btn.draw(surf)

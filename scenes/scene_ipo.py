@@ -10,7 +10,7 @@ import pygame
 from core import config, unlocks
 from core import ipo as IPO
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 DEFAULT_AMOUNT = 50_000.0
 
@@ -28,6 +28,8 @@ class IPOScene(Scene):
         self._subscribe_rects = {}
         self._decline_rects = {}
         self._amount_rect = None
+        self._all_rects = {}
+        self.focus = None
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
@@ -45,6 +47,32 @@ class IPOScene(Scene):
             return float(self.amount_str)
         except ValueError:
             return 0.0
+
+    def _activate_focus(self):
+        key = self.focus
+        if key is None or not isinstance(key, tuple):
+            return
+        p = self.app.gs.player
+        market = self.app.ensure_market()
+        if key[0] == "sub":
+            amount = self._amount()
+            if amount <= 0:
+                self.msg = "Montant invalide."
+                return
+            res = IPO.subscribe(p, key[1], amount, market)
+            if res["ok"]:
+                cur = self._cur()
+                self.msg = (f"Souscrit : {widgets.format_money(res['allocated_cash'], cur)} alloués "
+                            f"({res['shares']:.0f} actions {res['offer']['ticker']}), "
+                            f"remboursé {widgets.format_money(res['refund'], cur)}.")
+                if not p.hardcore:
+                    self.app.gs.save(config.AUTOSAVE_SLOT)
+            else:
+                reasons = {"cash": "trésorerie insuffisante.", "offer": "offre introuvable.",
+                           "amount": "montant invalide."}
+                self.msg = f"Refusé ({reasons.get(res['reason'], res['reason'])})."
+        elif key[0] == "decline":
+            IPO.decline(p, key[1])
 
     # ------------------------------------------------------------- events
     def handle_event(self, event):
@@ -73,6 +101,13 @@ class IPOScene(Scene):
             return
         if not self._can():
             return
+        if event.type == pygame.KEYDOWN and not self.amount_focus:
+            self.focus, activate = keynav.grid_nav(event, self._all_rects, self.focus)
+            if activate:
+                self._activate_focus()
+                return
+            if event.key in keynav.DIRECTIONS:
+                return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
             if self._list_rect and self._list_rect.collidepoint(event.pos):
                 self.scroll = max(0, min(self._max_scroll,
@@ -136,6 +171,7 @@ class IPOScene(Scene):
         cur = self._cur()
         self._subscribe_rects = {}
         self._decline_rects = {}
+        self._all_rects = {}
 
         # ---- montant à souscrire ----
         amt_y = 104
@@ -185,6 +221,11 @@ class IPOScene(Scene):
                 widgets.draw_text(surf, "DÉCLINER", dec.center, fonts.tiny(bold=True), config.COL_DOWN, align="center")
                 self._subscribe_rects[o["id"]] = sub
                 self._decline_rects[o["id"]] = dec
+                sub_fk, dec_fk = ("sub", o["id"]), ("decline", o["id"])
+                self._all_rects[sub_fk] = sub
+                self._all_rects[dec_fk] = dec
+                keynav.draw_focus_ring(surf, sub, self.focus == sub_fk)
+                keynav.draw_focus_ring(surf, dec, self.focus == dec_fk)
                 y += 70
 
         # ---- positions IPO en cours ----
@@ -226,5 +267,7 @@ class IPOScene(Scene):
         self.scroll = min(self.scroll, self._max_scroll)
         widgets.draw_scrollbar(surf, pos_panel, list_area, self.scroll, self._max_scroll, content_h)
 
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("↑↓", "naviguer"), ("ENTRÉE", "souscrire")])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)

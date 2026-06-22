@@ -35,6 +35,8 @@ class GovernmentsScene(Scene):
         codes = G.all_codes()
         self.sel = focus if (focus in codes) else codes[0]
         self.row_rects = {}
+        self._code_order = []
+        self._row_offsets = {}
         self.list_scroll = 0
         self._list_max = 0
         self.detail_scroll = 0
@@ -49,6 +51,19 @@ class GovernmentsScene(Scene):
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.go(self.return_to)
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_UP, pygame.K_DOWN) and self._code_order:
+            idx = self._code_order.index(self.sel) if self.sel in self._code_order else 0
+            idx = (idx + (1 if event.key == pygame.K_DOWN else -1)) % len(self._code_order)
+            self.sel = self._code_order[idx]
+            self.detail_scroll = 0
+            off = self._row_offsets.get(self.sel)
+            if off is not None and self._list_rect:
+                if off < self.list_scroll:
+                    self.list_scroll = off
+                elif off + 24 > self.list_scroll + self._list_rect.h:
+                    self.list_scroll = off + 24 - self._list_rect.h
+                self.list_scroll = max(0, min(self._list_max, self.list_scroll))
+            return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
         if self.bonds_btn.handle(event):
@@ -84,13 +99,17 @@ class GovernmentsScene(Scene):
         ph = config.footer_y() - 8 - 100
         self._draw_list(surf, pygame.Rect(40, 100, 320, ph), lang)
         self._draw_detail(surf, pygame.Rect(380, 100, config.SCREEN_WIDTH - 420, ph), lang)
+        hints = [("↑↓", "country")] if lang == "en" else [("↑↓", "pays")]
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14), hints)
         self.back_btn.draw(surf)
         self.bonds_btn.draw(surf)
 
     def _draw_list(self, surf, panel, lang):
         inner = widgets.draw_panel(surf, panel, "Pays", config.COL_CYAN)
-        self._list_rect = panel
+        self._list_rect = inner
         self.row_rects = {}
+        self._code_order = []
+        self._row_offsets = {}
         prev_clip = surf.get_clip()
         surf.set_clip(inner)
         y = inner.y - self.list_scroll
@@ -104,6 +123,8 @@ class GovernmentsScene(Scene):
             for g in govs:
                 rect = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 24)
                 self.row_rects[g["code"]] = rect
+                self._code_order.append(g["code"])
+                self._row_offsets[g["code"]] = y - inner.y + self.list_scroll
                 sel = (g["code"] == self.sel)
                 if sel:
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect)

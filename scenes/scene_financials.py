@@ -68,6 +68,10 @@ class FinancialsScene(Scene):
                                             "→ TABLEUR (CR)", config.COL_UP)
         self.sheet_bal_btn = widgets.Button((820, config.SCREEN_HEIGHT - 70, 200, 46),
                                             "→ TABLEUR (BILAN)", config.COL_UP)
+        self.buy_btn = widgets.Button((1030, config.SCREEN_HEIGHT - 70, 100, 46),
+                                      "ACHAT", config.COL_UP)
+        self.sell_btn = widgets.Button((1140, config.SCREEN_HEIGHT - 70, 100, 46),
+                                       "VENTE", config.COL_DOWN)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -83,6 +87,12 @@ class FinancialsScene(Scene):
                 self._open_spreadsheet("income")
             if self.sheet_bal_btn.handle(event):
                 self._open_spreadsheet("balance")
+            if self.buy_btn.handle(event):
+                self.app.pending_input = f"BUY {self.ticker} "
+                self.app.scenes.go("terminal")
+            if self.sell_btn.handle(event):
+                self.app.pending_input = f"SELL {self.ticker} ALL"
+                self.app.scenes.go("terminal")
 
     def _open_spreadsheet(self, which):
         years = [b["year"] for b in self.block]
@@ -112,6 +122,8 @@ class FinancialsScene(Scene):
         self.graph_btn.update(mp, dt)
         self.sheet_inc_btn.update(mp, dt)
         self.sheet_bal_btn.update(mp, dt)
+        self.buy_btn.update(mp, dt)
+        self.sell_btn.update(mp, dt)
 
     # ------------------------------------------------------------- draw
     def _draw_table(self, surf, rect, title, rows_by_year, accent):
@@ -199,6 +211,8 @@ class FinancialsScene(Scene):
         self.graph_btn.draw(surf)
         self.sheet_inc_btn.draw(surf)
         self.sheet_bal_btn.draw(surf)
+        self.buy_btn.draw(surf)
+        self.sell_btn.draw(surf)
 
     def _draw_overview(self, surf, rect):
         """Trois panneaux : (1) statistiques clés, (2) résultats/guidance +

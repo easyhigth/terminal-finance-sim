@@ -25,6 +25,7 @@ from scenes.scene_cert import CertScene
 from scenes.scene_commands import CommandsScene
 from scenes.scene_commodities import CommoditiesScene
 from scenes.scene_company import CompanyScene
+from scenes.scene_compare import CompareScene
 from scenes.scene_continent import ContinentScene
 from scenes.scene_credit import CreditScene
 from scenes.scene_crypto import CryptoScene
@@ -108,6 +109,7 @@ def build_scene_manager(app):
     m.register("saves", SavesScene(app))
     m.register("gameover", GameOverScene(app))
     m.register("company", CompanyScene(app))
+    m.register("compare", CompareScene(app))
     m.register("commands", CommandsScene(app))
     m.register("mission", MissionScene(app))
     m.register("career", CareerScene(app))

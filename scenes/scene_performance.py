@@ -73,6 +73,8 @@ class PerformanceScene(Scene):
         self._draw_bucket(surf, pygame.Rect(x2, top, colw, half_h), cur,
                           "Par style (Croissance / Valeur)", attribution.style_attribution(p, m))
         self._draw_selection_timing(surf, pygame.Rect(x2, top + half_h + M, colw, half_h), cur, p, m)
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("ESC", "retour")])
         self.back_btn.draw(surf)
 
     def _draw_bucket(self, surf, rect, cur, title, data):

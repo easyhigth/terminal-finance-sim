@@ -31,6 +31,7 @@ SECTIONS = [
         ("IPO", "ipo", {}),
     ]),
     ("Analyse & outils", [
+        ("Comparateur", "compare", {}),
         ("Graphes", "graph", {"kind": "line"}),
         ("Tableau de bord", "dashboard", {}),
         ("Analyse portefeuille", "analytics", {}),

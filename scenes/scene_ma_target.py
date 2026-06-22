@@ -47,11 +47,13 @@ class MATargetScene(Scene):
         self._msg = ""
         self._msg_col = config.COL_TEXT_DIM
         self._refresh()
-        self.back_btn = widgets.Button(config.back_button_rect(160),
+        back_rect = config.back_button_rect(160)
+        btn_y, btn_h = back_rect[1], back_rect[3]
+        self.back_btn = widgets.Button(back_rect,
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
-        self.sheet_inc_btn = widgets.Button((210, config.SCREEN_HEIGHT - 70, 200, 46),
+        self.sheet_inc_btn = widgets.Button((210, btn_y, 200, btn_h),
                                             "→ TABLEUR (CR)", config.COL_UP)
-        self.sheet_bal_btn = widgets.Button((420, config.SCREEN_HEIGHT - 70, 200, 46),
+        self.sheet_bal_btn = widgets.Button((420, btn_y, 200, btn_h),
                                             "→ TABLEUR (BILAN)", config.COL_UP)
 
     def _refresh(self):
@@ -188,17 +190,17 @@ class MATargetScene(Scene):
         accent = config.COL_UP if self.owned else config.COL_AMBER
         widgets.draw_text(surf, name, (40, 22), fonts.title(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, f"{self.ticker} · {self.data['sector']} · {self.data['region']} · {status}",
-                          (40, 64), fonts.small(), config.COL_TEXT_DIM)
+                          (40, 78), fonts.small(), config.COL_TEXT_DIM)
 
         if not self._can_ma():
             g = unlocks.effective_required_grade(self.app.gs.player, "ma")
             widgets.draw_text(surf, f"⊘ M&A débloqué au grade {config.GRADES[g]}.",
-                              (40, 92), fonts.small(), config.COL_DOWN)
+                              (40, 104), fonts.small(), config.COL_DOWN)
             self.back_btn.draw(surf)
             return
 
         self._tab_rects = {}
-        tx, ty = 40, 92
+        tx, ty = 40, 104
         for tname in TABS:
             w = fonts.small(bold=True).size(tname)[0] + 28
             rect = pygame.Rect(tx, ty, w, 28)

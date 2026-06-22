@@ -587,8 +587,14 @@ class TerminalRenderMixin:
             self._console_btns[key] = rr
 
         # lignes : fenêtre [start:start+nvis] selon le défilement (0 = bas)
+        cmax_scroll = max(0, total - nvis)
         start = max(0, total - nvis - self.console_scroll)
         window = self.cmd_history[start:start + nvis]
+        list_area = pygame.Rect(rect.x, rect.y + 22, rect.w, rect.h - 22)
+        # console_scroll=0 = bas (le plus récent) -> on inverse pour que la barre
+        # soit en bas dans ce cas (et remonte avec l'historique, comme un navigateur).
+        widgets.draw_scrollbar(surf, rect, list_area, cmax_scroll - self.console_scroll,
+                               cmax_scroll, total * self.CONSOLE_LINE_H)
         y = rect.y + 22
         for line in window:
             col = config.COL_AMBER if line.startswith(">") else config.COL_AMBER_DIM

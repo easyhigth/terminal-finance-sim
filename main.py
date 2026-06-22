@@ -36,6 +36,7 @@ from scenes.scene_evaluation import EvaluationScene
 from scenes.scene_examcert import ExamCertScene
 from scenes.scene_explorer import MarketExplorerScene
 from scenes.scene_financials import FinancialsScene
+from scenes.scene_frontier_lab import FrontierLabScene
 from scenes.scene_fx import FXScene
 from scenes.scene_gameover import GameOverScene
 from scenes.scene_glossary import GlossaryScene
@@ -134,6 +135,7 @@ def build_scene_manager(app):
     m.register("graph", GraphScene(app))
     m.register("rivals", RivalsScene(app))
     m.register("analytics", AnalyticsScene(app))
+    m.register("frontier_lab", FrontierLabScene(app))
     m.register("performance", PerformanceScene(app))
     m.register("explorer", MarketExplorerScene(app))
     m.register("tutorials", TutorialsScene(app))

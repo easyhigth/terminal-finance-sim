@@ -62,6 +62,7 @@ class SceneManager:
         self.palette_open = False
         self.palette_query = ""
         self.palette_sel = 0
+        self.palette_recent = []   # [(label, scene, kw)] derniers choix (session courante)
 
     def register(self, name, scene):
         self.scenes[name] = scene
@@ -90,14 +91,40 @@ class SceneManager:
         hits = market.suggest(query, limit)
         return [(f"↗ {tk} — {name}", "company", {"ticker": tk}) for tk, name in hits]
 
+    def _palette_glossary_matches(self, query, limit=4):
+        """Suggestions de termes du glossaire correspondant à la saisie, pour
+        ouvrir directement la définition sans passer par la scène glossaire."""
+        from core.i18n import get_lang
+        from data import glossary_data
+        lang = get_lang()
+        gloss, _cats = glossary_data.localized(lang)
+        hits = fuzzy.filter_sorted(query, list(gloss.keys()), key=lambda t: t)[:limit]
+        return [(f"📖 {glossary_data.display_name(t, lang)}", "glossary", {"term": t}) for t in hits]
+
+    def _palette_lesson_matches(self, query, limit=4):
+        """Suggestions de leçons de l'Académie correspondant à la saisie."""
+        from data import lessons as L
+        hits = fuzzy.filter_sorted(query, L.LESSONS, key=lambda l: l["title"])[:limit]
+        return [(f"🎓 {l['title']}", "academy", {"lesson_id": l["id"]}) for l in hits]
+
+    def _palette_remember(self, label, scene, kw):
+        """Mémorise un choix de palette (favoris récents, session courante) :
+        plus récent en tête, sans doublon, plafonné à 5."""
+        entry = (label, scene, kw)
+        self.palette_recent = [e for e in self.palette_recent if e[:2] != (label, scene)]
+        self.palette_recent.insert(0, entry)
+        self.palette_recent = self.palette_recent[:5]
+
     def _palette_filtered(self):
         entries = self._palette_entries()
         q = self.palette_query.strip()
         if not q:
-            return entries
+            return self.palette_recent + entries if self.palette_recent else entries
         scene_hits = fuzzy.filter_sorted(q, entries, key=lambda e: e[0])
         ticker_hits = self._palette_ticker_matches(q)
-        return ticker_hits + scene_hits
+        gloss_hits = self._palette_glossary_matches(q)
+        lesson_hits = self._palette_lesson_matches(q)
+        return ticker_hits + gloss_hits + lesson_hits + scene_hits
 
     def open_palette(self):
         self.palette_open = True
@@ -119,6 +146,7 @@ class SceneManager:
             for i, (label, scene, kw) in enumerate(filtered):
                 row = pygame.Rect(box.x+10, list_y + i*PALETTE_ROW_H, box.w-20, PALETTE_ROW_H)
                 if row.collidepoint(event.pos):
+                    self._palette_remember(label, scene, kw)
                     self.close_palette()
                     self.go(scene, return_to=self.current_name or "terminal", **kw)
                     return
@@ -139,7 +167,8 @@ class SceneManager:
                 self.palette_sel = (self.palette_sel - 1) % len(filtered)
         elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
             if filtered:
-                _, scene, kw = filtered[self.palette_sel % len(filtered)]
+                label, scene, kw = filtered[self.palette_sel % len(filtered)]
+                self._palette_remember(label, scene, kw)
                 self.close_palette()
                 self.go(scene, return_to=self.current_name or "terminal", **kw)
         elif event.unicode and event.unicode.isprintable():

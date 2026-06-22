@@ -28,7 +28,8 @@ _TOPIC_COL = {
 class AcademyScene(Scene):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
-        self.sel = L.LESSONS[0]["id"]
+        lid = kwargs.get("lesson_id")
+        self.sel = lid if lid and any(l["id"] == lid for l in L.LESSONS) else L.LESSONS[0]["id"]
         self._mark_read(self.sel)
         self.row_rects = {}
         self.scroll = 0          # défilement de la liste de leçons (px)

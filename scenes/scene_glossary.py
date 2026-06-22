@@ -17,7 +17,7 @@ class GlossaryScene(Scene):
         self.return_to = kwargs.get("return_to", "terminal")
         self.category = "__all__"     # sentinelle indépendante de la langue
         self.search = ""
-        self.selected_term = None
+        self.selected_term = kwargs.get("term")
         self.scroll = 0
         self.cursor = 0  # curseur clavier dans la liste visible de termes
         self._t = 0.0

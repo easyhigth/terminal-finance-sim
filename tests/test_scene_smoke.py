@@ -71,11 +71,12 @@ def _visit(app, name):
 # directement sur la scène fautive plutôt qu'un test générique.
 _KNOWN_SCENES = [
     "menu", "continent", "runsetup", "sandbox", "terminal", "glossary", "evaluation", "portfolio",
+    "portfolio_unified",
     "ma", "ma_target", "mandates", "deals", "track", "risk", "quant",
     "spreadsheet", "saves", "gameover", "company", "commands", "mission",
     "career", "book", "inbox", "dilemma", "intro", "academy", "cert", "deal",
     "financials", "bonds", "governments", "commodities", "crypto", "etfs",
-    "news", "more", "structured", "credit", "alm", "swaps", "hedge",
+    "news", "notifications", "more", "structured", "credit", "alm", "swaps", "hedge",
     "options", "ipo", "fx", "review", "calendar", "graph", "rivals",
     "analytics", "performance", "explorer", "tutorials", "splash", "markethub", "shop",
     "examcert", "stresstest", "history", "team", "alerts", "frontier_lab",

@@ -56,9 +56,11 @@ from scenes.scene_menu import MenuScene
 from scenes.scene_mission import MissionScene
 from scenes.scene_more import MoreScene
 from scenes.scene_news import NewsScene
+from scenes.scene_notifications import NotificationsScene
 from scenes.scene_options import OptionsScene
 from scenes.scene_performance import PerformanceScene
 from scenes.scene_portfolio import PortfolioScene
+from scenes.scene_portfolio_unified import PortfolioUnifiedScene
 from scenes.scene_quant import QuantScene
 from scenes.scene_review import ReviewScene
 from scenes.scene_risk import RiskScene
@@ -94,6 +96,7 @@ def build_scene_manager(app):
     m.register("glossary", GlossaryScene(app))
     m.register("evaluation", EvaluationScene(app))
     m.register("portfolio", PortfolioScene(app))
+    m.register("portfolio_unified", PortfolioUnifiedScene(app))
     m.register("ma", MAScene(app))
     m.register("ma_target", MATargetScene(app))
     m.register("mandates", MandatesScene(app))
@@ -123,6 +126,7 @@ def build_scene_manager(app):
     m.register("dashboard", DashboardScene(app))
     m.register("etfs", ETFScene(app))
     m.register("news", NewsScene(app))
+    m.register("notifications", NotificationsScene(app))
     m.register("more", MoreScene(app))
     m.register("structured", StructuredScene(app))
     m.register("credit", CreditScene(app))

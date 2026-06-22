@@ -46,6 +46,7 @@ SECTIONS = [
     ]),
     ("Carrière & monde", [
         ("Portefeuille", "book", {}),
+        ("Portefeuille unifié (toutes classes)", "portfolio_unified", {}),
         ("Carrière", "career", {}),
         ("Mission", "mission", {}),
         ("Exam / Certif", "examcert", {}),
@@ -54,6 +55,7 @@ SECTIONS = [
         ("Rivaux", "rivals", {}),
         ("Inbox", "inbox", {}),
         ("News & événements", "news", {}),
+        ("Centre de notifications (messages + actu)", "notifications", {}),
         ("Calendrier macro", "calendar", {}),
         ("Mandats clients", "mandates", {}),
         ("Deals", "deals", {}),

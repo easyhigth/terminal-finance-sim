@@ -164,7 +164,9 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         self.worldmap.set_day_markers(news_mod.for_day(p, p.day))
         self.news = list(SAMPLE_NEWS.get(p.continent, SAMPLE_NEWS["USA"]))
         self.recent_events = []
-        self.datawins = []        # fenêtres de données déplaçables (overlay)
+        if not hasattr(self, "datawins"):
+            self.datawins = []        # fenêtres de données déplaçables (overlay)
+            self._restore_workspace()
         self.cheat_panel = None   # panneau de triche (overlay, mode test uniquement)
         self._cheat_btn_rect = None
         self.shortcuts_panel = None   # panneau des raccourcis clavier (overlay)
@@ -186,6 +188,10 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         self._topco_panel_rect = None    # zone défilable (molette)
         self._topco_scroll = 0
         self._topco_max_scroll = 0
+        self._topco_sort_rects = {}    # en-têtes de colonne triables (panneau top sociétés)
+        if not hasattr(self, "_topco_sort_key"):
+            self._topco_sort_key = "mktcap"   # préservé entre deux passages par le terminal
+            self._topco_sort_rev = True
         self._index_rects = {}    # indices cliquables (panneau indices → graphe)
         self._indices_header_rect = None  # titre du panneau (clic → MARKETHUB)
         self._indices_panel_rect = None   # zone défilable (molette)
@@ -312,6 +318,14 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             if self._topco_header_rect and self._topco_header_rect.collidepoint(event.pos):
                 self.app.scenes.go("explorer", return_to="terminal")
                 return
+            for key, rect in self._topco_sort_rects.items():
+                if rect.collidepoint(event.pos):
+                    if self._topco_sort_key == key:
+                        self._topco_sort_rev = not self._topco_sort_rev
+                    else:
+                        self._topco_sort_key = key
+                        self._topco_sort_rev = key != "ticker"
+                    return
             if self._indices_header_rect and self._indices_header_rect.collidepoint(event.pos):
                 self.app.scenes.go("markethub", return_to="terminal")
                 return
@@ -556,6 +570,41 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                                         ticker=ticker, kind=kind, pos=pos))
         if len(self.datawins) > 5:
             self.datawins.pop(0)
+
+    def _sync_workspace(self):
+        """Reflète les fenêtres flottantes persistables (fiches société, graphes)
+        dans la sauvegarde, pour les retrouver à la reprise de la partie. Les
+        fenêtres génériques (tableaux figés type TOP/COMPARE) et l'accès rapide
+        (callback non sérialisable) sont volontairement exclus."""
+        from ui.popups import CompanyPopup, ChartPopup
+        entries = []
+        for w in self.datawins:
+            if getattr(w, "closed", False):
+                continue
+            if isinstance(w, CompanyPopup):
+                entries.append({"cls": "company", "ticker": w.ticker,
+                                "pos": [w.rect.x, w.rect.y]})
+            elif isinstance(w, ChartPopup) and w.render_fn is None and w.ticker:
+                entries.append({"cls": "chart", "ticker": w.ticker, "kind": w.kind,
+                                "pos": [w.rect.x, w.rect.y]})
+        self.app.gs.player.workspace = entries
+
+    def _restore_workspace(self):
+        """Reconstruit les fenêtres flottantes sauvegardées (reprise de partie),
+        à l'unique premier on_enter de la scène (cf. garde hasattr appelante)."""
+        from ui.popups import CompanyPopup, ChartPopup
+        p = self.app.gs.player
+        for entry in getattr(p, "workspace", []) or []:
+            pos = tuple(entry.get("pos") or (160, 120))
+            ticker = entry.get("ticker")
+            if not ticker or self.market.metrics(ticker.upper()) is None:
+                continue
+            if entry.get("cls") == "company":
+                self.datawins.append(CompanyPopup(ticker, self.market, pos=pos))
+            elif entry.get("cls") == "chart":
+                kind = entry.get("kind", "line")
+                self.datawins.append(ChartPopup(f"GRAPHE — {ticker.upper()}", market=self.market,
+                                                ticker=ticker, kind=kind, pos=pos))
 
     def _log(self, *lines):
         self.cmd_history += list(lines)
@@ -946,5 +995,6 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         self.t += dt
         self.worldmap.update(dt)
         onboarding_mod.progress(self.app.gs.player, self.app)
+        self._sync_workspace()
 
     # ----------------------------------------------------------------- draw

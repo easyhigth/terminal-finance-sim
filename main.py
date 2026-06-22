@@ -28,6 +28,7 @@ from scenes.scene_company import CompanyScene
 from scenes.scene_continent import ContinentScene
 from scenes.scene_credit import CreditScene
 from scenes.scene_crypto import CryptoScene
+from scenes.scene_dashboard import DashboardScene
 from scenes.scene_deal import DealScene
 from scenes.scene_deals import DealsScene
 from scenes.scene_dilemma import DilemmaScene
@@ -119,6 +120,7 @@ def build_scene_manager(app):
     m.register("governments", GovernmentsScene(app))
     m.register("commodities", CommoditiesScene(app))
     m.register("crypto", CryptoScene(app))
+    m.register("dashboard", DashboardScene(app))
     m.register("etfs", ETFScene(app))
     m.register("news", NewsScene(app))
     m.register("more", MoreScene(app))

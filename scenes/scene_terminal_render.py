@@ -386,16 +386,30 @@ class TerminalRenderMixin:
         self._topco_panel_rect = rect
         cur = config.CONTINENTS[p.continent]["currency"]
         self._topco_rects = {}
+        self._topco_sort_rects = {}
         mp = pygame.mouse.get_pos()
         list_area = pygame.Rect(inner.x, inner.y, inner.w, inner.h - 16)
         row_h = 28
+        sort_key, sort_rev = self._topco_sort_key, self._topco_sort_rev
         if watch:
-            for k, label in enumerate(("30j", "7j", "1j")):
-                hx = inner.right - k * 56
-                widgets.draw_text(surf, label, (hx, inner.y), fonts.tiny(bold=True),
-                                  config.COL_TEXT_DIM, align="right")
-            list_area.y += 14
-            list_area.h -= 14
+            headers = [("var_30", "30j"), ("var_7", "7j"), ("var_1", "1j")]
+        else:
+            headers = [("mktcap", "Capi")]
+        for k, (key, label) in enumerate(headers):
+            hx = inner.right - k * 56
+            arrow = ("▾" if sort_rev else "▴") if sort_key == key else ""
+            txt = f"{label}{arrow}"
+            col = config.COL_CYAN if sort_key == key else config.COL_TEXT_DIM
+            tw = fonts.tiny(bold=True).size(txt)[0]
+            self._topco_sort_rects[key] = pygame.Rect(hx - tw - 4, inner.y - 2, tw + 8, 16)
+            widgets.draw_text(surf, txt, (hx, inner.y), fonts.tiny(bold=True), col, align="right")
+        name_rect = pygame.Rect(inner.x + 58, inner.y - 2, 50, 16)
+        self._topco_sort_rects["name"] = name_rect
+        if sort_key == "name":
+            widgets.draw_text(surf, "▾" if sort_rev else "▴", (name_rect.right + 2, inner.y),
+                              fonts.tiny(bold=True), config.COL_CYAN)
+        list_area.y += 14
+        list_area.h -= 14
         n = max(len(watch), 20) if watch else 20
         if watch:
             companies = []
@@ -413,6 +427,18 @@ class TerminalRenderMixin:
                                       "var": var})
         else:
             companies = self.market.top_companies(region=p.continent, n=n)
+
+        def sort_value(c):
+            if sort_key == "name":
+                return c["name"].lower()
+            if sort_key == "mktcap":
+                return c["mktcap"]
+            lookup = {"var_1": "1j", "var_7": "7j", "var_30": "30j"}
+            if sort_key in lookup:
+                v = c.get("var", {}).get(lookup[sort_key])
+                return v if v is not None else float("-inf")
+            return 0
+        companies = sorted(companies, key=sort_value, reverse=sort_rev)
         prev_clip = surf.get_clip()
         surf.set_clip(list_area)
         y = list_area.y - self._topco_scroll

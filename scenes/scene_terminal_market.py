@@ -234,10 +234,10 @@ class TerminalMarketMixin:
 
     def _cmd_compare(self, args):
         if len(args) < 2:
-            self._log(_L("  Usage : COMPARE <t1> <t2> [t3] [t4]  (actions OU ETF, jusqu'à 4)",
-                          "  Usage: COMPARE <t1> <t2> [t3] [t4]  (stocks OR ETFs, up to 4)"))
+            self._log(_L("  Usage : COMPARE <t1> <t2> [...] [t6]  (actions OU ETF, jusqu'à 6)",
+                          "  Usage: COMPARE <t1> <t2> [...] [t6]  (stocks OR ETFs, up to 6)"))
             return
-        terms = [a.upper() for a in args[:4]]
+        terms = [a.upper() for a in args[:6]]
         # comparaison d'ETF (paniers) si tous les termes sont des ETF
         if all(etfs_mod.exists(t) for t in terms):
             quotes = screener_mod.compare_etfs(self.market, terms)
@@ -264,6 +264,15 @@ class TerminalMarketMixin:
             return
         def fmt(v, f):
             return f(v) if v is not None else "n.m."
+        for m in metrics:
+            hist = self.market.history_of(m["ticker"], 31)
+            for label, lookback in (("var_1j", 1), ("var_7j", 7), ("var_30j", 30)):
+                if len(hist) > lookback and hist[-1 - lookback]:
+                    m[label] = (hist[-1] / hist[-1 - lookback] - 1) * 100
+                else:
+                    m[label] = None
+        def vcol(v):
+            return (config.COL_UP if v >= 0 else config.COL_DOWN) if v is not None else config.COL_TEXT_DIM
         fields = [
             ("Prix", "price", lambda v: f"{v:.2f}"),
             ("Capi(M)", "mktcap", lambda v: f"{v:,.0f}"),
@@ -271,9 +280,19 @@ class TerminalMarketMixin:
             ("EV/EBITDA", "ev_ebitda", lambda v: f"{v:.1f}"),
             ("Marge nette", "net_margin", lambda v: f"{v*100:.0f}%"),
             ("Bêta", "beta", lambda v: f"{v:.2f}"),
+            ("Var 1j", "var_1j", lambda v: f"{v:+.1f}%"),
+            ("Var 7j", "var_7j", lambda v: f"{v:+.1f}%"),
+            ("Var 30j", "var_30j", lambda v: f"{v:+.1f}%"),
         ]
         cols = [("Métrique", 110)] + [(m["ticker"], 90) for m in metrics]
-        rows = [tuple([lbl] + [fmt(m[key], f) for m in metrics]) for lbl, key, f in fields]
+        rows = []
+        for lbl, key, f in fields:
+            cells = [lbl]
+            for m in metrics:
+                v = m[key]
+                txt = fmt(v, f)
+                cells.append((txt, vcol(v)) if key.startswith("var_") else txt)
+            rows.append(tuple(cells))
         self._open_window("COMPARER " + " / ".join(m["ticker"] for m in metrics), cols, rows)
 
     def _cmd_sector(self, name):

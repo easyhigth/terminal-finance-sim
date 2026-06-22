@@ -80,11 +80,24 @@ class SceneManager:
         from scenes.scene_more import SECTIONS
         return [(label, scene, kw) for _, items in SECTIONS for (label, scene, kw) in items]
 
+    def _palette_ticker_matches(self, query, limit=6):
+        """Suggestions d'actifs (ticker/nom) correspondant à la saisie, pour
+        sauter directement à la fiche d'analyse d'une société sans connaître
+        son ticker — la palette devient aussi une recherche globale d'actifs."""
+        market = getattr(self.app, "market", None)
+        if market is None or not query.strip():
+            return []
+        hits = market.suggest(query, limit)
+        return [(f"↗ {tk} — {name}", "company", {"ticker": tk}) for tk, name in hits]
+
     def _palette_filtered(self):
         entries = self._palette_entries()
-        if not self.palette_query.strip():
+        q = self.palette_query.strip()
+        if not q:
             return entries
-        return fuzzy.filter_sorted(self.palette_query, entries, key=lambda e: e[0])
+        scene_hits = fuzzy.filter_sorted(q, entries, key=lambda e: e[0])
+        ticker_hits = self._palette_ticker_matches(q)
+        return ticker_hits + scene_hits
 
     def open_palette(self):
         self.palette_open = True

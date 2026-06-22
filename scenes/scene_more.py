@@ -32,6 +32,7 @@ SECTIONS = [
     ]),
     ("Analyse & outils", [
         ("Graphes", "graph", {"kind": "line"}),
+        ("Tableau de bord", "dashboard", {}),
         ("Analyse portefeuille", "analytics", {}),
         ("Performance & attribution", "performance", {}),
         ("Alertes de prix", "alerts", {}),

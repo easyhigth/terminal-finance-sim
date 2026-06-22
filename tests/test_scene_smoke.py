@@ -23,6 +23,8 @@ _SPECIAL_KWARGS = {
     "financials": lambda app: {"ticker": app.market.companies[0]["ticker"]},
     "graph": lambda app: {"tickers": [app.market.companies[0]["ticker"]]},
     "saves": lambda app: {"return_to": "menu"},
+    "compare": lambda app: {"tickers": [app.market.companies[0]["ticker"],
+                                        app.market.companies[1]["ticker"]]},
 }
 
 # Scènes qui ne dépendent pas du joueur/marché en cours (écrans hors run).
@@ -80,7 +82,7 @@ _KNOWN_SCENES = [
     "options", "ipo", "fx", "review", "calendar", "graph", "rivals",
     "analytics", "performance", "explorer", "tutorials", "splash", "markethub", "shop",
     "examcert", "stresstest", "history", "team", "alerts", "frontier_lab",
-    "dashboard",
+    "dashboard", "compare",
 ]
 
 

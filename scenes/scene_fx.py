@@ -12,7 +12,7 @@ import pygame
 from core import config, unlocks
 from core import fx as FX
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 NOTIONAL_STEP = 5000
 
@@ -38,6 +38,8 @@ class FXScene(Scene):
         self.spot_btn = None
         self.forward_btn = None
         self.close_rects = {}
+        self._all_rects = {}
+        self.focus = "spot"
 
     def _can(self):
         return unlocks.unlocked(self.app.gs.player, "fx")
@@ -51,6 +53,48 @@ class FXScene(Scene):
     def _direction(self):
         return "long" if self.dir_idx == 0 else "short"
 
+    def _activate_focus(self):
+        key = self.focus
+        if key is None:
+            return
+        if isinstance(key, tuple) and key[0] == "pair":
+            self.pair_idx = key[1]
+        elif isinstance(key, tuple) and key[0] == "dir":
+            self.dir_idx = key[1]
+        elif isinstance(key, tuple) and key[0] == "tenor":
+            self.tenor_idx = key[1]
+        elif key == "notional:minus":
+            self.notional = max(NOTIONAL_STEP, self.notional - NOTIONAL_STEP)
+        elif key == "notional:plus":
+            self.notional += NOTIONAL_STEP
+        elif key == "spot":
+            p, m = self.app.gs.player, self.app.market
+            pair = self._pair()
+            direction = self._direction()
+            r = FX.open_spot(p, m, pair, direction, self.notional)
+            self.msg = (f"Position spot {direction.upper()} {pair} ouverte "
+                        f"(notionnel {widgets.format_money(self.notional, self._cur())})."
+                        if r["ok"] else f"Refusé ({r['reason']}).")
+            if r["ok"] and not p.hardcore:
+                self.app.gs.save(config.AUTOSAVE_SLOT)
+        elif key == "forward" and self.forward_btn:
+            p, m = self.app.gs.player, self.app.market
+            pair = self._pair()
+            direction = self._direction()
+            tenor = FX.FORWARD_TENORS[self.tenor_idx % len(FX.FORWARD_TENORS)]
+            r = FX.open_forward(p, m, pair, direction, self.notional, tenor)
+            self.msg = (f"Forward {direction.upper()} {pair} {tenor}m verrouillé."
+                        if r["ok"] else f"Refusé ({r['reason']}).")
+            if r["ok"] and not p.hardcore:
+                self.app.gs.save(config.AUTOSAVE_SLOT)
+        elif isinstance(key, tuple) and key[0] == "close":
+            p, m = self.app.gs.player, self.app.market
+            r = FX.close_spot(p, m, key[1])
+            if r["ok"]:
+                self.msg = f"Position fermée, P&L {widgets.format_money(r['pnl'], self._cur())}."
+                if not p.hardcore:
+                    self.app.gs.save(config.AUTOSAVE_SLOT)
+
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.go(self.return_to)
@@ -63,6 +107,13 @@ class FXScene(Scene):
             return
         if not self._can():
             return
+        if event.type == pygame.KEYDOWN:
+            self.focus, activate = keynav.grid_nav(event, self._all_rects, self.focus)
+            if activate:
+                self._activate_focus()
+                return
+            if event.key in keynav.DIRECTIONS:
+                return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for i, rect in self.pair_rects.items():
                 if rect.collidepoint(event.pos):
@@ -143,6 +194,7 @@ class FXScene(Scene):
         widgets.draw_text(surf, "Paire", (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 22
         self.pair_rects = {}
+        self._all_rects = {}
         x = inner.x
         for i, pair in enumerate(FX.PAIRS):
             rect = pygame.Rect(x, y, 96, 26)
@@ -152,6 +204,9 @@ class FXScene(Scene):
             widgets.draw_text(surf, pair, rect.center, fonts.tiny(bold=True),
                               config.COL_CYAN if sel else config.COL_TEXT, align="center")
             self.pair_rects[i] = rect
+            fk = ("pair", i)
+            self._all_rects[fk] = rect
+            keynav.draw_focus_ring(surf, rect, self.focus == fk)
             x += 102
             if x + 102 > inner.right:
                 x = inner.x
@@ -172,6 +227,9 @@ class FXScene(Scene):
             widgets.draw_text(surf, label, rect.center, fonts.small(bold=True),
                               col if sel else config.COL_TEXT, align="center")
             self.dir_rects[i] = rect
+            fk = ("dir", i)
+            self._all_rects[fk] = rect
+            keynav.draw_focus_ring(surf, rect, self.focus == fk)
             x += 100
         y += 40
 
@@ -183,10 +241,14 @@ class FXScene(Scene):
         pygame.draw.rect(surf, config.COL_BORDER, self.notional_minus_btn, 1, border_radius=4)
         widgets.draw_text(surf, "-", self.notional_minus_btn.center, fonts.small(bold=True),
                           config.COL_TEXT, align="center")
+        self._all_rects["notional:minus"] = self.notional_minus_btn
+        keynav.draw_focus_ring(surf, self.notional_minus_btn, self.focus == "notional:minus")
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self.notional_plus_btn, border_radius=4)
         pygame.draw.rect(surf, config.COL_BORDER, self.notional_plus_btn, 1, border_radius=4)
         widgets.draw_text(surf, "+", self.notional_plus_btn.center, fonts.small(bold=True),
                           config.COL_TEXT, align="center")
+        self._all_rects["notional:plus"] = self.notional_plus_btn
+        keynav.draw_focus_ring(surf, self.notional_plus_btn, self.focus == "notional:plus")
         widgets.draw_text(surf, widgets.format_money(self.notional, cur), (inner.x + 42, y + 4),
                           fonts.small(bold=True), config.COL_TEXT)
         y += 40
@@ -202,6 +264,8 @@ class FXScene(Scene):
         pygame.draw.rect(surf, config.COL_UP, self.spot_btn, 1, border_radius=4)
         widgets.draw_text(surf, "OUVRIR SPOT", self.spot_btn.center, fonts.small(bold=True),
                           config.COL_UP, align="center")
+        self._all_rects["spot"] = self.spot_btn
+        keynav.draw_focus_ring(surf, self.spot_btn, self.focus == "spot")
         y += 46
 
         widgets.draw_text(surf, "Tenor forward (mois)", (inner.x, y), fonts.small(), config.COL_TEXT)
@@ -216,6 +280,9 @@ class FXScene(Scene):
             widgets.draw_text(surf, f"{tenor}m", rect.center, fonts.tiny(bold=True),
                               config.COL_CYAN if sel else config.COL_TEXT, align="center")
             self.tenor_rects[i] = rect
+            fk = ("tenor", i)
+            self._all_rects[fk] = rect
+            keynav.draw_focus_ring(surf, rect, self.focus == fk)
             x += 76
         y += 36
 
@@ -225,6 +292,8 @@ class FXScene(Scene):
             pygame.draw.rect(surf, config.COL_AMBER, self.forward_btn, 1, border_radius=4)
             widgets.draw_text(surf, "VERROUILLER FORWARD", self.forward_btn.center, fonts.small(bold=True),
                               config.COL_AMBER, align="center")
+            self._all_rects["forward"] = self.forward_btn
+            keynav.draw_focus_ring(surf, self.forward_btn, self.focus == "forward")
         else:
             g = FX.FORWARD_MIN_GRADE
             grade_label = config.GRADES[g] if g < len(config.GRADES) else str(g)
@@ -257,6 +326,9 @@ class FXScene(Scene):
                 widgets.draw_text(surf, "FERMER", close_rect.center, fonts.tiny(bold=True),
                                   config.COL_DOWN, align="center")
                 self.close_rects[h["id"]] = close_rect
+                fk = ("close", h["id"])
+                self._all_rects[fk] = close_rect
+                keynav.draw_focus_ring(surf, close_rect, self.focus == fk)
                 yy += 42
 
         yy += 10
@@ -276,5 +348,7 @@ class FXScene(Scene):
                                   (pinner.x, yy + 18), fonts.tiny(), config.COL_TEXT_DIM)
                 yy += 42
 
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("↑↓", "paire/sens"), ("ENTRÉE", "ouvrir")])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)

@@ -11,7 +11,7 @@ import pygame
 from core import config, unlocks
 from core import swaps as SW
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 NOTIONAL_STEP = 100_000.0
 NOTIONAL_MIN = 100_000.0
@@ -33,6 +33,8 @@ class SwapsScene(Scene):
         self._tenor_rects = {}
         self._notional_rects = {}
         self._enter_rect = None
+        self._all_rects = {}
+        self.focus = "enter"
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
@@ -47,6 +49,31 @@ class SwapsScene(Scene):
         return config.CONTINENTS.get(region, {}).get("currency", "$")
 
     # ------------------------------------------------------------- events
+    def _activate_focus(self):
+        key = self.focus
+        if key is None:
+            return
+        if isinstance(key, tuple) and key[0] == "region":
+            self.region = key[1]
+        elif isinstance(key, tuple) and key[0] == "dir":
+            self.direction = key[1]
+        elif isinstance(key, tuple) and key[0] == "tenor":
+            self.years = key[1]
+        elif key == "notional:minus":
+            self.notional = max(NOTIONAL_MIN, self.notional - NOTIONAL_STEP)
+        elif key == "notional:plus":
+            self.notional = min(NOTIONAL_MAX, self.notional + NOTIONAL_STEP)
+        elif key == "enter" and self.region:
+            p = self.app.gs.player
+            r = SW.enter_swap(p, self.app.market, self.region, self.direction, self.notional, self.years)
+            if r["ok"]:
+                self.msg = f"Swap conclu : {self.region} / {self.years} ans / " \
+                          f"{widgets.format_money(self.notional, self._cur())}."
+                if not p.hardcore:
+                    self.app.gs.save(config.AUTOSAVE_SLOT)
+            else:
+                self.msg = f"Refusé ({r['reason']})."
+
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.go(self.return_to)
@@ -57,6 +84,13 @@ class SwapsScene(Scene):
         if self.tuto_btn.handle(event):
             self.app.scenes.go("tutorials", tid="swaps", return_to="swaps")
             return
+        if self._can_trade() and event.type == pygame.KEYDOWN:
+            self.focus, activate = keynav.grid_nav(event, self._all_rects, self.focus)
+            if activate:
+                self._activate_focus()
+                return
+            if event.key in keynav.DIRECTIONS:
+                return
         if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
             return
         if not self._can_trade():
@@ -119,6 +153,8 @@ class SwapsScene(Scene):
         pinner = widgets.draw_panel(surf, posp, "Vos swaps", config.COL_PRESTIGE)
         self._draw_holdings(surf, pinner, p, m)
 
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("↑↓", "naviguer"), ("ENTRÉE", "conclure")])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)
 
@@ -133,6 +169,7 @@ class SwapsScene(Scene):
         widgets.draw_text(surf, "Devise étrangère :", (x, y), fonts.small(bold=True), config.COL_AMBER)
         y += 22
         self._region_rects = {}
+        self._all_rects = {}
         for region in SW.foreign_regions(p):
             q = SW.quote(m, p, region)
             row = pygame.Rect(x, y, inner.w, 24)
@@ -140,6 +177,9 @@ class SwapsScene(Scene):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, row, border_radius=3)
             pygame.draw.rect(surf, config.COL_CYAN if sel else config.COL_BORDER, row, 1, border_radius=3)
             self._region_rects[region] = row
+            fk = ("region", region)
+            self._all_rects[fk] = row
+            keynav.draw_focus_ring(surf, row, self.focus == fk)
             widgets.draw_text(surf, f"{region} ({self._cur(region)})", (row.x + 8, row.y + 4),
                               fonts.tiny(bold=sel), config.COL_TEXT)
             dcol = config.COL_UP if q["diff"] >= 0 else config.COL_DOWN
@@ -159,6 +199,9 @@ class SwapsScene(Scene):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, row, border_radius=3)
             pygame.draw.rect(surf, config.COL_UP if sel else config.COL_BORDER, row, 1, border_radius=3)
             self._dir_rects[direction] = row
+            fk = ("dir", direction)
+            self._all_rects[fk] = row
+            keynav.draw_focus_ring(surf, row, self.focus == fk)
             widgets.draw_text(surf, SW.DIRECTION_LABEL[direction], row.center, fonts.tiny(bold=sel),
                               config.COL_TEXT, align="center")
             y += 30
@@ -177,6 +220,9 @@ class SwapsScene(Scene):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect, border_radius=3)
             pygame.draw.rect(surf, config.COL_AMBER if sel else config.COL_BORDER, rect, 1, border_radius=3)
             self._tenor_rects[years] = rect
+            fk = ("tenor", years)
+            self._all_rects[fk] = rect
+            keynav.draw_focus_ring(surf, rect, self.focus == fk)
             widgets.draw_text(surf, label, rect.center, fonts.small(bold=sel),
                               config.COL_AMBER if sel else config.COL_TEXT_DIM, align="center")
             tx += w + 8
@@ -189,9 +235,11 @@ class SwapsScene(Scene):
         minus = pygame.Rect(x + 260, y - 3, 26, 24)
         plus = pygame.Rect(x + 290, y - 3, 26, 24)
         self._notional_rects = {"minus": minus, "plus": plus}
-        for rect, sym in ((minus, "-"), (plus, "+")):
+        for rect, sym, fk in ((minus, "-", "notional:minus"), (plus, "+", "notional:plus")):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect)
             pygame.draw.rect(surf, config.COL_BORDER, rect, 1)
+            self._all_rects[fk] = rect
+            keynav.draw_focus_ring(surf, rect, self.focus == fk)
             widgets.draw_text(surf, sym, rect.center, fonts.body(bold=True), config.COL_AMBER, align="center")
         y += 38
 
@@ -213,6 +261,8 @@ class SwapsScene(Scene):
         self._enter_rect = pygame.Rect(x, y, 200, 32)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._enter_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_UP, self._enter_rect, 1, border_radius=4)
+        self._all_rects["enter"] = self._enter_rect
+        keynav.draw_focus_ring(surf, self._enter_rect, self.focus == "enter")
         widgets.draw_text(surf, "CONCLURE LE SWAP", self._enter_rect.center, fonts.small(bold=True),
                           config.COL_UP, align="center")
 

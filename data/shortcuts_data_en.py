@@ -77,6 +77,10 @@ SECTIONS_EN = [
             "+R Risk/VaR, +A Macro calendar, +V Annual review, +L Rivals, +S Stress test, "
             "+W Saves, +O Track/specialization) — see the MORE panel (CTRL+O) for "
             "the full list and search by name"),
+        ("CTRL+1 / 2 / 3", "Quick-save to SLOT1/2/3, from any screen in the game "
+            "(the SAVE command always saves to SLOT1 only)"),
+        ("CTRL+SHIFT+1 / 2 / 3", "Quick-load from SLOT1/2/3, from any screen in the game "
+            "(same slots as the SAVE command / Saves screen)"),
         ("Other pages", "Always reachable via CTRL+O (MORE) then arrows/search, "
             "or by typing their command directly (ETF, BONDS, CMDTY, CRYPTO, STRUCT, "
             "CREDIT, SWAP, GOV, FX, OPTIONS, IPO, GP, PA, ATTR, ALERT, QUANT, FRONTIER, "

@@ -87,6 +87,10 @@ SECTIONS = [
             "+R Risque/VaR, +A Calendrier macro, +V Revue annuelle, +L Rivaux, +S Stress test, "
             "+W Sauvegardes, +O Voie/spécialisation) — voir le panneau PLUS (CTRL+O) pour "
             "la liste complète et la recherche par nom"),
+        ("CTRL+1 / 2 / 3", "Sauvegarde rapide sur SLOT1/2/3, depuis n'importe quel écran "
+            "du jeu (la commande SAVE ne sauvegarde toujours que sur SLOT1)"),
+        ("CTRL+MAJ+1 / 2 / 3", "Chargement rapide depuis SLOT1/2/3, depuis n'importe quel "
+            "écran du jeu (mêmes slots que la commande SAVE/scène Sauvegardes)"),
         ("Autres pages", "Toujours accessibles via CTRL+O (MORE) puis flèches/recherche, "
             "ou en tapant directement leur commande (ETF, BONDS, CMDTY, CRYPTO, STRUCT, "
             "CREDIT, SWAP, GOV, FX, OPTIONS, IPO, GP, PA, ATTR, ALERT, QUANT, FRONTIER, "

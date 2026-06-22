@@ -20,30 +20,44 @@ class CompanyScene(Scene):
     def on_enter(self, **kwargs):
         self.ticker = (kwargs.get("ticker") or "").upper()
         self.return_to = kwargs.get("return_to", "terminal")
+        self.return_kwargs = kwargs.get("return_kwargs") or {}
         if self.app.market is not None:
             self.app.market.track_company(self.ticker)
         self.back_btn = widgets.Button(
-            (40, config.SCREEN_HEIGHT - 70, 200, 46), "← TERMINAL", config.COL_TEXT_DIM)
+            (40, config.SCREEN_HEIGHT - 70, 200, 46),
+            f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.fa_btn = widgets.Button(
             (250, config.SCREEN_HEIGHT - 70, 220, 46), "ÉTATS FINANCIERS (FA)", config.COL_CYAN)
         self.graph_btn = widgets.Button(
             (480, config.SCREEN_HEIGHT - 70, 160, 46), "GRAPHE (GP)", config.COL_AMBER)
+        self.buy_btn = widgets.Button(
+            (650, config.SCREEN_HEIGHT - 70, 110, 46), "ACHAT", config.COL_UP)
+        self.sell_btn = widgets.Button(
+            (770, config.SCREEN_HEIGHT - 70, 110, 46), "VENTE", config.COL_DOWN)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.go(self.return_to, **self.return_kwargs)
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.go(self.return_to, **self.return_kwargs)
         if self.fa_btn.handle(event):
             self.app.scenes.go("financials", ticker=self.ticker, return_to=self.return_to)
         if self.graph_btn.handle(event):
-            self.app.scenes.go("graph", kind="line", tickers=[self.ticker], return_to="terminal")
+            self.app.scenes.go("graph", kind="line", tickers=[self.ticker], return_to=self.return_to)
+        if self.buy_btn.handle(event):
+            self.app.pending_input = f"BUY {self.ticker} "
+            self.app.scenes.go("terminal")
+        if self.sell_btn.handle(event):
+            self.app.pending_input = f"SELL {self.ticker} ALL"
+            self.app.scenes.go("terminal")
 
     def update(self, dt):
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp, dt)
         self.fa_btn.update(mp, dt)
         self.graph_btn.update(mp, dt)
+        self.buy_btn.update(mp, dt)
+        self.sell_btn.update(mp, dt)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -169,6 +183,10 @@ class CompanyScene(Scene):
                 "depuis le terminal pour voir le cours évoluer.",
                 (cinner.x, cinner.y), fonts.small(), config.COL_TEXT_DIM, cinner.w)
 
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.SCREEN_HEIGHT - 56),
+                              [("ESC", "retour")])
         self.back_btn.draw(surf)
         self.fa_btn.draw(surf)
         self.graph_btn.draw(surf)
+        self.buy_btn.draw(surf)
+        self.sell_btn.draw(surf)

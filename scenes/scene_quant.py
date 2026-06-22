@@ -87,6 +87,8 @@ class QuantScene(Scene):
         self._draw_outputs(surf)
         self._draw_price_curve(surf)
         self._draw_payoff(surf)
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("souris", "ajuster les paramètres")])
         self.back_btn.draw(surf)
         self.toggle_btn.draw(surf)
         self.tuto_btn.draw(surf)

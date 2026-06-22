@@ -11,7 +11,7 @@ import pygame
 from core import config, unlocks
 from core import hedging as H
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 
 NOTIONAL = 100_000.0    # notionnel couvert par clic
 
@@ -30,12 +30,33 @@ class HedgeScene(Scene):
         self.buy_btn = None
         self.strike_rects = {}
         self.years_rects = {}
+        self._all_rects = {}
+        self.focus = "buy"
 
     def _can(self):
         return unlocks.unlocked(self.app.gs.player, "hedge")
 
     def _cur(self):
         return config.CONTINENTS[self.app.gs.player.continent]["currency"]
+
+    def _activate_focus(self):
+        key = self.focus
+        if key is None:
+            return
+        if isinstance(key, tuple) and key[0] == "strike":
+            self.strike_idx = key[1]
+        elif isinstance(key, tuple) and key[0] == "years":
+            self.years_idx = key[1]
+        elif key == "buy" and self.buy_btn:
+            p, m = self.app.gs.player, self.app.market
+            strike_pct = H.STRIKE_CHOICES[self.strike_idx]
+            years = H.MATURITY_CHOICES[self.years_idx]
+            r = H.buy_put(p, m, NOTIONAL, strike_pct, years)
+            self.msg = (f"Couverture souscrite ({widgets.format_money(NOTIONAL, self._cur())}, "
+                        f"prime {widgets.format_money(r['premium'], self._cur())})."
+                        if r["ok"] else f"Refusé ({r['reason']}).")
+            if r["ok"] and not p.hardcore:
+                self.app.gs.save(config.AUTOSAVE_SLOT)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -49,6 +70,13 @@ class HedgeScene(Scene):
             return
         if not self._can():
             return
+        if event.type == pygame.KEYDOWN:
+            self.focus, activate = keynav.grid_nav(event, self._all_rects, self.focus)
+            if activate:
+                self._activate_focus()
+                return
+            if event.key in keynav.DIRECTIONS:
+                return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for i, rect in self.strike_rects.items():
                 if rect.collidepoint(event.pos):
@@ -100,6 +128,7 @@ class HedgeScene(Scene):
                           fonts.small(), config.COL_TEXT)
         y += 22
         self.strike_rects = {}
+        self._all_rects = {}
         x = inner.x
         for i, pct in enumerate(H.STRIKE_CHOICES):
             rect = pygame.Rect(x, y, 90, 28)
@@ -109,6 +138,9 @@ class HedgeScene(Scene):
             widgets.draw_text(surf, f"{pct*100:.0f}%", rect.center, fonts.small(bold=True),
                               config.COL_CYAN if sel else config.COL_TEXT, align="center")
             self.strike_rects[i] = rect
+            fk = ("strike", i)
+            self._all_rects[fk] = rect
+            keynav.draw_focus_ring(surf, rect, self.focus == fk)
             x += 100
         y += 40
 
@@ -125,6 +157,9 @@ class HedgeScene(Scene):
             widgets.draw_text(surf, label, rect.center, fonts.small(bold=True),
                               config.COL_CYAN if sel else config.COL_TEXT, align="center")
             self.years_rects[i] = rect
+            fk = ("years", i)
+            self._all_rects[fk] = rect
+            keynav.draw_focus_ring(surf, rect, self.focus == fk)
             x += 100
         y += 40
 
@@ -147,6 +182,8 @@ class HedgeScene(Scene):
         pygame.draw.rect(surf, config.COL_UP, self.buy_btn, 1, border_radius=4)
         widgets.draw_text(surf, "SOUSCRIRE", self.buy_btn.center, fonts.small(bold=True),
                           config.COL_UP, align="center")
+        self._all_rects["buy"] = self.buy_btn
+        keynav.draw_focus_ring(surf, self.buy_btn, self.focus == "buy")
 
         # ---- contexte risque (milieu) ----
         risk_rect = pygame.Rect(500, 110, 320, 150)
@@ -179,5 +216,7 @@ class HedgeScene(Scene):
                                   (pinner.x, yy + 18), fonts.tiny(), pcol)
                 yy += 40
 
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("↑↓", "paramètres"), ("ENTRÉE", "couvrir")])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)

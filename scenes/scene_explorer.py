@@ -531,6 +531,8 @@ class MarketExplorerScene(Scene, PopupMixin):
                         f"{config.GRADES[unlocks_mod.effective_required_grade(self.app.gs.player, 'analyst')]}")
         widgets.draw_text(surf, sel_txt, (inner.x, inner.bottom - 6), fonts.tiny(), config.COL_TEXT_DIM)
 
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("↑↓", "naviguer"), ("ENTRÉE", "détail")])
         self.back_btn.draw(surf)
         self.add_btn.draw(surf)
         self.shop_btn.draw(surf)

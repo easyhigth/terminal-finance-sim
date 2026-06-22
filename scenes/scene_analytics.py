@@ -98,10 +98,7 @@ class AnalyticsScene(Scene, PopupMixin):
                     self.open_chart(tk, kind="change")
                     return
             if self._frontier_rect and self._frontier_rect.collidepoint(event.pos):
-                p, m = self.app.gs.player, self.market
-                self.open_custom_chart("FRONTIÈRE EFFICIENTE — actions",
-                                       lambda surf, rect: self._draw_frontier(surf, rect, p, m),
-                                       accent=config.COL_UP, size=(560, 420))
+                self.app.pages.open_popup("frontier_lab", return_to="analytics")
                 return
             if self._corr_rect and self._corr_rect.collidepoint(event.pos):
                 p, m = self.app.gs.player, self.market

@@ -236,6 +236,81 @@ def equity_frontier(player, market, n_points=30):
             "labels": [h["ticker"] for h in eq]}
 
 
+def frontier_for_universe(market, tickers, weights=None, n_points=30):
+    """Frontière efficiente pour un univers de tickers arbitraire (pas
+    forcément détenus) — utilisée par le laboratoire de diversification pour
+    simuler l'ajout/retrait d'actifs. `weights` (optionnel, même ordre que
+    `tickers`) donne le point « simulation » affiché sur la frontière ;
+    par défaut équipondéré. Retourne {vols, rets, sim:(vol,ret), labels}
+    (en %) ou None si < 2 tickers / historique insuffisant."""
+    tickers = [tk for tk in tickers if tk]
+    if len(tickers) < 2:
+        return None
+    series = [market.history_of(tk, _HIST) for tk in tickers]
+    rets = [charts.simple_returns(s) for s in series]
+    n = min((len(r) for r in rets), default=0)
+    if n < 10:
+        return None
+    R = np.array([r[-n:] for r in rets])
+    mean = R.mean(axis=1) * STEPS_PER_YEAR
+    cov = np.cov(R) * STEPS_PER_YEAR
+    try:
+        vols, frets, _ = finmath.efficient_frontier(mean, cov, n_points)
+    except Exception:
+        return None
+    if weights is None:
+        w = np.full(len(tickers), 1.0 / len(tickers))
+    else:
+        w = np.asarray(weights, dtype=np.float64)
+        tot = w.sum() or 1.0
+        w = w / tot
+    sim_vol = finmath.portfolio_volatility(w, cov)
+    sim_ret = finmath.portfolio_return(w, mean)
+    return {"vols": np.asarray(vols) * 100, "rets": np.asarray(frets) * 100,
+            "sim": (sim_vol * 100, sim_ret * 100), "labels": list(tickers)}
+
+
+def correlation_for(market, tickers):
+    """Matrice de corrélation pour un univers de tickers arbitraire."""
+    tickers = [tk for tk in tickers if tk]
+    if len(tickers) < 2:
+        return [], np.zeros((0, 0))
+    smap = {tk: market.history_of(tk, _HIST) for tk in tickers}
+    return charts.correlation_matrix(smap)
+
+
+def diversification_candidates(player, market, n=8):
+    """Suggère des actions NON détenues, peu corrélées à l'actuel portefeuille
+    actions — bonnes candidates pour diversifier la frontière efficiente.
+    Retourne une liste de tickers triés par corrélation moyenne croissante
+    avec les positions actuelles (les moins corrélées en premier)."""
+    held = {h["ticker"] for h in pf.holdings(player, market) if not h["short"]}
+    if not held:
+        return []
+    held_series = {tk: market.history_of(tk, _HIST) for tk in held}
+    held_rets = {tk: charts.simple_returns(s) for tk, s in held_series.items()}
+    scored = []
+    for c in market.companies:
+        tk = c["ticker"]
+        if tk in held:
+            continue
+        cand_ret = charts.simple_returns(market.history_of(tk, _HIST))
+        corrs = []
+        for tk2, r2 in held_rets.items():
+            m = min(len(cand_ret), len(r2))
+            if m < 10:
+                continue
+            with np.errstate(invalid="ignore", divide="ignore"):
+                cm = np.corrcoef(cand_ret[-m:], r2[-m:])
+            v = float(cm[0, 1])
+            if not np.isnan(v):
+                corrs.append(v)
+        if corrs:
+            scored.append((tk, sum(corrs) / len(corrs)))
+    scored.sort(key=lambda kv: kv[1])
+    return [tk for tk, _ in scored[:n]]
+
+
 def summary(player, market):
     """Synthèse chiffrée complète du portefeuille (pour le tableau de bord)."""
     rows = holdings_table(player, market)

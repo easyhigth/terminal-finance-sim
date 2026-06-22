@@ -213,8 +213,8 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             (None, "AGIR & PROGRESSER"),
             ("ADV ▸", "ADV"), ("EXAM/CERTIF", "EXAMCERT"),
             (None, "OUTILS"),
-            ("SHOP", "SHOP"), ("TABLEUR", "SHEET"), ("ACADÉMIE", "LEARN"),
-            ("GLOSSAIRE", "GLOSSARY"), ("PLUS", "MORE"),
+            ("SHOP", "SHOP"), ("EXPLORATEUR", "EXPLORER"), ("GRAPHES", "GP"),
+            ("ÉQUIPES/ANALYSTES", "TEAM"), ("PLUS", "MORE"),
             ("SAUVER", "SAVE"), ("AIDE", "COMMANDS"),
         ]
         self.networth_spark = widgets.Sparkline(80)

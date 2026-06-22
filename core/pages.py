@@ -35,6 +35,7 @@ from ui import fonts, widgets
 
 TAB_BAR_H = config.TAB_BAR_H
 TAB_W = 168
+MIN_TAB_W = 64      # largeur plancher d'un onglet compressé (façon navigateur)
 TAB_GAP = 2
 NEW_TAB_W = 28
 POPUP_TITLE_H = 24
@@ -83,6 +84,8 @@ class PageManager:
         self.active = 0
         self._drag_page = None     # Page en cours de déplacement (popup)
         self._drag_off = (0, 0)
+        self._tab_scroll_x = 0     # défilement horizontal de la barre d'onglets (px)
+        self._tab_max_scroll_x = 0
 
     # ------------------------------------------------------------ accès
     @property
@@ -115,6 +118,25 @@ class PageManager:
         page = Page(m, scene_name, kwargs)
         self.pages.append(page)
         self.active = len(self.pages) - 1
+        return page
+
+    def open_popup(self, scene_name, **kwargs):
+        """Ouvre directement une page en mode popup flottant, par-dessus
+        l'onglet actif courant (qui reste actif) — utilisé pour les vues
+        « laboratoire » ouvertes depuis une autre scène (ex. frontière
+        efficiente depuis l'analyse de portefeuille)."""
+        if not self.can_switch():
+            return None
+        m = self._build_manager(scene_name, kwargs)
+        page = Page(m, scene_name, kwargs)
+        page.popup = True
+        w, h = config.SCREEN_WIDTH * 4 // 5, config.SCREEN_HEIGHT * 4 // 5
+        page.popup_rect = pygame.Rect((config.SCREEN_WIDTH - w) // 2,
+                                      (config.SCREEN_HEIGHT - h) // 2 + 10, w, h)
+        self.pages.append(page)
+        sc = page.manager.current
+        if sc is not None:
+            sc.refresh_data()
         return page
 
     def duplicate_current(self):
@@ -178,13 +200,38 @@ class PageManager:
             if i != self.active and page.popup:
                 page.manager.update(dt)
 
+    def _tab_viewport_w(self):
+        """Largeur disponible pour les onglets, avant le bouton « + »."""
+        return config.SCREEN_WIDTH - NEW_TAB_W - 8
+
+    def _tab_metrics(self):
+        """Largeur d'un onglet et défilement max : les onglets se compressent
+        (façon navigateur) jusqu'à MIN_TAB_W pour tenir dans la largeur
+        disponible ; au-delà, ils restent à MIN_TAB_W et la barre devient
+        défilable horizontalement (molette / glisser le slider du bas)."""
+        n = len(self.pages)
+        avail = self._tab_viewport_w()
+        if n <= 0:
+            return TAB_W, 0
+        full_w = n * TAB_W + max(0, n - 1) * TAB_GAP
+        if full_w <= avail:
+            return TAB_W, 0
+        w = max(MIN_TAB_W, (avail - max(0, n - 1) * TAB_GAP) // n)
+        total_w = n * w + max(0, n - 1) * TAB_GAP
+        return w, max(0, total_w - avail)
+
     def _tab_rects(self):
+        w, max_scroll = self._tab_metrics()
+        self._tab_max_scroll_x = max_scroll
+        self._tab_scroll_x = max(0, min(max_scroll, self._tab_scroll_x))
         rects = []
-        x = 0
+        x = -self._tab_scroll_x
         for page in self.pages:
-            rects.append(pygame.Rect(x, 0, TAB_W, TAB_BAR_H))
-            x += TAB_W + TAB_GAP
-        new_rect = pygame.Rect(x, 0, NEW_TAB_W, TAB_BAR_H)
+            rects.append(pygame.Rect(x, 0, w, TAB_BAR_H))
+            x += w + TAB_GAP
+        avail = self._tab_viewport_w()
+        new_x = avail if max_scroll > 0 else min(x, avail)
+        new_rect = pygame.Rect(new_x, 0, NEW_TAB_W, TAB_BAR_H)
         return rects, new_rect
 
     def handle_event(self, event):
@@ -192,6 +239,12 @@ class PageManager:
 
         # barre d'onglets (toujours visible, en haut de la fenêtre, en repère
         # fenêtre non translaté) — prioritaire sur tout le reste
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5) and raw_pos and raw_pos[1] < TAB_BAR_H:
+            self._tab_rects()  # rafraîchit _tab_max_scroll_x
+            delta = -40 if event.button == 4 else 40
+            self._tab_scroll_x = max(0, min(self._tab_max_scroll_x, self._tab_scroll_x + delta))
+            return
+
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and raw_pos and raw_pos[1] < TAB_BAR_H:
             tab_rects, new_rect = self._tab_rects()
             if new_rect.collidepoint(raw_pos):
@@ -310,7 +363,12 @@ class PageManager:
         bar = pygame.Rect(0, 0, surf.get_width(), TAB_BAR_H)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, bar)
         blocked = not self.can_switch()
+        viewport = pygame.Rect(0, 0, self._tab_viewport_w(), TAB_BAR_H)
+        prev_clip = surf.get_clip()
+        surf.set_clip(viewport)
         for i, (page, rect) in enumerate(zip(self.pages, tab_rects)):
+            if rect.right < 0 or rect.x > viewport.right:
+                continue
             active = i == self.active
             col_bg = config.COL_PANEL if active else config.COL_BG
             pygame.draw.rect(surf, col_bg, rect)
@@ -319,20 +377,34 @@ class PageManager:
             label = page.label()
             if page.popup:
                 label = "⧉ " + label
-            widgets.draw_text(surf, label[:20], (rect.x + 6, rect.y + 6), fonts.tiny(),
+            # icônes fermer/popup masquées si l'onglet est trop compressé
+            # pour leur laisser de la place sans écraser le libellé.
+            show_close = len(self.pages) > 1 and rect.w >= 50
+            show_pop = i != self.active and rect.w >= 70
+            n_icons = int(show_close) + int(show_pop)
+            label_w = max(8, rect.w - 8 - 18 * n_icons)
+            widgets.draw_text(surf, widgets.fit_text(label, fonts.tiny(), label_w),
+                              (rect.x + 6, rect.y + 6), fonts.tiny(),
                               config.COL_TEXT if not blocked else config.COL_TEXT_DIM)
-            if len(self.pages) > 1:
+            if show_close:
                 close_rect = pygame.Rect(rect.right - 18, rect.y + 4, 14, 14)
                 widgets.draw_text(surf, "×", (close_rect.x + 3, close_rect.y - 2), fonts.small(),
                                   config.COL_TEXT_DIM)
-            if i != self.active:
+            if show_pop:
                 pop_rect = pygame.Rect(rect.right - 36, rect.y + 4, 14, 14)
                 widgets.draw_text(surf, "⧉", (pop_rect.x, pop_rect.y - 1), fonts.tiny(),
                                   config.COL_TEXT_DIM)
+        surf.set_clip(prev_clip)
         new_col = config.COL_TEXT_DIM if blocked else config.COL_CYAN
         pygame.draw.rect(surf, config.COL_BG, new_rect)
         pygame.draw.rect(surf, new_col, new_rect, 1)
         widgets.draw_text(surf, "+", (new_rect.x + 9, new_rect.y + 4), fonts.small(bold=True), new_col)
+        if self._tab_max_scroll_x > 0:
+            track = pygame.Rect(0, TAB_BAR_H - 3, viewport.w, 3)
+            pygame.draw.rect(surf, config.COL_PANEL, track)
+            bar_w = max(20, int(viewport.w * (viewport.w / (viewport.w + self._tab_max_scroll_x))))
+            bar_x = int((viewport.w - bar_w) * (self._tab_scroll_x / self._tab_max_scroll_x))
+            pygame.draw.rect(surf, config.COL_AMBER_DIM, (bar_x, TAB_BAR_H - 3, bar_w, 3))
         if blocked:
             widgets.draw_text(surf, "🔒 examen en cours — onglets verrouillés",
                               (new_rect.right + 12, 6), fonts.tiny(), config.COL_WARN)

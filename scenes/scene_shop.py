@@ -428,6 +428,7 @@ class ShopScene(Scene, PopupMixin):
                           (42, 72), fonts.tiny(), config.COL_TEXT_DIM)
 
         mp = pygame.mouse.get_pos()
+        self._tooltip = None
         x0 = 40
         top = config.content_top()
 
@@ -556,6 +557,8 @@ class ShopScene(Scene, PopupMixin):
         self.back_btn.draw(surf)
         self.explorer_btn.draw(surf)
         self.popups_draw(surf)
+        if self._tooltip:
+            widgets.draw_tooltip(surf, *self._tooltip)
 
     def _draw_row(self, surf, r, y, inner, cols, cur, mp, cursor=False):
         kind, key = r["kind"], r["key"]
@@ -571,7 +574,13 @@ class ShopScene(Scene, PopupMixin):
                           (inner.x, y), fonts.small(bold=True), kcol)
         widgets.draw_text(surf, KIND_LABEL.get(kind, kind), (inner.x + cols[1][1], y),
                           fonts.tiny(bold=True), kcol)
-        widgets.draw_text(surf, widgets.fit_text(str(r["sub"]), fonts.tiny(), 150),
+        sub_txt = str(r["sub"])
+        sub_fitted = widgets.fit_text(sub_txt, fonts.tiny(), 150)
+        if sub_fitted != sub_txt:
+            sub_rect = pygame.Rect(inner.x + cols[2][1], y + 1, 150, ROW_H - 4)
+            if sub_rect.collidepoint(mp):
+                self._tooltip = (sub_txt, mp)
+        widgets.draw_text(surf, sub_fitted,
                           (inner.x + cols[2][1], y + 1), fonts.tiny(), config.COL_TEXT_DIM)
         held = self._held_qty(kind, key)
         held_txt = f"{held:g}" if held else "—"

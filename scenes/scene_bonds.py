@@ -13,7 +13,7 @@ import pygame
 from core import bonds as B
 from core import config, unlocks
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 from ui.popups import PopupMixin
 
 LOT = 10   # taille d'un paquet d'achat/vente
@@ -31,6 +31,9 @@ class BondsScene(Scene, PopupMixin):
         self.scroll = 0
         self._max_scroll = 0
         self._list_rect = None
+        self.row_cursor = 0
+        self._row_list = []
+        self._row_offsets = {}
         self.search_box = widgets.SearchBox((40, 100, 280, 24),
                                              "Tapez pour rechercher (nom, émetteur)…")
         self.back_btn = widgets.Button(config.back_button_rect(160),
@@ -40,6 +43,20 @@ class BondsScene(Scene, PopupMixin):
 
     def _can_trade(self):
         return unlocks.unlocked(self.app.gs.player, "trade")
+
+    def _scroll_to_cursor(self):
+        if not self._list_rect or not self._row_list:
+            return
+        bid = self._row_list[self.row_cursor]
+        row_top = self._row_offsets.get(bid)
+        if row_top is None:
+            return
+        row_bottom = row_top + ROW_H
+        if row_top < self.scroll:
+            self.scroll = row_top
+        elif row_bottom > self.scroll + self._list_rect.h:
+            self.scroll = row_bottom - self._list_rect.h
+        self.scroll = max(0, min(self._max_scroll, self.scroll))
 
     def handle_event(self, event):
         if self.popups_handle_event(event):
@@ -61,6 +78,14 @@ class BondsScene(Scene, PopupMixin):
                 return
             elif event.key == pygame.K_PAGEDOWN:
                 self.scroll = min(self._max_scroll, self.scroll + 200)
+                return
+            elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
+                self.row_cursor, activate = widgets.list_key_nav(
+                    event, self.row_cursor, len(self._row_list))
+                if self._row_list:
+                    self._scroll_to_cursor()
+                if activate and self._row_list:
+                    self.open_bond(self._row_list[self.row_cursor])
                 return
             elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
                 self.search_box.handle_typing(event)
@@ -164,9 +189,14 @@ class BondsScene(Scene, PopupMixin):
         sov = sorted([q for q in quotes if q["kind"] == "Souverain"], key=lambda q: (q["region"], q["years"]))
         corp = sorted([q for q in quotes if q["kind"] == "Corporate"], key=lambda q: (q["region"], q["name"]))
         mp = pygame.mouse.get_pos()
+        self._tooltip = None
+        self._row_list = [q["id"] for q in sov] + [q["id"] for q in corp]
+        self._row_offsets = {}
+        self.row_cursor = min(self.row_cursor, len(self._row_list) - 1) if self._row_list else 0
+        cursor_id = self._row_list[self.row_cursor] if self._row_list else None
         y = list_top - self.scroll
-        y = self._draw_group(surf, "SOUVERAINS", sov, y, p, list_area, mp)
-        y = self._draw_group(surf, "CORPORATE", corp, y, p, list_area, mp)
+        y = self._draw_group(surf, "SOUVERAINS", sov, y, p, list_area, mp, cursor_id)
+        y = self._draw_group(surf, "CORPORATE", corp, y, p, list_area, mp, cursor_id)
         surf.set_clip(prev_clip)
 
         content_h = (y + self.scroll) - list_top
@@ -180,21 +210,27 @@ class BondsScene(Scene, PopupMixin):
                           + ("" if self._can_trade() else "   ⊘ trading débloqué au grade Associate"),
                           (inner.x, inner.bottom - 20), fonts.small(bold=True),
                           config.COL_UP if hv else config.COL_TEXT_DIM)
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("↑↓", "obligations"), ("ENTRÉE", "ouvrir")])
         self.back_btn.draw(surf)
         self.gov_btn.draw(surf)
         self.popups_draw(surf)
+        if self._tooltip:
+            widgets.draw_tooltip(surf, *self._tooltip)
 
-    def _draw_group(self, surf, title, quotes, y, p, list_area, mp):
+    def _draw_group(self, surf, title, quotes, y, p, list_area, mp, cursor_id=None):
         cols = self.cols
         widgets.draw_text(surf, f"— {title} ({len(quotes)})", (cols["name"], y),
                           fonts.tiny(bold=True), config.COL_AMBER)
         y += 20
         for q in quotes:
+            self._row_offsets[q["id"]] = y - list_area.top + self.scroll
             visible = (list_area.top - ROW_H) < y < list_area.bottom
             if visible:
                 row_rect = pygame.Rect(cols["name"] - 4, y - 2, list_area.w - 8, ROW_H)
                 if row_rect.collidepoint(mp):
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect, border_radius=3)
+                keynav.draw_focus_ring(surf, row_rect, q["id"] == cursor_id)
                 name_w = min(260, fonts.small(bold=True).size(q["name"])[0])
                 self.name_rects[q["id"]] = pygame.Rect(cols["name"] - 2, y - 2, name_w + 4, ROW_H - 4)
                 widgets.draw_text(surf, widgets.fit_text(q["name"], fonts.small(bold=True), 260),
@@ -203,6 +239,10 @@ class BondsScene(Scene, PopupMixin):
                 widgets.draw_text(surf, "Souv." if q["kind"] == "Souverain" else "Corp.",
                                   (cols["type"], y), fonts.tiny(bold=True), tcol)
                 issuer = widgets.fit_text(q["issuer"], fonts.tiny(), 200)
+                if issuer != q["issuer"]:
+                    issuer_rect = pygame.Rect(cols["issuer"], y + 1, 200, ROW_H - 4)
+                    if issuer_rect.collidepoint(mp):
+                        self._tooltip = (q["issuer"], mp)
                 widgets.draw_text(surf, issuer, (cols["issuer"], y + 1), fonts.tiny(), config.COL_TEXT_DIM)
                 rc = (config.COL_UP if q["rating"] in ("AAA", "AA", "A") else
                       config.COL_WARN if q["rating"] == "BBB" else config.COL_DOWN)

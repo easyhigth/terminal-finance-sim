@@ -86,6 +86,22 @@ def draw_text_fit(surf, text, pos, font, color=config.COL_TEXT, max_width=0, ali
     return draw_text(surf, text, pos, font, color, align)
 
 
+def draw_tooltip(surf, text, pos):
+    """Bulle d'info affichant `text` en entier près de `pos` (coin du curseur).
+    À appeler en dernier dans draw() pour rester au-dessus du reste."""
+    font = fonts.tiny()
+    pad = 6
+    w, h = font.size(text)
+    rect = pygame.Rect(pos[0] + 12, pos[1] + 18, w + pad * 2, h + pad * 2)
+    if rect.right > config.SCREEN_WIDTH - 4:
+        rect.x -= rect.right - (config.SCREEN_WIDTH - 4)
+    if rect.bottom > config.SCREEN_HEIGHT - 4:
+        rect.y = pos[1] - rect.h - 6
+    pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect, border_radius=4)
+    pygame.draw.rect(surf, config.COL_BORDER, rect, 1, border_radius=4)
+    draw_text(surf, text, (rect.x + pad, rect.y + pad), font, config.COL_TEXT)
+
+
 def draw_text_scaled(surf, text, pos, font, color, max_width, align="left"):
     """Dessine du texte sur une seule ligne, réduit à l'échelle s'il dépasse
     `max_width` (utile pour les titres longs qui ne doivent pas sortir de l'écran)."""

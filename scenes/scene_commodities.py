@@ -179,12 +179,13 @@ class CommoditiesScene(Scene, PopupMixin):
         if q:
             all_q = [r for r in all_q if q in f"{r['name']} {r['id']} {r['category']}".lower()]
         cats = [self.cat_filter] if self.cat_filter else CATEGORY_ORDER
+        mp = pygame.mouse.get_pos()
         y = list_top - self.scroll
         for cat in cats:
             q_cat = [q for q in all_q if q["category"] == cat]
             if not q_cat:
                 continue
-            y = self._draw_group(surf, cat, q_cat, y, p, list_area, cols, cur)
+            y = self._draw_group(surf, cat, q_cat, y, p, list_area, cols, cur, mp)
         surf.set_clip(prev_clip)
 
         content_h = (y + self.scroll) - list_top
@@ -206,13 +207,16 @@ class CommoditiesScene(Scene, PopupMixin):
         self.back_btn.draw(surf)
         self.popups_draw(surf)
 
-    def _draw_group(self, surf, title, quotes, y, p, list_area, cols, cur):
+    def _draw_group(self, surf, title, quotes, y, p, list_area, cols, cur, mp):
         widgets.draw_text(surf, f"— {title} ({len(quotes)})", (cols[0][1], y),
                           fonts.tiny(bold=True), config.COL_AMBER)
         y += 20
         for q in quotes:
             visible = (list_area.top - ROW_H) < y < list_area.bottom
             if visible:
+                row_rect = pygame.Rect(cols[0][1] - 4, y - 2, list_area.w - 8, ROW_H)
+                if row_rect.collidepoint(mp):
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect, border_radius=3)
                 pos = p.commodities.get(q["id"])
                 held = pos["qty"] if pos else 0
                 name_w = min(260, fonts.small(bold=True).size(q["name"])[0])

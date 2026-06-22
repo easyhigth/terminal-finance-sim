@@ -28,6 +28,9 @@ class MAScene(Scene):
         self.scroll = 0
         self._max_scroll = 0
         self._list_rect = None
+        self.hist_scroll = 0
+        self._hist_max_scroll = 0
+        self._hist_list_rect = None
         self._tab_rects = {}
         self._sector_rects = {}
         self._row_rects = {}      # ticker -> Rect (clic -> fiche)
@@ -60,9 +63,12 @@ class MAScene(Scene):
             self.app.scenes.go(self.return_to)
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            delta = -48 if event.button == 4 else 48
+            if self._hist_list_rect and self._hist_list_rect.collidepoint(event.pos):
+                self.hist_scroll = max(0, min(self._hist_max_scroll, self.hist_scroll + delta))
+                return
             if self._list_rect and self._list_rect.collidepoint(event.pos):
-                self.scroll = max(0, min(self._max_scroll,
-                                         self.scroll + (-48 if event.button == 4 else 48)))
+                self.scroll = max(0, min(self._max_scroll, self.scroll + delta))
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for name, rect in self._tab_rects.items():
@@ -257,15 +263,27 @@ class MAScene(Scene):
         if not hist:
             widgets.draw_text(surf, "Aucune cession ni défaut pour l'instant.",
                               (hinner.x, hinner.y + 4), fonts.small(), config.COL_TEXT_DIM)
+            self._hist_list_rect = None
+            self._hist_max_scroll = 0
         else:
-            y = hinner.y
-            for h in hist[:8]:
+            list_area = pygame.Rect(hinner.x - 4, hinner.y, hinner.w + 8, hinner.h)
+            self._hist_list_rect = list_area
+            prev_clip = surf.get_clip()
+            surf.set_clip(list_area)
+            y = hinner.y - self.hist_scroll
+            for h in hist:
                 col = config.COL_UP if h["pnl"] >= 0 else config.COL_DOWN
                 widgets.draw_text(surf, f"{h['name']} ({h['ticker']}) — {h['status']}",
                                   (hinner.x, y), fonts.small(), config.COL_TEXT)
                 widgets.draw_text(surf, f"P&L {widgets.format_money(h['pnl'], cur)}  ·  MOIC {h['moic']:.2f}x",
                                   (hinner.right, y), fonts.small(bold=True), col, align="right")
                 y += ROW_H
+            surf.set_clip(prev_clip)
+            content_h = (y + self.hist_scroll) - hinner.y
+            self._hist_max_scroll = max(0, content_h - list_area.h)
+            self.hist_scroll = max(0, min(self._hist_max_scroll, self.hist_scroll))
+            widgets.draw_scrollbar(surf, hist_panel, list_area, self.hist_scroll,
+                                   self._hist_max_scroll, content_h)
 
     # ------------------------------------------------------------- OUTILS (LBO / accretion)
     def _init_tools(self):

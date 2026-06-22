@@ -9,7 +9,7 @@ import pygame
 from core import config, unlocks
 from core import crypto as K
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 from ui.popups import PopupMixin
 
 LOT = 1
@@ -22,6 +22,8 @@ class CryptoScene(Scene, PopupMixin):
         self.search_box = widgets.SearchBox((40, 100, 280, 24), "Rechercher un actif…")
         self.buy_rects, self.sell_rects = {}, {}
         self.name_rects = {}
+        self.row_cursor = 0
+        self._row_list = []
         self.init_popups()
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
@@ -44,6 +46,12 @@ class CryptoScene(Scene, PopupMixin):
                 return
             elif event.key == pygame.K_BACKSPACE:
                 self.search_box.handle_typing(event)
+                return
+            elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
+                self.row_cursor, activate = widgets.list_key_nav(
+                    event, self.row_cursor, len(self._row_list))
+                if activate and self._row_list:
+                    self.open_crypto(self._row_list[self.row_cursor])
                 return
             elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
                 self.search_box.handle_typing(event)
@@ -121,12 +129,15 @@ class CryptoScene(Scene, PopupMixin):
         quotes = [q for q in K.all_quotes(m)
                   if not q_filter or q_filter in q["name"].lower() or q_filter in q["id"].lower()]
         mp = pygame.mouse.get_pos()
-        for q in quotes:
+        self._row_list = [q["id"] for q in quotes]
+        self.row_cursor = min(self.row_cursor, len(quotes) - 1) if quotes else 0
+        for i, q in enumerate(quotes):
             pos = p.crypto.get(q["id"])
             held = pos["qty"] if pos else 0
             row_rect = pygame.Rect(cols[0][1] - 4, y - 2, inner.w - 8, 28)
             if row_rect.collidepoint(mp):
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect, border_radius=3)
+            keynav.draw_focus_ring(surf, row_rect, i == self.row_cursor)
             name_rect = pygame.Rect(cols[0][1], y - 2, 280, 22)
             self.name_rects[q["id"]] = name_rect
             widgets.draw_text(surf, f"{q['name']} ({q['id']})", (cols[0][1], y),
@@ -165,6 +176,8 @@ class CryptoScene(Scene, PopupMixin):
                           + ("" if self._can_trade() else "   ⊘ trading débloqué au grade Associate"),
                           (inner.x, inner.bottom - 22), fonts.small(bold=True),
                           config.COL_UP if hv else config.COL_TEXT_DIM)
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("↑↓", "actifs"), ("ENTRÉE", "ouvrir")])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)
         self.popups_draw(surf)

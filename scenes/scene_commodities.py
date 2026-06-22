@@ -12,7 +12,7 @@ import pygame
 from core import commodities as C
 from core import config, unlocks
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 from ui.popups import PopupMixin
 
 LOT = 5
@@ -35,6 +35,9 @@ class CommoditiesScene(Scene, PopupMixin):
         self.scroll = 0
         self._max_scroll = 0
         self._list_rect = None
+        self.row_cursor = 0
+        self._row_list = []
+        self._row_offsets = {}
         self.cat_filter = None     # None = toutes catégories
         self._cat_rects = {}
         self.search_box = widgets.SearchBox((40, 74, 260, 24), "Tapez pour rechercher…")
@@ -43,6 +46,20 @@ class CommoditiesScene(Scene, PopupMixin):
 
     def _can_trade(self):
         return unlocks.unlocked(self.app.gs.player, "trade")
+
+    def _scroll_to_cursor(self):
+        if not self._list_rect or not self._row_list:
+            return
+        cid = self._row_list[self.row_cursor]
+        row_top = self._row_offsets.get(cid)
+        if row_top is None:
+            return
+        row_bottom = row_top + ROW_H
+        if row_top < self.scroll:
+            self.scroll = row_top
+        elif row_bottom > self.scroll + self._list_rect.h:
+            self.scroll = row_bottom - self._list_rect.h
+        self.scroll = max(0, min(self._max_scroll, self.scroll))
 
     def handle_event(self, event):
         if self.popups_handle_event(event):
@@ -64,6 +81,14 @@ class CommoditiesScene(Scene, PopupMixin):
                 return
             elif event.key == pygame.K_PAGEDOWN:
                 self.scroll = min(self._max_scroll, self.scroll + 200)
+                return
+            elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
+                self.row_cursor, activate = widgets.list_key_nav(
+                    event, self.row_cursor, len(self._row_list))
+                if self._row_list:
+                    self._scroll_to_cursor()
+                if activate and self._row_list:
+                    self.open_commodity(self._row_list[self.row_cursor])
                 return
             elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
                 self.search_box.handle_typing(event)
@@ -181,12 +206,16 @@ class CommoditiesScene(Scene, PopupMixin):
         cats = [self.cat_filter] if self.cat_filter else CATEGORY_ORDER
         mp = pygame.mouse.get_pos()
         self._tooltip = None
+        self._row_list = [q["id"] for cat in cats for q in all_q if q["category"] == cat]
+        self._row_offsets = {}
+        self.row_cursor = min(self.row_cursor, len(self._row_list) - 1) if self._row_list else 0
+        cursor_id = self._row_list[self.row_cursor] if self._row_list else None
         y = list_top - self.scroll
         for cat in cats:
             q_cat = [q for q in all_q if q["category"] == cat]
             if not q_cat:
                 continue
-            y = self._draw_group(surf, cat, q_cat, y, p, list_area, cols, cur, mp)
+            y = self._draw_group(surf, cat, q_cat, y, p, list_area, cols, cur, mp, cursor_id)
         surf.set_clip(prev_clip)
 
         content_h = (y + self.scroll) - list_top
@@ -205,21 +234,25 @@ class CommoditiesScene(Scene, PopupMixin):
                           + ("" if self._can_trade() else "   ⊘ trading débloqué au grade Associate"),
                           (inner.x, inner.bottom - 22), fonts.small(bold=True),
                           config.COL_UP if hv else config.COL_TEXT_DIM)
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("↑↓", "contrats"), ("ENTRÉE", "ouvrir")])
         self.back_btn.draw(surf)
         self.popups_draw(surf)
         if self._tooltip:
             widgets.draw_tooltip(surf, *self._tooltip)
 
-    def _draw_group(self, surf, title, quotes, y, p, list_area, cols, cur, mp):
+    def _draw_group(self, surf, title, quotes, y, p, list_area, cols, cur, mp, cursor_id=None):
         widgets.draw_text(surf, f"— {title} ({len(quotes)})", (cols[0][1], y),
                           fonts.tiny(bold=True), config.COL_AMBER)
         y += 20
         for q in quotes:
+            self._row_offsets[q["id"]] = y - list_area.top + self.scroll
             visible = (list_area.top - ROW_H) < y < list_area.bottom
             if visible:
                 row_rect = pygame.Rect(cols[0][1] - 4, y - 2, list_area.w - 8, ROW_H)
                 if row_rect.collidepoint(mp):
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect, border_radius=3)
+                keynav.draw_focus_ring(surf, row_rect, q["id"] == cursor_id)
                 pos = p.commodities.get(q["id"])
                 held = pos["qty"] if pos else 0
                 name_w = min(260, fonts.small(bold=True).size(q["name"])[0])

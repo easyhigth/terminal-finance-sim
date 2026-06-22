@@ -13,7 +13,7 @@ import pygame
 from core import config, unlocks
 from core import etfs as E
 from core.scene_manager import Scene
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
 from ui.popups import PopupMixin
 
 LOT = 10
@@ -37,6 +37,8 @@ class ETFScene(Scene, PopupMixin):
         self.scroll = 0
         self._max_scroll = 0
         self._list_rect = None
+        self.row_cursor = 0
+        self._row_list = []
         self.buy_rects = {}
         self.sell_rects = {}
         self.name_rects = {}
@@ -71,6 +73,18 @@ class ETFScene(Scene, PopupMixin):
             out.sort(key=lambda r: (r[key] if r[key] is not None else -1e18), reverse=rev)
         return out
 
+    def _scroll_to_cursor(self):
+        """Ajuste le scroll pour garder la ligne sélectionnée au clavier visible."""
+        if not self._list_rect:
+            return
+        row_top = self.row_cursor * ROW_H
+        row_bottom = row_top + ROW_H
+        if row_top < self.scroll:
+            self.scroll = row_top
+        elif row_bottom > self.scroll + self._list_rect.h:
+            self.scroll = row_bottom - self._list_rect.h
+        self.scroll = max(0, min(self._max_scroll, self.scroll))
+
     # --------------------------------------------------------------- events
     def handle_event(self, event):
         if self.popups_handle_event(event):
@@ -92,6 +106,14 @@ class ETFScene(Scene, PopupMixin):
                 return
             elif event.key == pygame.K_PAGEDOWN:
                 self.scroll = min(self._max_scroll, self.scroll + 200)
+                return
+            elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
+                self.row_cursor, activate = widgets.list_key_nav(
+                    event, self.row_cursor, len(self._row_list))
+                if self._row_list:
+                    self._scroll_to_cursor()
+                if activate and self._row_list:
+                    self.open_etf(self._row_list[self.row_cursor]["id"])
                 return
             elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
                 self.search += event.unicode
@@ -217,6 +239,8 @@ class ETFScene(Scene, PopupMixin):
         y += 28
 
         rows = self._filtered_sorted()
+        self._row_list = rows
+        self.row_cursor = min(self.row_cursor, len(rows) - 1) if rows else 0
         panel = pygame.Rect(x0, y, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - y)
         inner = widgets.draw_panel(surf, panel, f"ETF ({len(rows)})", config.COL_PRESTIGE)
         self.cols = {"name": inner.x, "tk": inner.x + 235, "cat": inner.x + 295,
@@ -238,9 +262,9 @@ class ETFScene(Scene, PopupMixin):
         prev_clip = surf.get_clip()
         surf.set_clip(list_area)
         ry = list_top - self.scroll
-        for q in rows:
+        for i, q in enumerate(rows):
             if (list_area.top - ROW_H) < ry < list_area.bottom:
-                self._draw_row(surf, q, ry, p, mp)
+                self._draw_row(surf, q, ry, p, mp, i == self.row_cursor)
             ry += ROW_H
         surf.set_clip(prev_clip)
 
@@ -260,6 +284,8 @@ class ETFScene(Scene, PopupMixin):
                           + ("" if self._can_trade() else "   ⊘ trading débloqué au grade Associate"),
                           (inner.x, inner.bottom - 18), fonts.small(bold=True),
                           config.COL_UP if hv else config.COL_TEXT_DIM)
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
+                              [("↑↓", "actifs"), ("ENTRÉE", "ouvrir")])
         self.back_btn.draw(surf)
         self.explore_btn.draw(surf)
         self.popups_draw(surf)
@@ -272,11 +298,12 @@ class ETFScene(Scene, PopupMixin):
             self._tooltip = (text, mp)
         return fitted
 
-    def _draw_row(self, surf, q, y, p, mp):
+    def _draw_row(self, surf, q, y, p, mp, cursor=False):
         cols = self.cols
         row_rect = pygame.Rect(cols["name"] - 4, y - 2, 1180, ROW_H)
         if row_rect.collidepoint(mp):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect, border_radius=3)
+        keynav.draw_focus_ring(surf, row_rect, cursor)
         risky = q["leveraged"]
         ncol = config.COL_DOWN if risky else config.COL_TEXT
         name_w = min(225, fonts.small(bold=True).size(q["name"])[0])

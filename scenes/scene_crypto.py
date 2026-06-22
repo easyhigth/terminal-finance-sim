@@ -120,14 +120,17 @@ class CryptoScene(Scene, PopupMixin):
         q_filter = self.search_box.query
         quotes = [q for q in K.all_quotes(m)
                   if not q_filter or q_filter in q["name"].lower() or q_filter in q["id"].lower()]
+        mp = pygame.mouse.get_pos()
         for q in quotes:
             pos = p.crypto.get(q["id"])
             held = pos["qty"] if pos else 0
+            row_rect = pygame.Rect(cols[0][1] - 4, y - 2, inner.w - 8, 28)
+            if row_rect.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect, border_radius=3)
             name_rect = pygame.Rect(cols[0][1], y - 2, 280, 22)
             self.name_rects[q["id"]] = name_rect
-            hover = name_rect.collidepoint(pygame.mouse.get_pos())
             widgets.draw_text(surf, f"{q['name']} ({q['id']})", (cols[0][1], y),
-                              fonts.small(bold=True), config.COL_CYAN if hover else config.COL_TEXT)
+                              fonts.small(bold=True), config.COL_TEXT)
             widgets.draw_text(surf, f"{q['spot']:,.2f}".replace(",", " "), (cols[1][1], y),
                               fonts.small(bold=True), config.COL_WHITE)
             widgets.draw_text(surf, f"{q['vol']*100:.0f}%", (cols[2][1], y), fonts.small(),

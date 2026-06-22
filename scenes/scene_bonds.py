@@ -163,9 +163,10 @@ class BondsScene(Scene, PopupMixin):
                       if q_filter in q["name"].lower() or q_filter in q["issuer"].lower()]
         sov = sorted([q for q in quotes if q["kind"] == "Souverain"], key=lambda q: (q["region"], q["years"]))
         corp = sorted([q for q in quotes if q["kind"] == "Corporate"], key=lambda q: (q["region"], q["name"]))
+        mp = pygame.mouse.get_pos()
         y = list_top - self.scroll
-        y = self._draw_group(surf, "SOUVERAINS", sov, y, p, list_area)
-        y = self._draw_group(surf, "CORPORATE", corp, y, p, list_area)
+        y = self._draw_group(surf, "SOUVERAINS", sov, y, p, list_area, mp)
+        y = self._draw_group(surf, "CORPORATE", corp, y, p, list_area, mp)
         surf.set_clip(prev_clip)
 
         content_h = (y + self.scroll) - list_top
@@ -183,7 +184,7 @@ class BondsScene(Scene, PopupMixin):
         self.gov_btn.draw(surf)
         self.popups_draw(surf)
 
-    def _draw_group(self, surf, title, quotes, y, p, list_area):
+    def _draw_group(self, surf, title, quotes, y, p, list_area, mp):
         cols = self.cols
         widgets.draw_text(surf, f"— {title} ({len(quotes)})", (cols["name"], y),
                           fonts.tiny(bold=True), config.COL_AMBER)
@@ -191,6 +192,9 @@ class BondsScene(Scene, PopupMixin):
         for q in quotes:
             visible = (list_area.top - ROW_H) < y < list_area.bottom
             if visible:
+                row_rect = pygame.Rect(cols["name"] - 4, y - 2, list_area.w - 8, ROW_H)
+                if row_rect.collidepoint(mp):
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect, border_radius=3)
                 name_w = min(260, fonts.small(bold=True).size(q["name"])[0])
                 self.name_rects[q["id"]] = pygame.Rect(cols["name"] - 2, y - 2, name_w + 4, ROW_H - 4)
                 widgets.draw_text(surf, widgets.fit_text(q["name"], fonts.small(bold=True), 260),

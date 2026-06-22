@@ -300,7 +300,8 @@ class MandatesScene(Scene):
                 hist = (p.cash_history or [])[-24:]
                 widgets.draw_series(surf, spark.inflate(-4, -4), hist,
                                     mouse_pos=pygame.mouse.get_pos(),
-                                    y_fmt=lambda v: widgets.format_money(v, cur))
+                                    y_fmt=lambda v: widgets.format_money(v, cur),
+                                    show_pct=True, show_extrema=False)
                 widgets.draw_text(surf, "Net worth (tendance)", (spark.x, spark.y - 14),
                                   fonts.tiny(), config.COL_TEXT_DIM)
 

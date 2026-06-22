@@ -148,7 +148,8 @@ class MarketHubScene(Scene, PopupMixin):
                                   (rect.x, rect.y), fonts.small(), config.COL_TEXT_DIM)
                 return
             widgets.draw_series(surf, rect, series, color, baseline=False,
-                                mouse_pos=pygame.mouse.get_pos(), y_fmt=lambda v: f"{v:,.2f}")
+                                mouse_pos=pygame.mouse.get_pos(), y_fmt=lambda v: f"{v:,.2f}",
+                                show_pct=True)
             widgets.draw_text(surf, f"Dernier : {series[-1]:,.2f}", (rect.x, rect.bottom - 16),
                               fonts.tiny(), config.COL_TEXT_DIM)
         self.open_custom_chart(title, render, accent=color)

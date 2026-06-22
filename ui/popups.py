@@ -90,7 +90,7 @@ def _draw_series_plot(surf, rect, s, kind):
         return f"vol. annualisée (20 pas) {vol[-1]:.1f}%"
     # ligne (défaut)
     col = config.COL_UP if s[-1] >= s[0] else config.COL_DOWN
-    widgets.draw_series(surf, rect, s, col, mouse_pos=mp, y_fmt=lambda v: f"{v:,.2f}")
+    widgets.draw_series(surf, rect, s, col, mouse_pos=mp, y_fmt=lambda v: f"{v:,.2f}", show_pct=True)
     chg = (s[-1] / s[0] - 1) * 100 if s[0] else 0.0
     return f"{s[-1]:,.2f}  ({'+' if chg>=0 else ''}{chg:.1f}%)"
 
@@ -803,6 +803,7 @@ class PopupMixin:
         return False
 
     def popups_draw(self, surf):
+        widgets.sync_chart_hover(self.popups, pygame.mouse.get_pos())
         for w in self.popups:
             w.draw(surf)
 

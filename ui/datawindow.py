@@ -36,6 +36,7 @@ class DataWindow:
         self.rows = rows[:max_rows]      # liste de tuples (même longueur que columns)
         self.accent = accent
         self.chart = chart              # liste de valeurs (mode graphe) ou None
+        self._chart_area = None         # zone de tracé du graphe (mode chart), pour la sync entre fenêtres
         self.resizable = resizable
         self.minimizable = minimizable
         self.minimized = False
@@ -173,11 +174,20 @@ class DataWindow:
         # mode graphe
         if self.chart is not None:
             area = pygame.Rect(content.x, content.y + 8, content.w, content.h - 38)
+            self._chart_area = area
             vals = self.chart
             if len(vals) >= 2:
                 col = config.COL_UP if vals[-1] >= vals[0] else config.COL_DOWN
+                mp = pygame.mouse.get_pos()
                 widgets.draw_series(surf, area, vals, col, baseline=True,
-                                    mouse_pos=pygame.mouse.get_pos(), y_fmt=lambda v: f"{v:,.0f}")
+                                    mouse_pos=mp, y_fmt=lambda v: f"{v:,.0f}", show_pct=True)
+                sync = widgets._hover_sync
+                if (not area.collidepoint(mp) and sync["frac"] is not None
+                        and sync["source"] != id(self)):
+                    lo, hi = min(vals), max(vals)
+                    span = (hi - lo) or 1.0
+                    widgets.draw_chart_ghost(surf, area, vals, lo, span, sync["frac"],
+                                             y_fmt=lambda v: f"{v:,.0f}")
                 perf = (vals[-1] / vals[0] - 1) * 100 if vals[0] else 0.0
                 widgets.draw_text(surf, f"{vals[-1]:,.0f}", (area.x, area.bottom + 6),
                                   fonts.small(bold=True), config.COL_WHITE)

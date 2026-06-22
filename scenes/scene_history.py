@@ -94,7 +94,8 @@ class HistoryScene(Scene):
             y_fmt=lambda v: widgets.format_money(v, cur), rows=4)
         widgets.draw_series(surf, chart_rect, hist, config.COL_CYAN, baseline=False,
                             mouse_pos=pygame.mouse.get_pos(),
-                            y_fmt=lambda v: widgets.format_money(v, cur))
+                            y_fmt=lambda v: widgets.format_money(v, cur),
+                            show_pct=True, show_extrema=False)
 
         i_max = max(range(len(hist)), key=lambda i: hist[i])
         i_min = min(range(len(hist)), key=lambda i: hist[i])

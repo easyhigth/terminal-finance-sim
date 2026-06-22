@@ -50,7 +50,7 @@ class OptionsScene(Scene):
         for tk in p.portfolio:
             if tk not in out:
                 out.append(tk)
-        return out[:10]
+        return out[:15]
 
     def _ticker(self):
         tickers = self._tickers()
@@ -135,7 +135,7 @@ class OptionsScene(Scene):
         tickers = self._tickers()
 
         # ---- cotation / souscription (gauche) ----
-        quote_rect = pygame.Rect(40, 110, 460, 360)
+        quote_rect = pygame.Rect(40, 110, 460, 410)
         inner = widgets.draw_panel(surf, quote_rect, "Nouvelle position", config.COL_CYAN)
         y = inner.y
 
@@ -257,7 +257,7 @@ class OptionsScene(Scene):
             self.buy_btn = None
 
         # ---- positions en cours (droite) ----
-        pos_rect = pygame.Rect(540, 110, config.SCREEN_WIDTH - 580, 360)
+        pos_rect = pygame.Rect(540, 110, config.SCREEN_WIDTH - 580, 410)
         pinner = widgets.draw_panel(surf, pos_rect, "Positions en cours", config.COL_UP)
         hold = O.holdings(p, m)
         if not hold:

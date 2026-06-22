@@ -23,13 +23,17 @@ class FrontierLabScene(Scene):
         p = self.app.gs.player
         held = [h["ticker"] for h in pf.holdings(p, self.market) if not h["short"]]
         self._held = list(held)
-        candidates = analytics.diversification_candidates(p, self.market, n=10)
+        candidates = analytics.diversification_candidates(p, self.market, n=20)
         self.universe = list(dict.fromkeys(held + candidates))
         self._candidates_sorted = list(candidates)
         self.selected = set(held)
         self.scroll = 0
         self._max_scroll = 0
         self._row_rects = {}
+        self.scroll_reco = 0
+        self._reco_max_scroll = 0
+        self._universe_rect = None
+        self._reco_rect = None
         self.back_btn = widgets.Button(
             config.back_button_rect(180), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.reset_btn = widgets.Button(
@@ -52,6 +56,12 @@ class FrontierLabScene(Scene):
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
             delta = -ROW_H * 2 if event.button == 4 else ROW_H * 2
+            if self._reco_rect and self._reco_rect.collidepoint(event.pos):
+                self.scroll_reco = max(0, min(self._reco_max_scroll, self.scroll_reco + delta))
+                return
+            if self._universe_rect and self._universe_rect.collidepoint(event.pos):
+                self.scroll = max(0, min(self._max_scroll, self.scroll + delta))
+                return
             self.scroll = max(0, min(self._max_scroll, self.scroll + delta))
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -92,6 +102,7 @@ class FrontierLabScene(Scene):
         inner = widgets.draw_panel(surf, rect, f"Univers d'actifs ({len(self.selected)} sél.)",
                                    config.COL_CYAN)
         self._row_rects = {}
+        self._universe_rect = inner
         prev_clip = surf.get_clip()
         surf.set_clip(inner)
         y = inner.y - self.scroll
@@ -162,15 +173,25 @@ class FrontierLabScene(Scene):
 
     def _draw_recommendations(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Suggestions de diversification", config.COL_AMBER)
-        cands = [tk for tk in self._candidates_sorted if tk not in self.selected][:6]
+        self._reco_rect = inner
+        cands = [tk for tk in self._candidates_sorted if tk not in self.selected]
         if not cands:
             widgets.draw_text(surf, "Toutes les candidates suggérées sont déjà incluses.",
                               (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
+            self._reco_max_scroll = 0
             return
         widgets.draw_text(surf, "Actions peu corrélées à vos positions actuelles — "
                           "cochez-les à gauche pour voir l'effet sur la frontière.",
                           (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
-        y = inner.y + 18
+        list_area = pygame.Rect(inner.x - 4, inner.y + 18, inner.w + 8, inner.h - 18)
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        y = inner.y + 18 - self.scroll_reco
         for tk in cands:
             widgets.draw_text(surf, tk, (inner.x, y), fonts.small(bold=True), config.COL_CYAN)
             y += 18
+        surf.set_clip(prev_clip)
+        content_h = (y + self.scroll_reco) - (inner.y + 18)
+        self._reco_max_scroll = max(0, content_h - list_area.h)
+        self.scroll_reco = max(0, min(self._reco_max_scroll, self.scroll_reco))
+        widgets.draw_scrollbar(surf, rect, list_area, self.scroll_reco, self._reco_max_scroll, content_h)

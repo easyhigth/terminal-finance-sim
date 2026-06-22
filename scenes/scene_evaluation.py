@@ -500,7 +500,7 @@ class EvaluationScene(Scene):
         _lang = get_lang()
         titles = [lessons_data.title_for(lid, _lang) for lid in self.missed_lessons
                   if lessons_data.get(lid)]
-        shown = titles[:4]
+        shown = titles[:8]
         # hauteur de panneau adaptée au contenu (anti-chevauchement du bouton)
         lessons_h = (32 + 22 * len(shown) + (20 if len(titles) > len(shown) else 0)
                      if titles else 0)

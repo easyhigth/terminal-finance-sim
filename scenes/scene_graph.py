@@ -65,6 +65,7 @@ _MULTI = {k for _, _, k, multi in TYPES if multi}
 _NO_ASSET = {"macro", "curve"}     # types sans saisie d'actif
 
 PERIODS = [("1A", 73), ("3A", 219), ("5A", 365), ("MAX", None)]
+_MAX_TICKERS = 10   # au-delà, légendes/puces deviennent illisibles
 SERIES_COLS = [config.COL_AMBER, config.COL_CYAN, config.COL_UP, config.COL_WARN,
                config.COL_PRESTIGE, config.COL_DOWN]
 
@@ -89,7 +90,7 @@ class GraphScene(Scene, PopupMixin):
             if not valid and self.kind not in _NO_ASSET:
                 self.error = f"Actif introuvable : {', '.join(requested)}"
             tickers = valid
-        self.tickers = [t.upper() for t in tickers][:6]
+        self.tickers = [t.upper() for t in tickers][:_MAX_TICKERS]
         self.period = kwargs.get("period", 365)
         self.spread_mode = "ratio"
         self.input = ""
@@ -235,7 +236,7 @@ class GraphScene(Scene, PopupMixin):
         if self.kind in _MULTI:
             if tk not in self.tickers:
                 self.tickers.append(tk)
-                self.tickers = self.tickers[-6:]
+                self.tickers = self.tickers[-_MAX_TICKERS:]
         else:
             self.tickers = [tk]
 
@@ -462,9 +463,15 @@ class GraphScene(Scene, PopupMixin):
             img = lbl_font.render("Sélection :", True, config.COL_TEXT_DIM)
             surf.blit(img, (x, y + 5))
             x += img.get_width() + 8
-            for tk in self.tickers:
+            chip_zone_right = config.SCREEN_WIDTH - 200   # laisse de la place aux suggestions
+            for n, tk in enumerate(self.tickers):
                 label = f"{tk}  ✕"
                 w = fonts.tiny(bold=True).size(label)[0] + 16
+                remaining = len(self.tickers) - n
+                if x + w > chip_zone_right and remaining > 1:
+                    more = widgets.draw_badge(surf, f"+{remaining}", (x, y), config.COL_TEXT_DIM)
+                    x = more.right + 6
+                    break
                 rect = pygame.Rect(x, y, w, 24)
                 self._chip_rects.append((rect, tk))
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect, border_radius=4)

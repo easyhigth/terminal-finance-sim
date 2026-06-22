@@ -88,6 +88,11 @@ class AnalyticsScene(Scene, PopupMixin):
             if self._alloc_list_rect and self._alloc_list_rect.collidepoint(event.pos):
                 self.scroll_alloc = max(0, min(self._alloc_max_scroll, self.scroll_alloc + delta))
                 return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            for tk, rect in self._holding_rects.items():
+                if rect.collidepoint(event.pos):
+                    self._open_holding(tk)
+                    return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for tk, rect in self._holding_rects.items():
                 if rect.collidepoint(event.pos):
@@ -103,7 +108,7 @@ class AnalyticsScene(Scene, PopupMixin):
             if self._corr_rect and self._corr_rect.collidepoint(event.pos):
                 p, m = self.app.gs.player, self.market
                 self.open_custom_chart("CORRÉLATIONS — actions",
-                                       lambda surf, rect: self._draw_corr(surf, rect, p, m),
+                                       lambda surf, rect: self._draw_corr(surf, rect, p, m, max_labels=None),
                                        accent=config.COL_DOWN, size=(560, 420))
                 return
 
@@ -274,7 +279,7 @@ class AnalyticsScene(Scene, PopupMixin):
         self.scroll_holdings = max(0, min(self._holdings_max_scroll, self.scroll_holdings))
         widgets.draw_scrollbar(surf, rect, list_area, self.scroll_holdings,
                                self._holdings_max_scroll, content_h)
-        widgets.draw_text(surf, "clic actif → fiche d'analyse · clic cours/valeur/P&L (actions) → graphe",
+        widgets.draw_text(surf, "clic/clic droit actif → fiche d'analyse · clic cours/valeur/P&L (actions) → graphe",
                           (inner.x, inner.bottom - 12), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_allocations(self, surf, rect, s, cur):
@@ -288,10 +293,10 @@ class AnalyticsScene(Scene, PopupMixin):
                               lambda k: _CLASS_COL.get(k, config.COL_TEXT))
         y += 6
         y = self._alloc_block(surf, inner, y, "Par secteur", s["by_sector"],
-                              lambda k: config.COL_CYAN, limit=6)
+                              lambda k: config.COL_CYAN)
         y += 6
         y = self._alloc_block(surf, inner, y, "Par région", s["by_region"],
-                              lambda k: config.COL_PRESTIGE, limit=5)
+                              lambda k: config.COL_PRESTIGE)
         y += 6
         liq_col = {"Liquide": config.COL_UP, "Peu liquide": config.COL_WARN,
                    "Illiquide": config.COL_DOWN}
@@ -326,13 +331,11 @@ class AnalyticsScene(Scene, PopupMixin):
         self.scroll_alloc = max(0, min(self._alloc_max_scroll, self.scroll_alloc))
         widgets.draw_scrollbar(surf, rect, inner, self.scroll_alloc, self._alloc_max_scroll, content_h)
 
-    def _alloc_block(self, surf, inner, y, title, data, colfn, limit=None):
+    def _alloc_block(self, surf, inner, y, title, data, colfn):
         widgets.draw_text(surf, title, (inner.x, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         y += 16
         total = sum(data.values()) or 1.0
         items = sorted(data.items(), key=lambda kv: -kv[1])
-        if limit:
-            items = items[:limit]
         for k, v in items:
             frac = v / total
             widgets.draw_text(surf, widgets.fit_text(str(k), fonts.tiny(), 110),
@@ -388,16 +391,16 @@ class AnalyticsScene(Scene, PopupMixin):
         widgets.draw_text(surf, f"vol {cvol:.0f}%  ·  rdt att. {cret:.0f}%",
                           (inner.x, inner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
 
-    def _draw_corr(self, surf, rect, p, m):
+    def _draw_corr(self, surf, rect, p, m, max_labels=8):
         inner = widgets.draw_panel(surf, rect, "Corrélations (actions)", config.COL_DOWN)
         labels, corr = analytics.correlation(p, m)
         if len(labels) < 2:
             widgets.draw_text(surf, "≥ 2 actions requises.", (inner.x, inner.y),
                               fonts.tiny(), config.COL_TEXT_DIM)
             return
-        labels = labels[:8]
+        labels = labels[:max_labels] if max_labels else labels
         nlab = len(labels)
-        cell = min((inner.h - 16) // nlab, (inner.w - 70) // nlab, 30)
+        cell = max(8, min((inner.h - 16) // nlab, (inner.w - 70) // nlab, 30))
         x0, y0 = inner.x + 62, inner.y + 14
         for r in range(nlab):
             widgets.draw_text(surf, widgets.fit_text(labels[r], fonts.tiny(), 58),

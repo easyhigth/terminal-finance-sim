@@ -110,6 +110,36 @@ class MarketHubScene(Scene, PopupMixin):
                 if rect.collidepoint(event.pos):
                     self._open_sector_popup(sector)
                     return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            # clic droit : aperçu en popup plutôt qu'une navigation complète
+            # (utile pour consulter une fiche sans perdre le contexte du hub)
+            for tk, rect in self._ticker_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.open_company(tk)
+                    return
+            for name, rect in self._index_row_rects.items():
+                if rect.collidepoint(event.pos):
+                    chg = self.market.index_change_pct(name)
+                    col = config.COL_UP if chg >= 0 else config.COL_DOWN
+                    self._open_series_popup(f"INDICE — {name}", self.market.index_history(name), col)
+                    return
+            if self._regime_rect and self._regime_rect.collidepoint(event.pos):
+                reg_good = self.market.regime in ("Expansion", "Calme")
+                self._open_series_popup("RÉGIME — taux directeur",
+                                        self.market.macro_hist.get("rate", []),
+                                        config.COL_UP if reg_good else config.COL_DOWN)
+                return
+            for key, rect in self._eco_row_rects.items():
+                if rect.collidepoint(event.pos):
+                    ch = self.market.macro_change(key)
+                    col = config.COL_UP if ch >= 0 else config.COL_DOWN
+                    label = self.market.macro[key]["label"]
+                    self._open_series_popup(f"ÉCO — {label}", self.market.macro_hist.get(key, []), col)
+                    return
+            for sector, rect in self._sector_row_rects.items():
+                if rect.collidepoint(event.pos):
+                    self._open_sector_popup(sector)
+                    return
 
     def _open_series_popup(self, title, series, color):
         def render(surf, rect):

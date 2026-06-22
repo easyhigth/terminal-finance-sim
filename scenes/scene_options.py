@@ -50,10 +50,13 @@ class OptionsScene(Scene):
         for tk in p.portfolio:
             if tk not in out:
                 out.append(tk)
-        return out[:15]
+        return out
+
+    def _shown_tickers(self):
+        return self._tickers()[:15]
 
     def _ticker(self):
-        tickers = self._tickers()
+        tickers = self._shown_tickers()
         if not tickers:
             return None
         i = min(self.ticker_idx, len(tickers) - 1)
@@ -132,7 +135,8 @@ class OptionsScene(Scene):
 
         m, p = self.app.market, self.app.gs.player
         cur = self._cur()
-        tickers = self._tickers()
+        all_tickers = self._tickers()
+        tickers = self._shown_tickers()
 
         # ---- cotation / souscription (gauche) ----
         quote_rect = pygame.Rect(40, 110, 460, 410)
@@ -161,7 +165,13 @@ class OptionsScene(Scene):
                 if x + 76 > inner.right:
                     x = inner.x
                     y += 30
-            y += 36
+            y += 30
+            if len(all_tickers) > len(tickers):
+                widgets.draw_text(surf, f"+{len(all_tickers) - len(tickers)} autre(s) titre(s) suivi(s) "
+                                        "(gérez votre watchlist pour réduire la liste).",
+                                  (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+                y += 14
+            y += 6
 
         widgets.draw_text(surf, "Sens", (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 22

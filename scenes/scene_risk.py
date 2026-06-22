@@ -405,8 +405,13 @@ class RiskScene(Scene):
             widgets.draw_badge(surf, "AUCUN DÉPASSEMENT", (inner.x, y), accent=config.COL_UP)
             y += 28
         else:
-            for b in res["breaches"][:3]:
+            breaches = res["breaches"]
+            for b in breaches[:3]:
                 widgets.draw_text(surf, f"{b['label']} : {b['value']:.1f} > {b['limit']:.1f}",
+                                  (inner.x, y), fonts.tiny(), config.COL_DOWN)
+                y += 16
+            if len(breaches) > 3:
+                widgets.draw_text(surf, f"+{len(breaches) - 3} autre(s) dépassement(s)",
                                   (inner.x, y), fonts.tiny(), config.COL_DOWN)
                 y += 16
             y += 10

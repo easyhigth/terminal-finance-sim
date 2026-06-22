@@ -108,6 +108,11 @@ class ETFScene(Scene, PopupMixin):
                 self.scroll = max(0, min(self._max_scroll,
                                          self.scroll + (-48 if event.button == 4 else 48)))
             return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            for eid, rect in self.name_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.open_etf(eid)
+                    return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
                 self.search = ""

@@ -77,6 +77,11 @@ class BondsScene(Scene, PopupMixin):
                 self.scroll = max(0, min(self._max_scroll,
                                          self.scroll + (-48 if event.button == 4 else 48)))
             return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            for bid, rect in self.name_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.open_bond(bid)
+                    return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.search_box.handle_clear_click(event):
                 return

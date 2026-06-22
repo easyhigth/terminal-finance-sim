@@ -39,20 +39,40 @@ class GameOverScene(Scene):
     def on_enter(self, **kwargs):
         self.t = 0.0
         p = self.app.gs.player
+        # fin de partie : on ferme tous les autres onglets pour repartir
+        # d'un état d'onglets totalement vierge à la prochaine partie.
+        self.app.pages.close_other_pages()
         # run définitif en hardcore : on efface l'autosave
         if p.hardcore:
             GameState.delete(config.AUTOSAVE_SLOT)
         market = getattr(self.app, "market", None)
         self.score = score_mod.compute_final_score(p, market)
         self.menu_btn = widgets.Button(
-            (config.SCREEN_WIDTH // 2 - 150, 692, 300, 26),
+            (config.SCREEN_WIDTH // 2 - 150, 660, 300, 26),
             "RETOUR AU MENU", config.COL_AMBER)
+        # défilement (molette) des blocs "Rapport final" et "Journal de carrière"
+        self.scroll_report = 0
+        self.scroll_journal = 0
+        self._report_max_scroll = 0
+        self._journal_max_scroll = 0
+        self._report_list_rect = None
+        self._journal_list_rect = None
 
     def handle_event(self, event):
         if self.menu_btn.handle(event):
             self.app.scenes.go("menu")
+            return
         if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
             self.app.scenes.go("menu")
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            delta = -32 if event.button == 4 else 32
+            if self._report_list_rect and self._report_list_rect.collidepoint(event.pos):
+                self.scroll_report = max(0, min(self._report_max_scroll, self.scroll_report + delta))
+                return
+            if self._journal_list_rect and self._journal_list_rect.collidepoint(event.pos):
+                self.scroll_journal = max(0, min(self._journal_max_scroll, self.scroll_journal + delta))
+                return
 
     def update(self, dt):
         self.t += dt
@@ -66,25 +86,57 @@ class GameOverScene(Scene):
         # titre pulsé en rouge (compact pour laisser de la place au score)
         pulse = 0.5 + 0.5 * math.sin(self.t * 2.5)
         col = widgets._lerp_col(config.COL_DOWN, (120, 20, 24), pulse)
-        widgets.draw_text(surf, "GAME OVER", (cx, 56),
+        widgets.draw_text(surf, "GAME OVER", (cx, 50),
                           fonts.title(bold=True), col, align="center")
-        widgets.draw_text(surf, "FIN DE CARRIÈRE", (cx, 92),
+        widgets.draw_text(surf, "FIN DE CARRIÈRE", (cx, 84),
                           fonts.small(), config.COL_TEXT_DIM, align="center")
 
         info = config.CONTINENTS.get(p.continent, {})
         cur = info.get("currency", "$")
 
-        top_y = 118
+        top_y = 106
         col_w = 250
         gap = 8
+        row_h = 360
         left_x = cx - (3 * col_w + 2 * gap) // 2
 
-        # panneau gauche : rapport final + stats de run
-        left = pygame.Rect(left_x, top_y, col_w, 230)
-        inner = widgets.draw_panel(surf, left, "Rapport final", config.COL_DOWN)
+        # panneau gauche : rapport final + stats de run (défilable)
+        left = pygame.Rect(left_x, top_y, col_w, row_h)
+        self._draw_report_panel(surf, left, p, cur)
+
+        # panneau central : journal de carrière, intégral (défilable)
+        mid = pygame.Rect(left_x + col_w + gap, top_y, col_w, row_h)
+        self._draw_journal_panel(surf, mid, p)
+
+        # panneau droit : score composite de fin de run
+        right = pygame.Rect(left_x + 2 * (col_w + gap), top_y, col_w, row_h)
+        self._draw_score_panel(surf, right)
+
+        # panneau bas : rétrospective graphique de la valeur nette
+        bottom_h = 150
+        bottom = pygame.Rect(left_x, top_y + row_h + gap, 3 * col_w + 2 * gap, bottom_h)
+        binner = widgets.draw_panel(surf, bottom, "Rétrospective — valeur nette", config.COL_CYAN)
+        self._draw_networth_retrospective(surf, binner, p, cur)
+
+        if p.hardcore:
+            widgets.draw_badge(surf, "HARDCORE — SAUVEGARDE EFFACÉE",
+                               (cx, bottom.bottom + 10), config.COL_DOWN, align="center")
+
+        self.menu_btn.draw(surf)
+
+    def _draw_report_panel(self, surf, rect, p, cur):
+        """Rapport final + stats de run — défilable à la molette pour
+        toujours pouvoir tout lire, même un motif de fin de partie long."""
+        inner = widgets.draw_panel(surf, rect, "Rapport final", config.COL_DOWN)
+        list_area = pygame.Rect(inner.x - 4, inner.y, inner.w + 8, inner.h)
+        self._report_list_rect = list_area
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        y = inner.y - self.scroll_report
         h = widgets.draw_text_wrapped(surf, p.game_over_reason or "Partie terminée.",
-                                      (inner.x, inner.y), fonts.tiny(),
+                                      (inner.x, y), fonts.tiny(),
                                       config.COL_TEXT, inner.w, line_gap=4)
+        y += h + 8
         lines = [
             f"Nom    : {p.name}",
             f"Grade  : {p.grade}",
@@ -96,43 +148,48 @@ class GameOverScene(Scene):
             f"Rép.   : {p.reputation}/100",
             f"Deals {p.deals_won}  Miss. {p.missions_done}",
         ]
-        y = inner.y + h + 6
         for ln in lines:
             widgets.draw_text(surf, ln, (inner.x, y), fonts.tiny(), config.COL_TEXT)
             y += 18
         if p.titles:
-            widgets.draw_text_wrapped(surf, "Titres : " + " · ".join(p.titles),
-                                      (inner.x, y + 2), fonts.tiny(), config.COL_WARN, inner.w)
+            y += 4
+            y += widgets.draw_text_wrapped(surf, "Titres : " + " · ".join(p.titles),
+                                           (inner.x, y), fonts.tiny(), config.COL_WARN, inner.w)
+        surf.set_clip(prev_clip)
+        content_h = (y + self.scroll_report) - inner.y
+        self._report_max_scroll = max(0, content_h - list_area.h)
+        self.scroll_report = max(0, min(self._report_max_scroll, self.scroll_report))
+        widgets.draw_scrollbar(surf, rect, list_area, self.scroll_report,
+                               self._report_max_scroll, content_h)
 
-        # panneau central : journal de carrière (rétrospective)
-        mid = pygame.Rect(left_x + col_w + gap, top_y, col_w, 230)
-        minner = widgets.draw_panel(surf, mid, "Journal de carrière", config.COL_AMBER)
-        if p.journal:
-            yy = minner.y
-            for e in list(reversed(p.journal))[:9]:
-                widgets.draw_text(surf, f"J{e['day']}", (minner.x, yy),
-                                  fonts.tiny(bold=True), config.COL_CYAN)
-                widgets.draw_text(surf, e["text"][:30], (minner.x + 40, yy),
-                                  fonts.tiny(), config.COL_TEXT)
-                yy += 22
-        else:
+    def _draw_journal_panel(self, surf, rect, p):
+        """Journal de carrière intégral (plus de limite à 9 entrées) —
+        défilable à la molette."""
+        inner = widgets.draw_panel(surf, rect, "Journal de carrière", config.COL_AMBER)
+        list_area = pygame.Rect(inner.x - 4, inner.y, inner.w + 8, inner.h)
+        self._journal_list_rect = list_area
+        if not p.journal:
             widgets.draw_text_wrapped(surf, "Carrière trop courte pour laisser une trace.",
-                              (minner.x, minner.y), fonts.tiny(), config.COL_TEXT_DIM, minner.w)
-
-        # panneau droit : score composite de fin de run
-        right = pygame.Rect(left_x + 2 * (col_w + gap), top_y, col_w, 230)
-        self._draw_score_panel(surf, right)
-
-        # panneau bas : rétrospective graphique de la valeur nette
-        bottom = pygame.Rect(left_x, top_y + 238, 3 * col_w + 2 * gap, 88)
-        binner = widgets.draw_panel(surf, bottom, "Rétrospective — valeur nette", config.COL_CYAN)
-        self._draw_networth_retrospective(surf, binner, p, cur)
-
-        if p.hardcore:
-            widgets.draw_badge(surf, "HARDCORE — SAUVEGARDE EFFACÉE",
-                               (cx, 680), config.COL_DOWN, align="center")
-
-        self.menu_btn.draw(surf)
+                              (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM, inner.w)
+            self._journal_max_scroll = 0
+            return
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        row_h = 22
+        yy = inner.y - self.scroll_journal
+        for e in reversed(p.journal):
+            if list_area.top - row_h < yy < list_area.bottom:
+                widgets.draw_text(surf, f"J{e['day']}", (inner.x, yy),
+                                  fonts.tiny(bold=True), config.COL_CYAN)
+                widgets.draw_text(surf, widgets.fit_text(e["text"], fonts.tiny(), inner.w - 40),
+                                  (inner.x + 40, yy), fonts.tiny(), config.COL_TEXT)
+            yy += row_h
+        surf.set_clip(prev_clip)
+        content_h = (yy + self.scroll_journal) - inner.y
+        self._journal_max_scroll = max(0, content_h - list_area.h)
+        self.scroll_journal = max(0, min(self._journal_max_scroll, self.scroll_journal))
+        widgets.draw_scrollbar(surf, rect, list_area, self.scroll_journal,
+                               self._journal_max_scroll, content_h)
 
     def _draw_score_panel(self, surf, rect):
         """Affiche le score composite de fin de run (core/score.py) : note
@@ -148,9 +205,9 @@ class GameOverScene(Scene):
         widgets.draw_text_wrapped(surf, sc.rank_label, (inner.x, inner.y + 30),
                                   fonts.tiny(), config.COL_TEXT_DIM, inner.w)
 
-        bar_y = inner.y + 56
-        bar_h = 13
-        gap = 5
+        bar_y = inner.y + 64
+        bar_h = 16
+        gap = 12
         for key, label in SCORE_DIMENSIONS:
             val = getattr(sc, key)
             widgets.draw_text(surf, label, (inner.x, bar_y), fonts.tiny(), config.COL_TEXT)

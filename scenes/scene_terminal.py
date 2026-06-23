@@ -20,11 +20,11 @@ from core import rivals as rivals_mod
 from core import unlocks as unlocks_mod
 from core.i18n import get_lang
 from core.scene_manager import Scene
-from scenes.scene_terminal_market import TerminalMarketMixin
-from scenes.scene_terminal_trading import TerminalTradingMixin
 from scenes.scene_terminal_career import TerminalCareerMixin
-from scenes.scene_terminal_time import TerminalTimeMixin
+from scenes.scene_terminal_market import TerminalMarketMixin
 from scenes.scene_terminal_render import TerminalRenderMixin
+from scenes.scene_terminal_time import TerminalTimeMixin
+from scenes.scene_terminal_trading import TerminalTradingMixin
 
 
 def _L(fr, en):
@@ -590,7 +590,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         dans la sauvegarde, pour les retrouver à la reprise de la partie. Les
         fenêtres génériques (tableaux figés type TOP/COMPARE) et l'accès rapide
         (callback non sérialisable) sont volontairement exclus."""
-        from ui.popups import CompanyPopup, ChartPopup
+        from ui.popups import ChartPopup, CompanyPopup
         entries = []
         for w in self.datawins:
             if getattr(w, "closed", False):
@@ -606,7 +606,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
     def _restore_workspace(self):
         """Reconstruit les fenêtres flottantes sauvegardées (reprise de partie),
         à l'unique premier on_enter de la scène (cf. garde hasattr appelante)."""
-        from ui.popups import CompanyPopup, ChartPopup
+        from ui.popups import ChartPopup, CompanyPopup
         p = self.app.gs.player
         for entry in getattr(p, "workspace", []) or []:
             pos = tuple(entry.get("pos") or (160, 120))

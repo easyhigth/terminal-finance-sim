@@ -5,9 +5,9 @@ hedge, rebalance, journal de trading. Extrait de scene_terminal_commands.py pour
 limiter sa taille ; mixé dans TerminalScene avec les autres mixins de commandes.
 """
 
+from core import career as career_mod
 from core import config
 from core import journal as journal_mod
-from core import career as career_mod
 from core import portfolio as pf_mod
 from core import unlocks as unlocks_mod
 from core.i18n import get_lang

@@ -8,8 +8,7 @@ consultables depuis leurs propres écrans (menu PLUS).
 """
 import pygame
 
-from core import bonds, commodities, crypto, etfs, portfolio_views
-from core import config
+from core import bonds, commodities, config, crypto, etfs, portfolio_views
 from core.scene_manager import Scene
 from ui import fonts, widgets
 

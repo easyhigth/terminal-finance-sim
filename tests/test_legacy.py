@@ -1,5 +1,4 @@
-from core import legacy
-from core import market
+from core import legacy, market
 from core.game_state import PlayerState
 
 

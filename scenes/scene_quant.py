@@ -184,8 +184,8 @@ class QuantScene(Scene):
         pad = (ymax-ymin)*0.1
         ymin -= pad; ymax += pad
         xmin, xmax = xs[0], xs[-1]
-        x0, y0 = inner.x+34, inner.bottom-20
-        w, h = inner.w-44, inner.h-34
+        x0, y0 = inner.x+34, inner.bottom-32
+        w, h = inner.w-44, inner.h-46
 
         def to_px(x, y):
             px = x0 + (x-xmin)/(xmax-xmin)*w
@@ -204,6 +204,13 @@ class QuantScene(Scene):
             py = y0 - (yv-ymin)/(ymax-ymin)*h
             widgets.draw_text(surf, f"{yv:.1f}", (inner.x, py-6),
                               fonts.tiny(), config.COL_TEXT_DIM)
+        # x labels (axe des spots sous-jacents) : décalés sous l'axe pour ne
+        # pas chevaucher les étiquettes d'extrema/curseur Y qui longent y0.
+        widgets.draw_chart_x_labels(surf, pygame.Rect(x0, y0 - h, w, h + 18), [
+            (0.0, f"{xmin:.0f}"),
+            (0.5, f"{(xmin+xmax)/2:.0f}"),
+            (1.0, f"{xmax:.0f}"),
+        ])
         # courbes
         for data, col, label in series:
             pts = [to_px(x, y) for x, y in zip(xs, data)]

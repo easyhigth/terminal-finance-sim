@@ -342,6 +342,7 @@ class GraphScene(Scene, PopupMixin):
         canvas = pygame.Rect(40, canvas_top, config.SCREEN_WIDTH - 80, main_h)
         widgets.draw_panel(surf, canvas, None)
         inner = canvas.inflate(-24, -24)
+        inner.height -= 14   # réserve une marge pour les libellés d'axe X
         drawer = getattr(self, f"_draw_{self.kind}", None)
         if drawer:
             drawer(surf, inner)
@@ -551,6 +552,19 @@ class GraphScene(Scene, PopupMixin):
         """Grille horizontale + libellés d'axe Y. Retourne (lo, hi, span)."""
         return widgets.draw_chart_axes(surf, rect, lo, hi, y_fmt, rows)
 
+    def _x_labels(self, surf, rect, n):
+        """Libellés d'axe X (début / milieu / aujourd'hui) sous une série
+        temporelle de `n` points, le point le plus à droite étant le plus
+        récent — comble l'absence d'axe des X signalée sur tous les types
+        de graphes basés sur une série temporelle."""
+        if n < 2:
+            return
+        widgets.draw_chart_x_labels(surf, rect, [
+            (0.0, f"-{n - 1}j"),
+            (0.5, f"-{(n - 1) // 2}j"),
+            (1.0, "aujourd'hui"),
+        ])
+
     def _polyline(self, surf, rect, series, lo, span, color, y_fmt=None, cursor=None,
                   show_pct=False):
         n = len(series)
@@ -588,6 +602,7 @@ class GraphScene(Scene, PopupMixin):
             allv += [v for v in boll[2] if v is not None]
         lo, hi = min(allv), max(allv)
         lo, hi, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:.0f}")
+        self._x_labels(surf, rect, len(s))
         legend = [("Cours", config.COL_AMBER),
                   ("MM20", config.COL_CYAN), ("MM50", config.COL_TEXT_DIM)]
         if boll:
@@ -663,7 +678,9 @@ class GraphScene(Scene, PopupMixin):
             return self._empty(surf, rect, "Historique indisponible.")
         lo, hi = min(s), max(s)
         self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:.0f}")
-        widgets.draw_candles(surf, rect, s, n_candles=min(60, len(s)), sma_windows=(10, 30))
+        n_candles = min(60, len(s))
+        widgets.draw_candles(surf, rect, s, n_candles=n_candles, sma_windows=(10, 30))
+        self._x_labels(surf, rect, n_candles)
 
     def _draw_bars(self, surf, rect):
         if not self.tickers:
@@ -675,6 +692,7 @@ class GraphScene(Scene, PopupMixin):
         lo = min(c[2] for c in candles)
         hi = max(c[1] for c in candles)
         _, _, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:.0f}")
+        self._x_labels(surf, rect, len(candles))
         slot = rect.w / len(candles)
         yof = lambda v: rect.bottom - int((v - lo) / span * rect.h)
         for k, (o, h, l, c) in enumerate(candles):
@@ -693,6 +711,7 @@ class GraphScene(Scene, PopupMixin):
         pct = charts.normalize(s)
         lo, hi = min(pct), max(pct)
         lo, hi, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:+.0f}%")
+        self._x_labels(surf, rect, len(pct))
         self._zero_line(surf, rect, lo, span)
         col = config.COL_UP if pct[-1] >= 0 else config.COL_DOWN
         self._polyline(surf, rect, pct, lo, span, col, y_fmt=lambda v: f"{v:+.1f}%",
@@ -707,6 +726,7 @@ class GraphScene(Scene, PopupMixin):
         allv = [v for _, s in series for v in s]
         lo, hi = min(allv), max(allv)
         lo, hi, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:+.0f}%")
+        self._x_labels(surf, rect, max(len(s) for _, s in series))
         self._zero_line(surf, rect, lo, span)
         legend = []
         for i, (tk, s) in enumerate(series):
@@ -725,6 +745,7 @@ class GraphScene(Scene, PopupMixin):
         lo, hi = min(sp), max(sp)
         fmt = (lambda v: f"{v:.2f}") if self.spread_mode == "ratio" else (lambda v: f"{v:.0f}")
         lo, hi, span = self._plot_axes(surf, rect, lo, hi, fmt)
+        self._x_labels(surf, rect, len(sp))
         self._polyline(surf, rect, sp, lo, span, config.COL_PRESTIGE, y_fmt=fmt,
                        cursor=self._cursor)
         op = "/" if self.spread_mode == "ratio" else "−"
@@ -741,6 +762,7 @@ class GraphScene(Scene, PopupMixin):
             return self._empty(surf, rect, "Historique insuffisant.")
         lo, hi = min(vol), max(vol)
         lo, hi, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:.0f}%")
+        self._x_labels(surf, rect, len(vol))
         self._polyline(surf, rect, vol, lo, span, config.COL_WARN, y_fmt=lambda v: f"{v:.1f}%",
                        cursor=self._cursor)
         self._legend(surf, rect, [(f"Vol. annualisée (20 pas) = {vol[-1]:.1f}%", config.COL_WARN)])
@@ -829,6 +851,7 @@ class GraphScene(Scene, PopupMixin):
             return self._empty(surf, rect, "Historique macro indisponible.")
         allv = [v for _, s in series for v in s]
         lo, hi, span = self._plot_axes(surf, rect, min(allv), max(allv), lambda v: f"{v:.1f}%")
+        self._x_labels(surf, rect, max(len(s) for _, s in series))
         legend = []
         for i, (lab, s) in enumerate(series):
             col = SERIES_COLS[i % len(SERIES_COLS)]

@@ -661,6 +661,41 @@ TUTORIALS = [
                    "performance courante.",
     },
     {
+        "id": "frontier",
+        "title": "Frontière efficiente : simuler sa diversification",
+        "image": "frontier.png",
+        "intro": "Le LABORATOIRE DE FRONTIÈRE EFFICIENTE simule en direct l'effet "
+                 "d'ajouter ou retirer des actions de votre portefeuille sur le "
+                 "couple risque/rendement, sans rien acheter ni vendre réellement. "
+                 "Ouvert depuis l'analyse de portefeuille (PA → onglet frontière).",
+        "steps": [
+            "À gauche, l'UNIVERS D'ACTIFS liste vos positions actuelles (★) plus "
+            "des candidates suggérées : cochez/décochez pour les inclure dans la "
+            "simulation.",
+            "Le graphe FRONTIÈRE EFFICIENTE trace le couple volatilité/rendement "
+            "attendu de toutes les combinaisons possibles de l'univers coché ; le "
+            "point SIMULATION (orange) est votre sélection actuelle, équipondérée.",
+            "Le point ACTUEL (gris) repère votre portefeuille réel, pour comparer "
+            "directement la simulation à votre allocation en place.",
+            "Le panneau SUGGESTIONS DE DIVERSIFICATION propose des actions peu "
+            "corrélées à vos positions actuelles : les cocher rapproche souvent le "
+            "point SIMULATION du bord supérieur-gauche de la frontière (meilleur "
+            "rendement pour un risque donné).",
+            "RÉINITIALISER revient à votre sélection de départ (vos positions "
+            "réelles) à tout moment.",
+        ],
+        "concept": "La frontière efficiente représente, pour un univers d'actifs "
+                   "donné, le meilleur rendement attendu atteignable pour chaque "
+                   "niveau de risque (et inversement, le risque minimal pour un "
+                   "rendement donné) : tout point EN DESSOUS de la courbe est "
+                   "sous-optimal car un autre mélange ferait mieux des deux côtés. "
+                   "Ajouter un actif peu corrélé à vos positions existantes "
+                   "déplace la frontière elle-même vers le haut-gauche (plus de "
+                   "rendement pour moins de risque), alors qu'ajouter un actif très "
+                   "corrélé aux positions déjà détenues n'apporte presque aucune "
+                   "diversification, même s'il semble attractif isolément.",
+    },
+    {
         "id": "history",
         "title": "Historique de carrière",
         "image": "history.png",

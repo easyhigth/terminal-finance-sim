@@ -38,6 +38,8 @@ class FrontierLabScene(Scene):
             config.back_button_rect(180), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.reset_btn = widgets.Button(
             (240, config.SCREEN_HEIGHT - 50, 220, 42), "↺ RÉINITIALISER", config.COL_TEXT_DIM)
+        self.tuto_btn = widgets.Button(
+            (470, config.SCREEN_HEIGHT - 50, 150, 42), "📘 TUTO", config.COL_CYAN)
 
     def refresh_data(self):
         p = self.app.gs.player
@@ -53,6 +55,9 @@ class FrontierLabScene(Scene):
             return
         if self.reset_btn.handle(event):
             self.selected = set(self._held)
+            return
+        if self.tuto_btn.handle(event):
+            self.app.scenes.go("tutorials", tid="frontier", return_to="frontier_lab")
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
             delta = -ROW_H * 2 if event.button == 4 else ROW_H * 2
@@ -78,6 +83,7 @@ class FrontierLabScene(Scene):
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp, dt)
         self.reset_btn.update(mp, dt)
+        self.tuto_btn.update(mp, dt)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -97,6 +103,7 @@ class FrontierLabScene(Scene):
         self._draw_lab(surf, pygame.Rect(M + lw + M, top, rw, h))
         self.back_btn.draw(surf)
         self.reset_btn.draw(surf)
+        self.tuto_btn.draw(surf)
 
     def _draw_universe(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, f"Univers d'actifs ({len(self.selected)} sél.)",

@@ -46,6 +46,7 @@ class MATargetScene(Scene):
         self.debt_pct = 0.6
         self._msg = ""
         self._msg_col = config.COL_TEXT_DIM
+        self._tooltip = None
         self._refresh()
         back_rect = config.back_button_rect(160)
         btn_y, btn_h = back_rect[1], back_rect[3]
@@ -177,6 +178,7 @@ class MATargetScene(Scene):
     # ------------------------------------------------------------- draw
     def draw(self, surf):
         surf.fill(config.COL_BG)
+        self._tooltip = None
         p = self.app.gs.player
         cur = config.CONTINENTS.get(p.continent, {}).get("currency", "$")
         if not self.data:
@@ -223,6 +225,8 @@ class MATargetScene(Scene):
             self.sheet_inc_btn.draw(surf)
             self.sheet_bal_btn.draw(surf)
         self.back_btn.draw(surf)
+        if self._tooltip:
+            widgets.draw_tooltip(surf, *self._tooltip)
 
     # --------------------------------------------------------- onglet APERÇU
     def _draw_apercu(self, surf, top, cur):
@@ -429,11 +433,17 @@ class MATargetScene(Scene):
             widgets.draw_text(surf, f"{yr} ({tag})", (xs[k] + colw - 8, inner.y),
                               fonts.tiny(bold=True), config.COL_TEXT_DIM, align="right")
         y = inner.y + 22
+        mp = pygame.mouse.get_pos()
         for label, vals in rows_by_year:
             emph = label in _EMPH
             lab_col = config.COL_AMBER if emph else config.COL_TEXT_DIM
-            widgets.draw_text_fit(surf, label, (inner.x, y), fonts.small(bold=emph), lab_col,
-                                  max_width=label_w)
+            font = fonts.small(bold=emph)
+            fitted = widgets.fit_text(label, font, label_w)
+            widgets.draw_text_fit(surf, label, (inner.x, y), font, lab_col, max_width=label_w)
+            if fitted != label:
+                row_rect = pygame.Rect(inner.x, y, label_w, 18)
+                if row_rect.collidepoint(mp):
+                    self._tooltip = (label, mp)
             for k, v in enumerate(vals):
                 col = config.COL_WHITE if emph else config.COL_TEXT
                 if v < -0.5 and not emph:

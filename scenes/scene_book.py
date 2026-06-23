@@ -345,7 +345,9 @@ class BookScene(Scene, PopupMixin):
                           lev_col, align="right")
 
         # ---- barre de trading rapide ----
-        bar_y = 100
+        # bar_y laisse une marge sous `marg` (tiny, y=88) pour que son texte
+        # (long, aligné à droite) ne soit pas recouvert par les chips/boîtes opaques.
+        bar_y = 112
         widgets.draw_text(surf, "TRADING RAPIDE :", (40, bar_y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         bx = 196
         self._kind_rects = {}

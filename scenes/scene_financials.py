@@ -72,6 +72,13 @@ class FinancialsScene(Scene):
                                       "ACHAT", config.COL_UP)
         self.sell_btn = widgets.Button((1140, config.SCREEN_HEIGHT - 70, 100, 46),
                                        "VENTE", config.COL_DOWN)
+        self.scroll_inc = 0
+        self.scroll_bal = 0
+        self._max_scroll_inc = 0
+        self._max_scroll_bal = 0
+        self._inc_rect = None
+        self._bal_rect = None
+        self._tooltip = None
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -93,6 +100,14 @@ class FinancialsScene(Scene):
             if self.sell_btn.handle(event):
                 self.app.pending_input = f"SELL {self.ticker} ALL"
                 self.app.scenes.go("terminal")
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            delta = -36 if event.button == 4 else 36
+            if self._inc_rect and self._inc_rect.collidepoint(event.pos):
+                self.scroll_inc = max(0, min(self._max_scroll_inc, self.scroll_inc + delta))
+                return
+            if self._bal_rect and self._bal_rect.collidepoint(event.pos):
+                self.scroll_bal = max(0, min(self._max_scroll_bal, self.scroll_bal + delta))
+                return
 
     def _open_spreadsheet(self, which):
         years = [b["year"] for b in self.block]
@@ -126,13 +141,12 @@ class FinancialsScene(Scene):
         self.sell_btn.update(mp, dt)
 
     # ------------------------------------------------------------- draw
-    def _draw_table(self, surf, rect, title, rows_by_year, accent):
+    def _draw_table(self, surf, rect, title, rows_by_year, accent, which):
         """rows_by_year : liste de (label, [valeurs par exercice]).
 
-        La hauteur de ligne s'adapte à l'espace disponible (au lieu d'une
-        valeur fixe) pour absorber les écarts de hauteur du bandeau supérieur
-        sans faire déborder le tableau le plus long (bilan, ~14 lignes) sur
-        le footer."""
+        Hauteur de ligne fixe ; si le tableau (bilan, ~14 lignes) ne tient pas
+        dans l'espace disponible, défile (molette) au lieu de déborder sur le
+        footer. Les libellés tronqués affichent une bulle au survol."""
         inner = widgets.draw_panel(surf, rect, title, accent)
         years = [b["year"] for b in self.block]
         colw = 84
@@ -145,27 +159,52 @@ class FinancialsScene(Scene):
             widgets.draw_text(surf, f"{yr} ({tag})", (xs[k] + colw - 8, inner.y),
                               fonts.tiny(bold=True), config.COL_TEXT_DIM, align="right")
         head_h = 22
-        n_rows = max(1, len(rows_by_year))
-        row_h = max(16, min(23, (inner.h - head_h) // n_rows))
-        y = inner.y + head_h
+        row_h = 20
+        list_area = pygame.Rect(inner.x - 4, inner.y + head_h, inner.w + 8, inner.h - head_h)
+        if which == "inc":
+            self._inc_rect = list_area
+            scroll = self.scroll_inc
+        else:
+            self._bal_rect = list_area
+            scroll = self.scroll_bal
+        mp = pygame.mouse.get_pos()
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        y = inner.y + head_h - scroll
         for label, vals in rows_by_year:
-            emph = label in _EMPH
-            lab_col = config.COL_AMBER if emph else config.COL_TEXT_DIM
-            widgets.draw_text_fit(surf, label, (x_label, y),
-                                  fonts.small(bold=emph), lab_col, max_width=label_w)
-            for k, v in enumerate(vals):
-                col = config.COL_WHITE if emph else config.COL_TEXT
-                if v < -0.5 and not emph:
-                    col = config.COL_DOWN
-                widgets.draw_text(surf, _fm(v), (xs[k] + colw - 8, y),
-                                  fonts.small(bold=emph), col, align="right")
-            if emph:
-                pygame.draw.line(surf, config.COL_BORDER, (x_label, y + row_h - 5),
-                                 (inner.right, y + row_h - 5), 1)
+            if (list_area.top - row_h) < y < list_area.bottom:
+                emph = label in _EMPH
+                lab_col = config.COL_AMBER if emph else config.COL_TEXT_DIM
+                font = fonts.small(bold=emph)
+                fitted = widgets.fit_text(label, font, label_w)
+                widgets.draw_text(surf, fitted, (x_label, y), font, lab_col)
+                if fitted != label:
+                    row_rect = pygame.Rect(x_label, y, label_w, row_h)
+                    if row_rect.collidepoint(mp):
+                        self._tooltip = (label, mp)
+                for k, v in enumerate(vals):
+                    col = config.COL_WHITE if emph else config.COL_TEXT
+                    if v < -0.5 and not emph:
+                        col = config.COL_DOWN
+                    widgets.draw_text(surf, _fm(v), (xs[k] + colw - 8, y),
+                                      fonts.small(bold=emph), col, align="right")
+                if emph:
+                    pygame.draw.line(surf, config.COL_BORDER, (x_label, y + row_h - 5),
+                                     (inner.right, y + row_h - 5), 1)
             y += row_h
+        surf.set_clip(prev_clip)
+        content_h = (y + scroll) - (inner.y + head_h)
+        max_scroll = max(0, content_h - list_area.h)
+        scroll = max(0, min(max_scroll, scroll))
+        if which == "inc":
+            self._max_scroll_inc, self.scroll_inc = max_scroll, scroll
+        else:
+            self._max_scroll_bal, self.scroll_bal = max_scroll, scroll
+        widgets.draw_scrollbar(surf, rect, list_area, scroll, max_scroll, content_h)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
+        self._tooltip = None
         widgets.draw_text(surf, f"SANTÉ FINANCIÈRE — {self.ticker}", (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         if self.error:
@@ -192,7 +231,7 @@ class FinancialsScene(Scene):
             inc_rows.append((line["label"],
                              [b["income"]["lines"][r]["value"] for b in self.block]))
         self._draw_table(surf, pygame.Rect(40, ty, half, ph),
-                         "Compte de résultat", inc_rows, config.COL_CYAN)
+                         "Compte de résultat", inc_rows, config.COL_CYAN, "inc")
 
         # bilan (droite) : actif puis passif + CP
         bal_rows = []
@@ -204,7 +243,7 @@ class FinancialsScene(Scene):
             bal_rows.append((self.block[0]["balance"]["liab_lines"][r]["label"],
                              [b["balance"]["liab_lines"][r]["value"] for b in self.block]))
         self._draw_table(surf, pygame.Rect(40 + half + 20, ty, half, ph),
-                         "Bilan", bal_rows, config.COL_AMBER)
+                         "Bilan", bal_rows, config.COL_AMBER, "bal")
 
         self.back_btn.draw(surf)
         self.fiche_btn.draw(surf)
@@ -213,6 +252,8 @@ class FinancialsScene(Scene):
         self.sheet_bal_btn.draw(surf)
         self.buy_btn.draw(surf)
         self.sell_btn.draw(surf)
+        if self._tooltip:
+            widgets.draw_tooltip(surf, *self._tooltip)
 
     def _draw_overview(self, surf, rect):
         """Trois panneaux : (1) statistiques clés, (2) résultats/guidance +
@@ -337,10 +378,13 @@ class FinancialsScene(Scene):
         plot_rect = pygame.Rect(cinner.x, cinner.y, cinner.w, chart_h)
         hist = self.app.market.history_of(self.ticker) if self.app.market else []
         if len(hist) >= 2:
-            plot = pygame.Rect(plot_rect.x, plot_rect.y + 4, plot_rect.w, plot_rect.h - 20)
+            plot = pygame.Rect(plot_rect.x, plot_rect.y + 4, plot_rect.w, plot_rect.h - 34)
             col = config.COL_UP if hist[-1] >= hist[0] else config.COL_DOWN
             widgets.draw_series(surf, plot, hist, col, mouse_pos=pygame.mouse.get_pos(),
                                 y_fmt=lambda v: f"{v:,.2f} {self.cur}", show_pct=True)
+            widgets.draw_chart_x_labels(surf, plot, [
+                (0.0, "-5 ans"), (0.5, "-2,5 ans"), (1.0, "aujourd'hui"),
+            ])
             chg = (hist[-1] / hist[0] - 1) * 100 if hist[0] else 0.0
             widgets.draw_text(surf, f"{hist[-1]:,.2f} {self.cur}  ({chg:+.1f}% sur 5 ans)",
                               (plot_rect.x, plot_rect.bottom - 14), fonts.tiny(),

@@ -122,9 +122,9 @@ class DealsScene(Scene):
             self.back_btn.draw(surf)
             return
         widgets.draw_text(surf, "Chaque deal expire au bout d'un nombre de jours ; cliquez une ligne pour le lancer.",
-                          (42, 56), fonts.small(), config.COL_TEXT_DIM)
+                          (42, 64), fonts.small(), config.COL_TEXT_DIM)
 
-        top = 86
+        top = 94
         search_rect = pygame.Rect(40, top, 260, 24)
         pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, search_rect, 1, border_radius=4)

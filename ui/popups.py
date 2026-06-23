@@ -36,6 +36,25 @@ from ui.datawindow import DataWindow
 
 _KIND_TABS = [("Ligne", "line"), ("Chandel.", "candles"), ("Var %", "change"), ("Vol.", "vol")]
 
+# hauteur réservée sous le tracé pour les libellés d'axe X (cf. _x_labels) ;
+# les appelants doivent en tenir compte dans le calcul de leur plot_rect.
+LABEL_H = 16
+
+
+def _x_labels(surf, rect, n):
+    """Libellés d'axe X (début / milieu / aujourd'hui) sous une série
+    temporelle de `n` points, le point le plus à droite étant le plus
+    récent — comble l'absence d'axe des X sur les mini-graphes des fiches
+    flottantes (cf. scenes/scene_graph.py::_x_labels pour l'équivalent sur
+    les graphes pleine page)."""
+    if n < 2:
+        return
+    widgets.draw_chart_x_labels(surf, rect, [
+        (0.0, f"-{n - 1}j"),
+        (0.5, f"-{(n - 1) // 2}j"),
+        (1.0, "aujourd'hui"),
+    ])
+
 
 def _draw_kind_tabs(surf, rect, kind, accent):
     """Dessine les onglets de type de graphe ; retourne {kind: Rect}."""
@@ -71,13 +90,16 @@ def _draw_series_plot(surf, rect, s, kind):
                           (rect.x, rect.y), fonts.tiny(), config.COL_TEXT_DIM)
         return None
     if kind == "candles":
-        widgets.draw_candles(surf, rect, s, n_candles=min(48, len(s)))
+        n_candles = min(48, len(s))
+        widgets.draw_candles(surf, rect, s, n_candles=n_candles)
+        _x_labels(surf, rect, n_candles)
         return None
     mp = pygame.mouse.get_pos()
     if kind == "change":
         pct = _charts.normalize(s)
         col = config.COL_UP if pct[-1] >= 0 else config.COL_DOWN
         widgets.draw_series(surf, rect, pct, col, mouse_pos=mp, y_fmt=lambda v: f"{v:+.1f}%")
+        _x_labels(surf, rect, len(pct))
         return f"variation cumulée {pct[-1]:+.1f}%"
     if kind == "vol":
         vol = [v for v in _charts.rolling_vol(s, 20) if v is not None]
@@ -87,10 +109,12 @@ def _draw_series_plot(surf, rect, s, kind):
             return None
         widgets.draw_series(surf, rect, vol, config.COL_WARN, baseline=False,
                             mouse_pos=mp, y_fmt=lambda v: f"{v:.1f}%")
+        _x_labels(surf, rect, len(vol))
         return f"vol. annualisée (20 pas) {vol[-1]:.1f}%"
     # ligne (défaut)
     col = config.COL_UP if s[-1] >= s[0] else config.COL_DOWN
     widgets.draw_series(surf, rect, s, col, mouse_pos=mp, y_fmt=lambda v: f"{v:,.2f}", show_pct=True)
+    _x_labels(surf, rect, len(s))
     chg = (s[-1] / s[0] - 1) * 100 if s[0] else 0.0
     return f"{s[-1]:,.2f}  ({'+' if chg>=0 else ''}{chg:.1f}%)"
 
@@ -118,7 +142,7 @@ class CompanyPopup(DataWindow):
                 if mt else config.COL_AMBER
         title = f"{self.ticker} — {mt['name']}" if mt else self.ticker
         super().__init__(title, [], [], pos=pos, accent=accent,
-                         size=(380, 320), resizable=True, min_size=(320, 240))
+                         size=(380, 320), resizable=True, min_size=(320, 280))
 
     def _handle_body(self, pos):
         for k, rr in self._kind_rects.items():
@@ -193,10 +217,11 @@ class CompanyPopup(DataWindow):
         self._kind_rects = _draw_kind_tabs(surf, tabs_rect, self.kind, self.accent)
         y += 24
         legend_h = 16
-        plot_rect = pygame.Rect(content.x, y, content.w, max(20, content.bottom - y - legend_h - 22))
+        plot_rect = pygame.Rect(content.x, y, content.w,
+                                max(20, content.bottom - y - legend_h - LABEL_H - 22))
         legend = _draw_kind_plot(surf, plot_rect, self.market, self.ticker, self.kind)
         if legend:
-            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4),
+            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4 + LABEL_H),
                               fonts.tiny(), config.COL_TEXT_DIM)
         self._expand_rect = pygame.Rect(content.right - 90, content.bottom - 18, 90, 18)
         hov = self._expand_rect.collidepoint(pygame.mouse.get_pos())
@@ -242,10 +267,10 @@ class ChartPopup(DataWindow):
             return
         tabs_rect = pygame.Rect(content.x, content.y, content.w, 22)
         self._kind_rects = _draw_kind_tabs(surf, tabs_rect, self.kind, self.accent)
-        plot_rect = pygame.Rect(content.x, content.y + 28, content.w, content.h - 28 - 18)
+        plot_rect = pygame.Rect(content.x, content.y + 28, content.w, content.h - 28 - 18 - LABEL_H)
         legend = _draw_kind_plot(surf, plot_rect, self.market, self.ticker, self.kind)
         if legend:
-            widgets.draw_text(surf, f"{self.ticker}  {legend}", (content.x, plot_rect.bottom + 4),
+            widgets.draw_text(surf, f"{self.ticker}  {legend}", (content.x, plot_rect.bottom + 4 + LABEL_H),
                               fonts.tiny(bold=True), config.COL_TEXT)
 
 
@@ -268,7 +293,7 @@ class CommodityPopup(DataWindow):
         accent = accent or config.COL_WARN
         title = f"{self.cid} — {q['name']}" if q else self.cid
         super().__init__(title, [], [], pos=pos, accent=accent,
-                         size=(360, 300), resizable=True, min_size=(300, 220))
+                         size=(360, 300), resizable=True, min_size=(300, 270))
 
     def _handle_body(self, pos):
         for k, rr in self._kind_rects.items():
@@ -328,11 +353,12 @@ class CommodityPopup(DataWindow):
         self._kind_rects = _draw_kind_tabs(surf, tabs_rect, self.kind, self.accent)
         y += 24
         legend_h = 16
-        plot_rect = pygame.Rect(content.x, y, content.w, max(20, content.bottom - y - legend_h - 4))
+        plot_rect = pygame.Rect(content.x, y, content.w,
+                                max(20, content.bottom - y - legend_h - LABEL_H - 4))
         series = commodities_mod.history(self.market, self.cid, 365) if self.market else []
         legend = _draw_series_plot(surf, plot_rect, series, self.kind)
         if legend:
-            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4),
+            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4 + LABEL_H),
                               fonts.tiny(), config.COL_TEXT_DIM)
 
 
@@ -355,7 +381,7 @@ class CryptoPopup(DataWindow):
         accent = accent or (config.COL_CYAN if (q and (q["stable"] or q["cbdc"])) else config.COL_DOWN)
         title = f"{self.cid} — {q['name']}" if q else self.cid
         super().__init__(title, [], [], pos=pos, accent=accent,
-                         size=(360, 300), resizable=True, min_size=(300, 220))
+                         size=(360, 300), resizable=True, min_size=(300, 260))
 
     def _handle_body(self, pos):
         for k, rr in self._kind_rects.items():
@@ -411,11 +437,12 @@ class CryptoPopup(DataWindow):
         self._kind_rects = _draw_kind_tabs(surf, tabs_rect, self.kind, self.accent)
         y += 24
         legend_h = 16
-        plot_rect = pygame.Rect(content.x, y, content.w, max(20, content.bottom - y - legend_h - 4))
+        plot_rect = pygame.Rect(content.x, y, content.w,
+                                max(20, content.bottom - y - legend_h - LABEL_H - 4))
         series = crypto_mod.history(self.market, self.cid, 365) if self.market else []
         legend = _draw_series_plot(surf, plot_rect, series, self.kind)
         if legend:
-            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4),
+            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4 + LABEL_H),
                               fonts.tiny(), config.COL_TEXT_DIM)
 
 
@@ -439,7 +466,7 @@ class BondPopup(DataWindow):
         accent = accent or config.COL_CYAN
         title = q["name"] if q else bond_id
         super().__init__(title, [], [], pos=pos, accent=accent,
-                         size=(360, 300), resizable=True, min_size=(300, 220))
+                         size=(360, 300), resizable=True, min_size=(300, 270))
 
     def _handle_body(self, pos):
         for k, rr in self._kind_rects.items():
@@ -503,11 +530,12 @@ class BondPopup(DataWindow):
         self._kind_rects = _draw_kind_tabs(surf, tabs_rect, self.kind, self.accent)
         y += 24
         legend_h = 16
-        plot_rect = pygame.Rect(content.x, y, content.w, max(20, content.bottom - y - legend_h - 4))
+        plot_rect = pygame.Rect(content.x, y, content.w,
+                                max(20, content.bottom - y - legend_h - LABEL_H - 4))
         series = bonds_mod.price_history(self.market, self.bond_id, 365) if self.market else []
         legend = _draw_series_plot(surf, plot_rect, series, self.kind)
         if legend:
-            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4),
+            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4 + LABEL_H),
                               fonts.tiny(), config.COL_TEXT_DIM)
 
 
@@ -533,7 +561,7 @@ class ETFPopup(DataWindow):
         accent = accent or (config.COL_DOWN if (q and q["leveraged"]) else config.COL_PRESTIGE)
         title = f"{self.eid} — {q['name']}" if q else self.eid
         super().__init__(title, [], [], pos=pos, accent=accent,
-                         size=(380, 320), resizable=True, min_size=(320, 240))
+                         size=(380, 320), resizable=True, min_size=(320, 300))
 
     def _handle_body(self, pos):
         for k, rr in self._kind_rects.items():
@@ -601,11 +629,11 @@ class ETFPopup(DataWindow):
         tabs_rect = pygame.Rect(content.x, y, content.w, 20)
         self._kind_rects = _draw_kind_tabs(surf, tabs_rect, self.kind, self.accent)
         y += 24
-        plot_rect = pygame.Rect(content.x, y, content.w, max(20, content.bottom - y - 16 - 4))
+        plot_rect = pygame.Rect(content.x, y, content.w, max(20, content.bottom - y - 16 - LABEL_H - 4))
         series = etfs_mod.nav_history(self.market, self.eid, 365) if self.market else []
         legend = _draw_series_plot(surf, plot_rect, series, self.kind)
         if legend:
-            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4),
+            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4 + LABEL_H),
                               fonts.tiny(), config.COL_TEXT_DIM)
 
 

@@ -35,6 +35,9 @@ class TeamScene(Scene):
         self.hire_cursor = 0   # curseur clavier liste "profils disponibles"
         self.fire_cursor = 0   # curseur clavier liste "équipe actuelle"
         self.focus = "hire"    # "hire" ou "fire" — liste qui reçoit HAUT/BAS/ENTRÉE
+        self.scroll = 0        # défilement de l'équipe actuelle (sans limite d'effectif)
+        self._max_scroll = 0
+        self._list_rect = None
 
     def _can(self):
         return unlocks.unlocked(self.app.gs.player, "team")
@@ -68,8 +71,14 @@ class TeamScene(Scene):
             else:
                 count = len(p.analysts)
                 self.fire_cursor, activate = widgets.list_key_nav(event, self.fire_cursor, count)
+                self._scroll_to_fire_cursor()
                 if activate and count:
                     self._do_fire(self.fire_cursor)
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            if self._list_rect and self._list_rect.collidepoint(event.pos):
+                self.scroll = max(0, min(self._max_scroll,
+                                         self.scroll + (-48 if event.button == 4 else 48)))
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for pid, rect in self.hire_rects.items():
@@ -102,6 +111,18 @@ class TeamScene(Scene):
             self.msg = f"{profile.get('label', '?')} licencié(e)."
             if not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
+
+    def _scroll_to_fire_cursor(self):
+        """Ajuste le scroll de l'équipe actuelle pour garder le curseur clavier visible."""
+        if not self._list_rect:
+            return
+        row_top = self.fire_cursor * ROW_H
+        row_bottom = row_top + ROW_H
+        if row_top < self.scroll:
+            self.scroll = row_top
+        elif row_bottom > self.scroll + self._list_rect.h:
+            self.scroll = row_bottom - self._list_rect.h
+        self.scroll = max(0, min(self._max_scroll, self.scroll))
 
     def _focus_hints(self):
         action = _L("embaucher", "hire") if self.focus == "hire" else _L("licencier", "fire")
@@ -163,39 +184,49 @@ class TeamScene(Scene):
         # ---- équipe actuelle (droite) ----
         team_rect = pygame.Rect(540, 110, config.SCREEN_WIDTH - 580, 420)
         tinner = widgets.draw_panel(surf, team_rect, f"Équipe actuelle ({len(p.analysts)})", config.COL_PRESTIGE)
-        ty = tinner.y
-        self.fire_rects = {}
         total_cost = TEAM.team_cost_per_step(p)
         total_rep = TEAM.team_bonus_rep_per_step(p)
+        footer_h = 26
+        list_area = pygame.Rect(tinner.x - 4, tinner.y, tinner.w + 8, tinner.h - footer_h)
+        self._list_rect = list_area
+        self.fire_rects = {}
         if not p.analysts:
             widgets.draw_text(surf, "Aucun analyste recruté. Embauchez dans le catalogue ci-contre.",
-                              (tinner.x, ty), fonts.small(), config.COL_TEXT_DIM)
-            ty += 26
+                              (tinner.x, tinner.y), fonts.small(), config.COL_TEXT_DIM)
+            self.scroll = self._max_scroll = 0
         else:
             self.fire_cursor = min(self.fire_cursor, len(p.analysts) - 1) if p.analysts else 0
+            prev_clip = surf.get_clip()
+            surf.set_clip(list_area)
+            ty = tinner.y - self.scroll
             for idx, a in enumerate(p.analysts):
-                profile = profiles.get(a.get("profile_id"), {})
-                row = pygame.Rect(tinner.x, ty, tinner.w, ROW_H - 8)
-                pygame.draw.rect(surf, config.COL_PANEL, row, border_radius=4)
-                pygame.draw.rect(surf, config.COL_BORDER, row, 1, border_radius=4)
-                if self.focus == "fire":
-                    keynav.draw_focus_ring(surf, row, idx == self.fire_cursor)
-                widgets.draw_text(surf, profile.get("label", a.get("profile_id", "?")),
-                                  (row.x + 10, row.y + 6), fonts.small(bold=True), config.COL_TEXT)
-                widgets.draw_text(surf, f"Coût : {widgets.format_money(profile.get('cost_per_step', 0), cur)}/tour",
-                                  (row.x + 10, row.y + 26), fonts.tiny(), config.COL_TEXT_DIM)
-                fire_btn = pygame.Rect(row.right - 100, row.y + 16, 90, 30)
-                pygame.draw.rect(surf, config.COL_PANEL_HEAD, fire_btn, border_radius=4)
-                pygame.draw.rect(surf, config.COL_DOWN, fire_btn, 1, border_radius=4)
-                widgets.draw_text(surf, "LICENCIER", fire_btn.center, fonts.tiny(bold=True),
-                                  config.COL_DOWN, align="center")
-                self.fire_rects[idx] = fire_btn
+                if (list_area.top - ROW_H) < ty < list_area.bottom:
+                    profile = profiles.get(a.get("profile_id"), {})
+                    row = pygame.Rect(tinner.x, ty, tinner.w, ROW_H - 8)
+                    pygame.draw.rect(surf, config.COL_PANEL, row, border_radius=4)
+                    pygame.draw.rect(surf, config.COL_BORDER, row, 1, border_radius=4)
+                    if self.focus == "fire":
+                        keynav.draw_focus_ring(surf, row, idx == self.fire_cursor)
+                    widgets.draw_text(surf, profile.get("label", a.get("profile_id", "?")),
+                                      (row.x + 10, row.y + 6), fonts.small(bold=True), config.COL_TEXT)
+                    widgets.draw_text(surf, f"Coût : {widgets.format_money(profile.get('cost_per_step', 0), cur)}/tour",
+                                      (row.x + 10, row.y + 26), fonts.tiny(), config.COL_TEXT_DIM)
+                    fire_btn = pygame.Rect(row.right - 100, row.y + 16, 90, 30)
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, fire_btn, border_radius=4)
+                    pygame.draw.rect(surf, config.COL_DOWN, fire_btn, 1, border_radius=4)
+                    widgets.draw_text(surf, "LICENCIER", fire_btn.center, fonts.tiny(bold=True),
+                                      config.COL_DOWN, align="center")
+                    self.fire_rects[idx] = fire_btn
                 ty += ROW_H
+            surf.set_clip(prev_clip)
+            content_h = (ty + self.scroll) - tinner.y
+            self._max_scroll = max(0, content_h - list_area.h)
+            self.scroll = min(self.scroll, self._max_scroll)
+            widgets.draw_scrollbar(surf, team_rect, list_area, self.scroll, self._max_scroll, content_h)
 
-        ty += 8
         widgets.draw_text(surf, f"Coût total récurrent : {widgets.format_money(total_cost, cur)}/tour"
                           f"  ·  bonus réputation passif : +{total_rep:.2f}/tour",
-                          (tinner.x, ty), fonts.small(bold=True), config.COL_AMBER)
+                          (tinner.x, list_area.bottom + 6), fonts.small(bold=True), config.COL_AMBER)
 
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14), self._focus_hints())
         self.back_btn.draw(surf)

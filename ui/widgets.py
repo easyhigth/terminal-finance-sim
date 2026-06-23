@@ -641,6 +641,20 @@ def draw_chart_axes(surf, rect, lo, hi, y_fmt=lambda v: f"{v:.0f}", rows=5):
     return lo, hi, span
 
 
+def draw_chart_x_labels(surf, rect, labels):
+    """Libellés d'axe X sous une zone de tracé (`rect`), pour indiquer la
+    période/l'étendue représentée (cf. items « axe des X manquant »).
+    `labels` : liste de `(frac, texte)` où `frac` ∈ [0, 1] est la position
+    relative le long de `rect.w` (0 = bord gauche, 1 = bord droit) ; l'appelant
+    doit avoir réservé une marge sous `rect` pour ce texte."""
+    rect = pygame.Rect(rect)
+    y = rect.bottom + 4
+    for frac, text in labels:
+        px = rect.x + int(frac * rect.w)
+        align = "left" if frac <= 0.05 else ("right" if frac >= 0.95 else "center")
+        draw_text(surf, text, (px, y), fonts.tiny(), config.COL_TEXT_DIM, align=align)
+
+
 def draw_chart_zero_line(surf, rect, lo, span, color=None):
     """Trace une ligne horizontale au niveau y=0 si elle tombe dans [lo, lo+span]
     (utile pour les graphes de variation % / spread centrés sur zéro)."""

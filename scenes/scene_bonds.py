@@ -18,6 +18,8 @@ from ui.popups import PopupMixin
 
 LOT = 10   # taille d'un paquet d'achat/vente
 ROW_H = 28
+SORT_FIELDS = [("name", "NOM"), ("price", "COURS"), ("value", "VALEUR"),
+               ("ytm", "RENDEMENT"), ("mod_duration", "DURATION")]
 
 
 class BondsScene(Scene, PopupMixin):
@@ -36,6 +38,9 @@ class BondsScene(Scene, PopupMixin):
         self._row_offsets = {}
         self.search_box = widgets.SearchBox((40, 100, 280, 24),
                                              "Tapez pour rechercher (nom, émetteur)…")
+        self.sort_key = "ytm"
+        self.sort_dir = -1
+        self._sort_rects = {}
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.gov_btn = widgets.Button((220, config.SCREEN_HEIGHT - 50, 160, 42),
@@ -110,6 +115,14 @@ class BondsScene(Scene, PopupMixin):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.search_box.handle_clear_click(event):
                 return
+            for key, rect in self._sort_rects.items():
+                if rect.collidepoint(event.pos):
+                    if self.sort_key == key:
+                        self.sort_dir *= -1
+                    else:
+                        self.sort_key = key
+                        self.sort_dir = 1 if key == "name" else -1
+                    return
             for bid, rect in self.name_rects.items():
                 if rect.collidepoint(event.pos):
                     self.open_bond(bid)
@@ -153,7 +166,24 @@ class BondsScene(Scene, PopupMixin):
 
         # ---- recherche ----
         self.search_box.draw(surf)
-        top = self.search_box.rect.bottom + 8
+        sort_y = self.search_box.rect.bottom + 8
+        self._sort_rects = {}
+        widgets.draw_text(surf, "TRIER :", (40, sort_y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        sx = 40 + 56
+        for key, lbl in SORT_FIELDS:
+            active = (self.sort_key == key)
+            arrow = (" ▲" if self.sort_dir > 0 else " ▼") if active else ""
+            full = lbl + arrow
+            w = fonts.tiny(bold=True).size(full)[0] + 16
+            rect = pygame.Rect(sx, sort_y, w, 20)
+            self._sort_rects[key] = rect
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if active else config.COL_PANEL, rect, border_radius=3)
+            pygame.draw.rect(surf, config.COL_AMBER if active else config.COL_BORDER, rect, 1, border_radius=3)
+            widgets.draw_text(surf, full, rect.center, fonts.tiny(bold=active),
+                              config.COL_AMBER if active else config.COL_TEXT_DIM, align="center")
+            sx += w + 6
+
+        top = sort_y + 28
         ph = config.footer_y() - 8 - top
         panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, ph)
         inner = widgets.draw_panel(surf, panel, "Obligations", config.COL_CYAN)
@@ -186,8 +216,17 @@ class BondsScene(Scene, PopupMixin):
         if q_filter:
             quotes = [q for q in quotes
                       if q_filter in q["name"].lower() or q_filter in q["issuer"].lower()]
-        sov = sorted([q for q in quotes if q["kind"] == "Souverain"], key=lambda q: (q["region"], q["years"]))
-        corp = sorted([q for q in quotes if q["kind"] == "Corporate"], key=lambda q: (q["region"], q["name"]))
+        def sort_value(q):
+            if self.sort_key == "name":
+                return q["name"].lower()
+            if self.sort_key == "value":
+                pos = p.bonds.get(q["id"])
+                return (pos["qty"] if pos else 0) * q["price"]
+            return q[self.sort_key]
+        sov = sorted([q for q in quotes if q["kind"] == "Souverain"],
+                     key=sort_value, reverse=(self.sort_dir < 0))
+        corp = sorted([q for q in quotes if q["kind"] == "Corporate"],
+                      key=sort_value, reverse=(self.sort_dir < 0))
         mp = pygame.mouse.get_pos()
         self._tooltip = None
         self._row_list = [q["id"] for q in sov] + [q["id"] for q in corp]

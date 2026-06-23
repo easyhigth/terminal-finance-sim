@@ -42,8 +42,8 @@ KIND_LABEL = {"Action": "Action", "ETF": "ETF", "Obligation": "Oblig.",
               "Commodity": "Cmdty", "Crypto": "Crypto", "Structuré": "Struct.",
               "Crédit": "Crédit"}
 QTY_PRESETS = [1, 5, 10, 25, 100]
-SCENE_LINKS = [("etfs", "📊 ETF"), ("bonds", "📜 OBLIGATIONS"), ("commodities", "🛢 COMMODITIES"),
-               ("crypto", "₿ CRYPTO"), ("structured", "🧩 STRUCTURÉS"), ("credit", "🏦 CRÉDIT")]
+SCENE_LINKS = [("etfs", "■ ETF"), ("bonds", "▫ OBLIGATIONS"), ("commodities", "▲ COMMODITIES"),
+               ("crypto", "₿ CRYPTO"), ("structured", "◆ STRUCTURÉS"), ("credit", "● CRÉDIT")]
 
 
 class ShopScene(Scene, PopupMixin):

@@ -7,10 +7,21 @@ apprentissage, système. Ouvert via le bouton PLUS du rail ou la commande MORE.
 """
 import pygame
 
-from core import config, fuzzy
+from core import config, fuzzy, unlocks
 from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
+
+# scène -> fonctionnalité gated (core/unlocks.py) dont dépend l'accès à la
+# scène ENTIÈRE (et non juste une action à l'intérieur) — cf. le pattern
+# `_can()` de chacune de ces scènes, qui affiche un message de verrou plutôt
+# que son contenu normal en dessous du grade requis.
+SCENE_FEATURE = {
+    "deals": "deals", "track": "track", "ma": "ma", "team": "team",
+    "hedge": "hedge", "options": "options", "ipo": "ipo", "fx": "fx",
+    "structured": "structured", "credit": "credit", "calendar": "calendar",
+    "mandates": "mandates", "swaps": "trade",
+}
 
 # (titre de section, [(libellé, scène, kwargs)])
 SECTIONS = [
@@ -47,7 +58,7 @@ SECTIONS = [
     ]),
     ("Carrière & monde", [
         ("Portefeuille", "book", {}),
-        ("Portefeuille unifié (toutes classes)", "portfolio_unified", {}),
+        ("Portefeuille unifié", "portfolio_unified", {}),
         ("Carrière", "career", {}),
         ("Mission", "mission", {}),
         ("Exam / Certif", "examcert", {}),
@@ -56,7 +67,7 @@ SECTIONS = [
         ("Rivaux", "rivals", {}),
         ("Inbox", "inbox", {}),
         ("News & événements", "news", {}),
-        ("Centre de notifications (messages + actu)", "notifications", {}),
+        ("Centre de notifications", "notifications", {}),
         ("Calendrier macro", "calendar", {}),
         ("Mandats clients", "mandates", {}),
         ("Deals", "deals", {}),
@@ -127,6 +138,20 @@ class MoreScene(Scene):
             y += BTN_H + BTN_GAP + 8
         return out
 
+    def _open(self, scene, kw):
+        """Ouvre `scene`, sauf si elle est verrouillée par le grade : dans ce
+        cas on affiche le même message que la scène afficherait elle-même,
+        sans y naviguer pour de vrai (cf. comportement du rail du terminal)."""
+        feat = SCENE_FEATURE.get(scene)
+        if feat:
+            p = self.app.gs.player
+            if not unlocks.unlocked(p, feat):
+                g = unlocks.effective_required_grade(p, feat)
+                self.app.notify(
+                    f"⊘ {unlocks.feature_label(feat)} débloqué au grade {config.GRADES[g]}.", "warn")
+                return
+        self.app.scenes.go(scene, return_to="more", **kw)
+
     def _scroll_to_cursor(self):
         """Ajuste le scroll pour garder le bouton sélectionné au clavier visible."""
         if not self._list_rect or not self._all_btn_rects:
@@ -164,7 +189,7 @@ class MoreScene(Scene):
                     self._scroll_to_cursor()
                 if activate and self._all_btn_rects:
                     _rect, scene, kw = self._all_btn_rects[self.btn_cursor]
-                    self.app.scenes.go(scene, return_to="more", **kw)
+                    self._open(scene, kw)
                 return
             elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
                 self.search += event.unicode
@@ -185,7 +210,7 @@ class MoreScene(Scene):
                 return
             for rect, scene, kw in self._btn_rects:
                 if rect.collidepoint(event.pos):
-                    self.app.scenes.go(scene, return_to="more", **kw)
+                    self._open(scene, kw)
                     return
 
     def update(self, dt):
@@ -220,6 +245,7 @@ class MoreScene(Scene):
         area = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - top)
         self._list_rect = area
         mp = pygame.mouse.get_pos()
+        self._tooltip = None
         self._btn_rects = []
         self._all_btn_rects = self._layout_buttons(sections, area)
         self.btn_cursor = min(self.btn_cursor, len(self._all_btn_rects) - 1) if self._all_btn_rects else 0
@@ -249,13 +275,23 @@ class MoreScene(Scene):
                     # bouton retour (footer) ni sur le reste de l'UI.
                     self._btn_rects.append((rect.clip(area), scene, kw))
                     hover = rect.collidepoint(mp)
-                    acc = widgets.hover_accent(hover)
-                    pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL,
+                    feat = SCENE_FEATURE.get(scene)
+                    locked = feat is not None and not unlocks.unlocked(self.app.gs.player, feat)
+                    acc = config.COL_BORDER if locked else widgets.hover_accent(hover)
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD if (hover and not locked) else config.COL_PANEL,
                                      rect, border_radius=5)
                     pygame.draw.rect(surf, acc, rect, 1, border_radius=5)
                     keynav.draw_focus_ring(surf, rect, is_cursor)
-                    widgets.draw_text(surf, label, rect.center, fonts.small(bold=hover),
-                                      acc if hover else config.COL_TEXT, align="center")
+                    disp_label = f"⊘ {label}" if locked else label
+                    fitted = widgets.fit_text(disp_label, fonts.small(bold=hover and not locked), BTN_W - 16)
+                    widgets.draw_text(surf, fitted, rect.center, fonts.small(bold=hover and not locked),
+                                      config.COL_TEXT_DIM if locked else (acc if hover else config.COL_TEXT),
+                                      align="center")
+                    if locked and hover:
+                        g = unlocks.effective_required_grade(self.app.gs.player, feat)
+                        self._tooltip = (f"{label} — débloqué au grade {config.GRADES[g]}.", mp)
+                    elif fitted != disp_label and hover:
+                        self._tooltip = (label, mp)
             y += BTN_H + BTN_GAP + 8
         surf.set_clip(prev_clip)
 
@@ -277,3 +313,5 @@ class MoreScene(Scene):
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14), hints)
 
         self.back_btn.draw(surf)
+        if self._tooltip:
+            widgets.draw_tooltip(surf, *self._tooltip)

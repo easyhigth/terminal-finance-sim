@@ -27,9 +27,14 @@ class InboxScene(Scene):
         self.return_to = kwargs.get("return_to", "terminal")
         self.app.gs.player.flags["onboarding_seen_inbox"] = True
         msgs = self.app.gs.player.inbox
-        # plus récents en haut ; sélectionne le 1er par défaut
+        # plus récents en haut ; sélectionne le 1er par défaut, sauf si on
+        # arrive depuis le centre de notifications avec un message précis visé
         self.order = list(reversed(range(len(msgs))))
-        self.sel = self.order[0] if self.order else None
+        select_idx = kwargs.get("select_idx")
+        if select_idx is not None and 0 <= select_idx < len(msgs):
+            self.sel = select_idx
+        else:
+            self.sel = self.order[0] if self.order else None
         if self.sel is not None:
             msgs[self.sel]["read"] = True
         self.row_rects = {}
@@ -38,8 +43,9 @@ class InboxScene(Scene):
         self.kind_filter = None
         self._kind_rects = {}
         self._t = 0.0
-        self.cursor = 0  # position clavier dans la liste visible (curseur ≠ sélection active)
+        self.cursor = self.order.index(self.sel) if self.sel in self.order else 0
         self.scroll = 0
+        self._pending_scroll = select_idx is not None
         self._max_scroll = 0
         self._list_rect = None
         self.back_btn = widgets.Button(
@@ -171,6 +177,9 @@ class InboxScene(Scene):
         linner = widgets.draw_panel(surf, listp, f"Reçus ({len(order)})", config.COL_CYAN)
         list_area = pygame.Rect(linner.x - 4, linner.y, linner.w + 8, linner.h)
         self._list_rect = list_area
+        if self._pending_scroll:
+            self._pending_scroll = False
+            self._scroll_to_cursor()
         self.row_rects = {}
         if not msgs:
             widgets.draw_text(surf, "Aucun message pour l'instant.", (linner.x, linner.y),

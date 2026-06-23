@@ -3,9 +3,8 @@ scene_notifications.py — Centre de notifications unifié : fusionne la
 messagerie (player.inbox — manager, client, conformité, desk, RH, pays,
 veille, dont les alertes de prix franchies) et le fil d'actualités
 (player.news_history) en un seul flux chronologique filtrable par source.
-Vue de lecture seule (clic = juste sélectionner/marquer comme lu pour les
-messages) ; les écrans dédiés (INBOX, NEWS) restent disponibles pour les
-interactions complètes propres à chaque source.
+Cliquer une ligne navigue vers l'écran dédié (INBOX ou NEWS) correspondant,
+en pré-sélectionnant l'élément cliqué pour les interactions complètes.
 """
 import pygame
 
@@ -98,6 +97,9 @@ class NotificationsScene(Scene):
                 if rect.collidepoint(event.pos):
                     if src == "inbox":
                         self.app.gs.player.inbox[ref]["read"] = True
+                        self.app.scenes.go("inbox", return_to="notifications", select_idx=ref)
+                    else:
+                        self.app.scenes.go("news", return_to="notifications", search=ref["text"][:60])
                     return
 
     def update(self, dt):

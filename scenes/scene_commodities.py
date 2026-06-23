@@ -17,6 +17,8 @@ from ui.popups import PopupMixin
 
 LOT = 5
 ROW_H = 26
+SORT_FIELDS = [("name", "NOM"), ("spot", "COURS"), ("value", "VALEUR"),
+               ("roll_yield", "ROLL"), ("vol", "VOL")]
 
 CATEGORY_ORDER = [
     "Métaux précieux", "Énergie", "Métaux industriels", "Minéraux stratégiques",
@@ -40,7 +42,10 @@ class CommoditiesScene(Scene, PopupMixin):
         self._row_offsets = {}
         self.cat_filter = None     # None = toutes catégories
         self._cat_rects = {}
-        self.search_box = widgets.SearchBox((40, 74, 260, 24), "Tapez pour rechercher…")
+        self.sort_key = "name"
+        self.sort_dir = 1
+        self._sort_rects = {}
+        self.search_box = widgets.SearchBox((40, 94, 260, 24), "Tapez pour rechercher…")
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
@@ -116,6 +121,14 @@ class CommoditiesScene(Scene, PopupMixin):
                         self.cat_filter = None if self.cat_filter == cat else cat
                     self.scroll = 0
                     return
+            for key, rect in self._sort_rects.items():
+                if rect.collidepoint(event.pos):
+                    if self.sort_key == key:
+                        self.sort_dir *= -1
+                    else:
+                        self.sort_key = key
+                        self.sort_dir = 1 if key == "name" else -1
+                    return
             for cid, rect in self.name_rects.items():
                 if rect.collidepoint(event.pos):
                     self.open_commodity(cid)
@@ -150,7 +163,7 @@ class CommoditiesScene(Scene, PopupMixin):
                           fonts.title(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, "Contango = futures > spot (roll négatif) · "
                                 "backwardation = futures < spot (roll positif). " + self.msg,
-                          (42, 50), fonts.small(), config.COL_TEXT_DIM)
+                          (42, 64), fonts.small(), config.COL_TEXT_DIM)
 
         # ---- recherche ----
         self.search_box.draw(surf)
@@ -158,7 +171,7 @@ class CommoditiesScene(Scene, PopupMixin):
         # chips de catégorie
         self._cat_rects = {}
         cx = 42 + self.search_box.rect.w + 16
-        cy = 74
+        cy = self.search_box.rect.y
         all_rect = pygame.Rect(cx, cy, 70, 20)
         self._cat_rects["__ALL__"] = all_rect
         sel = self.cat_filter is None
@@ -182,7 +195,24 @@ class CommoditiesScene(Scene, PopupMixin):
                               config.COL_AMBER if sel else config.COL_TEXT_DIM, align="center")
             cx += w + 8
 
-        panel_top = cy + 30
+        sort_y = cy + 30
+        self._sort_rects = {}
+        widgets.draw_text(surf, "TRIER :", (40, sort_y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        sx = 40 + 56
+        for key, lbl in SORT_FIELDS:
+            active = (self.sort_key == key)
+            arrow = (" ▲" if self.sort_dir > 0 else " ▼") if active else ""
+            full = lbl + arrow
+            w = fonts.tiny(bold=True).size(full)[0] + 16
+            rect = pygame.Rect(sx, sort_y, w, 20)
+            self._sort_rects[key] = rect
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if active else config.COL_PANEL, rect, border_radius=3)
+            pygame.draw.rect(surf, config.COL_AMBER if active else config.COL_BORDER, rect, 1, border_radius=3)
+            widgets.draw_text(surf, full, rect.center, fonts.tiny(bold=active),
+                              config.COL_AMBER if active else config.COL_TEXT_DIM, align="center")
+            sx += w + 6
+
+        panel_top = sort_y + 28
         ph = config.footer_y() - 8 - panel_top
         panel = pygame.Rect(40, panel_top, config.SCREEN_WIDTH - 80, ph)
         inner = widgets.draw_panel(surf, panel, "Contrats", config.COL_CYAN)
@@ -210,9 +240,18 @@ class CommoditiesScene(Scene, PopupMixin):
         self._row_offsets = {}
         self.row_cursor = min(self.row_cursor, len(self._row_list) - 1) if self._row_list else 0
         cursor_id = self._row_list[self.row_cursor] if self._row_list else None
+        def sort_value(q):
+            if self.sort_key == "name":
+                return q["name"].lower()
+            if self.sort_key == "value":
+                pos = p.commodities.get(q["id"])
+                return (pos["qty"] if pos else 0) * q["spot"]
+            return q[self.sort_key]
+
         y = list_top - self.scroll
         for cat in cats:
-            q_cat = [q for q in all_q if q["category"] == cat]
+            q_cat = sorted([q for q in all_q if q["category"] == cat],
+                           key=sort_value, reverse=(self.sort_dir < 0))
             if not q_cat:
                 continue
             y = self._draw_group(surf, cat, q_cat, y, p, list_area, cols, cur, mp, cursor_id)

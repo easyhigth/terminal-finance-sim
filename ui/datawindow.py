@@ -51,7 +51,7 @@ class DataWindow:
         if size is not None:
             w, h = size
         elif chart is not None:
-            w, h = 360, 200
+            w, h = 440, 280
         else:
             w = max(220, sum(c[1] for c in columns) + PAD * 2)
             h = TITLE_H + PAD + len(self.rows) * ROW_H + PAD + 16
@@ -173,7 +173,7 @@ class DataWindow:
             return
         # mode graphe
         if self.chart is not None:
-            area = pygame.Rect(content.x, content.y + 8, content.w, content.h - 38)
+            area = pygame.Rect(content.x, content.y + 8, content.w, content.h - 46)
             self._chart_area = area
             vals = self.chart
             if len(vals) >= 2:

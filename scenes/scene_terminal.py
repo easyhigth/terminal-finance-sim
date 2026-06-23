@@ -497,7 +497,8 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             f"{name} — historique", [], [],
             pos=(self.rail_w + 40, 100),
             accent=config.COL_AMBER,
-            chart=list(self.market.index_history(name))))
+            chart=list(self.market.index_history(name)),
+            resizable=True, min_size=(320, 220)))
         if len(self.datawins) > 5:
             self.datawins.pop(0)
 

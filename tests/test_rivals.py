@@ -270,7 +270,6 @@ def test_contest_target_success_removes_target_and_weakens_rival():
     target = ma.all_targets()[0]
     p.rival_owned_targets = [target["ticker"]]
     p.cash = 10_000_000.0
-    rng = random.Random(0)
     res = None
     for seed in range(100):
         p.rival_owned_targets = [target["ticker"]]

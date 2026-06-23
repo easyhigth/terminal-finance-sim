@@ -12,10 +12,9 @@ REBALANCE).
 """
 import pygame
 
-from core import analytics
+from core import analytics, config
 from core import bonds as B
 from core import commodities as CM
-from core import config
 from core import crypto as K
 from core import etfs as ETF
 from core import portfolio as pf

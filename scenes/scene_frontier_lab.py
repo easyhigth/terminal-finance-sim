@@ -9,7 +9,8 @@ réellement achetée/vendue ici, c'est une simulation.
 """
 import pygame
 
-from core import analytics, config, portfolio as pf
+from core import analytics, config
+from core import portfolio as pf
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
@@ -119,7 +120,7 @@ class FrontierLabScene(Scene):
             checked = tk in self.selected
             held = tk in self._held
             box_col = config.COL_UP if checked else config.COL_TEXT_DIM
-            box = f"[x]" if checked else "[ ]"
+            box = "[x]" if checked else "[ ]"
             widgets.draw_text(surf, box, (inner.x, y), fonts.small(bold=True), box_col)
             label = tk + (" ★" if held else "")
             col = config.COL_WHITE if checked else config.COL_TEXT_DIM

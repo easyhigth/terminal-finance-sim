@@ -11,10 +11,21 @@ import numpy as np
 
 from core import credit
 from core.market_constants import (
-    STEPS_PER_YEAR, EARN_PERIOD, EARN_ANTICIPATION_WINDOW, GUIDANCE_LABELS,
-    CURVE_TENORS, CURVE_TERM_PREMIUM, BASE_CREDIT_IG_BPS, BASE_CREDIT_HY_BPS,
-    EARN_NEWS_THRESH, VOL_WORLD, VOL_SECTOR, VOL_REGION,
-    _curve_ns_loadings, _curve_slope_target, _curve_curvature_target,
+    BASE_CREDIT_HY_BPS,
+    BASE_CREDIT_IG_BPS,
+    CURVE_TENORS,
+    CURVE_TERM_PREMIUM,
+    EARN_ANTICIPATION_WINDOW,
+    EARN_NEWS_THRESH,
+    EARN_PERIOD,
+    GUIDANCE_LABELS,
+    STEPS_PER_YEAR,
+    VOL_REGION,
+    VOL_SECTOR,
+    VOL_WORLD,
+    _curve_curvature_target,
+    _curve_ns_loadings,
+    _curve_slope_target,
 )
 
 

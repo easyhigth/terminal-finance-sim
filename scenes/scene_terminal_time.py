@@ -6,6 +6,7 @@ taille ; mixé dans TerminalScene avec les autres mixins de commandes.
 """
 
 from core import badges as badges_mod
+from core import career as career_mod
 from core import config
 from core import deals as deals_mod
 from core import dilemmas as dilemmas_mod
@@ -21,7 +22,6 @@ from core import portfolio as pf_mod
 from core import rivals as rivals_mod
 from core import scenarios as scenarios_mod
 from core import stresstest as stresstest_mod
-from core import career as career_mod
 from core.i18n import get_lang
 from ui import widgets
 

@@ -87,7 +87,7 @@ class HistoryScene(Scene):
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
             return
 
-        chart_rect = pygame.Rect(inner.x + 50, inner.y, inner.w - 60, inner.h - 20)
+        chart_rect = pygame.Rect(inner.x + 50, inner.y, inner.w - 60, inner.h - 38)
         lo, hi = min(hist), max(hist)
         lo, hi, span = widgets.draw_chart_axes(
             surf, chart_rect, lo, hi,
@@ -96,6 +96,12 @@ class HistoryScene(Scene):
                             mouse_pos=pygame.mouse.get_pos(),
                             y_fmt=lambda v: widgets.format_money(v, cur),
                             show_pct=True, show_extrema=False)
+        n_hist = len(hist)
+        widgets.draw_chart_x_labels(surf, chart_rect, [
+            (0.0, f"-{n_hist - 1}j"),
+            (0.5, f"-{(n_hist - 1) // 2}j"),
+            (1.0, "aujourd'hui"),
+        ])
 
         i_max = max(range(len(hist)), key=lambda i: hist[i])
         i_min = min(range(len(hist)), key=lambda i: hist[i])

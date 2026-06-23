@@ -25,7 +25,9 @@ class NewsScene(Scene):
         self.return_to = kwargs.get("return_to", "terminal")
         self.cat_filter = None
         self.region_filter = None
-        self.search = ""
+        # pré-rempli quand on arrive depuis le centre de notifications en
+        # cliquant sur une actu précise, pour la retrouver immédiatement
+        self.search = kwargs.get("search", "")
         self.scroll = 0
         self._max_scroll = 0
         self._list_rect = None

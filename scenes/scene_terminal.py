@@ -431,7 +431,15 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                 return
 
     def _datawin_row_click(self, w, idx):
-        """Si la 1ʳᵉ cellule de la ligne est un ticker connu, ouvre sa fiche."""
+        """Si la 1ʳᵉ cellule de la ligne est un ticker connu, ouvre sa fiche.
+        Cas particulier : fenêtre d'actualités (cf. _open_news_window) — un
+        clic navigue vers la scène NEWS avec une recherche pré-remplie sur
+        cette actu précise, pour la retrouver dans le fil complet."""
+        entries = getattr(w, "news_entries", None)
+        if entries is not None:
+            if idx < len(entries):
+                self.app.scenes.go("news", return_to="terminal", search=entries[idx]["text"][:60])
+            return
         if idx >= len(w.rows):
             return
         cell = w.rows[idx][0]
@@ -441,13 +449,17 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             self._open_company_popup(ticker[0].upper())
 
     def _open_window(self, title, columns, rows, accent=config.COL_CYAN):
-        """Ouvre une fenêtre de données déplaçable (en cascade)."""
+        """Ouvre une fenêtre de données déplaçable (en cascade). Retourne la
+        fenêtre créée (pour que l'appelant puisse y attacher des métadonnées,
+        ex. les entrées d'actualité sous-jacentes pour le clic-pour-naviguer)."""
         from ui.datawindow import DataWindow
         offset = 16 * (len(self.datawins) % 6)
         pos = (self.rail_w + 30 + offset, 90 + offset)
-        self.datawins.append(DataWindow(title, columns, rows, pos=pos, accent=accent))
+        w = DataWindow(title, columns, rows, pos=pos, accent=accent)
+        self.datawins.append(w)
         if len(self.datawins) > 5:
             self.datawins.pop(0)
+        return w
 
     def _open_news_window(self, region):
         """Détaille les news du jour à un emplacement de la carte (clic marqueur)."""
@@ -461,9 +473,10 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         if not rows:
             rows = [("—", _L("Aucune actualité détaillée.", "No detailed news."))]
         loc = region or _L("Mondial", "Global")
-        self._open_window(_L(f"NEWS — {loc} (jour {p.day})", f"NEWS — {loc} (day {p.day})"),
-                          [(_L("Type", "Type"), 110), (_L("Actualité", "Headline"), 360)],
-                          rows, accent=config.COL_PRESTIGE)
+        w = self._open_window(_L(f"NEWS — {loc} (jour {p.day})", f"NEWS — {loc} (day {p.day})"),
+                              [(_L("Type", "Type"), 110), (_L("Actualité", "Headline"), 360)],
+                              rows, accent=config.COL_PRESTIGE)
+        w.news_entries = items  # clic sur une ligne → navigue vers NEWS (cf. _datawin_row_click)
 
     def _open_company_popup(self, ticker):
         """Ouvre la fiche flottante d'une société (en cascade), sans changer de scène."""

@@ -525,6 +525,25 @@ def draw_progress(surf, rect, ratio, accent=config.COL_AMBER, bg=None):
                          (rect.x + 1, rect.y + 1, fill_w, rect.h - 2))
 
 
+# seuils d'alerte (rouge, ambre) des métriques de risque, en % — convention
+# unique partagée par toutes les jauges de risque de l'UI.
+ALERT_THRESHOLDS = {
+    "max_drawdown": (15.0, 8.0),
+    "top_weight": (35.0, 20.0),
+}
+
+
+def alert_color(value_pct, metric):
+    """Rouge si `value_pct` (en %) dépasse le seuil haut de `metric`, ambre si
+    le seuil bas, vert sinon (cf. `ALERT_THRESHOLDS`)."""
+    red, amber = ALERT_THRESHOLDS[metric]
+    if value_pct > red:
+        return config.COL_DOWN
+    if value_pct > amber:
+        return config.COL_WARN
+    return config.COL_UP
+
+
 def draw_tile(surf, rect, label, value, accent=config.COL_AMBER,
               value_color=config.COL_WHITE):
     """Tuile de statistique dense : libellé en haut, valeur en gros dessous."""

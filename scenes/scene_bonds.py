@@ -41,6 +41,8 @@ class BondsScene(Scene, PopupMixin):
         self.sort_key = "ytm"
         self.sort_dir = -1
         self._sort_rects = {}
+        self.kind_filter = kwargs.get("kind_filter")
+        self._kind_rects = {}
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.gov_btn = widgets.Button((220, config.SCREEN_HEIGHT - 50, 160, 42),
@@ -123,6 +125,11 @@ class BondsScene(Scene, PopupMixin):
                         self.sort_key = key
                         self.sort_dir = 1 if key == "name" else -1
                     return
+            for val, rect in self._kind_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.kind_filter = None if self.kind_filter == val else val
+                    self.scroll = 0
+                    return
             for bid, rect in self.name_rects.items():
                 if rect.collidepoint(event.pos):
                     self.open_bond(bid)
@@ -183,6 +190,21 @@ class BondsScene(Scene, PopupMixin):
                               config.COL_AMBER if active else config.COL_TEXT_DIM, align="center")
             sx += w + 6
 
+        self._kind_rects = {}
+        kx = sx + 20
+        widgets.draw_text(surf, "TYPE :", (kx, sort_y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        kx += 48
+        for val, lbl in (("Souverain", "SOUVERAINS"), ("Corporate", "CORPORATE")):
+            active = (self.kind_filter == val)
+            w = fonts.tiny(bold=True).size(lbl)[0] + 16
+            rect = pygame.Rect(kx, sort_y, w, 20)
+            self._kind_rects[val] = rect
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if active else config.COL_PANEL, rect, border_radius=3)
+            pygame.draw.rect(surf, config.COL_CYAN if active else config.COL_BORDER, rect, 1, border_radius=3)
+            widgets.draw_text(surf, lbl, rect.center, fonts.tiny(bold=active),
+                              config.COL_CYAN if active else config.COL_TEXT_DIM, align="center")
+            kx += w + 6
+
         top = sort_y + 28
         ph = config.footer_y() - 8 - top
         panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, ph)
@@ -227,6 +249,10 @@ class BondsScene(Scene, PopupMixin):
                      key=sort_value, reverse=(self.sort_dir < 0))
         corp = sorted([q for q in quotes if q["kind"] == "Corporate"],
                       key=sort_value, reverse=(self.sort_dir < 0))
+        if self.kind_filter == "Souverain":
+            corp = []
+        elif self.kind_filter == "Corporate":
+            sov = []
         mp = pygame.mouse.get_pos()
         self._tooltip = None
         self._row_list = [q["id"] for q in sov] + [q["id"] for q in corp]
@@ -234,8 +260,10 @@ class BondsScene(Scene, PopupMixin):
         self.row_cursor = min(self.row_cursor, len(self._row_list) - 1) if self._row_list else 0
         cursor_id = self._row_list[self.row_cursor] if self._row_list else None
         y = list_top - self.scroll
-        y = self._draw_group(surf, "SOUVERAINS", sov, y, p, list_area, mp, cursor_id)
-        y = self._draw_group(surf, "CORPORATE", corp, y, p, list_area, mp, cursor_id)
+        if sov:
+            y = self._draw_group(surf, "SOUVERAINS", sov, y, p, list_area, mp, cursor_id)
+        if corp:
+            y = self._draw_group(surf, "CORPORATE", corp, y, p, list_area, mp, cursor_id)
         surf.set_clip(prev_clip)
 
         content_h = (y + self.scroll) - list_top

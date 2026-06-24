@@ -207,7 +207,7 @@ class RiskScene(Scene):
                 y += 34
             widgets.draw_text(surf, f"Max drawdown valeur nette : {self.max_dd*100:.1f}%",
                               (inner.x, inner.bottom - 40), fonts.small(bold=True),
-                              config.COL_DOWN if self.max_dd > 0.15 else config.COL_TEXT_DIM)
+                              widgets.alert_color(self.max_dd * 100, "max_drawdown"))
             widgets.draw_text(surf, "Bascule en MODE DÉMO pour ajuster des expositions.",
                               (inner.x, inner.bottom - 18), fonts.tiny(), config.COL_TEXT_DIM)
             return

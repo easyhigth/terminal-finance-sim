@@ -57,6 +57,7 @@ class ShopScene(Scene, PopupMixin):
         self.qty_text = "10"
         self._t = 0.0
         self.type_filter = kwargs.get("type_filter")
+        self.sub_filter = kwargs.get("sub_filter")
         self.sort_key = "value"
         self.sort_dir = -1
         self.scroll = 0
@@ -68,6 +69,7 @@ class ShopScene(Scene, PopupMixin):
         self._buy_rects = {}
         self._sell_rects = {}
         self._type_rects = {}
+        self._sub_rects = {}
         self._sort_rects = {}
         self._qty_box = None
         self._qty_minus = None
@@ -143,11 +145,30 @@ class ShopScene(Scene, PopupMixin):
                          "yield_pct": q["coupon"] * 100.0, "change_pct": None})
         return rows
 
+    def _sub_options(self):
+        """Options de filtre secondaire (secteur/catégorie) selon le TYPE choisi
+        (même logique que scenes/scene_explorer.py::_sub_options)."""
+        if self.type_filter == "Action":
+            return list(self.market.sectors)
+        if self.type_filter == "Commodity":
+            seen = []
+            for cid, name, sp, dr, vol, sl, cat in CM.COMMODITIES:
+                if cat not in seen:
+                    seen.append(cat)
+            return seen
+        if self.type_filter == "Obligation":
+            return ["Souverain", "Corporate"]
+        if self.type_filter == "ETF":
+            return [lbl for _, lbl in ETF.CATEGORIES]
+        return []
+
     def _filtered_sorted(self):
         q = self.search.strip().lower()
         out = []
         for r in self.rows:
             if self.type_filter and r["kind"] != self.type_filter:
+                continue
+            if self.sub_filter and not str(r["sub"]).startswith(self.sub_filter):
                 continue
             if q:
                 hay = f"{r['name']} {r['key']} {r['sub']}".lower()
@@ -335,7 +356,7 @@ class ShopScene(Scene, PopupMixin):
             return
         if self.explorer_btn.handle(event):
             self.app.scenes.go("explorer", return_to="shop", search=self.search,
-                               type_filter=self.type_filter)
+                               type_filter=self.type_filter, sub_filter=self.sub_filter)
             return
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -377,6 +398,12 @@ class ShopScene(Scene, PopupMixin):
             for val, rect in self._type_rects.items():
                 if rect.collidepoint(event.pos):
                     self.type_filter = val
+                    self.sub_filter = None
+                    self.scroll = 0
+                    return
+            for val, rect in self._sub_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.sub_filter = None if self.sub_filter == val else val
                     self.scroll = 0
                     return
             for key, rect in self._sort_rects.items():
@@ -484,6 +511,15 @@ class ShopScene(Scene, PopupMixin):
         # ---- chips TYPE ----
         self._type_rects, y = self._draw_chip_row(surf, x0, top + 30, config.SCREEN_WIDTH - 40,
                                                    TYPE_CHIPS, self.type_filter, config.COL_AMBER)
+
+        # ---- chips SECTEUR / CATÉGORIE (dynamiques selon le TYPE) ----
+        sub_opts = self._sub_options()
+        if sub_opts:
+            sub_chips = [(s, s) for s in sub_opts]
+            self._sub_rects, y = self._draw_chip_row(surf, x0, y + 4, config.SCREEN_WIDTH - 40,
+                                                      sub_chips, self.sub_filter, config.COL_WARN)
+        else:
+            self._sub_rects = {}
 
         # ---- boutons de tri ----
         y += 6

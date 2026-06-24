@@ -22,25 +22,9 @@ _CLASS_COL = {"Actions": config.COL_AMBER, "Obligations": config.COL_CYAN,
               "ETF": config.COL_PRESTIGE, "Structurés": config.COL_PRESTIGE,
               "Crédit": config.COL_PRESTIGE}
 
-# seuils d'alerte (rouge, ambre) des métriques de risque, en % — convention
-# unique partagée par toutes les jauges de cet écran (avant ce constat, le
-# drawdown n'avait pas de palier ambre et la concentration utilisait des
-# seuils différents sans lien documenté).
-_ALERT_THRESHOLDS = {
-    "max_drawdown": (15.0, 8.0),
-    "top_weight": (35.0, 20.0),
-}
-
-
-def _alert_color(value, metric):
-    """Rouge si `value` dépasse le seuil haut de `metric`, ambre si le seuil
-    bas, vert sinon (cf. `_ALERT_THRESHOLDS`)."""
-    red, amber = _ALERT_THRESHOLDS[metric]
-    if value > red:
-        return config.COL_DOWN
-    if value > amber:
-        return config.COL_WARN
-    return config.COL_UP
+# seuils d'alerte partagés entre tous les écrans de risque — cf.
+# ui.widgets.ALERT_THRESHOLDS / alert_color.
+_alert_color = widgets.alert_color
 
 
 class AnalyticsScene(Scene, PopupMixin):
@@ -332,7 +316,7 @@ class AnalyticsScene(Scene, PopupMixin):
         widgets.draw_text(surf, f"Lignes effectives (1/HHI) : {s['effective_positions']:.1f}",
                           (inner.x, y), fonts.tiny(), config.COL_TEXT)
         y += 15
-        red, amber = _ALERT_THRESHOLDS["top_weight"]
+        red, amber = widgets.ALERT_THRESHOLDS["top_weight"]
         conc = "forte" if s["top_weight"] > red else "modérée" if s["top_weight"] > amber else "saine"
         ccol = _alert_color(s["top_weight"], "top_weight")
         widgets.draw_text(surf, f"Concentration : {conc} (top {s['top_weight']:.0f}%)",

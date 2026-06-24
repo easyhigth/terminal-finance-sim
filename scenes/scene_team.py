@@ -222,7 +222,7 @@ class TeamScene(Scene):
             content_h = (ty + self.scroll) - tinner.y
             self._max_scroll = max(0, content_h - list_area.h)
             self.scroll = min(self.scroll, self._max_scroll)
-            widgets.draw_scrollbar(surf, team_rect, list_area, self.scroll, self._max_scroll, content_h)
+            self.scroll = widgets.draw_scrollbar(surf, team_rect, list_area, self.scroll, self._max_scroll, content_h)
 
         widgets.draw_text(surf, f"Coût total récurrent : {widgets.format_money(total_cost, cur)}/tour"
                           f"  ·  bonus réputation passif : +{total_rep:.2f}/tour",

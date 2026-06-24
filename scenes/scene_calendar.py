@@ -258,7 +258,7 @@ class CalendarScene(Scene):
         content_h = (y + self.scroll) - list_area.y
         self._max_scroll = max(0, content_h - list_area.h)
         self.scroll = min(self.scroll, self._max_scroll)
-        widgets.draw_scrollbar(surf, pos_panel, list_area, self.scroll, self._max_scroll, content_h)
+        self.scroll = widgets.draw_scrollbar(surf, pos_panel, list_area, self.scroll, self._max_scroll, content_h)
 
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)

@@ -563,9 +563,18 @@ def draw_scrollbar(surf, panel_rect, list_area, scroll, max_scroll, content_h):
     `scroll`      : décalage de défilement courant (px).
     `max_scroll`  : décalage maximal (0 si tout le contenu est visible).
     `content_h`   : hauteur totale du contenu (pour le ratio du curseur).
+
+    Le curseur est aussi cliquable-glissable (sinon il a l'air draggable
+    sans rien faire, et seule la molette défile) : tant que le bouton gauche
+    est maintenu au-dessus de la piste (élargie horizontalement pour rester
+    facile à attraper), le curseur suit la position verticale de la souris.
+    Pas besoin d'état de glissement à conserver entre les frames : ce calcul
+    est simplement repris à chaque appel de `draw_scrollbar` (appelé à
+    chaque frame de dessin). Renvoie le `scroll` à jour : l'appelant doit
+    récupérer cette valeur (`self.scroll = widgets.draw_scrollbar(...)`).
     """
     if max_scroll <= 0:
-        return
+        return scroll
     panel_rect = pygame.Rect(panel_rect)
     list_area = pygame.Rect(list_area)
     track = pygame.Rect(panel_rect.right - 8, list_area.y, 6, list_area.h)
@@ -574,6 +583,13 @@ def draw_scrollbar(surf, panel_rect, list_area, scroll, max_scroll, content_h):
     bar_h = max(24, int(list_area.h * frac))
     bar_y = list_area.y + int((list_area.h - bar_h) * (scroll / max_scroll))
     pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 6, bar_h), border_radius=3)
+
+    grab_zone = track.inflate(10, 0)
+    mx, my = pygame.mouse.get_pos()
+    if pygame.mouse.get_pressed()[0] and grab_zone.collidepoint(mx, my):
+        rel = (my - bar_h // 2 - list_area.y) / max(1, list_area.h - bar_h)
+        return max(0, min(max_scroll, int(rel * max_scroll)))
+    return scroll
 
 
 class ScrollState:

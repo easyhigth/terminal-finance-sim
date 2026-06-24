@@ -131,7 +131,7 @@ class FrontierLabScene(Scene):
         content_h = (y + self.scroll) - inner.y
         self._max_scroll = max(0, content_h - inner.h)
         self.scroll = max(0, min(self._max_scroll, self.scroll))
-        widgets.draw_scrollbar(surf, rect, inner, self.scroll, self._max_scroll, content_h)
+        self.scroll = widgets.draw_scrollbar(surf, rect, inner, self.scroll, self._max_scroll, content_h)
         widgets.draw_text(surf, "★ = détenue actuellement · clic = inclure/exclure",
                           (inner.x, inner.bottom - 12), fonts.tiny(), config.COL_TEXT_DIM)
 
@@ -202,4 +202,4 @@ class FrontierLabScene(Scene):
         content_h = (y + self.scroll_reco) - (inner.y + 18)
         self._reco_max_scroll = max(0, content_h - list_area.h)
         self.scroll_reco = max(0, min(self._reco_max_scroll, self.scroll_reco))
-        widgets.draw_scrollbar(surf, rect, list_area, self.scroll_reco, self._reco_max_scroll, content_h)
+        self.scroll_reco = widgets.draw_scrollbar(surf, rect, list_area, self.scroll_reco, self._reco_max_scroll, content_h)

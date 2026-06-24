@@ -207,9 +207,9 @@ class MAScene(Scene):
                 widgets.draw_text(surf, f"{t['ebitda_margin']*100:.1f}%", (cols[4][1], y), fonts.small(), config.COL_TEXT)
                 widgets.draw_text(surf, widgets.format_money(ev, cur), (cols[5][1], y), fonts.small(bold=True), config.COL_AMBER)
                 mcol = config.COL_UP if t["management_score"] >= 60 else config.COL_WARN if t["management_score"] >= 40 else config.COL_DOWN
-                widgets.draw_text(surf, f"{t['management_score']:.0f}", (cols[6][1], y), fonts.small(), mcol)
+                widgets.draw_text(surf, f"{t['management_score']:.0f}/100", (cols[6][1], y), fonts.tiny(), mcol)
                 morcol = config.COL_UP if t["morale"] >= 60 else config.COL_WARN if t["morale"] >= 40 else config.COL_DOWN
-                widgets.draw_text(surf, f"{t['morale']:.0f}", (cols[7][1], y), fonts.small(), morcol)
+                widgets.draw_text(surf, f"{t['morale']:.0f}/100", (cols[7][1], y), fonts.tiny(), morcol)
             y += ROW_H
         surf.set_clip(prev_clip)
         content_h = (y + self.scroll) - list_top
@@ -282,7 +282,7 @@ class MAScene(Scene):
             content_h = (y + self.hist_scroll) - hinner.y
             self._hist_max_scroll = max(0, content_h - list_area.h)
             self.hist_scroll = max(0, min(self._hist_max_scroll, self.hist_scroll))
-            widgets.draw_scrollbar(surf, hist_panel, list_area, self.hist_scroll,
+            self.hist_scroll = widgets.draw_scrollbar(surf, hist_panel, list_area, self.hist_scroll,
                                    self._hist_max_scroll, content_h)
 
     # ------------------------------------------------------------- OUTILS (LBO / accretion)

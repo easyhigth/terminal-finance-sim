@@ -27,8 +27,10 @@ SCORE_DIMENSIONS = [
 
 
 def _score_color(v):
-    """Couleur du dégradé rouge→ambre→vert selon le score 0-100."""
-    if v >= 70:
+    """Couleur du dégradé rouge→ambre→vert selon le score 0-100 (seuils
+    alignés sur scenes/scene_ma.py et scenes/scene_ma_target.py : ≥60 vert,
+    ≥40 ambre, sinon rouge)."""
+    if v >= 60:
         return config.COL_UP
     if v >= 40:
         return config.COL_WARN
@@ -159,7 +161,7 @@ class GameOverScene(Scene):
         content_h = (y + self.scroll_report) - inner.y
         self._report_max_scroll = max(0, content_h - list_area.h)
         self.scroll_report = max(0, min(self._report_max_scroll, self.scroll_report))
-        widgets.draw_scrollbar(surf, rect, list_area, self.scroll_report,
+        self.scroll_report = widgets.draw_scrollbar(surf, rect, list_area, self.scroll_report,
                                self._report_max_scroll, content_h)
 
     def _draw_journal_panel(self, surf, rect, p):
@@ -188,7 +190,7 @@ class GameOverScene(Scene):
         content_h = (yy + self.scroll_journal) - inner.y
         self._journal_max_scroll = max(0, content_h - list_area.h)
         self.scroll_journal = max(0, min(self._journal_max_scroll, self.scroll_journal))
-        widgets.draw_scrollbar(surf, rect, list_area, self.scroll_journal,
+        self.scroll_journal = widgets.draw_scrollbar(surf, rect, list_area, self.scroll_journal,
                                self._journal_max_scroll, content_h)
 
     def _draw_score_panel(self, surf, rect):
@@ -211,9 +213,9 @@ class GameOverScene(Scene):
         for key, label in SCORE_DIMENSIONS:
             val = getattr(sc, key)
             widgets.draw_text(surf, label, (inner.x, bar_y), fonts.tiny(), config.COL_TEXT)
-            bar_rect = pygame.Rect(inner.x + 78, bar_y + 1, inner.w - 78 - 28, bar_h - 2)
+            bar_rect = pygame.Rect(inner.x + 78, bar_y + 1, inner.w - 78 - 46, bar_h - 2)
             widgets.draw_progress(surf, bar_rect, val / 100.0, _score_color(val))
-            widgets.draw_text(surf, f"{val:.0f}", (inner.right, bar_y),
+            widgets.draw_text(surf, f"{val:.0f}/100", (inner.right, bar_y),
                               fonts.tiny(), config.COL_TEXT_DIM, align="right")
             bar_y += bar_h + gap
 
@@ -236,9 +238,10 @@ class GameOverScene(Scene):
                             y_fmt=lambda v: widgets.format_money(v, cur),
                             show_pct=True, show_extrema=False)
         n_hist = len(hist)
+        d = config.DAYS_PER_STEP
         widgets.draw_chart_x_labels(surf, chart_rect, [
-            (0.0, f"-{n_hist - 1}j"),
-            (0.5, f"-{(n_hist - 1) // 2}j"),
+            (0.0, f"-{(n_hist - 1) * d}j"),
+            (0.5, f"-{(n_hist - 1) // 2 * d}j"),
             (1.0, "aujourd'hui"),
         ])
 

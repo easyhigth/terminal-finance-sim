@@ -146,9 +146,11 @@ class DataWindow:
                          border_bottom_left_radius=5 if self.minimized else 0,
                          border_bottom_right_radius=5 if self.minimized else 0)
         n_btn = 2 if self.minimizable else 1
+        title_font = fonts.small(bold=True)
         title_w = self.rect.w - TITLE_H * n_btn - 8
-        widgets.draw_text(surf, widgets.fit_text(self.title, fonts.small(bold=True), title_w),
-                          (tr.x + 8, tr.y + 5), fonts.small(bold=True), self.accent)
+        title_truncated = title_font.size(self.title)[0] > title_w
+        widgets.draw_text(surf, widgets.fit_text(self.title, title_font, title_w),
+                          (tr.x + 8, tr.y + 5), title_font, self.accent)
         cr = self._close_rect()
         widgets.draw_text(surf, "✕", (cr.centerx, cr.y + 5), fonts.small(bold=True),
                           config.COL_TEXT_DIM, align="center")
@@ -157,6 +159,11 @@ class DataWindow:
             sym = "▸" if self.minimized else "▾"
             widgets.draw_text(surf, sym, (mr.centerx, mr.y + 5), fonts.small(bold=True),
                               config.COL_TEXT_DIM, align="center")
+        if title_truncated:
+            title_rect = pygame.Rect(tr.x, tr.y, title_w + 8, tr.h)
+            mp = pygame.mouse.get_pos()
+            if title_rect.collidepoint(mp):
+                widgets.draw_tooltip(surf, self.title, mp)
         if self.minimized:
             return None
         if self.resizable:

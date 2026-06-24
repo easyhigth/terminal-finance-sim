@@ -49,9 +49,10 @@ def _x_labels(surf, rect, n):
     les graphes pleine page)."""
     if n < 2:
         return
+    d = config.DAYS_PER_STEP
     widgets.draw_chart_x_labels(surf, rect, [
-        (0.0, f"-{n - 1}j"),
-        (0.5, f"-{(n - 1) // 2}j"),
+        (0.0, f"-{(n - 1) * d}j"),
+        (0.5, f"-{(n - 1) // 2 * d}j"),
         (1.0, "aujourd'hui"),
     ])
 
@@ -153,7 +154,7 @@ class CompanyPopup(DataWindow):
             self.expand_requested = True
             return True
         if self._name_rect and self._name_rect.collidepoint(pos):
-            self.nav_request = {"to": "graph", "tickers": [self.ticker], "kind": "line"}
+            self.nav_request = {"to": "explorer", "search": self.ticker}
             return True
         mt = self.market.metrics(self.ticker) if self.market else None
         if mt:
@@ -301,7 +302,7 @@ class CommodityPopup(DataWindow):
                 self.kind = k
                 return True
         if self._name_rect and self._name_rect.collidepoint(pos):
-            self.nav_request = {"to": "graph", "tickers": [self.cid], "kind": "line"}
+            self.nav_request = {"to": "explorer", "search": self.cid}
             return True
         q = commodities_mod.quote(self.market, self.cid) if self.market else None
         if q:
@@ -389,7 +390,7 @@ class CryptoPopup(DataWindow):
                 self.kind = k
                 return True
         if self._name_rect and self._name_rect.collidepoint(pos):
-            self.nav_request = {"to": "graph", "tickers": [self.cid], "kind": "line"}
+            self.nav_request = {"to": "explorer", "search": self.cid}
             return True
         if self._type_rect and self._type_rect.collidepoint(pos):
             self.nav_request = {"to": "explorer", "type_filter": "Crypto"}
@@ -474,7 +475,7 @@ class BondPopup(DataWindow):
                 self.kind = k
                 return True
         if self._name_rect and self._name_rect.collidepoint(pos):
-            self.nav_request = {"to": "graph", "tickers": [self.bond_id], "kind": "line"}
+            self.nav_request = {"to": "explorer", "search": self.bond_id}
             return True
         q = bonds_mod.quote(self.market, self.bond_id) if self.market else None
         if q:
@@ -569,7 +570,7 @@ class ETFPopup(DataWindow):
                 self.kind = k
                 return True
         if self._name_rect and self._name_rect.collidepoint(pos):
-            self.nav_request = {"to": "graph", "tickers": [self.eid], "kind": "line"}
+            self.nav_request = {"to": "explorer", "search": self.eid}
             return True
         q = etfs_mod.quote(self.market, self.eid) if self.market else None
         if q:

@@ -22,6 +22,26 @@ _CLASS_COL = {"Actions": config.COL_AMBER, "Obligations": config.COL_CYAN,
               "ETF": config.COL_PRESTIGE, "Structurés": config.COL_PRESTIGE,
               "Crédit": config.COL_PRESTIGE}
 
+# seuils d'alerte (rouge, ambre) des métriques de risque, en % — convention
+# unique partagée par toutes les jauges de cet écran (avant ce constat, le
+# drawdown n'avait pas de palier ambre et la concentration utilisait des
+# seuils différents sans lien documenté).
+_ALERT_THRESHOLDS = {
+    "max_drawdown": (15.0, 8.0),
+    "top_weight": (35.0, 20.0),
+}
+
+
+def _alert_color(value, metric):
+    """Rouge si `value` dépasse le seuil haut de `metric`, ambre si le seuil
+    bas, vert sinon (cf. `_ALERT_THRESHOLDS`)."""
+    red, amber = _ALERT_THRESHOLDS[metric]
+    if value > red:
+        return config.COL_DOWN
+    if value > amber:
+        return config.COL_WARN
+    return config.COL_UP
+
 
 class AnalyticsScene(Scene, PopupMixin):
     def on_enter(self, **kwargs):
@@ -188,8 +208,9 @@ class AnalyticsScene(Scene, PopupMixin):
             ("Levier", lev, config.COL_WARN if s["leverage"] > 1.5 else config.COL_TEXT),
             ("Vol. annu.", f"{s['volatility']:.1f}%", config.COL_WARN),
             ("Max DD", f"{s['max_drawdown']:.1f}%",
-             config.COL_DOWN if s["max_drawdown"] > 15 else config.COL_TEXT),
-            ("Concentration", f"top {s['top_weight']:.0f}%", config.COL_TEXT),
+             _alert_color(s["max_drawdown"], "max_drawdown")),
+            ("Concentration", f"top {s['top_weight']:.0f}%",
+             _alert_color(s["top_weight"], "top_weight")),
             ("Exposition nette", fm(s["net_exposure"]),
              config.COL_UP if s["net_exposure"] >= 0 else config.COL_DOWN),
         ]
@@ -210,7 +231,7 @@ class AnalyticsScene(Scene, PopupMixin):
             ("VaR 95%", f"{s['var95']:.1f}%", config.COL_DOWN),
             ("CVaR 95%", f"{s['cvar95']:.1f}%", config.COL_DOWN),
             ("Tracking error", f"{s['tracking_error']:.1f}%", config.COL_TEXT),
-            ("Récup. (pas)", "—" if s["recovery_time"] is None else f"{s['recovery_time']}",
+            ("Récup.", "—" if s["recovery_time"] is None else f"{s['recovery_time']} pas",
              config.COL_WARN if s["recovery_time"] is None else config.COL_TEXT),
             ("Lignes effectives", f"{s['effective_positions']:.1f}", config.COL_TEXT),
         ]
@@ -279,7 +300,7 @@ class AnalyticsScene(Scene, PopupMixin):
         content_h = (y + self.scroll_holdings) - list_top
         self._holdings_max_scroll = max(0, content_h - list_area.h)
         self.scroll_holdings = max(0, min(self._holdings_max_scroll, self.scroll_holdings))
-        widgets.draw_scrollbar(surf, rect, list_area, self.scroll_holdings,
+        self.scroll_holdings = widgets.draw_scrollbar(surf, rect, list_area, self.scroll_holdings,
                                self._holdings_max_scroll, content_h)
         widgets.draw_text(surf, "clic/clic droit actif → fiche d'analyse · clic cours/valeur/P&L (actions) → graphe",
                           (inner.x, inner.bottom - 12), fonts.tiny(), config.COL_TEXT_DIM)
@@ -311,8 +332,9 @@ class AnalyticsScene(Scene, PopupMixin):
         widgets.draw_text(surf, f"Lignes effectives (1/HHI) : {s['effective_positions']:.1f}",
                           (inner.x, y), fonts.tiny(), config.COL_TEXT)
         y += 15
-        conc = ("forte" if s["top_weight"] > 35 else "modérée" if s["top_weight"] > 20 else "saine")
-        ccol = config.COL_DOWN if s["top_weight"] > 35 else config.COL_WARN if s["top_weight"] > 20 else config.COL_UP
+        red, amber = _ALERT_THRESHOLDS["top_weight"]
+        conc = "forte" if s["top_weight"] > red else "modérée" if s["top_weight"] > amber else "saine"
+        ccol = _alert_color(s["top_weight"], "top_weight")
         widgets.draw_text(surf, f"Concentration : {conc} (top {s['top_weight']:.0f}%)",
                           (inner.x, y), fonts.tiny(bold=True), ccol)
         y += 18
@@ -331,7 +353,7 @@ class AnalyticsScene(Scene, PopupMixin):
         content_h = y - y0
         self._alloc_max_scroll = max(0, content_h - inner.h)
         self.scroll_alloc = max(0, min(self._alloc_max_scroll, self.scroll_alloc))
-        widgets.draw_scrollbar(surf, rect, inner, self.scroll_alloc, self._alloc_max_scroll, content_h)
+        self.scroll_alloc = widgets.draw_scrollbar(surf, rect, inner, self.scroll_alloc, self._alloc_max_scroll, content_h)
 
     def _alloc_block(self, surf, inner, y, title, data, colfn):
         widgets.draw_text(surf, title, (inner.x, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)

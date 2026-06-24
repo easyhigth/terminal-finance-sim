@@ -260,7 +260,7 @@ class MarketHubScene(Scene, PopupMixin):
         surf.set_clip(prev_clip)
         content_h = (y + st.scroll) - inner.y
         st.set_bounds(list_area, content_h)
-        widgets.draw_scrollbar(surf, rect, list_area, st.scroll, st.max_scroll, content_h)
+        st.scroll = widgets.draw_scrollbar(surf, rect, list_area, st.scroll, st.max_scroll, content_h)
 
     def _draw_top(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Top sociétés", config.COL_CYAN)
@@ -304,7 +304,7 @@ class MarketHubScene(Scene, PopupMixin):
         surf.set_clip(prev_clip)
         content_h = (y + st.scroll) - list_top
         st.set_bounds(list_area, content_h)
-        widgets.draw_scrollbar(surf, rect, list_area, st.scroll, st.max_scroll, content_h)
+        st.scroll = widgets.draw_scrollbar(surf, rect, list_area, st.scroll, st.max_scroll, content_h)
 
     def _draw_movers(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Variations — plus forts mouvements", config.COL_DEAL)
@@ -342,7 +342,7 @@ class MarketHubScene(Scene, PopupMixin):
         surf.set_clip(prev_clip)
         content_h = (y + st.scroll) - list_area.y
         st.set_bounds(list_area, content_h)
-        widgets.draw_scrollbar(surf, pygame.Rect(col_x - 4, list_area.y, colw + 12, list_area.h),
+        st.scroll = widgets.draw_scrollbar(surf, pygame.Rect(col_x - 4, list_area.y, colw + 12, list_area.h),
                                list_area, st.scroll, st.max_scroll, content_h)
 
     def _draw_eco(self, surf, rect):
@@ -413,7 +413,7 @@ class MarketHubScene(Scene, PopupMixin):
         surf.set_clip(prev_clip)
         content_h = (y + st.scroll) - list_top
         st.set_bounds(list_area, content_h)
-        widgets.draw_scrollbar(surf, rect, list_area, st.scroll, st.max_scroll, content_h)
+        st.scroll = widgets.draw_scrollbar(surf, rect, list_area, st.scroll, st.max_scroll, content_h)
 
     def _draw_sectors(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Performance sectorielle (dernier pas, pondérée par capitalisation)",
@@ -453,7 +453,7 @@ class MarketHubScene(Scene, PopupMixin):
         surf.set_clip(prev_clip)
         content_h = (y + st.scroll) - list_top
         st.set_bounds(list_area, content_h)
-        widgets.draw_scrollbar(surf, rect, list_area, st.scroll, st.max_scroll, content_h)
+        st.scroll = widgets.draw_scrollbar(surf, rect, list_area, st.scroll, st.max_scroll, content_h)
 
     def _draw_topflop(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Top/Flop — plus forts mouvements sur la période", config.COL_DEAL)
@@ -516,7 +516,7 @@ class MarketHubScene(Scene, PopupMixin):
         surf.set_clip(prev_clip)
         content_h = (y_rows + st.scroll) - list_area.y
         st.set_bounds(list_area, content_h)
-        widgets.draw_scrollbar(surf, pygame.Rect(col_x - 4, list_area.y, colw + 12, list_area.h),
+        st.scroll = widgets.draw_scrollbar(surf, pygame.Rect(col_x - 4, list_area.y, colw + 12, list_area.h),
                                list_area, st.scroll, st.max_scroll, content_h)
 
     def _draw_heatmap(self, surf, rect):
@@ -594,4 +594,4 @@ class MarketHubScene(Scene, PopupMixin):
         surf.set_clip(prev_clip)
         content_h = (y + st.scroll) - inner.y
         st.set_bounds(list_area, content_h)
-        widgets.draw_scrollbar(surf, rect, list_area, st.scroll, st.max_scroll, content_h)
+        st.scroll = widgets.draw_scrollbar(surf, rect, list_area, st.scroll, st.max_scroll, content_h)

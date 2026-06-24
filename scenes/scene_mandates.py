@@ -319,7 +319,7 @@ class MandatesScene(Scene):
         content_h = (y + self.scroll) - list_top
         self._max_scroll = max(0, content_h - list_area.h)
         self.scroll = min(self.scroll, self._max_scroll)
-        widgets.draw_scrollbar(surf, act_panel, list_area, self.scroll, self._max_scroll, content_h)
+        self.scroll = widgets.draw_scrollbar(surf, act_panel, list_area, self.scroll, self._max_scroll, content_h)
 
         if offers:
             hints = [("↑↓", _L("offre", "offer")), (_L("ENTRÉE", "ENTER"), _L("accepter", "accept")), ("D", _L("refuser", "decline"))]

@@ -150,7 +150,7 @@ class AcademyScene(Scene):
         content_h = (y + self.scroll) - linner.y
         self._max_scroll = max(0, content_h - linner.h)
         self.scroll = min(self.scroll, self._max_scroll)
-        widgets.draw_scrollbar(surf, listp, linner, self.scroll, self._max_scroll, content_h)
+        self.scroll = widgets.draw_scrollbar(surf, listp, linner, self.scroll, self._max_scroll, content_h)
 
         # lecture à droite
         readp = pygame.Rect(420, 100, config.SCREEN_WIDTH - 460, ph)

@@ -126,4 +126,4 @@ class ShortcutsPanel:
         content_h = (y + self.scroll) - content.y
         self._max_scroll = max(0, content_h - content.h)
         self.scroll = min(self.scroll, self._max_scroll)
-        widgets.draw_scrollbar(surf, self.rect, content, self.scroll, self._max_scroll, content_h)
+        self.scroll = widgets.draw_scrollbar(surf, self.rect, content, self.scroll, self._max_scroll, content_h)

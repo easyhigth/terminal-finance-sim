@@ -317,7 +317,7 @@ class MarketExplorerScene(Scene, PopupMixin):
             return
         if self.shop_btn.handle(event):
             self.app.scenes.go("shop", return_to="explorer", search=self.search,
-                               type_filter=self.type_filter)
+                               type_filter=self.type_filter, sub_filter=self.sub_filter)
             return
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):

@@ -209,7 +209,7 @@ class BookScene(Scene, PopupMixin):
             sy += row_h
         surf.set_clip(prev_clip)
         pygame.draw.rect(surf, config.COL_BORDER, list_area, 1)
-        widgets.draw_scrollbar(surf, list_area, list_area, self.suggest_scroll,
+        self.suggest_scroll = widgets.draw_scrollbar(surf, list_area, list_area, self.suggest_scroll,
                                self._suggest_max_scroll, content_h)
 
     # ----------------------------------------------------------------- events
@@ -456,7 +456,7 @@ class BookScene(Scene, PopupMixin):
             content_h = (y + self.scroll_positions) - list_top
             self._positions_max_scroll = max(0, content_h - list_area.h)
             self.scroll_positions = max(0, min(self._positions_max_scroll, self.scroll_positions))
-            widgets.draw_scrollbar(surf, table, list_area, self.scroll_positions,
+            self.scroll_positions = widgets.draw_scrollbar(surf, table, list_area, self.scroll_positions,
                                    self._positions_max_scroll, content_h)
             widgets.draw_text(surf, "clic/clic droit nom → fiche d'analyse · clic valeur/P&L (actions) → graphe",
                               (inner.x, inner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
@@ -491,7 +491,7 @@ class BookScene(Scene, PopupMixin):
             content_h = (y + self.scroll_sector) - ainner.y
             self._sector_max_scroll = max(0, content_h - list_area.h)
             self.scroll_sector = max(0, min(self._sector_max_scroll, self.scroll_sector))
-            widgets.draw_scrollbar(surf, alloc, list_area, self.scroll_sector,
+            self.scroll_sector = widgets.draw_scrollbar(surf, alloc, list_area, self.scroll_sector,
                                    self._sector_max_scroll, content_h)
             if warn:
                 widgets.draw_text(surf, "⚠ Forte concentration sectorielle.",

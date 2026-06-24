@@ -97,9 +97,10 @@ class HistoryScene(Scene):
                             y_fmt=lambda v: widgets.format_money(v, cur),
                             show_pct=True, show_extrema=False)
         n_hist = len(hist)
+        d = config.DAYS_PER_STEP
         widgets.draw_chart_x_labels(surf, chart_rect, [
-            (0.0, f"-{n_hist - 1}j"),
-            (0.5, f"-{(n_hist - 1) // 2}j"),
+            (0.0, f"-{(n_hist - 1) * d}j"),
+            (0.5, f"-{(n_hist - 1) // 2 * d}j"),
             (1.0, "aujourd'hui"),
         ])
 
@@ -172,5 +173,5 @@ class HistoryScene(Scene):
         content_h = n_pages_rows * line_h
         self._timeline_max_scroll = max(0, content_h - inner.h)
         self.scroll_timeline = max(0, min(self._timeline_max_scroll, self.scroll_timeline))
-        widgets.draw_scrollbar(surf, rect, list_area, self.scroll_timeline,
+        self.scroll_timeline = widgets.draw_scrollbar(surf, rect, list_area, self.scroll_timeline,
                                self._timeline_max_scroll, content_h)

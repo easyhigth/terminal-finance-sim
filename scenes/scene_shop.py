@@ -533,7 +533,7 @@ class ShopScene(Scene, PopupMixin):
         content_h = (ry + self.scroll) - list_top
         self._max_scroll = max(0, content_h - list_area.h)
         self.scroll = min(self.scroll, self._max_scroll)
-        widgets.draw_scrollbar(surf, panel, list_area, self.scroll, self._max_scroll, content_h)
+        self.scroll = widgets.draw_scrollbar(surf, panel, list_area, self.scroll, self._max_scroll, content_h)
 
         if not self._can_trade():
             widgets.draw_text(surf, "⊘ Trading débloqué au grade Associate.",

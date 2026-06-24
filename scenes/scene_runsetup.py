@@ -209,7 +209,7 @@ class RunSetupScene(Scene):
             y += h + card_gap
         surf.set_clip(prev_clip)
         st.set_bounds(list_area, content_h)
-        widgets.draw_scrollbar(surf, panel_rect, list_area, st.scroll, st.max_scroll, content_h)
+        st.scroll = widgets.draw_scrollbar(surf, panel_rect, list_area, st.scroll, st.max_scroll, content_h)
         return rects
 
     def _draw_hardcore_bar(self, surf, rect):

@@ -196,11 +196,11 @@ class FinancialsScene(Scene):
         content_h = (y + scroll) - (inner.y + head_h)
         max_scroll = max(0, content_h - list_area.h)
         scroll = max(0, min(max_scroll, scroll))
+        scroll = widgets.draw_scrollbar(surf, rect, list_area, scroll, max_scroll, content_h)
         if which == "inc":
             self._max_scroll_inc, self.scroll_inc = max_scroll, scroll
         else:
             self._max_scroll_bal, self.scroll_bal = max_scroll, scroll
-        widgets.draw_scrollbar(surf, rect, list_area, scroll, max_scroll, content_h)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)

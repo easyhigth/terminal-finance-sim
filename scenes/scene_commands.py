@@ -362,3 +362,12 @@ class CommandsScene(Scene):
         bar_h = max(24, int(vp.h * frac))
         bar_y = vp.y + int((vp.h - bar_h) * (self.scroll / ms))
         pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 6, bar_h), border_radius=3)
+
+        # clic-glisser (cf. ui/widgets.py::draw_scrollbar pour la même logique
+        # appliquée aux autres écrans à liste défilante) : sans ça la barre a
+        # l'air draggable mais seule la molette défile vraiment.
+        grab_zone = track.inflate(10, 0)
+        mx, my = pygame.mouse.get_pos()
+        if pygame.mouse.get_pressed()[0] and grab_zone.collidepoint(mx, my):
+            rel = (my - bar_h // 2 - vp.y) / max(1, vp.h - bar_h)
+            self.scroll = max(0, min(ms, int(rel * ms)))

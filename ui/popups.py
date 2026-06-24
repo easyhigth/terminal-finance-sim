@@ -49,9 +49,10 @@ def _x_labels(surf, rect, n):
     les graphes pleine page)."""
     if n < 2:
         return
+    d = config.DAYS_PER_STEP
     widgets.draw_chart_x_labels(surf, rect, [
-        (0.0, f"-{n - 1}j"),
-        (0.5, f"-{(n - 1) // 2}j"),
+        (0.0, f"-{(n - 1) * d}j"),
+        (0.5, f"-{(n - 1) // 2 * d}j"),
         (1.0, "aujourd'hui"),
     ])
 

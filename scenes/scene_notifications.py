@@ -190,6 +190,6 @@ class NotificationsScene(Scene):
         content_h = (y + self.scroll) - inner.y
         self._max_scroll = max(0, content_h - list_area.h)
         self.scroll = min(self.scroll, self._max_scroll)
-        widgets.draw_scrollbar(surf, panel, list_area, self.scroll, self._max_scroll, content_h)
+        self.scroll = widgets.draw_scrollbar(surf, panel, list_area, self.scroll, self._max_scroll, content_h)
 
         self.back_btn.draw(surf)

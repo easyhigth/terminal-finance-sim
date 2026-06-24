@@ -217,7 +217,7 @@ class InboxScene(Scene):
             content_h = (y + self.scroll) - linner.y
             self._max_scroll = max(0, content_h - list_area.h)
             self.scroll = min(self.scroll, self._max_scroll)
-            widgets.draw_scrollbar(surf, listp, list_area, self.scroll, self._max_scroll, content_h)
+            self.scroll = widgets.draw_scrollbar(surf, listp, list_area, self.scroll, self._max_scroll, content_h)
 
         # volet de lecture à droite
         readp = pygame.Rect(540, list_top, config.SCREEN_WIDTH - 580, ph)

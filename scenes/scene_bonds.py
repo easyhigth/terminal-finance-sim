@@ -241,7 +241,7 @@ class BondsScene(Scene, PopupMixin):
         content_h = (y + self.scroll) - list_top
         self._max_scroll = max(0, content_h - list_area.h)
         self.scroll = min(self.scroll, self._max_scroll)
-        widgets.draw_scrollbar(surf, panel, list_area, self.scroll, self._max_scroll, content_h)
+        self.scroll = widgets.draw_scrollbar(surf, panel, list_area, self.scroll, self._max_scroll, content_h)
 
         # synthèse position obligataire
         hv = B.holdings_value(p, m)

@@ -290,7 +290,7 @@ class AlertsScene(Scene):
         content_h = (ry + self.scroll) - linner.y
         self._max_scroll = max(0, content_h - list_area.h)
         self.scroll = min(self.scroll, self._max_scroll)
-        widgets.draw_scrollbar(surf, listp, list_area, self.scroll, self._max_scroll, content_h)
+        self.scroll = widgets.draw_scrollbar(surf, listp, list_area, self.scroll, self._max_scroll, content_h)
 
         # ---- alertes actives (droite) ----
         p = self.app.gs.player
@@ -316,7 +316,7 @@ class AlertsScene(Scene):
             acontent_h = (ay + self._alerts_scroll) - rinner.y
             self._alerts_max_scroll = max(0, acontent_h - alerts_area.h)
             self._alerts_scroll = min(self._alerts_scroll, self._alerts_max_scroll)
-            widgets.draw_scrollbar(surf, rightp, alerts_area, self._alerts_scroll,
+            self._alerts_scroll = widgets.draw_scrollbar(surf, rightp, alerts_area, self._alerts_scroll,
                                    self._alerts_max_scroll, acontent_h)
 
         self.back_btn.draw(surf)

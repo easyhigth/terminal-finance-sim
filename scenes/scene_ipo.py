@@ -265,7 +265,7 @@ class IPOScene(Scene):
         content_h = (y + self.scroll) - list_area.y
         self._max_scroll = max(0, content_h - list_area.h)
         self.scroll = min(self.scroll, self._max_scroll)
-        widgets.draw_scrollbar(surf, pos_panel, list_area, self.scroll, self._max_scroll, content_h)
+        self.scroll = widgets.draw_scrollbar(surf, pos_panel, list_area, self.scroll, self._max_scroll, content_h)
 
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
                               [("↑↓", "naviguer"), ("ENTRÉE", "souscrire")])

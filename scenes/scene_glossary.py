@@ -151,8 +151,8 @@ class GlossaryScene(Scene):
                 (inner2.x+4, y+2), font, col)
             y += 30
         n_max_scroll = max(0, len(self.terms) - 18)
-        widgets.draw_scrollbar(surf, term_panel, inner2, self.scroll * 30,
-                               n_max_scroll * 30, len(self.terms) * 30)
+        self.scroll = widgets.draw_scrollbar(surf, term_panel, inner2, self.scroll * 30,
+                               n_max_scroll * 30, len(self.terms) * 30) // 30
 
         # --- Définition ---
         def_panel = pygame.Rect(592, 110, config.SCREEN_WIDTH-632, 560)

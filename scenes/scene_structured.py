@@ -242,7 +242,7 @@ class StructuredScene(Scene):
         content_h = (y + self.scroll) - inner.y
         self._max_scroll = max(0, content_h - list_area.h)
         self.scroll = min(self.scroll, self._max_scroll)
-        widgets.draw_scrollbar(surf, cat, list_area, self.scroll, self._max_scroll, content_h)
+        self.scroll = widgets.draw_scrollbar(surf, cat, list_area, self.scroll, self._max_scroll, content_h)
 
         # positions en cours (droite)
         posp = pygame.Rect(760, top, config.SCREEN_WIDTH - 800, ph)

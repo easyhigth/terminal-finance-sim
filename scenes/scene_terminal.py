@@ -265,6 +265,14 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                 if tk:
                     w.open_ticker = None
                     self._open_company_popup(tk)
+                nav = getattr(w, "nav_request", None)
+                if nav:
+                    w.nav_request = None
+                    nav = dict(nav)
+                    target = nav.pop("to")
+                    nav["return_to"] = "terminal"
+                    self.app.scenes.go(target, **nav)
+                    return
                 self.datawins = [x for x in self.datawins if not x.closed]
                 return
         # 1bis) molette : console, panneau indices, panneau top sociétés

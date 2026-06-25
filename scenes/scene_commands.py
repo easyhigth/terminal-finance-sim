@@ -146,6 +146,22 @@ def _copy_text(label):
     return (cut + " ") if has_arg else cut
 
 
+def _split_canonical(label):
+    """Découpe un libellé multi-alias en (nom canonique + placeholders, synonymes).
+    Ex : 'BUY / LONG <tk> <qté>' -> ('BUY <tk> <qté>', 'LONG'). Un seul alias
+    (pas de '/') renvoie le libellé tel quel et une chaîne de synonymes vide."""
+    if "<" in label:
+        base, _, args = label.partition("<")
+        args = "<" + args
+    else:
+        base, args = label, ""
+    aliases = [a.strip() for a in base.split("/") if a.strip()]
+    if len(aliases) <= 1:
+        return label, ""
+    canonical = aliases[0] + (" " + args if args else "")
+    return canonical, ", ".join(aliases[1:])
+
+
 def _label_lock_grade(label, player):
     """Grade minimal requis pour utiliser cette commande, ou None si déjà débloquée.
     Compare chaque alias du libellé (avant les placeholders) aux features de unlocks.py."""
@@ -334,9 +350,14 @@ class CommandsScene(Scene):
                             config.COL_CYAN if hovered else config.COL_AMBER)
                         badge = f"🔒 {config.GRADES[lock_g]}" if lock_g is not None else ""
                         avail_w = self._col_w - 8 - (fonts.tiny().size(badge)[0] + 6 if badge else 0)
-                        widgets.draw_text(surf, widgets.fit_text(label, fonts.small(bold=True),
-                                                                 avail_w),
-                                          (x, y), fonts.small(bold=True), label_col)
+                        canonical, synonyms = _split_canonical(label)
+                        name_rect = widgets.draw_text(surf, widgets.fit_text(canonical, fonts.small(bold=True),
+                                                                             avail_w),
+                                                       (x, y), fonts.small(bold=True), label_col)
+                        syn_w = avail_w - name_rect.w
+                        if synonyms and syn_w > 20:
+                            widgets.draw_text(surf, widgets.fit_text(f" ≡ {synonyms}", fonts.tiny(), syn_w),
+                                              (name_rect.right, y + 3), fonts.tiny(), config.COL_TEXT_DIM)
                         if badge:
                             widgets.draw_text(surf, badge, (x + self._col_w - 4, y + 2),
                                               fonts.tiny(bold=True), config.COL_AMBER_DIM,

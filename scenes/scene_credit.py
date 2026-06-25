@@ -158,7 +158,7 @@ class CreditScene(Scene):
                               (cols[1][1], y), fonts.small(), config.COL_TEXT)
             widgets.draw_text(surf, f"{q['thickness']*100:.0f}%", (cols[2][1], y), fonts.small(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, f"{q['coupon']*100:.1f}%", (cols[3][1], y), fonts.small(bold=True), config.COL_UP)
-            rc = config.COL_UP if q["rating"] == "AAA" else config.COL_WARN if q["rating"] == "BB" else config.COL_DOWN
+            rc = widgets.rating_color(q["rating"])
             widgets.draw_text(surf, q["rating"], (cols[4][1], y), fonts.small(bold=True), rc)
             lc = config.COL_DOWN if q["exp_loss"] > 0.1 else config.COL_TEXT_DIM
             widgets.draw_text(surf, f"{q['exp_loss']*100:.0f}%", (cols[5][1], y), fonts.small(), lc)

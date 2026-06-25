@@ -14,6 +14,12 @@ from ui import fonts, widgets
 PALETTE_W, PALETTE_H = 560, 360
 PALETTE_ROW_H = 30
 
+# Scènes de flux pré-partie (menu, création de run...) : jamais de fil
+# d'Ariane pendant cette phase, et la pile est purgée pour repartir propre
+# une fois "terminal" atteint.
+BREADCRUMB_SKIP = {"menu", "continent", "runsetup", "sandbox", "splash", "intro", "gameover"}
+BREADCRUMB_Y = 4
+
 
 def _L(fr, en):
     """Renvoie la version FR ou EN selon la langue courante (chrome UI)."""
@@ -69,6 +75,8 @@ class SceneManager:
         self.palette_query = ""
         self.palette_sel = 0
         self.palette_recent = []   # [(label, scene, kw)] derniers choix (session courante)
+        self.nav_stack = []        # [(scene, kwargs)] fil d'Ariane depuis "terminal"
+        self._breadcrumb_rects = []  # [(Rect, scene, kwargs)] segments cliquables (hors dernier)
 
     def register(self, name, scene):
         self.scenes[name] = scene
@@ -76,11 +84,66 @@ class SceneManager:
     def go(self, name, **kwargs):
         if name not in self.scenes:
             raise KeyError(f"Scène inconnue : {name}")
+        self._update_breadcrumb(name, kwargs)
         self.current = self.scenes[name]
         self.current_name = name
         self.current.on_enter(**kwargs)
         self._fade = 1.0          # déclenche le fondu d'entrée
         self.palette_open = False
+
+    # --- fil d'Ariane (breadcrumb) -----------------------------------------
+    def _update_breadcrumb(self, name, kwargs):
+        if name in BREADCRUMB_SKIP:
+            self.nav_stack = []
+            return
+        if name == "terminal":
+            self.nav_stack = [("terminal", {})]
+            return
+        for i, (n, _kw) in enumerate(self.nav_stack):
+            if n == name:
+                # on revient sur une scène déjà visitée (clic sur un segment,
+                # ou navigation en boucle) : on tronque plutôt que d'empiler.
+                self.nav_stack = self.nav_stack[:i + 1]
+                return
+        if not self.nav_stack:
+            self.nav_stack = [("terminal", {})]
+        self.nav_stack.append((name, dict(kwargs)))
+
+    def _scene_label(self, name):
+        if name == "terminal":
+            return "Terminal"
+        from scenes.scene_more import SECTIONS
+        for _title, items in SECTIONS:
+            for label, scene_name, _kw in items:
+                if scene_name == name:
+                    return label
+        return name.capitalize()
+
+    def _draw_breadcrumb(self, surf):
+        self._breadcrumb_rects = []
+        if len(self.nav_stack) < 2:
+            return
+        font = fonts.tiny()
+        x, y = 12, BREADCRUMB_Y
+        n = len(self.nav_stack)
+        for i, (name, kw) in enumerate(self.nav_stack):
+            label = self._scene_label(name)
+            is_last = (i == n - 1)
+            col = config.COL_TEXT_DIM if is_last else config.COL_CYAN
+            rect = widgets.draw_text(surf, label, (x, y), font, col)
+            if not is_last:
+                self._breadcrumb_rects.append((rect, name, kw))
+            x = rect.right
+            if not is_last:
+                sep = widgets.draw_text(surf, " › ", (x, y), font, config.COL_TEXT_DIM)
+                x = sep.right
+
+    def _handle_breadcrumb_click(self, pos):
+        for rect, name, kw in self._breadcrumb_rects:
+            if rect.collidepoint(pos):
+                self.go(name, **kw)
+                return True
+        return False
 
     # --- palette de navigation globale (Ctrl+K) ---------------------------
     def _palette_entries(self):
@@ -272,6 +335,9 @@ class SceneManager:
         if self.palette_open:
             self._handle_palette_event(event)
             return
+        if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                and self._handle_breadcrumb_click(event.pos)):
+            return
         # on ignore les entrées pendant le tout début du fondu pour éviter
         # les clics fantômes hérités de la scène précédente
         if self.current and self._fade < 0.6:
@@ -290,6 +356,7 @@ class SceneManager:
         if not self.current:
             return
         self.current.draw(surf)
+        self._draw_breadcrumb(surf)
         # overlay : notifications (toasts) au-dessus de la scène, sous le fondu
         notes = getattr(self.app, "notes", None)
         if notes:

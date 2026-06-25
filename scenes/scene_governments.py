@@ -23,11 +23,6 @@ from ui import fonts, widgets
 _REGION_ORDER = ["USA", "Am.Nord", "Europe", "Am.Sud", "Afrique", "Asia", "Océanie"]
 
 
-def _rating_color(rating):
-    return (config.COL_UP if rating in ("AAA", "AA", "A") else
-            config.COL_WARN if rating == "BBB" else config.COL_DOWN)
-
-
 class GovernmentsScene(Scene):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
@@ -134,7 +129,7 @@ class GovernmentsScene(Scene):
                                   (inner.x + 6, y + 3), fonts.small(bold=sel),
                                   config.COL_WHITE if sel else config.COL_TEXT)
                 widgets.draw_text(surf, g["rating"], (inner.right - 6, y + 3),
-                                  fonts.tiny(bold=True), _rating_color(g["rating"]), align="right")
+                                  fonts.tiny(bold=True), widgets.rating_color(g["rating"]), align="right")
                 y += 26
             y += 6
         surf.set_clip(prev_clip)
@@ -166,7 +161,7 @@ class GovernmentsScene(Scene):
         # tuiles : rating, dette/PIB, stabilité
         tile_w = (inner.w - 2 * 12) // 3
         widgets.draw_tile(surf, (x, y, tile_w, 46), "Note souveraine", g["rating"],
-                          _rating_color(g["rating"]), _rating_color(g["rating"]))
+                          widgets.rating_color(g["rating"]), widgets.rating_color(g["rating"]))
         widgets.draw_tile(surf, (x + tile_w + 12, y, tile_w, 46), "Dette / PIB",
                           f"{g['debt_gdp']}%", config.COL_AMBER,
                           config.COL_DOWN if g["debt_gdp"] >= 100 else config.COL_TEXT)
@@ -214,7 +209,7 @@ class GovernmentsScene(Scene):
             widgets.draw_text(surf, widgets.fit_text(q["name"], fonts.small(), 210),
                               (cols[0][1], y), fonts.small(bold=True), config.COL_TEXT)
             widgets.draw_text(surf, q["rating"], (cols[1][1], y), fonts.small(bold=True),
-                              _rating_color(q["rating"]))
+                              widgets.rating_color(q["rating"]))
             widgets.draw_text(surf, f"{q['coupon']*100:.1f}%", (cols[2][1], y), fonts.small(), config.COL_TEXT)
             widgets.draw_text(surf, f"{q['years']}a", (cols[3][1], y), fonts.small(), config.COL_TEXT)
             widgets.draw_text(surf, f"{q['ytm']*100:.2f}%", (cols[4][1], y), fonts.small(), config.COL_CYAN)

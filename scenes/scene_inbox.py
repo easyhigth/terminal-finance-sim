@@ -168,6 +168,11 @@ class InboxScene(Scene):
                               kcol if sel else config.COL_TEXT_DIM, align="center")
             cx += w + 6
 
+        if self.kind_filter:
+            klabel = _KIND.get(self.kind_filter, (self.kind_filter, config.COL_AMBER))[0]
+            widgets.draw_text(surf, f"Filtre actif : {klabel} — cliquez TOUS pour réinitialiser.",
+                              (cx + 14, chip_y + 2), fonts.tiny(), config.COL_AMBER)
+
         # liste à gauche
         list_top = chip_y + 28
         ph = config.footer_y() - 8 - list_top

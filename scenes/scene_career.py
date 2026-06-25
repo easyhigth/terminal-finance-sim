@@ -101,15 +101,21 @@ class CareerScene(Scene):
                               fonts.tiny(), config.COL_TEXT_DIM)
         else:
             x = inner.x
+            mp = pygame.mouse.get_pos()
+            self._badge_hover_desc = None
             for bid in p.badges:
                 b = badges_mod.get(bid)
                 if not b:
                     continue
                 r = widgets.draw_badge(surf, badges_mod.badge_name(b), (x, y), config.COL_PRESTIGE)
+                if r.collidepoint(mp):
+                    self._badge_hover_desc = badges_mod.badge_desc(b)
                 x = r.right + 6
                 if x > inner.right - 90:
                     x = inner.x
                     y += r.height + 6
+            if self._badge_hover_desc:
+                widgets.draw_tooltip(surf, self._badge_hover_desc, mp)
 
     def _draw_roadmap(self, surf, rect, p):
         ready = career.promotion_ready(p)

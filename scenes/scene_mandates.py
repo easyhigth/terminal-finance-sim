@@ -19,6 +19,61 @@ def _L(fr, en):
 
 ROW_H = 26
 
+_JARGON = {
+    "bêta": "Bêta : sensibilité du portefeuille aux mouvements du marché. β=1 suit le "
+            "marché ; au-delà, risque (et gain potentiel) amplifiés.",
+    "tracking error": "Tracking error : écart de performance entre votre portefeuille et "
+                       "l'indice de référence du mandat. Plus il est faible, plus vous "
+                       "« collez » au benchmark.",
+    "duration": "Duration : sensibilité du portefeuille obligataire aux taux d'intérêt (en "
+                "années). Plus elle est élevée, plus la valeur varie si les taux bougent.",
+    "drawdown": "Drawdown : perte maximale subie depuis un sommet de valeur liquidative sur "
+                "la période. Mesure le risque de baisse vécu par le client.",
+    "liquidité": "Liquidité : part du portefeuille immédiatement cessible (cash + actifs très "
+                 "liquides), exigée par le client pour faire face à des retraits.",
+    "rendement cible": "Rendement cible : performance minimale promise au client sur "
+                       "l'horizon du mandat.",
+}
+
+
+def _jargon_lines(*texts):
+    lo = " ".join(t or "" for t in texts).lower()
+    return [v for k, v in _JARGON.items() if k in lo]
+
+
+def _draw_jargon_hint(surf, pos, mp, *texts):
+    """Icône « ? » à `pos` ; au survol, affiche les définitions des termes
+    financiers détectés dans `texts`."""
+    lines = _jargon_lines(*texts)
+    if not lines:
+        return
+    rect = pygame.Rect(pos[0], pos[1], 14, 14)
+    hover = rect.collidepoint(mp)
+    pygame.draw.circle(surf, config.COL_CYAN if hover else config.COL_TEXT_DIM, rect.center, 7, 1)
+    widgets.draw_text(surf, "?", rect.center, fonts.tiny(bold=True),
+                      config.COL_CYAN if hover else config.COL_TEXT_DIM, align="center")
+    if hover:
+        _draw_multiline_tooltip(surf, lines, mp)
+
+
+def _draw_multiline_tooltip(surf, lines, pos):
+    font = fonts.tiny()
+    pad = 6
+    line_h = font.get_height() + 3
+    w = max(font.size(l)[0] for l in lines) + pad * 2
+    h = line_h * len(lines) + pad * 2
+    rect = pygame.Rect(pos[0] + 12, pos[1] + 18, w, h)
+    if rect.right > config.SCREEN_WIDTH - 4:
+        rect.x -= rect.right - (config.SCREEN_WIDTH - 4)
+    if rect.bottom > config.SCREEN_HEIGHT - 4:
+        rect.y = pos[1] - rect.h - 6
+    pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect, border_radius=4)
+    pygame.draw.rect(surf, config.COL_BORDER, rect, 1, border_radius=4)
+    y = rect.y + pad
+    for l in lines:
+        widgets.draw_text(surf, l, (rect.x + pad, y), font, config.COL_TEXT)
+        y += line_h
+
 
 def _extra_constraints_text(m):
     """Résumé compact des contraintes supplémentaires (item 18) d'un mandat,
@@ -178,6 +233,7 @@ class MandatesScene(Scene):
                           (42, 56), fonts.small(), config.COL_TEXT_DIM)
 
         market = self.app.ensure_market()
+        mp = pygame.mouse.get_pos()
         cur = config.CONTINENTS.get(p.continent, {}).get("currency", "$")
         from core import portfolio_views
         current_beta = portfolio_views.portfolio_beta(p, market)
@@ -221,8 +277,9 @@ class MandatesScene(Scene):
                     desc = MD.profile_desc(o["client_profile"])
                     extra = f"{desc}  ·  {extra}" if extra else desc
                 if extra:
-                    widgets.draw_text(surf, extra, (row.x + 12, row.y + 42),
-                                      fonts.tiny(), config.COL_TEXT_DIM)
+                    et = widgets.draw_text(surf, extra, (row.x + 12, row.y + 42),
+                                           fonts.tiny(), config.COL_TEXT_DIM)
+                    _draw_jargon_hint(surf, (et.right + 6, row.y + 42), mp, "bêta", extra)
                 widgets.draw_text(surf, f"Commission si réussite : {widgets.format_money(o['reward_cash'], cur)}  "
                                         f"(+{o['reward_rep']} rép.)  ·  échec : -{o['penalty_rep']} rép.",
                                   (row.x + 12, row.y + 56), fonts.tiny(), config.COL_TEXT_DIM)
@@ -311,8 +368,9 @@ class MandatesScene(Scene):
 
                 extra_text, extra_ok = _extra_status(m, check["values"])
                 if extra_text:
-                    widgets.draw_text(surf, extra_text, (row.x + 12, row.y + 78), fonts.tiny(),
-                                      config.COL_TEXT if extra_ok else config.COL_DOWN)
+                    et2 = widgets.draw_text(surf, extra_text, (row.x + 12, row.y + 78), fonts.tiny(),
+                                            config.COL_TEXT if extra_ok else config.COL_DOWN)
+                    _draw_jargon_hint(surf, (et2.right + 6, row.y + 78), mp, "bêta", extra_text)
 
                 feas = check["ok"]
                 widgets.draw_badge(surf, "EN BONNE VOIE" if feas else "EN RISQUE",

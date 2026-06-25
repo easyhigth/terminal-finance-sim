@@ -203,13 +203,19 @@ class MissionScene(Scene):
             f"Récompense (au prorata du score) : jusqu'à +{self.mission['reward_rep']} réputation",
             "et un honoraire de conseil.",
             "",
-            f"Seuil de réputation pour l'examen (EVAL) : "
-            f"{M.reputation_threshold(self.app.gs.player.grade_index)}/100.",
         ]
         y = inner.y + 70
         for ln in lines:
             widgets.draw_text(surf, ln, (inner.x, y), fonts.small(), config.COL_TEXT)
             y += 26
+        p = self.app.gs.player
+        thr = M.reputation_threshold(p.grade_index)
+        widgets.draw_text(surf, f"Seuil de réputation pour l'examen (EVAL) : {p.reputation}/{thr}",
+                          (inner.x, y), fonts.small(), config.COL_TEXT)
+        y += 22
+        widgets.draw_progress(surf, pygame.Rect(inner.x, y, 280, 10),
+                              min(1.0, p.reputation / thr) if thr else 1.0,
+                              config.COL_UP if p.reputation >= thr else config.COL_AMBER)
         self.continue_btn.label = "COMMENCER"
         self.continue_btn.draw(surf)
 

@@ -145,8 +145,23 @@ class NotificationsScene(Scene):
                               config.COL_CYAN if sel else config.COL_TEXT_DIM, align="center")
             cx += w + 6
 
+        legend_y = chip_y + 26
+        widgets.draw_text(surf, "✉ message :", (x0, legend_y), fonts.tiny(), config.COL_TEXT_DIM)
+        lx = x0 + 76
+        for kind, (tag, col) in _INBOX_KIND.items():
+            w = fonts.tiny(bold=True).size(tag)[0]
+            widgets.draw_text(surf, tag, (lx, legend_y), fonts.tiny(bold=True), col)
+            lx += w + 10
+        widgets.draw_text(surf, "📰 actu :", (lx + 14, legend_y), fonts.tiny(), config.COL_TEXT_DIM)
+        lx2 = lx + 14 + 60
+        for kind_lbl, col in (("bonne", config.COL_UP), ("mauvaise", config.COL_DOWN),
+                              ("neutre", config.COL_CYAN)):
+            w = fonts.tiny(bold=True).size(kind_lbl)[0]
+            widgets.draw_text(surf, kind_lbl, (lx2, legend_y), fonts.tiny(bold=True), col)
+            lx2 += w + 10
+
         rows = self._rows()
-        list_top = chip_y + 28
+        list_top = legend_y + 22
         panel = pygame.Rect(x0, list_top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - list_top)
         inner = widgets.draw_panel(surf, panel, f"Flux ({len(rows)})", config.COL_CYAN)
         list_area = pygame.Rect(inner.x - 4, inner.y, inner.w + 8, inner.h)

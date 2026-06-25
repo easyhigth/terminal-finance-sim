@@ -15,6 +15,32 @@ from ui import fonts, keynav, widgets
 LOT = S.LOT     # notionnel souscrit par clic
 FAMILY_CHIPS = [(None, "TOUTES"), ("Classique", "CLASSIQUE"),
                 ("Exotique", "EXOTIQUE"), ("Volatilité", "VOLATILITÉ")]
+_CHART_W, _CHART_H = 110, 38
+
+
+def _draw_payoff_chart(surf, rect, tpl_id):
+    """Mini-diagramme indicatif du payoff (ratio capital final / notionnel)
+    en fonction de la performance finale du sous-jacent (ou de la volatilité
+    réalisée pour les produits Volatilité)."""
+    pts = S.payoff_curve(tpl_id, n=21)
+    if not pts:
+        return
+    pygame.draw.rect(surf, config.COL_PANEL, rect, border_radius=3)
+    pygame.draw.rect(surf, config.COL_BORDER, rect, 1, border_radius=3)
+    ratios = [r for _, r in pts]
+    lo, hi = min(0.0, min(ratios)), max(1.0, max(ratios))
+    span = max(1e-6, hi - lo)
+    zero_y = rect.bottom - int(((1.0 - lo) / span) * rect.h)
+    pygame.draw.line(surf, config.COL_TEXT_DIM, (rect.x, zero_y), (rect.right, zero_y), 1)
+    n = len(pts)
+    pixels = []
+    for i, (_, ratio) in enumerate(pts):
+        x = rect.x + int(i / (n - 1) * (rect.w - 1))
+        y = rect.bottom - int(((ratio - lo) / span) * rect.h)
+        pixels.append((x, max(rect.y, min(rect.bottom, y))))
+    col = config.COL_UP if ratios[-1] >= 1.0 else config.COL_AMBER
+    if len(pixels) > 1:
+        pygame.draw.lines(surf, col, False, pixels, 2)
 
 
 class StructuredScene(Scene):
@@ -214,8 +240,14 @@ class StructuredScene(Scene):
             widgets.draw_text(surf, f"{tpl['family']} · {tpl['years']} ans", (inner.right - 160, y),
                               fonts.tiny(), config.COL_TEXT_DIM)
             y += 20
-            y += widgets.draw_text_wrapped(surf, tpl["desc"], (inner.x, y),
-                                           fonts.small(), config.COL_TEXT, inner.w - 130, line_gap=3) + 4
+            desc_h = widgets.draw_text_wrapped(surf, tpl["desc"], (inner.x, y),
+                                               fonts.small(), config.COL_TEXT, inner.w - 150, line_gap=3)
+            if visible:
+                chart_rect = pygame.Rect(inner.right - _CHART_W, y, _CHART_W, _CHART_H)
+                _draw_payoff_chart(surf, chart_rect, tpl["id"])
+                widgets.draw_text(surf, S.payoff_curve_xlabel(tpl["id"]),
+                                  (chart_rect.x, chart_rect.bottom + 1), fonts.tiny(), config.COL_TEXT_DIM)
+            y += max(desc_h, _CHART_H + 14) + 4
             if self._can_trade():
                 rect = pygame.Rect(inner.right - 150, y, 140, 26)
                 if visible:

@@ -239,9 +239,13 @@ class MoreScene(Scene):
                                                    22, search_rect.h)
             widgets.draw_text(surf, "✕", self._search_clear_rect.center, fonts.small(bold=True),
                               config.COL_TEXT_DIM, align="center")
+        else:
+            widgets.draw_text(surf, "Ex. : risk, mandats, structuré, certif, news…",
+                              (search_rect.x, search_rect.bottom + 4),
+                              fonts.tiny(), config.COL_TEXT_DIM)
 
         sections = self._filtered_sections()
-        top = search_rect.bottom + 10
+        top = search_rect.bottom + 22
         area = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - top)
         self._list_rect = area
         mp = pygame.mouse.get_pos()

@@ -14,6 +14,13 @@ from core.scene_manager import Scene
 from ui import fonts, widgets
 
 CARD_KEYS = ["exam", "cert"]
+_REQ_HINTS = {
+    "Réputation": "Augmentez votre réputation via les missions, les deals et les certifications "
+                  "(CFA/FRM/CQF réduisent aussi le seuil requis).",
+    "Missions (ce grade)": "Terminez des missions (MISSIONS) — chaque mission complétée à ce grade compte.",
+    "Deals conclus (ce grade)": "Concluez des deals via DEALS pour valider ce critère.",
+    "Ancienneté (trimestres)": "Patientez : ce critère se remplit automatiquement avec le temps passé à ce grade.",
+}
 
 
 def _L(fr, en):
@@ -98,8 +105,10 @@ class ExamCertScene(Scene):
         self.back_btn.draw(surf)
 
     def _draw_exam_card(self, surf, rect, p, mp, focused):
+        paused = isinstance(p.eval_state, dict) and p.eval_state.get("mode") == "promotion" \
+            and p.eval_state.get("items")
         ready = p.can_promote() and career_mod.promotion_ready(p)
-        accent = config.COL_UP if ready else config.COL_WARN
+        accent = config.COL_CYAN if paused else (config.COL_UP if ready else config.COL_WARN)
         hover = rect.collidepoint(mp)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL, rect, border_radius=6)
         pygame.draw.rect(surf, config.COL_CYAN if focused else accent, rect, 3 if focused else 2,
@@ -107,8 +116,14 @@ class ExamCertScene(Scene):
         self._card_rects["exam"] = rect
         widgets.draw_text(surf, "EXAMEN DE PROMOTION", (rect.x + 20, rect.y + 18),
                           fonts.head(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Réussir l'examen vous fait passer au grade suivant.",
-                          (rect.x + 20, rect.y + 54), fonts.small(), config.COL_TEXT)
+        if paused:
+            idx = p.eval_state.get("idx", 0)
+            total = len(p.eval_state.get("items", []))
+            widgets.draw_text(surf, f"⏸ Examen en pause — question {idx + 1}/{total}. Reprenez ci-dessous.",
+                              (rect.x + 20, rect.y + 54), fonts.small(bold=True), config.COL_CYAN)
+        else:
+            widgets.draw_text(surf, "Réussir l'examen vous fait passer au grade suivant.",
+                              (rect.x + 20, rect.y + 54), fonts.small(), config.COL_TEXT)
         if not p.can_promote():
             widgets.draw_text(surf, "Grade maximal atteint.", (rect.x + 20, rect.y + 84),
                               fonts.small(bold=True), config.COL_UP)
@@ -120,8 +135,11 @@ class ExamCertScene(Scene):
                 widgets.draw_text(surf, f"{mark} {r['label']}", (rect.x + 20, y), fonts.small(), col)
                 widgets.draw_text(surf, f"{int(r['current'])}/{int(r['target'])}",
                                   (rect.right - 20, y), fonts.small(bold=True), col, align="right")
+                hint = _REQ_HINTS.get(r["label"])
+                if hint and pygame.Rect(rect.x + 20, y, rect.w - 40, 20).collidepoint(mp):
+                    widgets.draw_tooltip(surf, hint, mp)
                 y += 26
-        label = "PASSER L'EXAMEN" if ready else "VOIR LA ROADMAP (CAREER)"
+        label = "REPRENDRE L'EXAMEN" if paused else ("PASSER L'EXAMEN" if ready else "VOIR LA ROADMAP (CAREER)")
         widgets.draw_card_footer(surf, rect, label, accent, hover=hover)
 
     def _draw_cert_card(self, surf, rect, p, mp, focused):

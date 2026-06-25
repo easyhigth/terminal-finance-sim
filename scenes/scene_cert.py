@@ -100,8 +100,14 @@ class CertScene(Scene):
             widgets.draw_text(surf, C.desc_for(pid), (rect.x+16, rect.y+72),
                               fonts.small(), config.COL_TEXT)
             lvl = C.level(p, pid)
-            widgets.draw_text(surf, f"Statut : {C.status_label(p, pid)}  ·  "
-                                    f"niveaux {prog['levels']}  ·  voie {prog['track']}",
+            status_line = (f"Statut : {C.status_label(p, pid)}  ·  "
+                          f"niveaux {prog['levels']}  ·  voie {prog['track']}")
+            if lvl < len(prog["fee"]):
+                remaining = sum(prog["fee"][lvl:])
+                status_line += (f"  ·  frais restants : {widgets.format_money(remaining, cur)} "
+                                f"({prog['levels'] - lvl} niveau(x), débités un par un à "
+                                f"l'inscription)")
+            widgets.draw_text(surf, status_line,
                               (rect.x+16, rect.y+94), fonts.small(), config.COL_TEXT_DIM)
             # bouton d'inscription, ancré en bas-droite de la carte (largeur fixe)
             code, fee, _ = C.can_attempt(p, pid)

@@ -354,6 +354,49 @@ def all_templates(market=None):
     return [template_quote(t["id"], market) for t in TEMPLATES]
 
 
+def payoff_curve(template_id, n=21):
+    """Points (x, ratio_payoff/notionnel) pour une visualisation pédagogique du
+    payoff. Pour les produits Volatilité, x = volatilité réalisée annualisée
+    (0% à 40%) ; pour les autres, x = performance finale du sous-jacent
+    (-50% à +50%). Indicatif : ignore l'effet de chemin exact (barrière suivie
+    en continu, plus haut observé...) et n'utilise que le niveau final."""
+    tpl = _resolve_template(template_id)
+    if tpl is None:
+        return []
+    t = tpl["type"]
+    pts = []
+    if t in ("var_swap", "short_vol"):
+        for i in range(n):
+            rv = i / (n - 1) * 0.40
+            if t == "var_swap":
+                diff = rv - tpl["vol_strike"]
+                ratio = max(0.0, 1.0 + tpl["vol_mult"] * diff)
+            else:
+                if rv <= tpl["vol_cap"]:
+                    ratio = 1.0 + tpl["coupon"]
+                else:
+                    loss = min(1.0, (rv - tpl["vol_cap"]) * tpl.get("vol_loss_mult", 3.0))
+                    ratio = 1.0 - loss
+            pts.append((rv, ratio))
+        return pts
+    for i in range(n):
+        perf = -0.5 + i / (n - 1) * 1.0
+        final = 1.0 + perf
+        prod = dict(tpl)
+        prod["notional"] = 1.0
+        prod["start_level"] = 1.0
+        ratio = payoff(prod, final, path=[final], market=None)
+        pts.append((perf, ratio))
+    return pts
+
+
+def payoff_curve_xlabel(template_id):
+    tpl = _resolve_template(template_id)
+    if tpl is not None and tpl["type"] in ("var_swap", "short_vol"):
+        return "Volatilité réalisée"
+    return "Performance du sous-jacent"
+
+
 def holdings_value(player, market):
     """Mark-to-model simple : notionnel (détenu jusqu'à l'échéance)."""
     return sum(p["notional"] for p in getattr(player, "structured", []))

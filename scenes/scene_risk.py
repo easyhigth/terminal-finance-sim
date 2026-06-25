@@ -16,6 +16,27 @@ from core import risk as risk_mod
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
+def _draw_wrapped_tooltip(surf, text, pos, max_width=320):
+    """Bulle d'info multi-lignes (texte replié à `max_width` px)."""
+    font = fonts.tiny()
+    pad = 6
+    lines = widgets.wrap_text_lines(text, font, max_width)
+    line_h = font.get_height() + 3
+    w = max(font.size(l)[0] for l in lines) + pad * 2
+    h = line_h * len(lines) + pad * 2
+    rect = pygame.Rect(pos[0] + 12, pos[1] + 18, w, h)
+    if rect.right > config.SCREEN_WIDTH - 4:
+        rect.x -= rect.right - (config.SCREEN_WIDTH - 4)
+    if rect.bottom > config.SCREEN_HEIGHT - 4:
+        rect.y = pos[1] - rect.h - 6
+    pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect, border_radius=4)
+    pygame.draw.rect(surf, config.COL_BORDER, rect, 1, border_radius=4)
+    y = rect.y + pad
+    for l in lines:
+        widgets.draw_text(surf, l, (rect.x + pad, y), font, config.COL_TEXT)
+        y += line_h
+
+
 # Exposition du portefeuille à des facteurs (valeur notionnelle en M)
 FACTORS = ["Equities", "Rates", "Credit", "FX", "Commodities"]
 DEFAULT_EXPOSURE = np.array([40.0, 25.0, 15.0, 10.0, 10.0])   # M$
@@ -277,17 +298,33 @@ class RiskScene(Scene):
             cx += 80
 
         rows = [
-            ("VaR historique", f"-{self.var:.2f} M$", config.COL_DOWN),
-            ("VaR paramétrique", f"-{self.param_var:.2f} M$", config.COL_WARN),
-            ("CVaR (Expected Shortfall)", f"-{self.cvar:.2f} M$", config.COL_DOWN),
-            ("Volatilité du P&L (1j)", f"{self.port_sigma:.2f} M$", config.COL_TEXT),
+            ("VaR historique", f"-{self.var:.2f} M$", config.COL_DOWN,
+             f"Perte maximale attendue sur 1 jour avec {int(self.confidence*100)}% de confiance, "
+             "estimée à partir de l'historique réel des P&L du portefeuille (sans hypothèse de "
+             "distribution)."),
+            ("VaR paramétrique", f"-{self.param_var:.2f} M$", config.COL_WARN,
+             "Même perte maximale à 1 jour, mais calculée avec une hypothèse de distribution "
+             "normale des rendements (formule fermée, plus rapide mais moins fidèle aux queues "
+             "épaisses du marché réel)."),
+            ("CVaR (Expected Shortfall)", f"-{self.cvar:.2f} M$", config.COL_DOWN,
+             "Perte MOYENNE dans les pires scénarios au-delà de la VaR — répond à « si je dépasse "
+             "la VaR, combien je perds en moyenne ? ». Toujours ≥ la VaR en valeur absolue."),
+            ("Volatilité du P&L (1j)", f"{self.port_sigma:.2f} M$", config.COL_TEXT,
+             "Écart-type quotidien du P&L du portefeuille : mesure la dispersion des résultats, "
+             "sans distinguer gains et pertes."),
             (f"VaR annualisée (~√{52 if self.real else 252})",
-             f"-{self.var*np.sqrt(52 if self.real else 252):.1f} M$", config.COL_NEUTRAL),
+             f"-{self.var*np.sqrt(52 if self.real else 252):.1f} M$", config.COL_NEUTRAL,
+             "Extrapolation de la VaR quotidienne sur 1 an (règle de la racine du temps), à "
+             "interpréter avec prudence : suppose des pertes i.i.d. sans corrélation entre jours."),
         ]
+        mp = pygame.mouse.get_pos()
         y = inner.y+58
-        for label, val, col in rows:
-            widgets.draw_text(surf, label, (inner.x, y), fonts.small(), config.COL_TEXT_DIM)
+        for label, val, col, hint in rows:
+            lr = widgets.draw_text(surf, label, (inner.x, y), fonts.small(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, val, (inner.x+250, y), fonts.body(bold=True), col)
+            hover_rect = pygame.Rect(inner.x, y - 2, 250, 22)
+            if hover_rect.collidepoint(mp):
+                _draw_wrapped_tooltip(surf, hint, mp)
             y += 33
 
     def _draw_stress(self, surf):

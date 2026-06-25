@@ -88,6 +88,8 @@ class TerminalTimeMixin:
             rival = rivals_mod.snipe(p, d, random)
             inbox_mod.on_deal_sniped(p, d, rival)
             career_mod.log(p, "deal", f"{rival} rafle « {d['title']} »")
+            self.app.notify(_L(f"Deal perdu : {d['title']} — raflé par {rival}",
+                                f"Deal lost: {d['title']} — snatched by {rival}"), "bad")
         # rivaux ACTIFS : percées, snipe de deals en retard, débauchage de mandats
         for ev in rivals_mod.act(p, m, random):
             self.recent_events.insert(0, {"title": ev["text"][:70], "kind": ev["kind"]})
@@ -216,6 +218,23 @@ class TerminalTimeMixin:
                 f"Margin call: leverage {mc['leverage_before']:.2f}x → {mc['leverage_after']:.2f}x "
                 f"(liquidated {widgets.format_money(mc['liquidated'], cur)})"))
             self.app.notify(_L("Appel de marge : liquidation forcée","Margin call: forced liquidation"), "bad")
+        elif p.portfolio:
+            # alerte préventive : on prévient AVANT que la marge ne déclenche une
+            # liquidation forcée (mc ci-dessus), pas seulement après coup.
+            st = pf_mod.margin_status(p, m)
+            if st["gross"] > 0:
+                threshold = pf_mod._maint_margin(p) * st["gross"]
+                if threshold > 0 and st["equity"] < threshold * 1.2:
+                    headroom_pct = max(0.0, (st["equity"] / threshold - 1) * 100)
+                    self._log(_L(
+                        f"  ⚠ Marge sous surveillance : capitaux propres {widgets.format_money(st['equity'], cur)} "
+                        f"proches du seuil de maintenance {widgets.format_money(threshold, cur)} "
+                        f"(marge restante {headroom_pct:.0f}%). Tapez MARGIN pour les détails.",
+                        f"  ⚠ Margin under watch: equity {widgets.format_money(st['equity'], cur)} "
+                        f"close to maintenance threshold {widgets.format_money(threshold, cur)} "
+                        f"(headroom {headroom_pct:.0f}%). Type MARGIN for details."))
+                    self.app.notify(_L("Marge basse : surveillez votre levier",
+                                        "Low margin: watch your leverage"), "warn")
 
         # news marché en tête du flux
         self.recent_events = [{"title": n["text"], "kind": n["kind"], "cash": 0, "rep": 0}

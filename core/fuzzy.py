@@ -54,6 +54,37 @@ def score(query, text):
     return total
 
 
+def _levenshtein(a, b):
+    """Distance d'édition classique (insertion/suppression/substitution = 1)."""
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i] + [0] * len(b)
+        for j, cb in enumerate(b, 1):
+            cost = 0 if ca == cb else 1
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+        prev = cur
+    return prev[-1]
+
+
+def suggest(token, candidates, max_distance=2):
+    """Renvoie le candidat le plus proche de `token` (typo probable), ou None
+    si aucun n'est à distance d'édition <= max_distance. Utilisé pour
+    proposer un « vouliez-vous dire... ? » sur une commande inconnue."""
+    token = token.upper()
+    best, best_dist = None, max_distance + 1
+    for c in candidates:
+        d = _levenshtein(token, c.upper())
+        if d < best_dist:
+            best, best_dist = c, d
+    return best if best_dist <= max_distance else None
+
+
 def filter_sorted(query, items, key):
     """Filtre `items` (itérable quelconque) aux éléments dont `key(item)`
     matche `query`, triés par score décroissant (ordre d'origine conservé en

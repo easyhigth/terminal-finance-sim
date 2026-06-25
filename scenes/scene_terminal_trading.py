@@ -109,7 +109,7 @@ class TerminalTradingMixin:
         if not res["ok"]:
             reason = {"ticker": "ticker inconnu", "qty": "quantité invalide",
                       "isshort": f"position courte ouverte sur {tk} — utilisez COVER",
-                      "leverage": f"levier max atteint ({res.get('max_leverage',0):.1f}x)"
+                      "leverage": f"levier max atteint ({res.get('max_leverage',0):.1f}x) — tapez MARGIN pour le détail"
                       }.get(res["reason"], res["reason"])
             self._log(_L(f"  Achat refusé : {reason}.", f"  Buy rejected: {reason}."))
             return
@@ -117,12 +117,28 @@ class TerminalTradingMixin:
                      f"{widgets.format_money(res['total'], self._cur())} (frais inclus).",
                      f"  ✓ Bought {qty} {tk} @ {res['price']:.2f} = "
                      f"{widgets.format_money(res['total'], self._cur())} (fees incl.)."))
+        self._warn_if_leveraged()
         if res["total"] > 60000:
             career_mod.log(self.app.gs.player, "deal", f"Achat {qty} {tk}")
         journal_mod.log_trade(self.app.gs.player, self.market, asset_class="Action",
                               key=tk, label=tk, side="achat", qty=qty,
                               price=res["price"], fee=res.get("fee", 0.0))
         self._after_trade()
+
+    def _warn_if_leveraged(self):
+        """Aperçu immédiat du risque pris : si le trade qui vient de s'exécuter
+        approche le levier maximal autorisé, le signaler tout de suite plutôt
+        que d'attendre un appel de marge surprise au prochain ADV."""
+        st = pf_mod.margin_status(self.app.gs.player, self.market)
+        if st["max_leverage"] <= 0 or st["leverage"] == float("inf"):
+            return
+        ratio = st["leverage"] / st["max_leverage"]
+        if ratio >= 0.75:
+            self._log(_L(
+                f"  ⚠ Levier {st['leverage']:.2f}x / {st['max_leverage']:.1f}x max — "
+                "marge de sécurité réduite, tapez MARGIN pour le détail.",
+                f"  ⚠ Leverage {st['leverage']:.2f}x / {st['max_leverage']:.1f}x max — "
+                "safety margin reduced, type MARGIN for detail."))
 
     def _cmd_sell(self, args):
         if not args:
@@ -162,7 +178,7 @@ class TerminalTradingMixin:
         if not res["ok"]:
             reason = {"ticker": "ticker inconnu", "qty": "quantité invalide",
                       "islong": f"position longue ouverte sur {tk} — vendez-la d'abord",
-                      "leverage": f"levier max atteint ({res.get('max_leverage',0):.1f}x)"
+                      "leverage": f"levier max atteint ({res.get('max_leverage',0):.1f}x) — tapez MARGIN pour le détail"
                       }.get(res["reason"], res["reason"])
             self._log(_L(f"  Short refusé : {reason}.", f"  Short rejected: {reason}."))
             return
@@ -172,6 +188,7 @@ class TerminalTradingMixin:
                      f"  ✓ Shorted {qty} {tk} @ {res['price']:.2f} = "
                      f"+{widgets.format_money(res['net'], self._cur())} cash "
                      "(buy back via COVER)."))
+        self._warn_if_leveraged()
         journal_mod.log_trade(self.app.gs.player, self.market, asset_class="Action",
                               key=tk, label=tk, side="short", qty=qty,
                               price=res["price"], fee=res.get("fee", 0.0))

@@ -162,6 +162,18 @@ def _split_canonical(label):
     return canonical, ", ".join(aliases[1:])
 
 
+def all_command_tokens():
+    """Liste plate de tous les tokens de commande valides (alias compris,
+    placeholders <...> exclus), pour la suggestion « vouliez-vous dire ? »
+    sur une commande inconnue."""
+    tokens = []
+    for _title, items in CATALOG:
+        for label, _desc in items:
+            base = label.split("<")[0].strip()
+            tokens.extend(a.strip() for a in base.split("/") if a.strip())
+    return tokens
+
+
 def _label_lock_grade(label, player):
     """Grade minimal requis pour utiliser cette commande, ou None si déjà débloquée.
     Compare chaque alias du libellé (avant les placeholders) aux features de unlocks.py."""

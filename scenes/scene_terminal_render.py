@@ -217,6 +217,15 @@ class TerminalRenderMixin:
         if st["margin_call"]:
             widgets.draw_badge(surf, "⚠ MARGIN CALL", (r.right + 10, y - 2), config.COL_DOWN)
         x = r.right + 18
+        # objectifs du trimestre — toujours visible au terminal, pas seulement
+        # dans le panneau CARRIÈRE (sinon facile à oublier jusqu'à l'examen).
+        if p.objectives:
+            done = sum(1 for o in p.objectives if career_mod.objective_progress(p, o)[2])
+            total = len(p.objectives)
+            obj_col = config.COL_UP if done == total else config.COL_TEXT_DIM
+            r = widgets.draw_text(surf, "OBJ  ", (x, y), fonts.small(), config.COL_TEXT_DIM)
+            r = widgets.draw_text(surf, f"{done}/{total}", (r.right, y), fonts.small(bold=True), obj_col)
+            x = r.right + 18
         # devise
         r = widgets.draw_text(surf, f"{info['currency']}", (x, y), fonts.body(bold=True), accent)
         x = r.right + 14

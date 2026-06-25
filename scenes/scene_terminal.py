@@ -681,9 +681,14 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         feat = unlocks_mod.CMD_FEATURE.get(cmd)
         if feat and not unlocks_mod.unlocked(p, feat):
             g = unlocks_mod.effective_required_grade(p, feat)
-            self._log(_L(f"  ⊘ {unlocks_mod.feature_label(feat)}", f"  ⊘ {unlocks_mod.feature_label(feat)}"),
-                      _L(f"     débloqué au grade {config.GRADES[g]} (vous : {p.grade}).",
-                         f"     unlocked at grade {config.GRADES[g]} (you: {p.grade})."))
+            lines = [_L(f"  ⊘ {unlocks_mod.feature_label(feat)}", f"  ⊘ {unlocks_mod.feature_label(feat)}"),
+                     _L(f"     débloqué au grade {config.GRADES[g]} (vous : {p.grade}).",
+                        f"     unlocked at grade {config.GRADES[g]} (you: {p.grade}).")]
+            tid = unlocks_mod.FEATURE_TUTORIAL.get(feat)
+            if tid:
+                lines.append(_L(f"     en attendant, tapez TUTO {tid} pour voir comment ça marche.",
+                                 f"     in the meantime, type TUTO {tid} to see how it works."))
+            self._log(*lines)
             return
 
         if cmd == "HELP":
@@ -701,6 +706,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                         "  INBOX messages · STATUS · SAVE · MENU",
                         "  → more commands (trading, derivatives, M&A...) unlock as you "
                         "are promoted. Type COMMANDS to see everything.",
+                        "  ★ TIP: press Ctrl+K anywhere to jump to a page or asset by name.",
                     )
                 else:
                     self._log(
@@ -711,6 +717,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                         "  INBOX messagerie · STATUS · SAVE · MENU",
                         "  → d'autres commandes (trading, dérivés, M&A...) se débloquent "
                         "en progressant. Tapez COMMANDS pour tout voir.",
+                        "  ★ ASTUCE : Ctrl+K ouvre n'importe où une recherche rapide (page, actif…).",
                     )
                 return
             if get_lang() == "en":
@@ -843,7 +850,10 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         elif cmd in ("LEARN", "ACADEMY", "ACADEMIE", "APPRENDRE"):
             self.app.scenes.go("academy", return_to="terminal")
         elif cmd in ("TUTO", "TUTORIAL", "TUTORIELS", "HOWTO", "GUIDE"):
-            self.app.scenes.go("tutorials", return_to="terminal")
+            from data import tutorials as tutorials_mod
+            tids = {t["id"] for t in tutorials_mod.TUTORIALS}
+            kw = {"tid": arg.lower()} if arg and arg.lower() in tids else {}
+            self.app.scenes.go("tutorials", return_to="terminal", **kw)
         elif cmd in ("GOV", "GOVERNMENTS", "GOVT", "PAYS", "SOUVERAINS", "POLITICS", "POLITIQUE"):
             self.app.scenes.go("governments", return_to="terminal",
                                focus=(arg.upper() if arg else None))
@@ -1010,7 +1020,14 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         elif cmd == "MENU":
             self.app.scenes.go("menu")
         else:
-            self._log(_L(f"  Commande inconnue : {raw}. Tapez COMMANDS.", f"  Unknown command: {raw}. Type COMMANDS."))
+            from core import fuzzy
+            from scenes.scene_commands import all_command_tokens
+            guess = fuzzy.suggest(cmd, all_command_tokens())
+            if guess:
+                self._log(_L(f"  Commande inconnue : {raw}. Vouliez-vous dire {guess} ? Tapez COMMANDS pour la liste.",
+                              f"  Unknown command: {raw}. Did you mean {guess}? Type COMMANDS for the list."))
+            else:
+                self._log(_L(f"  Commande inconnue : {raw}. Tapez COMMANDS.", f"  Unknown command: {raw}. Type COMMANDS."))
 
     # ------------------------------------------------------- commandes marché
     def update(self, dt):

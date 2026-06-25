@@ -51,6 +51,7 @@ class MarketHubScene(Scene, PopupMixin):
         self._eco_row_rects = {}
         self._sector_row_rects = {}
         self._regime_rect = None
+        self._watchlist_shop_rect = None
         # une ScrollState indépendante par panneau défilant (clé = id de panneau).
         self._scrolls = {}
 
@@ -71,6 +72,9 @@ class MarketHubScene(Scene, PopupMixin):
                 if st.handle_wheel(event):
                     return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._watchlist_shop_rect and self._watchlist_shop_rect.collidepoint(event.pos):
+                self.app.scenes.go("shop", return_to="markethub")
+                return
             for tab_id, rect in self._tab_rects.items():
                 if rect.collidepoint(event.pos):
                     self.tab = tab_id
@@ -557,11 +561,18 @@ class MarketHubScene(Scene, PopupMixin):
     def _draw_watchlist(self, surf, rect):
         p = self.app.gs.player
         inner = widgets.draw_panel(surf, rect, f"Votre watchlist ({len(p.watchlist)}/10)", config.COL_CYAN)
+        self._watchlist_shop_rect = None
         if not p.watchlist:
             widgets.draw_text(surf, "Aucune valeur suivie. Utilisez WATCHLIST ADD <ticker> au terminal,",
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, "ou ouvrez une société puis ajoutez-la à vos favoris.",
                               (inner.x, inner.y + 20), fonts.small(), config.COL_TEXT_DIM)
+            btn = pygame.Rect(inner.x, inner.y + 46, 160, 30)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD, btn, border_radius=4)
+            pygame.draw.rect(surf, config.COL_AMBER, btn, 1, border_radius=4)
+            widgets.draw_text(surf, "🛒 BOUTIQUE", btn.center, fonts.small(bold=True),
+                              config.COL_AMBER, align="center")
+            self._watchlist_shop_rect = btn
             return
         mp = pygame.mouse.get_pos()
         cur = self._cur()

@@ -38,6 +38,8 @@ class AnalyticsScene(Scene, PopupMixin):
             (240, config.SCREEN_HEIGHT - 50, 170, 42), "📒 PORTEFEUILLE", config.COL_AMBER)
         self.stress_btn = widgets.Button(
             (420, config.SCREEN_HEIGHT - 50, 170, 42), "⚠ STRESS TEST", config.COL_DOWN)
+        self.shop_btn = widgets.Button(
+            (600, config.SCREEN_HEIGHT - 50, 160, 42), "🛒 SHOP", config.COL_AMBER)
         self._holding_rects = {}    # label -> Rect (clic → fiche flottante, toutes classes)
         self._chart_rects = {}      # ticker -> Rect (clic → graphe flottant, actions uniquement)
         self._row_cls = {}
@@ -84,6 +86,9 @@ class AnalyticsScene(Scene, PopupMixin):
         if self.stress_btn.handle(event):
             self.app.scenes.go("stresstest", return_to="analytics")
             return
+        if self.shop_btn.handle(event):
+            self.app.scenes.go("shop", return_to="analytics")
+            return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
             delta = -32 if event.button == 4 else 32
             if self._holdings_list_rect and self._holdings_list_rect.collidepoint(event.pos):
@@ -121,6 +126,7 @@ class AnalyticsScene(Scene, PopupMixin):
         self.back_btn.update(mp, dt)
         self.book_btn.update(mp, dt)
         self.stress_btn.update(mp, dt)
+        self.shop_btn.update(mp, dt)
 
     # -------------------------------------------------------------- draw
     def draw(self, surf):
@@ -141,6 +147,7 @@ class AnalyticsScene(Scene, PopupMixin):
                               "BUYCMDTY…) pour voir l'analyse détaillée.",
                               (40, 120), fonts.body(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
+            self.shop_btn.draw(surf)
             self.popups_draw(surf)
             return
 

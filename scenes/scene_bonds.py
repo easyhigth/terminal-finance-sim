@@ -311,8 +311,7 @@ class BondsScene(Scene, PopupMixin):
                     if issuer_rect.collidepoint(mp):
                         self._tooltip = (q["issuer"], mp)
                 widgets.draw_text(surf, issuer, (cols["issuer"], y + 1), fonts.tiny(), config.COL_TEXT_DIM)
-                rc = (config.COL_UP if q["rating"] in ("AAA", "AA", "A") else
-                      config.COL_WARN if q["rating"] == "BBB" else config.COL_DOWN)
+                rc = widgets.rating_color(q["rating"])
                 widgets.draw_text(surf, q["rating"], (cols["rating"], y), fonts.small(bold=True), rc)
                 widgets.draw_text(surf, f"{q['coupon']*100:.1f}", (cols["coupon"], y), fonts.small(), config.COL_TEXT)
                 widgets.draw_text(surf, f"{q['years']}a", (cols["mat"], y), fonts.small(), config.COL_TEXT)

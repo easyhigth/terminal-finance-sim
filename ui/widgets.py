@@ -544,6 +544,23 @@ def alert_color(value_pct, metric):
     return config.COL_UP
 
 
+# notations de crédit (obligations souveraines/corporate, tranches ABS) —
+# convention unique partagée : investment grade (AAA/AA/A) = vert, BBB
+# (limite investment grade) = ambre, spéculatif (BB et en-dessous) ou non
+# noté = rouge.
+RATING_GREEN = ("AAA", "AA", "A")
+RATING_AMBER = ("BBB",)
+
+
+def rating_color(rating):
+    """Vert/ambre/rouge selon la notation de crédit (cf. RATING_GREEN/AMBER)."""
+    if rating in RATING_GREEN:
+        return config.COL_UP
+    if rating in RATING_AMBER:
+        return config.COL_WARN
+    return config.COL_DOWN
+
+
 def draw_tile(surf, rect, label, value, accent=config.COL_AMBER,
               value_color=config.COL_WHITE):
     """Tuile de statistique dense : libellé en haut, valeur en gros dessous."""

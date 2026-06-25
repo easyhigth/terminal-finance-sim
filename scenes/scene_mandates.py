@@ -179,6 +179,8 @@ class MandatesScene(Scene):
 
         market = self.app.ensure_market()
         cur = config.CONTINENTS.get(p.continent, {}).get("currency", "$")
+        from core import portfolio_views
+        current_beta = portfolio_views.portfolio_beta(p, market)
         top = 86
         self._accept_rects = {}
         self._decline_rects = {}
@@ -208,10 +210,12 @@ class MandatesScene(Scene):
                 if o.get("type"):
                     widgets.draw_badge(surf, MD.type_label(o["type"]), (r.right + 10, row.y + 4),
                                        accent=config.COL_CYAN)
+                beta_ok = current_beta <= o["max_beta"]
                 widgets.draw_text(surf, f"Capital : {widgets.format_money(o['capital'], cur)}  ·  "
                                         f"Horizon : {o['horizon']}T  ·  Objectif : {o['target_pct']:.1f}%  ·  "
-                                        f"β max {o['max_beta']:.2f}",
-                                  (row.x + 12, row.y + 26), fonts.tiny(), config.COL_TEXT)
+                                        f"β max {o['max_beta']:.2f} (votre β actuel : {current_beta:.2f})",
+                                  (row.x + 12, row.y + 26), fonts.tiny(),
+                                  config.COL_TEXT if beta_ok else config.COL_WARN)
                 extra = _extra_constraints_text(o)
                 if o.get("client_profile"):
                     desc = MD.profile_desc(o["client_profile"])

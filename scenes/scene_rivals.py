@@ -20,6 +20,19 @@ _TRACK_COL = {
 }
 
 
+def _relative_date(player, entry):
+    """Date relative lisible (« aujourd'hui », « il y a N j/sem. ») plutôt que
+    le « T2 j14 » brut, dur à situer sans faire le calcul soi-même."""
+    delta = player.day - entry.get("day", player.day)
+    if delta <= 0:
+        return "aujourd'hui"
+    if delta == 1:
+        return "hier"
+    if delta < 14:
+        return f"il y a {delta} j"
+    return f"il y a {delta // 7} sem."
+
+
 class RivalsScene(Scene):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
@@ -96,7 +109,7 @@ class RivalsScene(Scene):
             for entry in log_events:
                 kind = entry.get("kind", "info")
                 ecol = config.COL_WARN if kind in ("deal", "crisis") else config.COL_TEXT_DIM
-                label = f"T{entry.get('quarter', '?')} j{entry.get('day', '?')} — {entry.get('text', '')}"
+                label = f"{_relative_date(player, entry)} — {entry.get('text', '')}"
                 widgets.draw_text(surf, widgets.fit_text(label, fonts.tiny(), inner.w),
                                   (inner.x, y), fonts.tiny(), ecol)
                 y += row_h
@@ -113,7 +126,7 @@ class RivalsScene(Scene):
         for entry in recent:
             kind = entry.get("kind", "info")
             ecol = config.COL_DOWN if kind == "bad" else config.COL_TEXT_DIM
-            label = f"j{entry.get('day', '?')} — {entry.get('text', '')}"
+            label = f"{_relative_date(player, entry)} — {entry.get('text', '')}"
             widgets.draw_text(surf, widgets.fit_text(label, fonts.tiny(), inner2.w),
                               (inner2.x, y), fonts.tiny(), ecol)
             y += row_h

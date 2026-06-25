@@ -148,11 +148,27 @@ class DilemmaScene(Scene):
             parts.append((f"scrutin {o['heat']:+d}", config.COL_DOWN if o["heat"] > 0 else config.COL_UP))
         return parts
 
+    def _objective_impact_lines(self, p):
+        """Relie l'effet cash/réputation de la décision aux objectifs du
+        trimestre en cours, pour éviter d'avoir à aller voir CAREER pour
+        comprendre l'impact carrière du choix."""
+        from core import career
+        lines = []
+        for o in p.objectives:
+            if o["kind"] not in ("cash", "reputation"):
+                continue
+            cur_v, target, ok = career.objective_progress(p, o)
+            mark = "✓" if ok else "→"
+            lines.append(f"{mark} {career.objective_label(p, o)}")
+        return lines
+
     def _draw_outcome(self, surf, d, cur):
         o = self.applied
         p = self.app.gs.player
         others = [opt for i, opt in enumerate(d["options"]) if i != self.chosen]
-        panel = pygame.Rect(120, 290, config.SCREEN_WIDTH - 240, 230 + 22 * len(others))
+        impact = self._objective_impact_lines(p)
+        impact_h = (18 * len(impact) + 6) if impact else 0
+        panel = pygame.Rect(120, 290, config.SCREEN_WIDTH - 240, 230 + 22 * len(others) + impact_h)
         inner = widgets.draw_panel(surf, panel, "Conséquence", config.COL_CYAN)
         widgets.draw_text(surf, o["label"], (inner.x, inner.y), fonts.head(bold=True), config.COL_WHITE)
         widgets.draw_text_wrapped(surf, o["outcome"], (inner.x, inner.y + 36),
@@ -165,6 +181,11 @@ class DilemmaScene(Scene):
             r = widgets.draw_text(surf, text, (x, y), fonts.small(bold=True), c)
             x = r.right + 18
         y += 28
+        if impact:
+            for line in impact:
+                widgets.draw_text(surf, line, (inner.x, y), fonts.tiny(), config.COL_CYAN)
+                y += 18
+            y += 6
         # ce que vous avez écarté : comparaison avec les options non choisies, pour
         # que la décision raconte une mini-histoire ("j'ai préféré X plutôt que Y").
         if others:

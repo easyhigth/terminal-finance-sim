@@ -324,6 +324,20 @@ class MissionScene(Scene):
                                    else "VOIR RÉSULTAT")
         self.continue_btn.draw(surf)
 
+    def _objective_impact_lines(self, p):
+        """Montre l'effet de cette mission sur les objectifs du trimestre en
+        cours (missions/réputation), pour relier le résultat immédiat à la
+        roadmap de promotion sans devoir aller voir CAREER."""
+        from core import career
+        lines = []
+        for o in p.objectives:
+            if o["kind"] not in ("missions", "reputation"):
+                continue
+            cur, target, ok = career.objective_progress(p, o)
+            mark = "✓" if ok else "→"
+            lines.append(f"{mark} {career.objective_label(p, o)}")
+        return lines
+
     def _draw_result(self, surf):
         total = len(self.mission["items"])
         ratio = self.score / max(1, total)
@@ -346,6 +360,9 @@ class MissionScene(Scene):
                 msg.append(f"Avec un score parfait : +{miss_rep} réputation et "
                            f"+{widgets.format_money(miss_cash, cur)} de plus.")
         msg.append("")
+        msg.extend(self._objective_impact_lines(p))
+        if msg[-1]:
+            msg.append("")
         thr = M.reputation_threshold(p.grade_index)
         if p.reputation >= thr and p.can_promote():
             msg.append(f"Réputation ≥ {thr} : vous pouvez tenter l'examen (EVAL).")

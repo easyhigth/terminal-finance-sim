@@ -89,22 +89,28 @@ class SavesScene(Scene):
                     return
 
     def _handle_confirm_event(self, event):
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_n):
             self.confirm = None
             return
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_y:
+            self._confirm_yes()
+            return
         if self._yes_btn and self._yes_btn.handle(event):
-            kind, slot = self.confirm["kind"], self.confirm["slot"]
-            self.confirm = None
-            if kind == "delete":
-                GameState.delete(slot)
-                self.message = f"Slot '{slot}' supprimé."
-                self._refresh()
-            elif kind == "save":
-                self._save(slot)
+            self._confirm_yes()
             return
         if self._no_btn and self._no_btn.handle(event):
             self.confirm = None
             return
+
+    def _confirm_yes(self):
+        kind, slot = self.confirm["kind"], self.confirm["slot"]
+        self.confirm = None
+        if kind == "delete":
+            GameState.delete(slot)
+            self.message = f"Slot '{slot}' supprimé."
+            self._refresh()
+        elif kind == "save":
+            self._save(slot)
 
     def _load(self, slot):
         gs = GameState.load(slot)
@@ -186,6 +192,8 @@ class SavesScene(Scene):
         widgets.draw_panel(surf, box, "CONFIRMATION", accent)
         widgets.draw_text_wrapped(surf, msg, (box.x + 20, box.y + 50),
                                   fonts.body(), config.COL_TEXT, box.w - 40)
+        widgets.draw_text(surf, "Y = confirmer, N/Échap = annuler", (box.x + 20, box.y + 96),
+                          fonts.tiny(), config.COL_TEXT_DIM)
 
         self._yes_btn.accent = accent
         self._yes_btn.draw(surf)

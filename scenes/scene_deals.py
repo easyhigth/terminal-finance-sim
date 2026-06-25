@@ -209,8 +209,11 @@ class DealsScene(Scene):
 
                 # jauge de probabilité de réussite
                 px = row.x + 400
-                widgets.draw_text(surf, f"Probabilité {int(prob*100)}%", (px, row.y + 8), fonts.tiny(), config.COL_TEXT)
                 pcol = config.COL_UP if prob >= 0.6 else config.COL_WARN if prob >= 0.35 else config.COL_DOWN
+                calib = ("Facile" if prob >= 0.6 else "Modéré" if prob >= 0.35
+                         else "Difficile" if prob >= 0.15 else "Très difficile")
+                widgets.draw_text(surf, f"Probabilité {int(prob*100)}% — {calib} pour vous",
+                                  (px, row.y + 8), fonts.tiny(), pcol)
                 widgets.draw_progress(surf, pygame.Rect(px, row.y + 24, 160, 14), prob, accent=pcol)
 
                 widgets.draw_text(surf, f"Gain {widgets.format_money(d['reward_cash'], cur)} (+{d['reward_rep']} rép.)",

@@ -703,7 +703,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             if novice:
                 if get_lang() == "en":
                     self._log(
-                        "  COMMANDS full catalogue · the clock runs live (⏸/▶/▶▶/▶▶▶ top-right)",
+                        "  COMMANDS full catalogue · the clock runs live (▮▮/▶/▶▶/▶▶▶ top-right)",
                         "  MARKET indices · COMPANY <tk> · SEARCH · WATCHLIST",
                         "  MISSION work · CAREER career · EVAL promotion",
                         "  LEARN academy · GLOSSARY · DEFINE <term>",
@@ -714,7 +714,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                     )
                 else:
                     self._log(
-                        "  COMMANDS catalogue complet · le temps avance en direct (⏸/▶/▶▶/▶▶▶ en haut à droite)",
+                        "  COMMANDS catalogue complet · le temps avance en direct (▮▮/▶/▶▶/▶▶▶ en haut à droite)",
                         "  MARKET indices · COMPANY <tk> · SEARCH · WATCHLIST",
                         "  MISSION travailler · CAREER carrière · EVAL promotion",
                         "  LEARN académie · GLOSSARY · DEFINE <terme>",
@@ -726,7 +726,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                 return
             if get_lang() == "en":
                 self._log(
-                    "  COMMANDS full catalogue · the clock runs live (⏸/▶/▶▶/▶▶▶ top-right)",
+                    "  COMMANDS full catalogue · the clock runs live (▮▮/▶/▶▶/▶▶▶ top-right)",
                     "  MARKET indices · TOP [region] · MOVERS · EXPLORE explorer",
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
                     "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC charts",
@@ -744,7 +744,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                 )
             else:
                 self._log(
-                    "  COMMANDS catalogue complet · le temps avance en direct (⏸/▶/▶▶/▶▶▶ en haut à droite)",
+                    "  COMMANDS catalogue complet · le temps avance en direct (▮▮/▶/▶▶/▶▶▶ en haut à droite)",
                     "  MARKET indices · TOP [region] · MOVERS · EXPLORE explorer",
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
                     "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC graphes",

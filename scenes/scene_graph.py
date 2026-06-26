@@ -25,6 +25,7 @@ from core import charts, config, indicators
 from core import commodities as CMD
 from core import crypto as CRY
 from core import etfs as ETF
+from core import intraday
 from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.popups import PopupMixin
@@ -64,7 +65,15 @@ _KIND_BY_CODE = {c: k for c, _, k, _ in TYPES}
 _MULTI = {k for _, _, k, multi in TYPES if multi}
 _NO_ASSET = {"macro", "curve"}     # types sans saisie d'actif
 
-PERIODS = [("1A", 73), ("3A", 219), ("5A", 365), ("MAX", None)]
+# Périodes "par pas" (jours de jeu, cf. moteur de marché par paliers) +
+# fenêtres intraday animées (Round 11 Phase 3) encodées en minutes de jeu
+# négatives pour les distinguer des pas — uniquement valables pour les types
+# de graphe à série unique (ligne/chandeliers/barres/variation %), où la
+# liste de clôtures suffit (`_aggregate_ohlc` re-agrège lui-même l'OHLC).
+INTRADAY_PERIODS = [(label, -minutes) for label, minutes in intraday.INTRADAY_WINDOWS]
+STEP_PERIODS = [("1A", 73), ("3A", 219), ("5A", 365), ("MAX", None)]
+PERIODS = INTRADAY_PERIODS + STEP_PERIODS
+_INTRADAY_KINDS = {"line", "candles", "bars", "change"}
 _MAX_TICKERS = 10   # au-delà, légendes/puces deviennent illisibles
 SERIES_COLS = [config.COL_AMBER, config.COL_CYAN, config.COL_UP, config.COL_WARN,
                config.COL_PRESTIGE, config.COL_DOWN]
@@ -91,7 +100,14 @@ class GraphScene(Scene, PopupMixin):
                 self.error = f"Actif introuvable : {', '.join(requested)}"
             tickers = valid
         self.tickers = [t.upper() for t in tickers][:_MAX_TICKERS]
-        self.period = kwargs.get("period", 365)
+        # Par défaut : fenêtre intraday "5 dernières minutes" (Round 11 Phase 3)
+        # — bien plus représentatif/interactif qu'une vue figée sur l'année.
+        # Sans objet pour les graphes statistiques/multi-actifs (vol/bêta/
+        # corrélation/macro/courbe/spread/comparer) : retombent sur 1A.
+        default_period = INTRADAY_PERIODS[0][1] if self.kind in _INTRADAY_KINDS else 73
+        self.period = kwargs.get("period", default_period)
+        if self.kind not in _INTRADAY_KINDS and self.period is not None and self.period < 0:
+            self.period = 73
         self._cursor = widgets.ChartCursor()
         self.spread_mode = "ratio"
         self.input = ""
@@ -146,11 +162,12 @@ class GraphScene(Scene, PopupMixin):
         if self._cursor.handle_event(event):
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
-            idx = next((i for i, (_, s) in enumerate(PERIODS) if s == self.period), 2)
+            choices = self._period_choices()
+            idx = next((i for i, (_, s) in enumerate(choices) if s == self.period), 2)
             if event.button == 4 and idx > 0:
-                self.period = PERIODS[idx - 1][1]
-            elif event.button == 5 and idx < len(PERIODS) - 1:
-                self.period = PERIODS[idx + 1][1]
+                self.period = choices[idx - 1][1]
+            elif event.button == 5 and idx < len(choices) - 1:
+                self.period = choices[idx + 1][1]
             return
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
@@ -200,6 +217,8 @@ class GraphScene(Scene, PopupMixin):
                 if rect.collidepoint(event.pos):
                     self.kind = _KIND_BY_CODE[code]
                     self.input = ""
+                    if self.kind not in _INTRADAY_KINDS and self.period is not None and self.period < 0:
+                        self.period = 365
             for steps, rect in self._period_rects.items():
                 if rect.collidepoint(event.pos):
                     self.period = steps
@@ -301,17 +320,42 @@ class GraphScene(Scene, PopupMixin):
                                ("Vol.", f"{q['vol']*100:.0f}%")]}
         return None
 
+    def _period_choices(self):
+        """Périodes proposées pour le type de graphe courant — les fenêtres
+        intraday (5M..2H) n'ont de sens que pour les graphes à série unique
+        (ligne/chandeliers/barres/variation %)."""
+        if self.kind in _INTRADAY_KINDS:
+            return PERIODS
+        return STEP_PERIODS
+
+    def _region_of(self, tk):
+        i = self.market.ticker_idx.get(tk)
+        return self.market.companies[i].get("region") if i is not None else None
+
     def _series(self, tk):
         kind = _asset_kind(tk)
+        if self.period is not None and self.period < 0:
+            # fenêtre intraday animée (Round 11 Phase 3) : uniquement pour les
+            # actions (seule classe avec un historique par pas exploitable
+            # tel quel + une région de cotation pour le gel hors session) ;
+            # les autres classes d'actifs retombent sur la vue "MAX".
+            if kind == "stock":
+                hist = self.market.history_of(tk)
+                return intraday.intraday_series(
+                    self.market, self.app.sim_clock, self.app.gs.player.day, tk, hist,
+                    window_minutes=-self.period, n_points=60, region=self._region_of(tk))
+            n = None
+        else:
+            n = self.period
         if kind == "bond":
-            return BND.price_history(self.market, tk, self.period)
+            return BND.price_history(self.market, tk, n)
         if kind == "commodity":
-            return CMD.history(self.market, tk, self.period)
+            return CMD.history(self.market, tk, n)
         if kind == "crypto":
-            return CRY.history(self.market, tk, self.period)
+            return CRY.history(self.market, tk, n)
         if kind == "etf":
-            return ETF.nav_history(self.market, tk, self.period)
-        return self.market.history_of(tk, self.period)
+            return ETF.nav_history(self.market, tk, n)
+        return self.market.history_of(tk, n)
 
     # -------------------------------------------------------------- draw
     def draw(self, surf):
@@ -412,9 +456,11 @@ class GraphScene(Scene, PopupMixin):
     def _draw_controls(self, surf):
         # sélecteur de période (gauche)
         self._period_rects = {}
+        choices = self._period_choices()
+        btn_w = 44 if len(choices) > 4 else 56
         x, y = 40, 158
-        for plabel, steps in PERIODS:
-            rect = pygame.Rect(x, y, 56, 26)
+        for plabel, steps in choices:
+            rect = pygame.Rect(x, y, btn_w, 26)
             self._period_rects[steps] = rect
             sel = (steps == self.period)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect)
@@ -422,11 +468,11 @@ class GraphScene(Scene, PopupMixin):
             font = fonts.small(bold=sel)
             img = font.render(plabel, True, config.COL_CYAN if sel else config.COL_TEXT)
             surf.blit(img, img.get_rect(center=rect.center))
-            x += 60
+            x += btn_w + 4
         # saisie d'actif (droite) + recherche intelligente par nom OU ticker
         if self.kind not in _NO_ASSET:
             hint = "+ NOM/TICKER" if self.kind in _MULTI else "NOM/TICKER"
-            box = pygame.Rect(320, y, 300, 26)
+            box = pygame.Rect(x + 16, y, 300, 26)
             self._input_box = box
             pygame.draw.rect(surf, config.COL_PANEL, box)
             pygame.draw.rect(surf, config.COL_CYAN if self.input else config.COL_BORDER, box, 1)
@@ -558,6 +604,14 @@ class GraphScene(Scene, PopupMixin):
         récent — comble l'absence d'axe des X signalée sur tous les types
         de graphes basés sur une série temporelle."""
         if n < 2:
+            return
+        if self.period is not None and self.period < 0:
+            window = -self.period
+            widgets.draw_chart_x_labels(surf, rect, [
+                (0.0, f"-{window}min"),
+                (0.5, f"-{window // 2}min"),
+                (1.0, "maintenant"),
+            ])
             return
         d = config.DAYS_PER_STEP
         widgets.draw_chart_x_labels(surf, rect, [

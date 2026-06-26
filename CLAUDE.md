@@ -62,6 +62,16 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   Les indices émergent de leurs constituants pondérés capi. Crises = chocs sur les facteurs.
   **L'état est reconstruit via (seed, nb de pas)** : le save ne stocke que
   `market_seed`/`market_step`, jamais les prix. Ne pas sérialiser les prix.
+- **`core/intraday.py`** : animation intraday **déterministe et display-only** des prix
+  (pont brownien pinné aux bornes du pas via bruit fBm multi-octave). Aucun état persisté :
+  reconstruit à partir de `(seed, step_count, clé, minute)`. `SimClock.game_minutes_acc`
+  fournit la progression dans le pas courant. Branché via des paramètres optionnels
+  `sim_clock=None, day=None` sur `core/market_query.py` (`index_history`, `track_company`,
+  `history_of` — comportement inchangé si omis), consommé par les sparklines d'indices du
+  terminal, le popup société (onglet graphe) et `scenes/scene_graph.py` (qui ajoute des
+  fenêtres intraday 5M/10M/30M/1H/2H, en plus de 1A/3A/5A/MAX, pour les graphes mono-actif
+  ligne/bougies/barres/variation). N'affecte jamais les prix d'exécution (`BUY/SELL/...`),
+  qui restent sur `market.price[i]`.
 - **`data/companies.py`** : roster fictif déterministe (320 sociétés, `ROSTER_SEED` fixe,
   noms déformés exprès : LVMH→LWNH, NVIDIA→MVC…).
 - **`core/`** : systèmes de jeu (career, portfolio, bonds, commodities, crypto, structured,

@@ -193,7 +193,7 @@ def sell(player, market, ticker, qty):
     if abs(pos["shares"]) <= 1e-9:
         del player.portfolio[ticker]
     return {"ok": True, "price": fill, "qty": qty, "net": net, "fee": fee,
-            "realized": realized}
+            "realized": realized, "slippage": fill - price}
 
 
 # ---------------------------------------------------------------------------

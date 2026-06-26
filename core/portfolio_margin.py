@@ -161,4 +161,5 @@ def accrue_financing(player, market, days):
     total = interest + borrow_fee
     if total:
         player.cash -= total
+        player.total_financing_paid = getattr(player, "total_financing_paid", 0.0) + total
     return {"interest": interest, "borrow_fee": borrow_fee, "total": total}

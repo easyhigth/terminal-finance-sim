@@ -302,18 +302,20 @@ class TerminalRenderMixin:
                 v = self.market.index_value(name)
                 chg = self.market.index_change_pct(name)
                 col = config.COL_UP if chg >= 0 else config.COL_DOWN
+                hist = self.market.index_history(name, self.app.sim_clock, self.app.gs.player.day)
+                live_v = hist[-1] if hist else v
+                flash_col = self._index_flash.tick(name, live_v, config.COL_UP, config.COL_DOWN,
+                                                    config.COL_WHITE)
                 row = pygame.Rect(inner.x - 4, y - 1, inner.w + 8, step - 2)
                 self._index_rects[name] = row
                 if row.collidepoint(mp):
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
                 widgets.draw_text(surf, name, (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
-                widgets.draw_text(surf, f"{v:,.0f}", (inner.x + 96, y), fonts.small(), config.COL_WHITE)
+                widgets.draw_text(surf, f"{v:,.0f}", (inner.x + 96, y), fonts.small(), flash_col)
                 widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.2f}%", (inner.right, y),
                                   fonts.small(bold=True), col, align="right")
                 widgets.draw_series(surf, pygame.Rect(inner.x, y + 16, inner.w, spark_h),
-                                    self.market.index_history(
-                                        name, self.app.sim_clock, self.app.gs.player.day),
-                                    col, baseline=False,
+                                    hist, col, baseline=False,
                                     mouse_pos=mp, y_fmt=lambda v: f"{v:,.0f}", show_pct=True,
                                     show_extrema=False)
                 if self.zones.zone == "indices" and self.zones.inside and self.zones.item == name:

@@ -6,7 +6,7 @@ import math
 
 import pygame
 
-from core import config
+from core import anim_settings, config
 from core.game_state import GameState
 from core.i18n import get_lang, t, toggle_lang
 from core.scene_manager import Scene
@@ -36,9 +36,15 @@ class MenuScene(Scene):
         # bouton de langue (en haut à droite)
         self.lang_btn = widgets.Button((config.SCREEN_WIDTH-150, 40, 110, 34),
                                        f"LANG : {get_lang().upper()}", config.COL_CYAN)
+        # bouton "réduire les animations" (accessibilité/perf — sous LANG)
+        self.anim_btn = widgets.Button((config.SCREEN_WIDTH-150, 80, 110, 34),
+                                       self._anim_label(), config.COL_NEUTRAL)
         self.buttons["continue"].enabled = self.auto is not None
         self.buttons["load"].enabled = len(GameState.list_saves()) > 0
         self.t = 0.0
+
+    def _anim_label(self):
+        return "ANIM : RÉDUITE" if anim_settings.reduce_motion() else "ANIM : NORMALE"
 
     def _continue(self):
         gs = GameState.load(config.AUTOSAVE_SLOT)
@@ -52,6 +58,10 @@ class MenuScene(Scene):
         if self.lang_btn.handle(event):
             toggle_lang()
             self.on_enter()       # reconstruit les libellés dans la nouvelle langue
+            return
+        if self.anim_btn.handle(event):
+            anim_settings.toggle_reduce_motion()
+            self.anim_btn.label = self._anim_label()
             return
         for key, btn in self.buttons.items():
             if btn.handle(event):
@@ -72,6 +82,7 @@ class MenuScene(Scene):
         for btn in self.buttons.values():
             btn.update(mp, dt)
         self.lang_btn.update(mp, dt)
+        self.anim_btn.update(mp, dt)
 
     def _draw_backdrop(self, surf):
         """Fond animé discret : chandeliers boursiers stylisés qui défilent."""
@@ -124,6 +135,7 @@ class MenuScene(Scene):
             btn.draw(surf)
         self.lang_btn.label = f"LANG : {get_lang().upper()}"
         self.lang_btn.draw(surf)
+        self.anim_btn.draw(surf)
 
         widgets.draw_text(surf, "v0.3.0 — alpha",
                           (config.SCREEN_WIDTH-10, config.SCREEN_HEIGHT-22),

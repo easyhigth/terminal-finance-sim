@@ -632,6 +632,48 @@ def draw_scrollbar(surf, panel_rect, list_area, scroll, max_scroll, content_h):
     return scroll
 
 
+class TickFlash:
+    """Suit, pour un ensemble de clés (ticker/indice...), la dernière valeur
+    "en direct" vue et renvoie une couleur de flash qui s'éteint en ~300ms à
+    chaque variation perceptible — l'effet "tick vert/rouge" des terminaux de
+    marché, posé sur l'animation intraday (Round 11 Phase 3, `core/intraday.py`)
+    sans dépendre d'un `dt` explicite (décroissance basée sur l'horloge murale
+    `pygame.time.get_ticks()`, donc utilisable depuis `draw()` seul).
+
+    Usage :
+        flash = widgets.TickFlash()                  # un par panneau, stocké sur self
+        col = flash.tick(name, live_value, up_color, down_color, base_color)
+        widgets.draw_text(surf, txt, pos, font, col)
+    """
+    DECAY_MS = 300
+
+    def __init__(self):
+        self._last = {}   # key -> (value, dir, t_ms)
+
+    def tick(self, key, value, up_color, down_color, base_color):
+        now = pygame.time.get_ticks()
+        prev = self._last.get(key)
+        if prev is None:
+            self._last[key] = (value, 0, now)
+            return base_color
+        prev_value, prev_dir, prev_t = prev
+        if value > prev_value:
+            self._last[key] = (value, 1, now)
+            prev_dir, prev_t = 1, now
+        elif value < prev_value:
+            self._last[key] = (value, -1, now)
+            prev_dir, prev_t = -1, now
+        else:
+            self._last[key] = (value, prev_dir, prev_t)
+        if prev_dir == 0:
+            return base_color
+        intensity = max(0.0, 1.0 - (now - prev_t) / self.DECAY_MS)
+        if intensity <= 0.0:
+            return base_color
+        flash = up_color if prev_dir > 0 else down_color
+        return tuple(int(b + (f - b) * intensity) for b, f in zip(base_color, flash))
+
+
 class ScrollState:
     """État de défilement minimal pour un panneau-liste, réutilisable quand un
     même écran a PLUSIEURS zones défilantes indépendantes (contrairement au

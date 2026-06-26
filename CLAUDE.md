@@ -71,7 +71,17 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   terminal, le popup société (onglet graphe) et `scenes/scene_graph.py` (qui ajoute des
   fenêtres intraday 5M/10M/30M/1H/2H, en plus de 1A/3A/5A/MAX, pour les graphes mono-actif
   ligne/bougies/barres/variation). N'affecte jamais les prix d'exécution (`BUY/SELL/...`),
-  qui restent sur `market.price[i]`.
+  qui restent sur `market.price[i]`. Amplitude de bruit modulée par la volatilité propre de
+  chaque actif (`vol_mult_for_sigma(sigma, scale)`, basé sur `market.sigma`) ; les bougies
+  intraday de `scene_graph.py` regroupent les points bruts en 18 bougies réelles (open/high/
+  low/close) au lieu d'une bougie dégénérée par point. Le flash couleur vert/rouge sur tick
+  (sparklines d'indices, popup société) vit dans `ui/widgets.py::TickFlash` (horloge murale
+  `pygame.time.get_ticks()`, pas de dépendance à `dt`).
+- **`core/anim_settings.py`** : réglage persisté « réduire les animations » (fichier JSON
+  séparé sous `config.SAVE_DIR`, distinct de `core/i18n.py`/`settings.json`). Unique point de
+  gating dans `core/intraday.py::wiggle()` : si actif, toutes les courbes intraday retombent
+  en interpolation linéaire pure (sans bruit), sans toucher les sites d'appel. Bouton dans
+  `scenes/scene_menu.py`.
 - **`data/companies.py`** : roster fictif déterministe (320 sociétés, `ROSTER_SEED` fixe,
   noms déformés exprès : LVMH→LWNH, NVIDIA→MVC…).
 - **`core/`** : systèmes de jeu (career, portfolio, bonds, commodities, crypto, structured,

@@ -67,6 +67,7 @@ class CompanyScene(Scene):
         self._tooltip = None
         self._tab_rects = {}
         self._chart_kind_rects = {}
+        self._chart_flash = widgets.TickFlash()
         m = self.app.market
         if m is not None:
             m.track_company(self.ticker)
@@ -542,6 +543,10 @@ class CompanyScene(Scene):
             widgets.draw_text(surf, "Historique en cours de constitution.",
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
             return
+        flash_col = self._chart_flash.tick(self.ticker, hist[-1], config.COL_UP, config.COL_DOWN,
+                                            config.COL_WHITE)
+        widgets.draw_text(surf, f"{hist[-1]:,.2f} {self.cur}", (panel_rect.right - 12, panel_rect.y + 4),
+                          fonts.small(bold=True), flash_col, align="right")
         if self.chart_kind == "candles":
             widgets.draw_candles(surf, inner, hist, n_candles=32, sma_windows=(10, 30))
         elif self.chart_kind == "line":

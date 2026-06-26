@@ -16,7 +16,9 @@ from core import commodities as CM
 from core import config, unlocks
 from core import crypto as K
 from core import etfs as ETF
+from core import liquidity as LIQ
 from core import portfolio as PF
+from core import portfolio_margin as PM
 from core import securitisation as SEC
 from core import structured as S
 from core.i18n import get_lang
@@ -252,11 +254,20 @@ class ShopScene(Scene, PopupMixin):
         else:
             return
         if r["ok"]:
-            self.msg = f"Vendu {r['qty']:g} × {key} @ {r['price']:.2f} (P&L {r['realized']:+.0f})."
+            self.msg = f"Vendu {r['qty']:g} × {key} @ {r['price']:.2f} (P&L {r['realized']:+.0f})." \
+                + self._slip_suffix(r)
             if not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
         else:
             self.msg = f"Vente refusée ({r['reason']})."
+
+    def _slip_suffix(self, r):
+        slip = r.get("slippage")
+        if slip is None:
+            return ""
+        mid = r["price"] - slip
+        pct = (slip / mid * 100.0) if mid else 0.0
+        return f" Glissement {pct:+.2f}%."
 
     def _do_buy(self, kind, key):
         if not self._can_trade():
@@ -283,7 +294,7 @@ class ShopScene(Scene, PopupMixin):
         else:
             return
         if r["ok"]:
-            self.msg = f"Acheté {qty:g} × {key} @ {r['price']:.2f}."
+            self.msg = f"Acheté {qty:g} × {key} @ {r['price']:.2f}." + self._slip_suffix(r)
             if not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
         else:
@@ -453,6 +464,11 @@ class ShopScene(Scene, PopupMixin):
                                 "ou VENDRE (positions détenues). "
                                 + (self.msg if self.msg else ""),
                           (42, 72), fonts.tiny(), config.COL_TEXT_DIM)
+        st = PM.margin_status(p, self.market)
+        widgets.draw_text(surf, f"Pouvoir d'achat {widgets.format_money(st['buying_power'], cur)}"
+                                f" · levier {st['leverage']:.2f}x / {st['max_leverage']:.1f}x max",
+                          (config.SCREEN_WIDTH - 40, 26), fonts.small(bold=True),
+                          config.COL_DOWN if st["margin_call"] else config.COL_TEXT_DIM, align="right")
 
         mp = pygame.mouse.get_pos()
         self._tooltip = None
@@ -624,6 +640,13 @@ class ShopScene(Scene, PopupMixin):
                           config.COL_AMBER if held > 0 else config.COL_TEXT_DIM)
         price_txt = f"{r['price']:,.2f}".replace(",", " ") if r["price"] is not None else "—"
         widgets.draw_text(surf, price_txt, (inner.x + cols[4][1], y), fonts.small(), config.COL_WHITE)
+        if kind == "Action":
+            price_rect = pygame.Rect(inner.x + cols[4][1] - 4, y - 2, 80, ROW_H - 4)
+            if price_rect.collidepoint(mp):
+                tier = LIQ.equity_tier(self.market, key)
+                self._tooltip = (f"Liquidité : {tier} (selon la capitalisation). "
+                                  "Tier moins liquide = spread et impact de marché plus élevés "
+                                  "sur les gros ordres.", mp)
         value_txt = widgets.format_money(r["value"], cur) if r["value"] is not None else "—"
         widgets.draw_text(surf, value_txt, (inner.x + cols[5][1], y), fonts.small(bold=True), config.COL_TEXT)
         if r["yield_pct"] is not None:

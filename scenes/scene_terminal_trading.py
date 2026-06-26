@@ -7,7 +7,9 @@ limiter sa taille ; mixé dans TerminalScene avec les autres mixins de commandes
 
 from core import career as career_mod
 from core import config
+from core import firms as firms_mod
 from core import journal as journal_mod
+from core import liquidity as liq_mod
 from core import portfolio as pf_mod
 from core import unlocks as unlocks_mod
 from core.i18n import get_lang
@@ -107,23 +109,70 @@ class TerminalTradingMixin:
         tk, qty = args[0].upper(), int(args[1])
         res = pf_mod.buy(self.app.gs.player, self.market, tk, qty)
         if not res["ok"]:
-            reason = {"ticker": "ticker inconnu", "qty": "quantité invalide",
-                      "isshort": f"position courte ouverte sur {tk} — utilisez COVER",
-                      "leverage": f"levier max atteint ({res.get('max_leverage',0):.1f}x) — tapez MARGIN pour le détail"
-                      }.get(res["reason"], res["reason"])
+            if res["reason"] == "sector_excluded":
+                firm = firms_mod.get(self.app.gs.player.firm)
+                fname = firm["name"] if firm else "votre firme"
+                reason = _L(
+                    f"secteur {res.get('sector', '?')} exclu par l'ADN « {fname} » "
+                    "(contrainte ESG/mandat de la firme, pas de contournement possible)",
+                    f"{res.get('sector', '?')} sector excluded by « {fname} »'s DNA "
+                    "(firm ESG/mandate constraint, no workaround)")
+            else:
+                reason = {"ticker": "ticker inconnu", "qty": "quantité invalide",
+                          "isshort": f"position courte ouverte sur {tk} — utilisez COVER",
+                          "leverage": f"levier max atteint ({res.get('max_leverage',0):.1f}x) — tapez MARGIN pour le détail"
+                          }.get(res["reason"], res["reason"])
             self._log(_L(f"  Achat refusé : {reason}.", f"  Buy rejected: {reason}."))
             return
+        slip_pct = self._slippage_pct(res)
+        tier = liq_mod.equity_tier(self.market, tk)
         self._log(_L(f"  ✓ Achat {qty} {tk} @ {res['price']:.2f} = "
-                     f"{widgets.format_money(res['total'], self._cur())} (frais inclus).",
+                     f"{widgets.format_money(res['total'], self._cur())} (frais inclus)"
+                     f" · glissement {slip_pct:+.2f}% · liquidité {tier}.",
                      f"  ✓ Bought {qty} {tk} @ {res['price']:.2f} = "
-                     f"{widgets.format_money(res['total'], self._cur())} (fees incl.)."))
+                     f"{widgets.format_money(res['total'], self._cur())} (fees incl.)"
+                     f" · slippage {slip_pct:+.2f}% · liquidity {tier}."))
         self._warn_if_leveraged()
+        self._warn_leverage_cost_first_time()
         if res["total"] > 60000:
             career_mod.log(self.app.gs.player, "deal", f"Achat {qty} {tk}")
         journal_mod.log_trade(self.app.gs.player, self.market, asset_class="Action",
                               key=tk, label=tk, side="achat", qty=qty,
                               price=res["price"], fee=res.get("fee", 0.0))
         self._after_trade()
+
+    def _slippage_pct(self, res):
+        """Glissement (spread + impact de marché) en % du prix mi-coté,
+        à partir de la clé `slippage` (écart fill - mid) renvoyée par
+        core.portfolio.buy/sell."""
+        slip = res.get("slippage", 0.0)
+        mid = res["price"] - slip
+        return (slip / mid * 100.0) if mid else 0.0
+
+    def _warn_leverage_cost_first_time(self):
+        """À la première utilisation de la marge (cash emprunté) ou d'un short,
+        explique une fois le coût annualisé (taux directeur + surcoût marge /
+        frais d'emprunt de titres) — invisible sinon avant le premier relevé
+        de financement en fin de tour."""
+        p = self.app.gs.player
+        if p.flags.get("onboarding_seen_leverage_cost"):
+            return
+        st = pf_mod.margin_status(p, self.market)
+        has_short = any(pos["shares"] < 0 for pos in p.portfolio.values())
+        if st["borrowed"] <= 0 and not has_short:
+            return
+        p.flags["onboarding_seen_leverage_cost"] = True
+        rate = self.market.macro["rate"]["v"] if hasattr(self.market, "macro") else 3.0
+        from core import portfolio_margin as pm_mod
+        self._log(_L(
+            f"  ℹ Coût annualisé du levier : intérêts sur capital emprunté ≈ taux "
+            f"directeur ({rate:.1f}%) + {pm_mod.MARGIN_SPREAD*100:.0f}% de surcoût · "
+            f"short = + {pm_mod.SHORT_FEE_ANNUAL*100:.0f}%/an d'emprunt de titres "
+            "(prélevé chaque tour, tapez MARGIN).",
+            f"  ℹ Annualized leverage cost: interest on borrowed cash ≈ policy "
+            f"rate ({rate:.1f}%) + {pm_mod.MARGIN_SPREAD*100:.0f}% spread · "
+            f"short = + {pm_mod.SHORT_FEE_ANNUAL*100:.0f}%/yr stock borrow fee "
+            "(charged every turn, type MARGIN)."))
 
     def _warn_if_leveraged(self):
         """Aperçu immédiat du risque pris : si le trade qui vient de s'exécuter
@@ -156,12 +205,15 @@ class TerminalTradingMixin:
             self._log(_L(f"  Vente refusée : {'aucune position' if res['reason']=='noposition' else res['reason']}.", f"  Sell rejected: {'no position' if res['reason']=='noposition' else res['reason']}."))
             return
         sign = "+" if res["realized"] >= 0 else ""
+        slip_pct = self._slippage_pct(res)
         self._log(_L(f"  ✓ Vente {int(res['qty'])} {tk} @ {res['price']:.2f} = "
                      f"{widgets.format_money(res['net'], self._cur())}  "
-                     f"(P&L réalisé {sign}{widgets.format_money(res['realized'], self._cur())}).",
+                     f"(P&L réalisé {sign}{widgets.format_money(res['realized'], self._cur())}) "
+                     f"· glissement {slip_pct:+.2f}%.",
                      f"  ✓ Sold {int(res['qty'])} {tk} @ {res['price']:.2f} = "
                      f"{widgets.format_money(res['net'], self._cur())}  "
-                     f"(realised P&L {sign}{widgets.format_money(res['realized'], self._cur())})."))
+                     f"(realised P&L {sign}{widgets.format_money(res['realized'], self._cur())}) "
+                     f"· slippage {slip_pct:+.2f}%."))
         journal_mod.log_trade(self.app.gs.player, self.market, asset_class="Action",
                               key=tk, label=tk, side="vente", qty=res["qty"],
                               price=res["price"], fee=res.get("fee", 0.0),
@@ -182,13 +234,15 @@ class TerminalTradingMixin:
                       }.get(res["reason"], res["reason"])
             self._log(_L(f"  Short refusé : {reason}.", f"  Short rejected: {reason}."))
             return
+        tier = liq_mod.equity_tier(self.market, tk)
         self._log(_L(f"  ✓ Short {qty} {tk} @ {res['price']:.2f} = "
                      f"+{widgets.format_money(res['net'], self._cur())} en cash "
-                     "(à racheter via COVER).",
+                     f"(à racheter via COVER) · liquidité {tier}.",
                      f"  ✓ Shorted {qty} {tk} @ {res['price']:.2f} = "
                      f"+{widgets.format_money(res['net'], self._cur())} cash "
-                     "(buy back via COVER)."))
+                     f"(buy back via COVER) · liquidity {tier}."))
         self._warn_if_leveraged()
+        self._warn_leverage_cost_first_time()
         journal_mod.log_trade(self.app.gs.player, self.market, asset_class="Action",
                               key=tk, label=tk, side="short", qty=qty,
                               price=res["price"], fee=res.get("fee", 0.0))
@@ -222,8 +276,10 @@ class TerminalTradingMixin:
         self._after_trade()
 
     def _cmd_margin(self):
-        """MARGIN : état de la marge (equity, exposition, levier, pouvoir d'achat)."""
-        st = pf_mod.margin_status(self.app.gs.player, self.market)
+        """MARGIN : état de la marge (equity, exposition, levier, pouvoir d'achat,
+        coût de financement cumulé, répartition par classe d'actifs)."""
+        p = self.app.gs.player
+        st = pf_mod.margin_status(p, self.market)
         cur = self._cur()
         lev = "∞" if st["leverage"] == float("inf") else f"{st['leverage']:.2f}x"
         self._log(_L(f"  Marge — equity {widgets.format_money(st['equity'], cur)} · "
@@ -238,6 +294,23 @@ class TerminalTradingMixin:
                      f"  Buying power {widgets.format_money(st['buying_power'], cur)} · "
                      f"borrowed {widgets.format_money(st['borrowed'], cur)}"
                      + ("  ⚠ MARGIN CALL IMMINENT" if st["margin_call"] else "")))
+        total_fin = getattr(p, "total_financing_paid", 0.0)
+        if total_fin:
+            self._log(_L(f"  Financement cumulé payé (intérêts marge + emprunt de titres) : "
+                         f"{widgets.format_money(total_fin, cur)}.",
+                         f"  Cumulative financing paid (margin interest + stock borrow fees): "
+                         f"{widgets.format_money(total_fin, cur)}."))
+        from core import analytics as analytics_mod
+        by_class = analytics_mod.holdings_table(p, self.market)
+        if by_class:
+            agg = {}
+            for r in by_class:
+                agg[r["cls"]] = agg.get(r["cls"], 0.0) + abs(r["value"])
+            tot = sum(agg.values()) or 1.0
+            parts = " · ".join(f"{c} {v/tot*100:.0f}%" for c, v in
+                              sorted(agg.items(), key=lambda kv: -kv[1]))
+            self._log(_L(f"  Répartition par classe : {parts}.",
+                         f"  Allocation by asset class: {parts}."))
 
     def _cmd_allocate(self, args):
         """ALLOCATE <ticker> <pct> : ajuste la position à pct% de la valeur nette."""

@@ -17,6 +17,8 @@ from core import bonds as B
 from core import commodities as CM
 from core import crypto as K
 from core import etfs as ETF
+from core import firms as firms_mod
+from core import liquidity as liq
 from core import portfolio as pf
 from core import securitisation as SEC
 from core import structured as S
@@ -71,6 +73,7 @@ class BookScene(Scene, PopupMixin):
         self._sector_list_rect = None
         self._positions_max_scroll = 0
         self._sector_max_scroll = 0
+        self._tooltip = None
 
     # --------------------------------------------------------------- trading
     def _qty(self):
@@ -114,11 +117,25 @@ class BookScene(Scene, PopupMixin):
         else:
             return
         if r["ok"]:
-            self.msg = f"Acheté {qty:g} × {key.upper()} @ {r['price']:.2f}."
+            self.msg = f"Acheté {qty:g} × {key.upper()} @ {r['price']:.2f}." + self._slip_suffix(r)
+            if kind == "Action":
+                self.msg += f" Liquidité {liq.equity_tier(m, key.upper())}."
             if not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
+        elif r["reason"] == "sector_excluded":
+            firm = firms_mod.get(p.firm)
+            fname = firm["name"] if firm else "votre firme"
+            self.msg = f"Achat refusé : secteur {r.get('sector', '?')} exclu par l'ADN « {fname} »."
         else:
             self.msg = f"Achat refusé ({r['reason']})."
+
+    def _slip_suffix(self, r):
+        slip = r.get("slippage")
+        if slip is None:
+            return ""
+        mid = r["price"] - slip
+        pct = (slip / mid * 100.0) if mid else 0.0
+        return f" Glissement {pct:+.2f}%."
 
     def _do_sell(self):
         p, m, kind, raw_key = self.app.gs.player, self.market, self.trade_kind, self.trade_key.strip()
@@ -144,7 +161,8 @@ class BookScene(Scene, PopupMixin):
         else:
             return
         if r["ok"]:
-            self.msg = f"Vendu {r['qty']:g} × {key.upper()} @ {r['price']:.2f} (P&L {r['realized']:+.0f})."
+            self.msg = (f"Vendu {r['qty']:g} × {key.upper()} @ {r['price']:.2f} "
+                       f"(P&L {r['realized']:+.0f})." + self._slip_suffix(r))
             if not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
         else:
@@ -342,11 +360,14 @@ class BookScene(Scene, PopupMixin):
                 + ("  ⚠ APPEL DE MARGE" if st["margin_call"] else ""))
         widgets.draw_text(surf, marg, (config.SCREEN_WIDTH - 40, 88), fonts.tiny(),
                           lev_col, align="right")
+        total_fin = getattr(p, "total_financing_paid", 0.0)
+        widgets.draw_text(surf, f"Financement cumulé payé : {widgets.format_money(total_fin, cur)}",
+                          (config.SCREEN_WIDTH - 40, 102), fonts.tiny(), config.COL_TEXT_DIM, align="right")
 
         # ---- barre de trading rapide ----
-        # bar_y laisse une marge sous `marg` (tiny, y=88) pour que son texte
-        # (long, aligné à droite) ne soit pas recouvert par les chips/boîtes opaques.
-        bar_y = 112
+        # bar_y laisse une marge sous la ligne de financement (tiny, y=102) pour
+        # que son texte (aligné à droite) ne soit pas recouvert par les chips/boîtes opaques.
+        bar_y = 126
         widgets.draw_text(surf, "TRADING RAPIDE :", (40, bar_y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         bx = 196
         self._kind_rects = {}
@@ -417,6 +438,7 @@ class BookScene(Scene, PopupMixin):
             self._name_rects = {}
             self._chart_rects = {}
             self._row_cls = {}
+            self._tooltip = None
             prev_clip = surf.get_clip()
             surf.set_clip(list_area)
             y = list_top - self.scroll_positions
@@ -439,6 +461,15 @@ class BookScene(Scene, PopupMixin):
                     hov = name_rect.collidepoint(mp) or (chart_rect and chart_rect.collidepoint(mp))
                     if hov:
                         pygame.draw.rect(surf, config.COL_PANEL_HEAD, (inner.x - 4, y - 2, inner.w + 8, 22))
+                        if is_stock:
+                            dy = m.metrics(label)["div_yield"]
+                            if dy:
+                                sign = -1.0 if r["short"] else 1.0
+                                income = sign * r["value"] * dy
+                                verb = "perçu" if income >= 0 else "payé (short)"
+                                self._tooltip = (
+                                    f"Dividende estimé : {widgets.format_money(abs(income), cur)}/an "
+                                    f"{verb} ({dy*100:.1f}% de rendement).", mp)
                     name_label = widgets.fit_text(r["name"], fonts.small(bold=True), 200) \
                         + (" (S)" if r["short"] else "")
                     name_col = config.COL_DOWN if r["short"] else kcol
@@ -502,3 +533,5 @@ class BookScene(Scene, PopupMixin):
         self.shop_btn.draw(surf)
         self._draw_key_suggestions(surf)   # overlay : au-dessus de la table
         self.popups_draw(surf)
+        if self._tooltip:
+            widgets.draw_tooltip(surf, *self._tooltip)

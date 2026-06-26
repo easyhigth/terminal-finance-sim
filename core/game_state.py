@@ -54,6 +54,7 @@ class PlayerState:
     realized_pnl: float = 0.0                          # P&L réalisé cumulé (ventes)
     total_fees_paid: float = 0.0                       # commissions/frais d'exécution cumulés (achats/ventes/short/cover)
     total_margin_penalty: float = 0.0                  # surcoûts cumulés de liquidation forcée (appels de marge)
+    total_financing_paid: float = 0.0                  # intérêts marge + frais d'emprunt de titres cumulés
     investigations_count: int = 0                       # nb d'enquêtes réglementaires subies (cf. core/dilemmas.py)
     # ----- progression de carrière -----
     deals_won: int = 0                                 # deals conclus (cumulatif)

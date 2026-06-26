@@ -5,6 +5,7 @@ hedge, rebalance, journal de trading. Extrait de scene_terminal_commands.py pour
 limiter sa taille ; mixé dans TerminalScene avec les autres mixins de commandes.
 """
 
+from core import audio
 from core import career as career_mod
 from core import config
 from core import firms as firms_mod
@@ -117,6 +118,7 @@ class TerminalTradingMixin:
 
     def _after_trade(self):
         p = self.app.gs.player
+        audio.play("order")        # retour sonore d'exécution d'ordre
         self._check_badges()
         if not p.hardcore:
             self.app.gs.save(config.AUTOSAVE_SLOT)

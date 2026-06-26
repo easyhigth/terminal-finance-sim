@@ -7,9 +7,11 @@ import pygame
 from core import career as career_mod
 from core import config
 from core import inbox as inbox_mod
+from core import liquidity as liq_mod
 from core import market_hours as mh_mod
 from core import onboarding as onboarding_mod
 from core import portfolio as pf_mod
+from core import portfolio_views as pv_mod
 from core import unlocks as unlocks_mod
 from core.i18n import get_lang
 from core.i18n import t as _t
@@ -213,6 +215,14 @@ class TerminalRenderMixin:
             r = widgets.draw_text(surf, "●", (x, y), fonts.small(bold=True), dot_col)
             x = r.right + 2
         x += 14
+        # badge régime de marché (contexte macro en permanence, code couleur)
+        reg = getattr(self.market, "regime", None)
+        if reg:
+            reg_col = {"Expansion": config.COL_UP, "Calme": config.COL_CYAN,
+                       "Volatil": config.COL_WARN, "Récession": config.COL_DOWN}.get(
+                           reg, config.COL_NEUTRAL)
+            r = widgets.draw_badge(surf, self.market.regime_label(), (x, y - 2), reg_col)
+            x = r.right + 14
         # levier / marge — toujours visible, pour anticiper un margin call
         st = pf_mod.margin_status(p, self.market)
         r = widgets.draw_text(surf, "LEV  ", (x, y), fonts.small(), config.COL_TEXT_DIM)
@@ -257,16 +267,28 @@ class TerminalRenderMixin:
             widgets.draw_text(surf, "🛠 CHEAT", btn.center, fonts.tiny(bold=True),
                               config.COL_DOWN, align="center")
             self._cheat_btn_rect = btn
-        # bouton raccourcis clavier (toujours visible, coin haut-droit de la scène)
-        sw, sh = 168, 26
+        # boutons coin haut-droit : RACCOURCIS (rétréci) + RÉGLAGES (⚙) à sa
+        # gauche, alignés sur la même rangée.
+        mp = pygame.mouse.get_pos()
+        sw, sh = 132, 26
         sbtn = pygame.Rect(config.SCREEN_WIDTH - 10 - sw, 4, sw, sh)
-        hover = sbtn.collidepoint(pygame.mouse.get_pos())
+        hover = sbtn.collidepoint(mp)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL,
                          sbtn, border_radius=5)
         pygame.draw.rect(surf, config.COL_CYAN, sbtn, 1, border_radius=5)
         widgets.draw_text(surf, "⌨ RACCOURCIS", sbtn.center, fonts.small(bold=True),
                           config.COL_CYAN, align="center")
         self._shortcuts_btn_rect = sbtn
+        # bouton réglages, juste à gauche des raccourcis
+        gw = 116
+        gbtn = pygame.Rect(sbtn.x - 8 - gw, 4, gw, sh)
+        ghover = gbtn.collidepoint(mp)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD if ghover else config.COL_PANEL,
+                         gbtn, border_radius=5)
+        pygame.draw.rect(surf, config.COL_AMBER, gbtn, 1, border_radius=5)
+        widgets.draw_text(surf, "⚙ RÉGLAGES", gbtn.center, fonts.small(bold=True),
+                          config.COL_AMBER, align="center")
+        self._settings_btn_rect = gbtn
 
     def _draw_ticker(self, surf):
         y = config.TOPBAR_H + 4
@@ -277,6 +299,14 @@ class TerminalRenderMixin:
             chg = self.market.index_change_pct(name)
             sign = "+" if chg >= 0 else ""
             parts.append(f"{name} {v:,.0f} {sign}{chg:.2f}%")
+        # positions ouvertes du joueur, à la suite des indices (P&L latent %)
+        for h in pv_mod.holdings(self.app.gs.player, self.market):
+            pct = h.get("pnl_pct")
+            if pct is None:
+                continue
+            tag = "▾" if h.get("short") else "▴"
+            sign = "+" if pct >= 0 else ""
+            parts.append(f"{tag}{h['ticker']} {h['price']:,.2f} {sign}{pct:.2f}%")
         line = "    •    ".join(parts) + "    •    "
         offset = int(self.t * 50) % max(1, fonts.small().size(line)[0])
         widgets.draw_text(surf, line + line, (10 - offset, y + 3),
@@ -721,3 +751,18 @@ class TerminalRenderMixin:
         widgets.draw_series(surf, spark_rect, hist[-30:], col, baseline=False, show_extrema=False)
         widgets.draw_text(surf, f"{ticker} {hist[-1]:,.2f}", (spark_rect.x, spark_rect.y - 14),
                           fonts.tiny(), config.COL_TEXT_DIM)
+        # estimation d'impact de marché si une quantité est saisie (#5) : même
+        # mécanique que core/liquidity.fill_price (demi-spread + impact ∝ taille
+        # / profondeur), affichée AVANT d'exécuter l'ordre.
+        if len(parts) >= 3 and parts[2].isdigit():
+            qty = int(parts[2])
+            idx = m.ticker_idx[ticker]
+            price = float(m.price[idx])
+            depth = price * float(m.shares[idx])
+            tier = liq_mod.equity_tier(m, ticker)
+            half, impact_k = liq_mod.params(tier)
+            impact = min(liq_mod.MAX_SLIPPAGE, impact_k * (qty * price) / depth) if depth else 0.0
+            slip_pct = (half + impact) * 100.0
+            scol = config.COL_WARN if slip_pct >= 0.5 else config.COL_TEXT_DIM
+            widgets.draw_text(surf, f"impact ≈ -{slip_pct:.2f}% · {tier}",
+                              (spark_rect.x, spark_rect.bottom + 1), fonts.tiny(), scol)

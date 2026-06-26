@@ -12,10 +12,13 @@ Tout se pilote au clavier. COMMANDS affiche le catalogue complet.
 """
 import pygame
 
+from core import audio
 from core import career as career_mod
 from core import config
+from core import market_hours as mh_mod
 from core import news as news_mod
 from core import onboarding as onboarding_mod
+from core import portfolio as pf_mod
 from core import portfolio_views as pv_mod
 from core import rivals as rivals_mod
 from core import unlocks as unlocks_mod
@@ -102,7 +105,7 @@ CMD_NAMES = [
     "STRUCT", "CREDIT", "ALM", "SWAP", "SWAPS",
     "ALLOCATE", "HEDGE", "PROTECT", "OPTIONS", "IPO", "FX", "AGENDA", "PRONOS", "REVIEW", "REBALANCE",
     "PITCH", "FRONTIER", "RISK", "QUANT", "MA", "SHEET", "GLOSSARY",
-    "SAVE", "SAVES", "NEWS", "MORE", "SHORTCUTS", "REG", "STATUS", "MENU",
+    "SAVE", "SAVES", "NEWS", "MORE", "SHORTCUTS", "SETTINGS", "REGLAGES", "REG", "STATUS", "MENU",
     "TEAM", "EQUIPE", "STRESS", "TIMELINE",
     "GP", "GPC", "GPO", "GPCH", "COMP", "HS", "HVOL", "BETA", "CORR",
     "GEG", "GC", "RV", "ECO", "DEFINE", "PA", "ATTR",
@@ -171,6 +174,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         self._cheat_btn_rect = None
         self.shortcuts_panel = None   # panneau des raccourcis clavier (overlay)
         self._shortcuts_btn_rect = None
+        self._settings_btn_rect = None   # bouton ⚙ RÉGLAGES (topbar)
         # navigation hiérarchique au clavier : pile de focus bloc → contenu
         # interne (cf. ui/keynav.ZoneStack). Par défaut le focus reste « dans »
         # la console comme avant (saisie immédiate), Échap permet de remonter
@@ -201,6 +205,11 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             self._index_flash = widgets.TickFlash()   # flash vert/rouge du tick en direct
         if not hasattr(self, "_pnl_sign"):
             self._pnl_sign = {}   # signe du P&L latent par ticker, pour notifier un franchissement
+        if not hasattr(self, "_session_open"):
+            self._session_open = None   # état d'ouverture des sessions régionales (cloche)
+        if not hasattr(self, "_session_day"):
+            self._session_day = None    # jour de jeu courant (résumé de séance)
+            self._day_start_nw = 0.0
         self._career_panel_rect = None   # panneau CARRIÈRE (ex-priorités) → scène carrière
         self._career_content_rect = None  # zone défilable (molette)
         self._career_scroll = 0
@@ -306,6 +315,9 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                 return
             if self._shortcuts_btn_rect and self._shortcuts_btn_rect.collidepoint(event.pos):
                 self._toggle_shortcuts_panel()
+                return
+            if self._settings_btn_rect and self._settings_btn_rect.collidepoint(event.pos):
+                self.app.scenes.go("settings", return_to="terminal")
                 return
             if (getattr(self.app, "cheats", False) and self._cheat_btn_rect
                     and self._cheat_btn_rect.collidepoint(event.pos)):
@@ -775,6 +787,8 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             self.app.scenes.go("markethub", return_to="terminal")
         elif cmd == "WALL":
             self.app.scenes.go("wall", return_to="terminal")
+        elif cmd in ("SETTINGS", "REGLAGES", "RÉGLAGES"):
+            self.app.scenes.go("settings", return_to="terminal")
         elif cmd == "TOP":
             self._cmd_top(arg)
         elif cmd in ("EXPLORE", "EXPLORER", "EXPLO"):
@@ -1045,6 +1059,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         self._sync_workspace()
         self._drain_pending_steps()
         self._check_pnl_threshold()
+        self._check_market_clock()
 
     def _check_pnl_threshold(self):
         """Notifie un toast quand le P&L latent d'une position franchit le
@@ -1066,5 +1081,50 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         for tk in list(self._pnl_sign):
             if tk not in self.app.gs.player.portfolio:
                 del self._pnl_sign[tk]
+
+    def _check_market_clock(self):
+        """Cloche d'ouverture/fermeture des sessions régionales (toast + son)
+        et résumé de séance au changement de jour de jeu — purement
+        informatif, ne touche ni au marché ni aux ordres."""
+        m = self.app.market
+        if not m:
+            return
+        p = self.app.gs.player
+        day, minute = self.app.sim_clock.current_time(p.day)
+        labels = (mh_mod.SESSION_LABEL_EN if get_lang() == "en" else mh_mod.SESSION_LABEL)
+        weekday = mh_mod.is_weekday_open(day)
+        cur = {s: (weekday and mh_mod.is_session_open(s, minute)) for s in mh_mod.SESSION_HOURS}
+        if self._session_open is not None:
+            for s, is_open in cur.items():
+                was = self._session_open.get(s, False)
+                if is_open and not was:
+                    audio.play("bell")
+                    self.app.notify(_L(f"🔔 Ouverture {labels[s]}", f"🔔 {labels[s]} open"), "good")
+                elif was and not is_open:
+                    self.app.notify(_L(f"🔔 Clôture {labels[s]}", f"🔔 {labels[s]} close"), "info")
+        self._session_open = cur
+        # résumé de séance : émis une fois par changement de jour de jeu
+        if self._session_day is None:
+            self._session_day, self._day_start_nw = day, pf_mod.net_worth(p, m)
+        elif day != self._session_day:
+            self._emit_day_summary()
+            self._session_day, self._day_start_nw = day, pf_mod.net_worth(p, m)
+
+    def _emit_day_summary(self):
+        """Toast de fin de séance : variation de valeur nette + meilleure/pire
+        position latente du jour (réutilise portfolio_views.holdings)."""
+        m, p = self.app.market, self.app.gs.player
+        cur = config.CONTINENTS[p.continent]["currency"]
+        delta = pf_mod.net_worth(p, m) - getattr(self, "_day_start_nw", 0.0)
+        sign = "+" if delta >= 0 else ""
+        msg = _L(f"Séance close · valeur nette {sign}{widgets.format_money(delta, cur)}",
+                 f"Session close · net worth {sign}{widgets.format_money(delta, cur)}")
+        hs = [h for h in pv_mod.holdings(p, m) if h.get("pnl_pct") is not None]
+        if hs:
+            best = max(hs, key=lambda h: h["pnl_pct"])
+            worst = min(hs, key=lambda h: h["pnl_pct"])
+            msg += (f" · {best['ticker']} {best['pnl_pct']:+.1f}%"
+                    f" · {worst['ticker']} {worst['pnl_pct']:+.1f}%")
+        self.app.notify(msg, "good" if delta >= 0 else "warn")
 
     # ----------------------------------------------------------------- draw

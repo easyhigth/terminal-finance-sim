@@ -20,6 +20,7 @@ CATALOG = [
         ("COMMANDS / ?", "Ce catalogue complet"),
         ("STATUS", "Votre situation : grade, cash, réputation, temps"),
         ("MENU / ESC", "Retour au menu principal"),
+        ("SETTINGS / REGLAGES", "Réglages : affichage (plein écran), son, langue, vitesse"),
         ("SAVE", "Sauvegarde manuelle (désactivée en hardcore)"),
         ("SAVES / LOAD", "Gestion des sauvegardes (slots)"),
     ]),

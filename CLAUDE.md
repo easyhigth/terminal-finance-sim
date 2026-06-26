@@ -82,6 +82,19 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   gating dans `core/intraday.py::wiggle()` : si actif, toutes les courbes intraday retombent
   en interpolation linéaire pure (sans bruit), sans toucher les sites d'appel. Bouton dans
   `scenes/scene_menu.py`.
+- **`core/display_settings.py`** : mode d'affichage de la fenêtre (`windowed`/`fullscreen`/
+  `borderless`), persisté (`display_settings.json` sous `config.SAVE_DIR`). Appliqué par
+  `main.App._apply_window_mode()`/`set_window_mode()` : le plein écran utilise
+  `pygame.FULLSCREEN|SCALED` (résolution LOGIQUE inchangée, mise à l'échelle du moniteur —
+  net sur Retina/Mac), avec repli fenêtré si le driver refuse. F11 bascule rapide.
+- **`core/audio.py`** : effets sonores **synthétisés** (numpy, sinus enveloppées : ordre
+  exécuté, alerte de prix, cloche de session…) joués par `pygame.mixer`, **robuste headless**
+  (no-op si le mixer ne s'initialise pas — CI, `SDL_AUDIODRIVER=dummy`). Volume maître + mute
+  persistés (`audio_settings.json`, séparé). `audio.play(name)` est sûr partout.
+- **`scenes/scene_settings.py`** (scène `"settings"`) : écran RÉGLAGES regroupant affichage,
+  son (sourdine + volume), langue (FR/EN), animations et vitesse de jeu — façade de pilotage
+  des modules ci-dessus. Accessible via le bouton ⚙ du terminal (à côté de RACCOURCIS), le
+  bouton du menu, la commande `SETTINGS`/`REGLAGES`, ou la palette Ctrl+K.
 - **`data/companies.py`** : roster fictif déterministe (320 sociétés, `ROSTER_SEED` fixe,
   noms déformés exprès : LVMH→LWNH, NVIDIA→MVC…).
 - **`core/`** : systèmes de jeu (career, portfolio, bonds, commodities, crypto, structured,

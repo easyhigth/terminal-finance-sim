@@ -6,6 +6,7 @@ faire ses missions, analyser le marché (en lecture seule). Les actions à
 conséquence et techniques se débloquent ensuite, par paliers de grade — pour
 une montée en complexité maîtrisée.
 """
+from core import config
 
 # fonctionnalité -> grade minimal requis
 UNLOCKS = {
@@ -116,6 +117,20 @@ CMD_FEATURE = {
 
 VETERAN_HEADSTART = 2   # grades d'avance sur les paliers pour un profil "vétéran"
 
+# Contenu exclusif par voie : une fois la spécialisation choisie, certains
+# modules « historiquement » associés à une AUTRE voie deviennent une vraie
+# porte fermée (pas juste un malus) jusqu'au grade max — où toutes les voies
+# redeviennent accessibles librement, en cohérence avec le déverrouillage de
+# la reconversion libre (core/tracks.py::TOP_GRADE_INDEX).
+TRACK_AFFINITY = {
+    "ma": "M&A",
+    "hedge": "Risk",
+    "options": "Quant",
+    "mandates": "Advisory",
+    "structured": "Portfolio",
+}
+TRACK_LOCK_GRADE = len(config.GRADES) - 1
+
 
 def required_grade(feature):
     return UNLOCKS.get(feature, 0)
@@ -123,11 +138,33 @@ def required_grade(feature):
 
 def effective_required_grade(player, feature):
     """Grade minimal requis, raccourci pour un profil vétéran (déjà allé loin
-    dans une partie antérieure) : il rouvre la complexité plus vite."""
+    dans une partie antérieure) : il rouvre la complexité plus vite. Un
+    module à affinité de voie reste verrouillé jusqu'au grade max si le
+    joueur a choisi une AUTRE voie — un vétéran ne contourne pas ce verrou,
+    qui dépend du choix de voie, pas de l'expérience générale."""
     g = required_grade(feature)
     if player.flags.get("veteran"):
         g = max(0, g - VETERAN_HEADSTART)
+    affinity = TRACK_AFFINITY.get(feature)
+    track = getattr(player, "track", "General")
+    if affinity and track not in (affinity, "General"):
+        g = max(g, TRACK_LOCK_GRADE)
     return g
+
+
+def track_lock_note(player, feature):
+    """Phrase explicative (FR/EN) si le module est verrouillé pour cause de
+    voie incompatible (plutôt que de simple grade insuffisant), sinon None."""
+    affinity = TRACK_AFFINITY.get(feature)
+    track = getattr(player, "track", "General")
+    if not affinity or track in (affinity, "General"):
+        return None
+    return _L(
+        f"     réservé à la voie {affinity} (la vôtre : {track}) — accessible "
+        f"librement au grade {config.GRADES[TRACK_LOCK_GRADE]}.",
+        f"     reserved for the {affinity} track (yours: {track}) — freely "
+        f"accessible at grade {config.GRADES[TRACK_LOCK_GRADE]}.",
+    )
 
 
 def unlocked(player, feature):

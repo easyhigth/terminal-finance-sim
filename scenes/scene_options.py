@@ -164,9 +164,13 @@ class OptionsScene(Scene):
         widgets.draw_text(surf, "DESK D'OPTIONS — CALLS / PUTS ACTIONS", (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         if not self._can():
-            g = unlocks.effective_required_grade(self.app.gs.player, "options")
+            p = self.app.gs.player
+            g = unlocks.effective_required_grade(p, "options")
             widgets.draw_text(surf, f"⊘ Desk d'options débloqué au grade {config.GRADES[g]}.",
                               (42, 74), fonts.small(), config.COL_TEXT_DIM)
+            note = unlocks.track_lock_note(p, "options")
+            if note:
+                widgets.draw_text(surf, note.strip(), (42, 94), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             self.tuto_btn.draw(surf)
             return

@@ -85,57 +85,71 @@ def test_switch_track_rejects_same_track():
     assert tracks.switch_track(p, None, "Risk")["reason"] == "same_track"
 
 
-def test_switch_track_blocks_when_cash_insufficient():
-    p = _player("Risk")
-    m = Market(seed=1)
-    tk = m.companies[0]["ticker"]
-    m.price[m.ticker_idx[tk]] = 100.0
-    p.cash = 1_000_000.0
-    pf.buy(p, m, tk, 9000)   # gros stock -> valeur nette élevée, cash résiduel faible
-    p.cash = 10.0            # force un cash résiduel insuffisant pour le coût (8% de la valeur nette)
-    res = tracks.switch_track(p, m, "Quant")
+def test_switch_track_locked_below_top_grade():
+    p = _player("Risk", grade=8)
+    res = tracks.switch_track(p, None, "Quant")
     assert res["ok"] is False
-    assert res["reason"] == "cash"
+    assert res["reason"] == "locked_until_top_grade"
     assert p.track == "Risk"
 
 
-def test_switch_track_charges_cost_and_sets_new_track():
-    p = _player("Risk")
+def test_reconversion_cost_is_zero_at_top_grade():
+    p = _player("Risk", grade=tracks.TOP_GRADE_INDEX)
     p.cash = 1_000_000.0
-    cost_before = tracks.reconversion_cost(p, None)
+    assert tracks.reconversion_cost(p, None) == 0.0
+
+
+def test_switch_track_free_and_instant_at_top_grade():
+    p = _player("Risk", grade=tracks.TOP_GRADE_INDEX)
+    p.cash = 1_000_000.0
     res = tracks.switch_track(p, None, "Quant")
     assert res["ok"] is True
-    assert res["cost"] == pytest.approx(cost_before)
+    assert res["cost"] == 0.0
+    assert res["ramp_days"] == 0
     assert p.track == "Quant"
-    assert p.cash == pytest.approx(1_000_000.0 - cost_before)
-    assert p.flags["track_switch_day"] == p.day
-
-
-def test_perk_is_neutral_immediately_after_switch_and_ramps_up():
-    p = _player("Risk")
-    p.cash = 1_000_000.0
-    tracks.switch_track(p, None, "Quant")
-    # rodage : juste après le switch, les avantages Quant ne sont pas actifs
-    assert tracks.perk(p, "deal_bonus") == pytest.approx(tracks._DEFAULTS["deal_bonus"])
-    # à mi-rodage, valeur intermédiaire entre neutre et pleine puissance
-    p.day += tracks.RAMP_DAYS // 2
-    mid = tracks.perk(p, "deal_bonus")
-    full = tracks.PERKS["Quant"]["deal_bonus"]
-    assert tracks._DEFAULTS["deal_bonus"] < mid < full
-    # rodage terminé : pleine puissance
-    p.day += tracks.RAMP_DAYS
-    assert tracks.perk(p, "deal_bonus") == pytest.approx(full)
-
-
-def test_perk_maint_margin_falls_back_to_none_during_ramp():
-    p = _player("Quant")
-    p.cash = 1_000_000.0
-    tracks.switch_track(p, None, "Risk")
-    assert tracks.perk(p, "maint_margin") is None
-    p.day += tracks.RAMP_DAYS
-    assert tracks.perk(p, "maint_margin") == pytest.approx(tracks.PERKS["Risk"]["maint_margin"])
+    assert p.cash == pytest.approx(1_000_000.0)
+    assert "track_switch_day" not in p.flags
+    assert p.flags["track_chosen_day"] == p.day
+    # gratuit au grade max : pleine puissance immédiate, sans rodage
+    assert tracks.perk(p, "deal_bonus") == pytest.approx(tracks.PERKS["Quant"]["deal_bonus"])
 
 
 def test_no_ramp_without_any_switch():
     p = _player("Risk")
     assert tracks.perk(p, "deal_bonus") == pytest.approx(tracks.PERKS["Risk"]["deal_bonus"])
+
+
+# --------------------------------------------------------------- fidélité de voie
+def test_loyalty_bonus_zero_right_after_choice():
+    p = _player("Quant")
+    p.flags["track_chosen_day"] = p.day
+    deal = {"kind": "Quant", "difficulty": 4}
+    bonus, _ = tracks.deal_edge(p, deal)
+    assert bonus == pytest.approx(tracks.perk(p, "deal_bonus"))
+
+
+def test_loyalty_bonus_partial_midway_through_ramp():
+    p = _player("Quant")
+    p.flags["track_chosen_day"] = p.day
+    p.day += tracks.LOYALTY_RAMP_DAYS // 2
+    deal = {"kind": "Quant", "difficulty": 4}
+    bonus, _ = tracks.deal_edge(p, deal)
+    expected = tracks.perk(p, "deal_bonus") + tracks.LOYALTY_MAX_BONUS * 0.5
+    assert bonus == pytest.approx(expected, rel=1e-6)
+
+
+def test_loyalty_bonus_full_after_ramp_complete():
+    p = _player("Quant")
+    p.flags["track_chosen_day"] = p.day
+    p.day += tracks.LOYALTY_RAMP_DAYS + 10
+    deal = {"kind": "Quant", "difficulty": 4}
+    bonus, _ = tracks.deal_edge(p, deal)
+    expected = tracks.perk(p, "deal_bonus") + tracks.LOYALTY_MAX_BONUS
+    assert bonus == pytest.approx(expected, rel=1e-6)
+
+
+def test_loyalty_bonus_absent_without_track_chosen_day():
+    p = _player("Quant")
+    deal = {"kind": "Quant", "difficulty": 4}
+    bonus, _ = tracks.deal_edge(p, deal)
+    assert bonus == pytest.approx(tracks.perk(p, "deal_bonus"))

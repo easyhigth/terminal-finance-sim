@@ -182,6 +182,38 @@ def sector_allowed(player, sector):
     return sector not in excluded_sectors(player)
 
 
+# ---------------------------------------------------------------------------
+# Synergie firme × voie : la firme oriente déjà le joueur vers une spécialité
+# implicite (boutique M&A, hedge fund...) ; choisir la voie qui correspond
+# (ou s'y opposer) a un effet tangible sur les deals, en plus des perks
+# propres à chacune des deux dimensions.
+TRACK_SYNERGY = {
+    "boutique_ma": "M&A",
+    "asset_manager": "Portfolio",
+    "hedge_fund": "Risk",
+    "maison_esg": "Advisory",
+    "desk_obligataire": "Quant",
+    "banque_universelle": None,
+}
+SYNERGY_BONUS = 0.05
+MISMATCH_PENALTY = -0.03
+
+
+def track_synergy_bonus(player):
+    """Bonus (ou malus) additif de proba de réussite des deals selon
+    l'accord entre la firme et la voie du joueur. Nul si la firme n'a pas
+    d'affinité dédiée, ou si le joueur n'a pas encore choisi de voie."""
+    track = getattr(player, "track", "General")
+    if track == "General":
+        return 0.0
+    affinity = TRACK_SYNERGY.get(getattr(player, "firm", None))
+    if affinity is None:
+        return 0.0
+    if track == affinity:
+        return SYNERGY_BONUS
+    return MISMATCH_PENALTY
+
+
 def apply(player, firm_id):
     """Fixe la firme d'un joueur neuf et applique son effet sur le capital de
     départ (les autres perks sont lus en continu via `perk()`)."""

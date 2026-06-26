@@ -55,6 +55,39 @@ def test_next_unlock_none_when_everything_open():
     assert unlocks.next_unlock(p) is None
 
 
+def test_track_affinity_locks_mismatched_module_until_top_grade():
+    p = _player(grade=6)
+    p.track = "Quant"
+    # "ma" est affilié à M&A : un Quant reste verrouillé jusqu'au grade max
+    assert not unlocks.unlocked(p, "ma")
+    assert unlocks.effective_required_grade(p, "ma") == unlocks.TRACK_LOCK_GRADE
+    assert unlocks.track_lock_note(p, "ma") is not None
+    p.grade_index = unlocks.TRACK_LOCK_GRADE
+    assert unlocks.unlocked(p, "ma")
+
+
+def test_track_affinity_allows_matching_track_at_base_grade():
+    p = _player(grade=unlocks.required_grade("ma"))
+    p.track = "M&A"
+    assert unlocks.unlocked(p, "ma")
+    assert unlocks.track_lock_note(p, "ma") is None
+
+
+def test_track_affinity_does_not_lock_general_track():
+    p = _player(grade=unlocks.required_grade("hedge"))
+    p.track = "General"
+    assert unlocks.unlocked(p, "hedge")
+    assert unlocks.track_lock_note(p, "hedge") is None
+
+
+def test_track_affinity_ignores_veteran_headstart():
+    p = _player(grade=unlocks.TRACK_LOCK_GRADE - 1)
+    p.track = "Risk"
+    p.flags["veteran"] = True
+    # "options" est affilié à Quant : le headstart vétéran ne contourne pas le verrou de voie
+    assert not unlocks.unlocked(p, "options")
+
+
 def test_intern_has_read_only_analysis_tools_from_day_one():
     """Dès le grade Intern (0), les outils d'analyse/sandbox sans impact
     économique (watchlist, alertes, recherche, ALM/RISK/QUANT en lecture/

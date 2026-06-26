@@ -86,6 +86,35 @@ def test_promotion_ready_false_at_max_grade():
     assert not career.promotion_ready(p)
 
 
+def test_promotion_requires_chosen_track_from_grade_2():
+    p = _player(grade_index=2, reputation=100)
+    p.grade_missions = 10
+    p.grade_deals = 10
+    reqs = career.promotion_requirements(p)
+    track_req = next(r for r in reqs if r["kind"] == "track")
+    assert track_req["met"] is False
+    assert not career.promotion_ready(p)
+    p.track = "Quant"
+    assert all(r["kind"] != "track" for r in career.promotion_requirements(p))
+    assert career.promotion_ready(p)
+
+
+def test_promotion_does_not_require_track_below_grade_2():
+    p = _player(grade_index=1, reputation=100)
+    p.grade_missions = 10
+    assert all(r["kind"] != "track" for r in career.promotion_requirements(p))
+    assert career.promotion_ready(p)
+
+
+def test_award_promotion_track_specific_titles_at_top_grades():
+    p = _player(grade_index=10)
+    p.track = "Quant"
+    assert career.award_promotion(p) == "Head of Quant Strategies"
+    p2 = _player(grade_index=11)
+    p2.track = "M&A"
+    assert career.award_promotion(p2) == "Légende des fusions-acquisitions"
+
+
 def test_missing_criteria_lists_unmet_labels():
     p = _player(grade_index=0, reputation=0)
     missing = career.missing_criteria(p)

@@ -161,3 +161,28 @@ def test_desk_obligataire_cheaper_bond_commission():
     r0 = bonds.buy_bond(p0, m, bid, 10)
     rd = bonds.buy_bond(pd, m, bid, 10)
     assert rd["fee"] < r0["fee"]
+
+
+# --------------------------------------------------------------- synergie firme x track
+def test_track_synergy_bonus_matching_firm_and_track():
+    p = _player(firm="boutique_ma")
+    p.track = "M&A"
+    assert firms.track_synergy_bonus(p) == pytest.approx(firms.SYNERGY_BONUS)
+
+
+def test_track_synergy_bonus_mismatched_firm_and_track():
+    p = _player(firm="boutique_ma")
+    p.track = "Risk"
+    assert firms.track_synergy_bonus(p) == pytest.approx(firms.MISMATCH_PENALTY)
+
+
+def test_track_synergy_bonus_neutral_for_general_track():
+    p = _player(firm="boutique_ma")
+    p.track = "General"
+    assert firms.track_synergy_bonus(p) == 0.0
+
+
+def test_track_synergy_bonus_neutral_for_firm_without_affinity():
+    p = _player(firm="banque_universelle")
+    p.track = "M&A"
+    assert firms.track_synergy_bonus(p) == 0.0

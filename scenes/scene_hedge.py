@@ -191,10 +191,13 @@ class HedgeScene(Scene):
         from core import portfolio as pf
         beta = pf.portfolio_beta(p, m)
         coverage = H.coverage_ratio(p, m)
+        bcol = config.COL_DOWN if beta > 1.3 else (config.COL_WARN if beta > 1.0 else config.COL_UP)
         widgets.draw_text(surf, f"Bêta net du portefeuille : {beta:.2f}",
-                          (rinner.x, rinner.y), fonts.small(bold=True), config.COL_TEXT)
+                          (rinner.x, rinner.y), fonts.small(bold=True), bcol)
+        widgets.draw_text(surf, "(marché neutre = 1.00 · prudent ≤ 0.80)",
+                          (rinner.x, rinner.y + 18), fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text_wrapped(surf, f"Couverture en cours : {coverage*100:.0f}% de l'exposition brute",
-                          (rinner.x, rinner.y + 26), fonts.small(),
+                          (rinner.x, rinner.y + 40), fonts.small(),
                           config.COL_UP if coverage > 0 else config.COL_TEXT_DIM, rinner.w)
 
         # ---- positions en cours (droite) ----

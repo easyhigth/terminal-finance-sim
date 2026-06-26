@@ -29,6 +29,7 @@ class DealsScene(Scene):
         self._t = 0.0
         self.row_cursor = 0  # curseur clavier dans la liste filtrée/triée
         self._row_list = []
+        self._tooltip = None
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
@@ -185,6 +186,8 @@ class DealsScene(Scene):
 
         prev_clip = surf.get_clip()
         surf.set_clip(list_area)
+        mp = pygame.mouse.get_pos()
+        self._tooltip = None
         y = list_top - self.scroll
         for i, d in enumerate(deals):
             visible = (list_area.top - ROW_H) < y < list_area.bottom
@@ -226,8 +229,12 @@ class DealsScene(Scene):
                 widgets.draw_text(surf, f"{d['days_left']} j restants", (ux, row.y + 8), fonts.tiny(), config.COL_TEXT)
                 urgent = d["days_left"] <= 7
                 ucol = config.COL_DOWN if urgent else config.COL_WARN if d["days_left"] <= 14 else config.COL_UP
-                widgets.draw_progress(surf, pygame.Rect(ux, row.y + 24, 150, 10),
-                                      min(1.0, d["days_left"] / 26), accent=ucol)
+                count_rect = pygame.Rect(ux, row.y + 24, 150, 10)
+                widgets.draw_progress(surf, count_rect, min(1.0, d["days_left"] / 26), accent=ucol)
+                hover_rect = pygame.Rect(ux, row.y, 150, 36)
+                if hover_rect.collidepoint(mp):
+                    self._tooltip = ("Passé ce délai, l'offre est retirée — un rival peut la "
+                                      "rafler avant vous.", mp)
                 if urgent:
                     widgets.draw_badge(surf, "URGENT", (ux, row.y + 42), accent=config.COL_DOWN)
             y += ROW_H
@@ -238,3 +245,5 @@ class DealsScene(Scene):
         self.scroll = widgets.draw_scrollbar(surf, panel, list_area, self.scroll, self._max_scroll, content_h)
 
         self.back_btn.draw(surf)
+        if self._tooltip:
+            widgets.draw_tooltip(surf, *self._tooltip)

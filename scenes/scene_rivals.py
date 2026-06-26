@@ -118,8 +118,10 @@ class RivalsScene(Scene):
         max_recent = max(1, inner2.h // 16)
         recent = list(reversed(getattr(player, "rival_events", None) or []))[:max_recent]
         if not recent:
-            widgets.draw_text(surf, "Rien à signaler pour l'instant.",
-                              (inner2.x, inner2.y + 2), fonts.tiny(), config.COL_TEXT_DIM)
+            widgets.draw_text_wrapped(surf, "Rien à signaler pour l'instant. Les rivaux agissent "
+                                      "en avançant le temps (ADV) : sniping de deals, débauchage "
+                                      "de mandats, percées en cours.",
+                              (inner2.x, inner2.y + 2), fonts.tiny(), config.COL_TEXT_DIM, inner2.w)
             return
         y = inner2.y
         row_h = max(16, inner2.h // len(recent))

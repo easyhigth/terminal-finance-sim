@@ -188,6 +188,8 @@ class Market(MarketQueryMixin):
         self.crises = []
         self.ended_crises = []   # crises qui viennent de s'éteindre CE pas (pour postmortem)
         self.crisis_cooldown = 0  # pas restants d'accalmie forcée après une crise majeure
+        self.crisis_log = []     # historique {step, name, kind, severity} (cf. add_crisis) —
+        # reconstruit déterministiquement en rejouant step() depuis l'origine, pas sérialisé
         self._last_news = []
         # bump de crédit RÉGIONAL transitoire (en décimal de rendement) injecté
         # par les événements politiques (core/politics.py) et lu par core/bonds.py :

@@ -126,6 +126,8 @@ class MarketQueryMixin:
 
     def add_crisis(self, crisis):
         self.crises.append(crisis)
+        self.crisis_log.append({"step": self.step_count, "name": crisis.name,
+                                 "kind": crisis.kind, "severity": crisis.severity})
 
     def bump_region_credit(self, region, amount):
         """Élargit (amount>0) ou resserre (amount<0) le spread de crédit d'une

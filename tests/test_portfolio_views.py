@@ -230,6 +230,41 @@ def test_sector_heatmap_empty_when_no_positions():
     assert pv.sector_heatmap(p, m) == []
 
 
+# ------------------------------------------------------- holdings_correlation
+def test_holdings_correlation_empty_when_no_positions():
+    p, m = _setup()
+    labels, corr = pv.holdings_correlation(p, m)
+    assert labels == []
+    assert corr.shape == (0, 0)
+
+
+def test_holdings_correlation_empty_with_single_position():
+    p, m = _setup()
+    tk = m.companies[0]["ticker"]
+    _set_price(m, tk, 100.0)
+    pf.buy(p, m, tk, 10)
+    labels, corr = pv.holdings_correlation(p, m)
+    assert labels == []
+    assert corr.shape == (0, 0)
+
+
+def test_holdings_correlation_returns_matrix_for_two_equity_positions():
+    p, m = _setup()
+    for _ in range(5):
+        m.step()
+    tk1, tk2 = m.companies[0]["ticker"], m.companies[1]["ticker"]
+    _set_price(m, tk1, 100.0)
+    _set_price(m, tk2, 50.0)
+    pf.buy(p, m, tk1, 10)
+    pf.buy(p, m, tk2, 10)
+    labels, corr = pv.holdings_correlation(p, m)
+    assert set(labels) == {tk1, tk2}
+    assert corr.shape == (2, 2)
+    assert corr[0, 0] == pytest.approx(1.0)
+    assert corr[1, 1] == pytest.approx(1.0)
+    assert corr[0, 1] == pytest.approx(corr[1, 0])
+
+
 # --------------------------------------------------------------- dividends
 def test_dividends_long_position_receives_expected_payout():
     p, m = _setup(cash=1_000_000.0)

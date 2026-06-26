@@ -31,6 +31,23 @@ _ATTRIB_LABELS = {
 }
 
 
+def _crisis_markers(market, hist):
+    """Associe à chaque crise de market.crisis_log l'index de cash_history où
+    elle est tombée (si encore dans la fenêtre visible), via la correspondance
+    step_count <-> index : step_for_index(i) = step_count - (len(hist)-1-i)
+    (cash_history est tronqué à 80 entrées, donc on ne retrouve que les
+    crises encore couvertes par l'historique affiché)."""
+    if not hist or market is None:
+        return []
+    n = len(hist)
+    out = []
+    for c in getattr(market, "crisis_log", []):
+        idx = c["step"] - market.step_count + (n - 1)
+        if 0 <= idx <= n - 1:
+            out.append((idx, c))
+    return out
+
+
 def _drawdowns(hist):
     """Retourne (drawdown courant %, drawdown max %) depuis une série de valeurs
     nettes, calculés par rapport au sommet glissant (running peak)."""
@@ -56,6 +73,7 @@ class HistoryScene(Scene):
         self.scroll_timeline = 0
         self._timeline_max_scroll = 0
         self._timeline_list_rect = None
+        self._crisis_tooltip = None  # (texte, pos souris) si survol d'un marqueur
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -109,6 +127,8 @@ class HistoryScene(Scene):
 
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)
+        if self._crisis_tooltip:
+            widgets.draw_tooltip(surf, *self._crisis_tooltip)
 
     def _draw_networth_chart(self, surf, rect, p, cur):
         inner = widgets.draw_panel(surf, rect, "Valeur nette — évolution", config.COL_CYAN)
@@ -148,6 +168,17 @@ class HistoryScene(Scene):
         x_min, y_min = pt(i_min)
         pygame.draw.circle(surf, config.COL_UP, (x_max, y_max), 4)
         pygame.draw.circle(surf, config.COL_DOWN, (x_min, y_min), 4)
+
+        self._crisis_tooltip = None
+        mp = pygame.mouse.get_pos()
+        market = getattr(self.app, "market", None)
+        for idx, c in _crisis_markers(market, hist):
+            x, _ = pt(idx)
+            col = config.COL_UP if c.get("kind") == "good" else config.COL_DOWN
+            pygame.draw.line(surf, col, (x, chart_rect.y), (x, chart_rect.bottom), 1)
+            pygame.draw.circle(surf, col, (x, chart_rect.bottom), 3)
+            if abs(mp[0] - x) <= 4 and chart_rect.y <= mp[1] <= chart_rect.bottom + 6:
+                self._crisis_tooltip = (f"{c['name']} (sévérité {c['severity']:.1f}x)", mp)
 
         best = max(p.best_cash, hist[i_max])
         label_y = inner.y + inner.h - 14

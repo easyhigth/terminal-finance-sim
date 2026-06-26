@@ -257,7 +257,7 @@ def apply_choice(player, dilemma, option_index):
     """Applique l'option choisie. Retourne l'option (avec son issue)."""
     from core import archetypes, certifications, firms
     opt = dilemma["options"][option_index]
-    player.adjust_cash(opt["cash"])
+    player.adjust_cash(opt["cash"], category="evenements")
     player.adjust_reputation(opt["rep"], reason=f"Décision : {dilemma['title']} → {opt['label']}")
     heat_delta = opt["heat"]
     if heat_delta > 0:
@@ -324,7 +324,7 @@ def maybe_investigate(player, rng=None):
     scale = _scale(player.grade_index)
     fine = round(rng.uniform(40, 120) * 1000 * scale, 2)
     rep_loss = rng.randint(6, 12)
-    player.adjust_cash(-fine)
+    player.adjust_cash(-fine, category="evenements")
     player.adjust_reputation(-rep_loss, reason="Enquête réglementaire (scrutin élevé)")
     player.heat = max(0, player.heat - 35)
     player.investigations_count = getattr(player, "investigations_count", 0) + 1

@@ -132,7 +132,7 @@ def acknowledge(player, action):
     elif action == "hedge_now":
         hedge_cost = max(500.0, 0.002 * test["net_worth"])   # frais de couverture symbolique
         cash_delta = -hedge_cost
-        player.adjust_cash(cash_delta)
+        player.adjust_cash(cash_delta, category="evenements")
         if passed:
             rep_delta = random.choice([1, 2])
             message = (f"Vous renforcez vos couvertures par prudence malgré un "

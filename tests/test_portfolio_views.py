@@ -168,6 +168,68 @@ def test_allocation_by_empty_when_no_positions():
     assert pv.allocation_by(p, m, "sector") == {}
 
 
+# --------------------------------------------------------------- sector_heatmap
+def test_sector_heatmap_aggregates_value_and_pnl_per_sector():
+    p, m = _setup(cash=1_000_000.0)
+    tk1 = m.companies[0]["ticker"]
+    tk2 = m.companies[1]["ticker"]
+    sector1 = m.companies[0]["sector"]
+    sector2 = m.companies[1]["sector"]
+    _set_price(m, tk1, 100.0)
+    _set_price(m, tk2, 50.0)
+    pf.buy(p, m, tk1, 10)
+    pf.buy(p, m, tk2, 10)
+    avg1, avg2 = p.portfolio[tk1]["avg"], p.portfolio[tk2]["avg"]
+    _set_price(m, tk1, 120.0)
+    _set_price(m, tk2, 40.0)
+    exp_value1, exp_pnl1 = 120.0 * 10, (120.0 - avg1) * 10
+    exp_value2, exp_pnl2 = 40.0 * 10, (40.0 - avg2) * 10
+    heat = pv.sector_heatmap(p, m)
+    by_sector = {a["sector"]: a for a in heat}
+    if sector1 == sector2:
+        a = by_sector[sector1]
+        assert a["value"] == pytest.approx(exp_value1 + exp_value2)
+        assert a["pnl"] == pytest.approx(exp_pnl1 + exp_pnl2)
+    else:
+        assert by_sector[sector1]["value"] == pytest.approx(exp_value1)
+        assert by_sector[sector1]["pnl"] == pytest.approx(exp_pnl1)
+        assert by_sector[sector2]["value"] == pytest.approx(exp_value2)
+        assert by_sector[sector2]["pnl"] == pytest.approx(exp_pnl2)
+
+
+def test_sector_heatmap_sorted_by_absolute_value_descending():
+    p, m = _setup(cash=1_000_000.0)
+    tk1, tk2, tk3 = (m.companies[i]["ticker"] for i in range(3))
+    _set_price(m, tk1, 100.0)
+    _set_price(m, tk2, 100.0)
+    _set_price(m, tk3, 100.0)
+    pf.buy(p, m, tk1, 5)
+    pf.buy(p, m, tk2, 30)
+    pf.buy(p, m, tk3, 10)
+    heat = pv.sector_heatmap(p, m)
+    values = [abs(a["value"]) for a in heat]
+    assert values == sorted(values, reverse=True)
+
+
+def test_sector_heatmap_handles_short_positions():
+    p, m = _setup(cash=1_000_000.0)
+    tk = m.companies[0]["ticker"]
+    _set_price(m, tk, 100.0)
+    pf.short(p, m, tk, 10)
+    avg = p.portfolio[tk]["avg"]
+    _set_price(m, tk, 80.0)  # le short gagne quand le prix baisse
+    heat = pv.sector_heatmap(p, m)
+    a = heat[0]
+    assert a["value"] == pytest.approx(-800.0)
+    assert a["pnl"] == pytest.approx((avg - 80.0) * 10)
+    assert a["pnl"] > 0
+
+
+def test_sector_heatmap_empty_when_no_positions():
+    p, m = _setup()
+    assert pv.sector_heatmap(p, m) == []
+
+
 # --------------------------------------------------------------- dividends
 def test_dividends_long_position_receives_expected_payout():
     p, m = _setup(cash=1_000_000.0)

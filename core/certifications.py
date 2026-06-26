@@ -90,7 +90,7 @@ def pay_and_start(player, program):
     code, fee, tier = can_attempt(player, program)
     if code != "ok":
         return None
-    player.adjust_cash(-fee)
+    player.adjust_cash(-fee, category="evenements")
     return tier, level(player, program)
 
 

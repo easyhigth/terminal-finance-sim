@@ -320,3 +320,56 @@ def test_check_game_over_false_when_healthy():
     p = PlayerState(cash=1_000_000.0, reputation=50)
     assert p.check_game_over(net_worth=1_000_000.0) is False
     assert p.game_over is False
+
+
+# ---------------------------------------------------------------------------
+# Attribution de performance par source (quarter_flows / last_quarter_attribution)
+# ---------------------------------------------------------------------------
+def test_adjust_cash_without_category_does_not_tag_flows():
+    p = PlayerState()
+    p.adjust_cash(100.0)
+    assert p.quarter_flows == {}
+    assert p.cash == 100.0
+
+
+def test_adjust_cash_with_category_accumulates_into_quarter_flows():
+    p = PlayerState()
+    p.adjust_cash(100.0, category="deals")
+    p.adjust_cash(50.0, category="deals")
+    p.adjust_cash(-20.0, category="evenements")
+    assert p.quarter_flows == {"deals": 150.0, "evenements": -20.0}
+    assert p.cash == 130.0
+
+
+def test_advance_step_computes_residual_marches_bucket_at_quarter_close():
+    gs = GameState()
+    p = gs.player
+    p.cash = 100_000.0
+    steps_per_quarter = -(-config.DAYS_PER_QUARTER // config.DAYS_PER_STEP)
+    for _ in range(steps_per_quarter):
+        gs.advance_step()
+    attrib = p.last_quarter_attribution
+    assert attrib
+    # la somme de l'attribution doit reconstituer exactement la variation de
+    # trésorerie du trimestre clos (aucun flux non comptabilisé) : pas de marché
+    # fourni ici, donc tout transite par adjust_cash et le résidu "marches" est nul.
+    assert attrib["marches"] == pytest.approx(0.0, abs=1e-6)
+    assert sum(attrib.values()) == pytest.approx(p.cash - 100_000.0, rel=1e-6)
+    assert p.quarter_flows == {}
+
+
+def test_advance_step_residual_marches_bucket_captures_untagged_market_flows():
+    gs = GameState()
+    p = gs.player
+    p.cash = 10_000.0
+    market = Market(seed=1)
+    tk = market.companies[0]["ticker"]
+    market.price[market.ticker_idx[tk]] = 100.0
+    gs.advance_step(market)   # amorce l'ancre de trimestre avant tout achat
+    from core import portfolio as pf
+    pf.buy(p, market, tk, 10)   # frais d'exécution non tagué -> doit retomber dans "marches"
+    steps_per_quarter = -(-config.DAYS_PER_QUARTER // config.DAYS_PER_STEP)
+    for _ in range(steps_per_quarter):
+        gs.advance_step(market)
+    attrib = p.last_quarter_attribution
+    assert attrib["marches"] != 0.0

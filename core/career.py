@@ -231,5 +231,5 @@ def close_quarter(player):
     else:
         reason = "Objectifs trimestriels non atteints" if total else None
     player.adjust_reputation(rep, reason=reason)
-    player.adjust_cash(cash)
+    player.adjust_cash(cash, category="objectifs")
     return {"done": done, "total": total, "rep": rep, "cash": cash}

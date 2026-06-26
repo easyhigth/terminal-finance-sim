@@ -92,7 +92,7 @@ def negotiate(player, choice):
     if choice == "accept":
         bonus_paid = base
         rep_delta = random.choice([1, 2])
-        player.adjust_cash(bonus_paid)
+        player.adjust_cash(bonus_paid, category="evenements")
         player.adjust_reputation(rep_delta, reason=_L("Revue de performance : bonus accepté",
                                                         "Performance review: bonus accepted"))
         message = _L(f"Vous acceptez le bonus standard de {bonus_paid:,.0f}. "
@@ -121,7 +121,7 @@ def negotiate(player, choice):
                          f"insistance, ne vous verse que {bonus_paid:,.0f}.",
                          f"The negotiation fails. Your manager, disappointed by your "
                          f"insistence, only pays you {bonus_paid:,.0f}.")
-        player.adjust_cash(bonus_paid)
+        player.adjust_cash(bonus_paid, category="evenements")
         player.adjust_reputation(rep_delta, reason=_L(
             "Revue de performance : négociation réussie" if success
             else "Revue de performance : négociation échouée",

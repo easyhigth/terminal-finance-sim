@@ -10,7 +10,7 @@ Ouvert via HISTORY depuis le terminal (câblage central, hors périmètre ici).
 """
 import pygame
 
-from core import config
+from core import charts, config
 from core.career_history import format_timeline
 from core.scene_manager import Scene
 from ui import fonts, widgets
@@ -19,6 +19,29 @@ _KIND_COLORS = {
     "promo": config.COL_UP, "deal": config.COL_DEAL, "crisis": config.COL_DOWN,
     "objective": config.COL_CYAN, "info": config.COL_TEXT_DIM,
 }
+
+_ATTRIB_LABELS = {
+    "salaire": ("Salaire", config.COL_CYAN),
+    "revenus": ("Revenus passifs", config.COL_UP),
+    "deals": ("Deals", config.COL_DEAL),
+    "mandats": ("Mandats", config.COL_AMBER),
+    "objectifs": ("Objectifs", config.COL_PRESTIGE),
+    "evenements": ("Événements", config.COL_WARN),
+    "marches": ("Marchés", config.COL_TEXT),
+}
+
+
+def _drawdowns(hist):
+    """Retourne (drawdown courant %, drawdown max %) depuis une série de valeurs
+    nettes, calculés par rapport au sommet glissant (running peak)."""
+    peak = hist[0]
+    max_dd = 0.0
+    for v in hist:
+        peak = max(peak, v)
+        if peak > 0:
+            max_dd = max(max_dd, (peak - v) / peak * 100.0)
+    cur_dd = (peak - hist[-1]) / peak * 100.0 if peak > 0 else 0.0
+    return cur_dd, max_dd
 
 
 class HistoryScene(Scene):
@@ -64,15 +87,23 @@ class HistoryScene(Scene):
         top = config.content_top()
         bottom = config.footer_y() - 8
         total_h = bottom - top
-        chart_h = int(total_h * 0.42)
+        chart_h = int(total_h * 0.36)
+        mid_h = int(total_h * 0.22)
         gap = 12
-        journal_h = total_h - chart_h - gap
+        journal_h = total_h - chart_h - mid_h - 2 * gap
 
         cur = config.CONTINENTS.get(p.continent, {}).get("currency", "$")
         chart_rect = pygame.Rect(M, top, config.SCREEN_WIDTH - 2 * M, chart_h)
         self._draw_networth_chart(surf, chart_rect, p, cur)
 
-        journal_rect = pygame.Rect(M, top + chart_h + gap,
+        mid_y = top + chart_h + gap
+        half_w = (config.SCREEN_WIDTH - 2 * M - gap) // 2
+        perf_rect = pygame.Rect(M, mid_y, half_w, mid_h)
+        attrib_rect = pygame.Rect(M + half_w + gap, mid_y, half_w, mid_h)
+        self._draw_perf_vs_index(surf, perf_rect, p)
+        self._draw_attribution(surf, attrib_rect, p, cur)
+
+        journal_rect = pygame.Rect(M, mid_y + mid_h + gap,
                                    config.SCREEN_WIDTH - 2 * M, journal_h)
         self._draw_timeline(surf, journal_rect, p)
 
@@ -124,9 +155,79 @@ class HistoryScene(Scene):
                           (inner.x, label_y), fonts.tiny(bold=True), config.COL_UP)
         widgets.draw_text(surf, f"Plus bas : {widgets.format_money(hist[i_min], cur)}",
                           (inner.x + 220, label_y), fonts.tiny(bold=True), config.COL_DOWN)
+
+        cur_dd, max_dd = _drawdowns(hist)
+        widgets.draw_text(surf, f"Drawdown actuel : -{cur_dd:.1f}%",
+                          (inner.x + 440, label_y), fonts.tiny(bold=True),
+                          config.COL_DOWN if cur_dd > 0 else config.COL_TEXT_DIM)
+        widgets.draw_text(surf, f"Drawdown max : -{max_dd:.1f}%",
+                          (inner.x + 640, label_y), fonts.tiny(bold=True), config.COL_WARN)
         widgets.draw_text(
             surf, f"({len(hist)} relevés récents)",
             (inner.right, inner.y), fonts.tiny(), config.COL_TEXT_DIM, align="right")
+
+    def _draw_perf_vs_index(self, surf, rect, p):
+        inner = widgets.draw_panel(surf, rect, "Performance vs indice régional", config.COL_AMBER)
+        hist = p.cash_history or []
+        market = getattr(self.app, "market", None)
+        idx_name = None
+        if market is not None:
+            for name, region in getattr(market, "index_region", {}).items():
+                if region == p.continent:
+                    idx_name = name
+                    break
+        if len(hist) < 2 or idx_name is None:
+            widgets.draw_text(surf, "Historique trop court pour comparer.",
+                              (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
+            return
+        idx_hist_full = market.index_hist.get(idx_name, [])
+        idx_hist = idx_hist_full[-len(hist):]
+        if len(idx_hist) < 2:
+            widgets.draw_text(surf, "Historique trop court pour comparer.",
+                              (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
+            return
+        nw_pct = charts.normalize(hist)
+        idx_pct = charts.normalize(idx_hist)
+        chart_rect = pygame.Rect(inner.x + 50, inner.y, inner.w - 60, inner.h - 14)
+        lo = min(min(nw_pct), min(idx_pct))
+        hi = max(max(nw_pct), max(idx_pct))
+        lo, hi, span = widgets.draw_chart_axes(
+            surf, chart_rect, lo, hi, y_fmt=lambda v: f"{v:+.0f}%", rows=4)
+        widgets.draw_series(surf, chart_rect, nw_pct, config.COL_CYAN, baseline=False,
+                            show_extrema=False)
+        widgets.draw_series(surf, chart_rect, idx_pct, config.COL_TEXT_DIM, baseline=False,
+                            show_extrema=False)
+        widgets.draw_chart_zero_line(surf, chart_rect, lo, span)
+        widgets.draw_chart_legend(surf, rect, [
+            ("Vous", config.COL_CYAN), (idx_name, config.COL_TEXT_DIM),
+        ])
+
+    def _draw_attribution(self, surf, rect, p, cur):
+        inner = widgets.draw_panel(surf, rect, "Attribution du dernier trimestre", config.COL_PRESTIGE)
+        attrib = getattr(p, "last_quarter_attribution", None) or {}
+        if not attrib:
+            widgets.draw_text(surf, "Disponible après la clôture d'un trimestre.",
+                              (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
+            return
+        items = sorted(attrib.items(), key=lambda kv: -abs(kv[1]))
+        max_abs = max((abs(v) for _, v in items), default=1.0) or 1.0
+        line_h = 20
+        bar_x = inner.x + 130
+        bar_w = inner.w - 150
+        for i, (cat, delta) in enumerate(items):
+            y = inner.y + i * line_h
+            if y + line_h > inner.bottom:
+                break
+            label, col = _ATTRIB_LABELS.get(cat, (cat, config.COL_TEXT_DIM))
+            widgets.draw_text(surf, label, (inner.x, y + 2), fonts.tiny(), config.COL_TEXT)
+            frac = abs(delta) / max_abs
+            w = max(2, int(bar_w * 0.5 * frac))
+            mid_x = bar_x + bar_w // 2
+            bar_rect = (mid_x, y + 3, w, 12) if delta >= 0 else (mid_x - w, y + 3, w, 12)
+            pygame.draw.rect(surf, col, bar_rect)
+            sign = "+" if delta >= 0 else ""
+            widgets.draw_text(surf, f"{sign}{widgets.format_money(delta, cur)}",
+                              (bar_x + bar_w, y + 2), fonts.tiny(), col, align="right")
 
     def _draw_timeline(self, surf, rect, p):
         inner = widgets.draw_panel(surf, rect, "Timeline des évènements", config.COL_AMBER)

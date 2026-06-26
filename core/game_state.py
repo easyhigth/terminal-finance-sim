@@ -131,6 +131,10 @@ class PlayerState:
     risk_limit_profile: str = "default"  # "strict" / "default" / "souple"
     # ----- espace de travail (fenêtres flottantes du terminal) -----
     workspace: list = field(default_factory=list)  # [{"cls","ticker"/"kind","pos":[x,y]}]
+    # ----- attribution de performance par source (core/career.py, scene_history.py) -----
+    quarter_flows: dict = field(default_factory=dict)       # catégorie -> delta cash cumulé du trimestre en cours
+    quarter_nw_anchor: float = 0.0                            # valeur nette au début du trimestre en cours
+    last_quarter_attribution: dict = field(default_factory=dict)  # catégorie -> delta du dernier trimestre clos
 
     @property
     def grade(self):
@@ -148,8 +152,16 @@ class PlayerState:
             self.grade_start_quarter = self.quarter
 
     # ----- Économie / réputation ----------------------------------------
-    def adjust_cash(self, delta):
+    def adjust_cash(self, delta, category=None):
+        """Modifie la trésorerie. Si `category` est fourni, cumule le delta dans
+        `quarter_flows` (catégorie -> delta) pour l'attribution de performance par
+        source du trimestre en cours (cf. `core/career.py::close_quarter`,
+        `scenes/scene_history.py`). Les flux liés au trading pur (frais, marge,
+        règlements de dérivés...) ne sont volontairement pas tagués : ils
+        retombent dans le résidu « marchés » calculé à la clôture du trimestre."""
         self.cash += delta
+        if category and delta:
+            self.quarter_flows[category] = self.quarter_flows.get(category, 0.0) + delta
 
     def adjust_reputation(self, delta, reason=None):
         """Modifie la réputation (bornée 0-100). Si `reason` est fourni et que le
@@ -342,6 +354,14 @@ class GameState:
         # tour, lu en fin de fonction pour le résumé puis exposé au terminal.
         p.rep_log = []
 
+        # ancre de l'attribution de performance par source : valeur nette au
+        # tout premier appel (avant toute mutation), pour amorcer le résidu
+        # « marchés » dès le premier trimestre, y compris sur une sauvegarde
+        # antérieure à l'ajout de ce mécanisme.
+        if "attribution_anchor_set" not in p.flags:
+            p.quarter_nw_anchor = p.cash_history[-1] if p.cash_history else p.cash
+            p.flags["attribution_anchor_set"] = True
+
         prev_quarter = p.quarter
         p.day += config.DAYS_PER_STEP
         p.quarter = p.quarter_of_day()
@@ -362,7 +382,7 @@ class GameState:
                 p.team_rep_accum -= whole
         net = (p.salary_per_step() - p.costs_per_step()
                + getattr(p, "salary_bonus_per_step", 0.0) - team_cost)
-        p.adjust_cash(net)
+        p.adjust_cash(net, category="salaire")
 
         # vieillissement des deals : ceux arrivés à échéance non traités pénalisent
         expired = deals.age_deals(p)
@@ -390,27 +410,27 @@ class GameState:
             from core import portfolio
             dividends = portfolio.dividends(p, market, config.DAYS_PER_STEP)
             if dividends:
-                p.adjust_cash(dividends)
+                p.adjust_cash(dividends, category="revenus")
             # coupons obligataires (revenu de portage)
             if getattr(p, "bonds", None):
                 from core import bonds as _bonds
                 coup = _bonds.coupons(p, market, config.DAYS_PER_STEP)
                 if coup:
-                    p.adjust_cash(coup)
+                    p.adjust_cash(coup, category="revenus")
                     dividends += coup   # agrégé dans le revenu passif affiché
             # roulement des futures commodities (roll yield : coût en contango)
             if getattr(p, "commodities", None):
                 from core import commodities as _cmdty
                 roll = _cmdty.roll_cost(p, market, config.DAYS_PER_STEP)
                 if roll:
-                    p.adjust_cash(roll)
+                    p.adjust_cash(roll, category="revenus")
                     dividends += roll
             # intérêt de la CBDC (actif sûr rémunéré au taux directeur)
             if getattr(p, "crypto", None):
                 from core import crypto as _crypto
                 cbi = _crypto.interest(p, market, config.DAYS_PER_STEP)
                 if cbi:
-                    p.adjust_cash(cbi)
+                    p.adjust_cash(cbi, category="revenus")
                     dividends += cbi
             financing = portfolio.accrue_financing(p, market, config.DAYS_PER_STEP)
             margin_call = portfolio.check_margin_call(p, market)
@@ -464,7 +484,7 @@ class GameState:
                 from core import swaps as _swaps
                 swap_flow, swaps_expired = _swaps.accrue(p, market, config.DAYS_PER_STEP)
                 if swap_flow:
-                    p.adjust_cash(swap_flow)
+                    p.adjust_cash(swap_flow, category="revenus")
                     dividends += swap_flow
             nw = portfolio.net_worth(p, market)
         else:
@@ -475,6 +495,16 @@ class GameState:
         ma_events = []
         review_offer = None
         if p.quarter != prev_quarter:
+            # attribution de performance par source : tout ce qui n'est pas
+            # passé par adjust_cash(..., category=...) ce trimestre (frais,
+            # marge, règlements de dérivés, plus/moins-values de marché...)
+            # retombe dans le résidu « marchés », garantissant une somme
+            # exacte avec la variation de valeur nette du trimestre.
+            attribution = dict(p.quarter_flows)
+            attribution["marches"] = (nw - p.quarter_nw_anchor) - sum(p.quarter_flows.values())
+            p.last_quarter_attribution = attribution
+            p.quarter_flows = {}
+            p.quarter_nw_anchor = nw
             quarter_report = career.close_quarter(p)
             career.ensure_objectives(p)
             from core import review as _review

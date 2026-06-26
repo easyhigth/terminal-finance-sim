@@ -137,3 +137,44 @@ def test_history_scene_renders_with_empty_history():
 
     surf = pygame.Surface((1280, 720))
     scene.draw(surf)
+
+
+def test_history_scene_renders_with_market_and_attribution():
+    """Avec un marché et une attribution de trimestre déjà calculée, les
+    panneaux perf-vs-indice et attribution doivent se dessiner sans erreur."""
+    from core.market import Market
+    from scenes.scene_history import HistoryScene
+
+    gs = _make_player_state()
+    p = gs.player
+    p.last_quarter_attribution = {"salaire": 12000.0, "deals": -3000.0, "marches": 1500.0}
+    app = _FakeApp(gs)
+    app.market = Market(seed=1)
+    for _ in range(25):
+        app.market.step()
+    scene = HistoryScene(app)
+    scene.on_enter(return_to="terminal")
+    scene.update(0.016)
+
+    surf = pygame.Surface((1280, 720))
+    scene.draw(surf)
+
+
+# ---------------------------------------------------------------------------
+# drawdown (running peak) — scenes/scene_history.py::_drawdowns
+# ---------------------------------------------------------------------------
+def test_drawdowns_zero_on_monotonic_increase():
+    from scenes.scene_history import _drawdowns
+
+    cur, mx = _drawdowns([100.0, 110.0, 120.0, 130.0])
+    assert cur == pytest.approx(0.0)
+    assert mx == pytest.approx(0.0)
+
+
+def test_drawdowns_current_and_max_after_a_dip():
+    from scenes.scene_history import _drawdowns
+
+    # pic à 200, creux à 100 (-50%), puis remonte à 180 (toujours -10% du pic)
+    cur, mx = _drawdowns([100.0, 200.0, 100.0, 180.0])
+    assert mx == pytest.approx(50.0)
+    assert cur == pytest.approx(10.0)

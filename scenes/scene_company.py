@@ -537,7 +537,7 @@ class CompanyScene(Scene):
         panel_rect = pygame.Rect(rect.x, y + h + 10, rect.w, rect.bottom - (y + h + 10))
         inner = widgets.draw_panel(surf, panel_rect, "Graphique", self.accent)
         m = self.app.market
-        hist = m.track_company(self.ticker) if m else []
+        hist = m.track_company(self.ticker, self.app.sim_clock, self.app.gs.player.day) if m else []
         if not hist or len(hist) < 2:
             widgets.draw_text(surf, "Historique en cours de constitution.",
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)

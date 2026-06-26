@@ -1,5 +1,5 @@
 """
-simclock_widget.py — Barre ⏸ ▶ ▶▶ ▶▶▶ de l'horloge de jeu (SimClock).
+simclock_widget.py — Barre ▮▮ ▶ ▶▶ ▶▶▶ de l'horloge de jeu (SimClock).
 
 Affichée par `core/scene_manager.py::SceneManager.draw()` au-dessus de
 *toutes* les scènes (sauf l'écran-titre / création de partie), pour que la
@@ -61,7 +61,7 @@ def draw(surf, app):
     bg = config.COL_PANEL_HEAD if (hover or active) else config.COL_PANEL
     pygame.draw.rect(surf, bg, btn, border_radius=4)
     pygame.draw.rect(surf, config.COL_AMBER if active else config.COL_BORDER, btn, 1, border_radius=4)
-    widgets.draw_text(surf, "⏸", btn.center, fonts.small(bold=True),
+    widgets.draw_text(surf, "▮▮", btn.center, fonts.small(bold=True),
                       config.COL_AMBER if active else config.COL_TEXT_DIM, align="center")
     for sp in SPEEDS:
         btn = rects[sp]
@@ -74,5 +74,5 @@ def draw(surf, app):
                           config.COL_CYAN if active else config.COL_TEXT_DIM, align="center")
     if clock.auto_paused:
         tag_rect = rects["pause"]
-        widgets.draw_text(surf, "⏸ EN PAUSE (action en cours)",
+        widgets.draw_text(surf, "▮▮ EN PAUSE (action en cours)",
                           (tag_rect.x, tag_rect.bottom + 3), fonts.tiny(), config.COL_AMBER)

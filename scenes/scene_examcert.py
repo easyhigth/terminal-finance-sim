@@ -119,7 +119,7 @@ class ExamCertScene(Scene):
         if paused:
             idx = p.eval_state.get("idx", 0)
             total = len(p.eval_state.get("items", []))
-            widgets.draw_text(surf, f"⏸ Examen en pause — question {idx + 1}/{total}. Reprenez ci-dessous.",
+            widgets.draw_text(surf, f"▮▮ Examen en pause — question {idx + 1}/{total}. Reprenez ci-dessous.",
                               (rect.x + 20, rect.y + 54), fonts.small(bold=True), config.COL_CYAN)
         else:
             widgets.draw_text(surf, "Réussir l'examen vous fait passer au grade suivant.",

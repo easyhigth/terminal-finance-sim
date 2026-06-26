@@ -311,7 +311,9 @@ class TerminalRenderMixin:
                 widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.2f}%", (inner.right, y),
                                   fonts.small(bold=True), col, align="right")
                 widgets.draw_series(surf, pygame.Rect(inner.x, y + 16, inner.w, spark_h),
-                                    self.market.index_history(name), col, baseline=False,
+                                    self.market.index_history(
+                                        name, self.app.sim_clock, self.app.gs.player.day),
+                                    col, baseline=False,
                                     mouse_pos=mp, y_fmt=lambda v: f"{v:,.0f}", show_pct=True,
                                     show_extrema=False)
                 if self.zones.zone == "indices" and self.zones.inside and self.zones.item == name:

@@ -150,24 +150,45 @@ class MarketQueryMixin:
             return 0.0
         return (hist[-1] / hist[-2] - 1.0) * 100.0
 
-    def index_history(self, name):
-        return self.index_hist.get(name, [])
+    def index_history(self, name, sim_clock=None, day=None):
+        """Historique par pas de l'indice. Si `sim_clock`/`day` sont fournis,
+        un point animé (Round 11 Phase 3 — `core/intraday.py`) est ajouté en
+        fin de série pour que le graphe bouge entre deux pas de marché —
+        affichage uniquement, n'affecte jamais `index_value()`."""
+        hist = self.index_hist.get(name, [])
+        if sim_clock is not None and day is not None and hist:
+            from core import intraday
+            return intraday.append_live(self, sim_clock, day, name, hist)
+        return hist
 
-    def track_company(self, ticker):
+    def track_company(self, ticker, sim_clock=None, day=None):
         """Démarre le suivi d'historique d'une société (au 1er accès).
-        L'historique est pré-rempli depuis le passé complet (5 ans de préhistoire)."""
+        L'historique est pré-rempli depuis le passé complet (5 ans de préhistoire).
+        Cf. `index_history` pour `sim_clock`/`day` (animation intraday)."""
         if ticker not in self.price_hist and ticker in self.ticker_idx:
             self.price_hist[ticker] = self.history_of(ticker)
-        return self.price_hist.get(ticker, [])
+        hist = self.price_hist.get(ticker, [])
+        if sim_clock is not None and day is not None and hist:
+            from core import intraday
+            i = self.ticker_idx.get(ticker)
+            region = self.companies[i].get("region") if i is not None else None
+            return intraday.append_live(self, sim_clock, day, ticker, hist, region=region)
+        return hist
 
-    def history_of(self, ticker, n=None):
+    def history_of(self, ticker, n=None, sim_clock=None, day=None):
         """Historique de prix complet d'une société (depuis la préhistoire de 5 ans).
-        `n` borne au dernier n points si fourni. Retourne une liste de floats."""
+        `n` borne au dernier n points si fourni. Retourne une liste de floats.
+        Cf. `index_history` pour `sim_clock`/`day` (animation intraday)."""
         i = self.ticker_idx.get(ticker)
         if i is None:
             return []
         snaps = self.price_hist_all[-n:] if n else self.price_hist_all
-        return [float(s[i]) for s in snaps]
+        hist = [float(s[i]) for s in snaps]
+        if sim_clock is not None and day is not None and hist:
+            from core import intraday
+            region = self.companies[i].get("region")
+            return intraday.append_live(self, sim_clock, day, ticker, hist, region=region)
+        return hist
 
     def price_of(self, ticker):
         i = self.ticker_idx.get(ticker)

@@ -9,6 +9,7 @@ from core import config, tracks
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
+
 def _L(fr, en):
     from core.i18n import get_lang
     return en if get_lang() == "en" else fr

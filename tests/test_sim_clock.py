@@ -4,7 +4,6 @@ de cotation par région."""
 from core import market_hours as mh
 from core.sim_clock import SimClock
 
-
 # --------------------------------------------------------------- SimClock
 
 def test_effective_speed_paused():

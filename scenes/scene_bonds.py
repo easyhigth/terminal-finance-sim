@@ -261,9 +261,9 @@ class BondsScene(Scene, PopupMixin):
         cursor_id = self._row_list[self.row_cursor] if self._row_list else None
         y = list_top - self.scroll
         if sov:
-            y = self._draw_group(surf, "SOUVERAINS", sov, y, p, list_area, mp, cursor_id)
+            y = self._draw_group(surf, "SOUVERAINS", sov, y, p, m, list_area, mp, cursor_id)
         if corp:
-            y = self._draw_group(surf, "CORPORATE", corp, y, p, list_area, mp, cursor_id)
+            y = self._draw_group(surf, "CORPORATE", corp, y, p, m, list_area, mp, cursor_id)
         surf.set_clip(prev_clip)
 
         content_h = (y + self.scroll) - list_top
@@ -285,7 +285,7 @@ class BondsScene(Scene, PopupMixin):
         if self._tooltip:
             widgets.draw_tooltip(surf, *self._tooltip)
 
-    def _draw_group(self, surf, title, quotes, y, p, list_area, mp, cursor_id=None):
+    def _draw_group(self, surf, title, quotes, y, p, m, list_area, mp, cursor_id=None):
         cols = self.cols
         widgets.draw_text(surf, f"— {title} ({len(quotes)})", (cols["name"], y),
                           fonts.tiny(bold=True), config.COL_AMBER)
@@ -317,6 +317,15 @@ class BondsScene(Scene, PopupMixin):
                 widgets.draw_text(surf, f"{q['years']}a", (cols["mat"], y), fonts.small(), config.COL_TEXT)
                 widgets.draw_text(surf, f"{q['ytm']*100:.2f}%", (cols["ytm"], y), fonts.small(), config.COL_CYAN)
                 widgets.draw_text(surf, f"{q['price']:.1f}", (cols["price"], y), fonts.small(bold=True), config.COL_WHITE)
+                if self._can_trade():
+                    price_rect = pygame.Rect(cols["price"] - 2, y - 2, 70, ROW_H - 4)
+                    if price_rect.collidepoint(mp):
+                        fb = B.fill_price(m, q["id"], LOT, "buy")
+                        fs = B.fill_price(m, q["id"], LOT, "sell")
+                        if fb and fs and q["price"]:
+                            spread_pct = (fb - fs) / q["price"] * 100
+                            self._tooltip = (f"Achat ~{fb:.2f} / Vente ~{fs:.2f} "
+                                              f"(spread {spread_pct:.2f}% pour {LOT} unités)", mp)
                 widgets.draw_text(surf, f"{q['mod_duration']:.1f}", (cols["dur"], y), fonts.small(), config.COL_TEXT_DIM)
                 pos = p.bonds.get(q["id"])
                 held = pos["qty"] if pos else 0

@@ -129,7 +129,12 @@ class CareerScene(Scene):
         for r in career.promotion_requirements(p):
             mark = "✓" if r["met"] else "○"
             col = config.COL_UP if r["met"] else config.COL_TEXT
-            widgets.draw_text(surf, f"{mark} {r['label']}", (inner.x, y), fonts.small(), col)
+            label = r["label"]
+            if not r["met"] and r["label"].startswith("Ancienneté") :
+                next_q = p.grade_start_quarter + int(r["target"])
+                days_left = max(0, (next_q - 1) * config.DAYS_PER_QUARTER + 1 - p.day)
+                label += f" (encore {days_left} j)"
+            widgets.draw_text(surf, f"{mark} {label}", (inner.x, y), fonts.small(), col)
             widgets.draw_text(surf, f"{int(r['current'])}/{int(r['target'])}",
                               (inner.right, y), fonts.small(bold=True),
                               col, align="right")

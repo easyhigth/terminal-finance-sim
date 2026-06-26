@@ -211,8 +211,13 @@ class AlertsScene(Scene):
         surf.fill(config.COL_BG)
         widgets.draw_text(surf, "ALERTES DE PRIX", (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
+        range_hint = ""
+        if self.sel_ticker:
+            hist = self.market.history_of(self.sel_ticker, 60)
+            if hist:
+                range_hint = f" Plage des 60 derniers jours : {min(hist):.2f} – {max(hist):.2f}."
         widgets.draw_text(surf, "Choisissez un actif dans la liste, indiquez un seuil de cours, "
-                                "puis posez l'alerte. " + (self.msg if self.msg else ""),
+                                "puis posez l'alerte." + range_hint + " " + (self.msg if self.msg else ""),
                           (42, 72), fonts.tiny(), config.COL_TEXT_DIM)
 
         mp = pygame.mouse.get_pos()
@@ -354,6 +359,16 @@ class AlertsScene(Scene):
         cur = self.market.price_of(a["ticker"])
         ctxt = f"{cur:.2f}" if cur is not None else "—"
         widgets.draw_text(surf, f"cours {ctxt}", (inner.x + 170, y), fonts.small(), config.COL_TEXT_DIM)
+        if cur is not None and a["price"]:
+            dist_pct = abs(cur - a["price"]) / a["price"] * 100
+            if dist_pct <= 2:
+                pcol, ptxt = config.COL_DOWN, "imminent"
+            elif dist_pct <= 8:
+                pcol, ptxt = config.COL_WARN, "proche"
+            else:
+                pcol, ptxt = config.COL_TEXT_DIM, "loin"
+            widgets.draw_text(surf, f"{ptxt} ({dist_pct:.1f}%)", (inner.x + 260, y),
+                              fonts.tiny(bold=True), pcol)
         del_rect = pygame.Rect(inner.right - 26, y - 2, 22, 20)
         self._delete_rects[idx] = del_rect
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, del_rect, border_radius=3)

@@ -10,6 +10,7 @@ from core import config
 from core import firms as firms_mod
 from core import journal as journal_mod
 from core import liquidity as liq_mod
+from core import market_hours as mh_mod
 from core import portfolio as pf_mod
 from core import unlocks as unlocks_mod
 from core.i18n import get_lang
@@ -93,6 +94,27 @@ class TerminalTradingMixin:
     def _cur(self):
         return config.CONTINENTS[self.app.gs.player.continent]["currency"]
 
+    def _market_closed_msg(self, tk):
+        """Renvoie un message de refus si le marché actions de `tk` est fermé
+        à l'heure de jeu courante (cf. core/market_hours.py, Round 11 Phase
+        2 : sessions Asie/Europe/Amériques, lundi-vendredi), sinon None.
+        Ticker inconnu : on laisse pf_mod.buy/sell/short renvoyer l'erreur
+        normale plutôt que de la masquer derrière un faux « marché fermé »."""
+        idx = self.market.ticker_idx.get(tk)
+        if idx is None:
+            return None
+        region = self.market.companies[idx]["region"]
+        p = self.app.gs.player
+        day, minute = self.app.sim_clock.current_time(p.day)
+        if mh_mod.is_region_open(region, day, minute):
+            return None
+        nd, nm = mh_mod.next_open(region, day, minute)
+        when = "aujourd'hui" if nd == day else ("demain" if nd == day + 1 else f"jour {nd}")
+        when_en = "today" if nd == day else ("tomorrow" if nd == day + 1 else f"day {nd}")
+        return _L(
+            f"  ⊘ Marché {region} fermé — réouverture {when} à {mh_mod.fmt_hhmm(nm)}.",
+            f"  ⊘ {region} market closed — reopens {when_en} at {mh_mod.fmt_hhmm(nm)}.")
+
     def _after_trade(self):
         p = self.app.gs.player
         self._check_badges()
@@ -107,6 +129,10 @@ class TerminalTradingMixin:
             self._log(_L("  Usage : BUY <ticker> <quantité>","  Usage: BUY <ticker> <quantity>"))
             return
         tk, qty = args[0].upper(), int(args[1])
+        closed = self._market_closed_msg(tk)
+        if closed:
+            self._log(closed)
+            return
         res = pf_mod.buy(self.app.gs.player, self.market, tk, qty)
         if not res["ok"]:
             if res["reason"] == "sector_excluded":
@@ -200,6 +226,10 @@ class TerminalTradingMixin:
                 self._log(_L("  Quantité invalide.","  Invalid quantity."))
                 return
             qty = int(args[1])
+        closed = self._market_closed_msg(tk)
+        if closed:
+            self._log(closed)
+            return
         res = pf_mod.sell(self.app.gs.player, self.market, tk, qty)
         if not res["ok"]:
             self._log(_L(f"  Vente refusée : {'aucune position' if res['reason']=='noposition' else res['reason']}.", f"  Sell rejected: {'no position' if res['reason']=='noposition' else res['reason']}."))
@@ -226,6 +256,10 @@ class TerminalTradingMixin:
             self._log(_L("  Usage : SHORT <ticker> <quantité>  (parier à la baisse)","  Usage: SHORT <ticker> <quantity>  (bet on a fall)"))
             return
         tk, qty = args[0].upper(), int(args[1])
+        closed = self._market_closed_msg(tk)
+        if closed:
+            self._log(closed)
+            return
         res = pf_mod.short(self.app.gs.player, self.market, tk, qty)
         if not res["ok"]:
             reason = {"ticker": "ticker inconnu", "qty": "quantité invalide",
@@ -260,6 +294,10 @@ class TerminalTradingMixin:
                 self._log(_L("  Quantité invalide.","  Invalid quantity."))
                 return
             qty = int(args[1])
+        closed = self._market_closed_msg(tk)
+        if closed:
+            self._log(closed)
+            return
         res = pf_mod.cover(self.app.gs.player, self.market, tk, qty)
         if not res["ok"]:
             self._log(_L(f"  Rachat refusé : {'aucune position courte' if res['reason']=='noshort' else res['reason']}.", f"  Cover rejected: {'no short position' if res['reason']=='noshort' else res['reason']}."))

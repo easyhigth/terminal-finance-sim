@@ -90,7 +90,7 @@ ZONE_ORDER = ["console", "rail", "indices", "health", "topco", "career", "feed"]
 # Noms de commandes pour l'autocomplétion (Tab) et la suggestion fantôme
 CMD_NAMES = [
     "HELP", "COMMANDS", "MISSION", "EVAL", "EXAMCERT", "TRACK", "CAREER", "INBOX",
-    "RIVALS", "RECLAIM", "RECONVERT", "MANDATES", "MANDATE", "DECIDE", "MARKET", "MARKETHUB", "TOP", "MOVERS",
+    "RIVALS", "RECLAIM", "RECONVERT", "MANDATES", "MANDATE", "DECIDE", "MARKET", "MARKETHUB", "HOURS", "TOP", "MOVERS",
     "COMPANY", "FA", "SEARCH", "ACCESS", "EXPLORE", "SHOP", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS", "LEGACY", "ARCHETYPE",
     "TENSION", "CRISIS",
@@ -764,6 +764,8 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             self.app.scenes.go("commands", return_to="terminal")
         elif cmd in ("MARKET", "INDEX", "INDICES", "WEI"):
             self._cmd_market()
+        elif cmd == "HOURS":
+            self._cmd_hours()
         elif cmd == "MARKETHUB":
             self.app.scenes.go("markethub", return_to="terminal")
         elif cmd == "TOP":

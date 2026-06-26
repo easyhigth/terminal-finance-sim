@@ -51,6 +51,12 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   automatiquement l'horloge en pause (`auto_paused`) dès qu'on quitte la scène `"terminal"`
   (mission, examen, deal, dilemme…) et la reprend exactement au retour — aucune minute de jeu
   n'est comptée pendant l'absence. Widget de contrôle (⏸/▶/▶▶/▶▶▶) : `ui/simclock_widget.py`.
+- **`core/market_hours.py`** : calendrier des sessions de cotation par région (Asie/Europe/
+  Amériques, lundi-vendredi, plages horaires partiellement chevauchantes — jamais les 3
+  ouvertes en même temps). `SimClock.current_time(player.day)` donne le (jour, minute du
+  jour) courant ; `BUY/SELL/SHORT/COVER` (`scenes/scene_terminal_trading.py`) refusent le
+  trade actions hors session avec l'heure de réouverture ; commande `HOURS` au terminal pour
+  consulter le statut des 3 sessions.
 - **`core/market.py`** : moteur de marché **déterministe** à modèle de facteurs
   `r_i = drift + beta·F_monde + b_secteur·F_secteur + b_region·F_region + sigma·bruit`.
   Les indices émergent de leurs constituants pondérés capi. Crises = chocs sur les facteurs.

@@ -56,6 +56,15 @@ class SimClock:
     def set_auto_paused(self, value):
         self.auto_paused = bool(value)
 
+    def current_time(self, base_day):
+        """(jour, minute du jour) courants, dérivés des minutes de jeu
+        accumulées depuis le dernier pas de marché complet — `base_day` est
+        le jour de jeu courant (`player.day`), qui n'avance que par pas
+        complets de `config.DAYS_PER_STEP` jours. Utilisé par
+        `core.market_hours` pour déterminer si un marché régional est ouvert."""
+        sub_day, minute_of_day = divmod(self.game_minutes_acc, MINUTES_PER_DAY)
+        return base_day + int(sub_day), int(minute_of_day)
+
     def advance(self, dt_real_seconds, days_per_step):
         """Avance l'horloge de `dt_real_seconds` secondes réelles. Retourne le
         nombre de pas de marché (`days_per_step` jours chacun) à exécuter."""

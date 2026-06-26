@@ -8,6 +8,7 @@ TerminalScene avec les autres mixins de commandes.
 from core import config
 from core import etfs as etfs_mod
 from core import inbox as inbox_mod
+from core import market_hours as mh_mod
 from core import opportunities as opportunities_mod
 from core import screener as screener_mod
 from core.i18n import get_lang
@@ -31,6 +32,30 @@ class TerminalMarketMixin:
         self._open_window("INDICES MONDIAUX", [("Indice", 110), ("Valeur", 90),
                                                ("Var.", 80)], rows)
         self._log(_L("  Indices ouverts (fenêtre).","  Indices opened (window)."))
+
+    def _cmd_hours(self):
+        """HOURS : statut des 3 sessions de cotation (Asie/Europe/Amériques) —
+        ouvert/fermé et heure de réouverture si fermé (cf. core/market_hours.py)."""
+        p = self.app.gs.player
+        day, minute = self.app.sim_clock.current_time(p.day)
+        lang = get_lang()
+        rows = []
+        for sess in ("ASIA", "EUROPE", "AMERICAS"):
+            open_m, close_m = mh_mod.SESSION_HOURS[sess]
+            labels = mh_mod.SESSION_LABEL_EN if lang == "en" else mh_mod.SESSION_LABEL
+            name = labels[sess]
+            is_open = mh_mod.is_weekday_open(day) and mh_mod.is_session_open(sess, minute)
+            status = _L("OUVERT", "OPEN") if is_open else _L("FERMÉ", "CLOSED")
+            col = config.COL_UP if is_open else config.COL_DOWN
+            rows.append(((name, config.COL_AMBER),
+                         f"{mh_mod.fmt_hhmm(open_m)}–{mh_mod.fmt_hhmm(close_m)}",
+                         (status, col)))
+        self._open_window(_L("HORAIRES DES MARCHÉS", "MARKET HOURS"),
+                          [(_L("Session", "Session"), 110),
+                           (_L("Plage horaire", "Window"), 130),
+                           (_L("Statut", "Status"), 90)], rows)
+        self._log(_L(f"  Jour {day} — {mh_mod.fmt_hhmm(minute)} (heure de jeu).",
+                     f"  Day {day} — {mh_mod.fmt_hhmm(minute)} (game time)."))
 
     def _match_region(self, name):
         if not name:

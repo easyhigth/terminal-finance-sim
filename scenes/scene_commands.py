@@ -58,6 +58,8 @@ CATALOG = [
     ]),
     ("Marché & sociétés", [
         ("MARKET / WEI", "Indices mondiaux (C&D 500, KAK 40, NKX 225…)"),
+        ("HOURS", "Statut des sessions de cotation Asie/Europe/Amériques (ouvert/fermé, "
+                  "heure de réouverture) — le trading actions est bloqué hors session"),
         ("TENSION", "Arc de tension du marché : phase, niveau, crises actives"),
         ("TOP [region] / RANKING", "Meilleures sociétés (USA / Europe / Asia…)"),
         ("MOVERS", "Plus fortes hausses / baisses du dernier pas"),

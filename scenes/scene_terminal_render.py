@@ -7,6 +7,7 @@ import pygame
 from core import career as career_mod
 from core import config
 from core import inbox as inbox_mod
+from core import market_hours as mh_mod
 from core import onboarding as onboarding_mod
 from core import portfolio as pf_mod
 from core import unlocks as unlocks_mod
@@ -198,12 +199,20 @@ class TerminalRenderMixin:
         r = widgets.draw_text(surf, f"{p.reputation}/100", (r.right, y), fonts.small(bold=True),
                               config.COL_WHITE)
         x = r.right + 18
-        # day
+        # day + heure de jeu (cf. core/sim_clock.py)
+        day_now, minute_now = self.app.sim_clock.current_time(p.day)
         widgets.draw_text(surf, "DAY  ", (x, y), fonts.small(), config.COL_TEXT_DIM)
-        r = widgets.draw_text(surf, f"{p.day} (T{p.quarter})",
+        r = widgets.draw_text(surf, f"{p.day} (T{p.quarter}) {mh_mod.fmt_hhmm(minute_now)}",
                               (x + fonts.small().size("DAY  ")[0], y), fonts.small(bold=True),
                               config.COL_WHITE)
-        x = r.right + 18
+        x = r.right + 14
+        # pastilles de sessions de marché ouvertes/fermées (Asie/Europe/Amériques)
+        for sess in ("ASIA", "EUROPE", "AMERICAS"):
+            open_now = mh_mod.is_weekday_open(day_now) and mh_mod.is_session_open(sess, minute_now)
+            dot_col = config.COL_UP if open_now else config.COL_TEXT_DIM
+            r = widgets.draw_text(surf, "●", (x, y), fonts.small(bold=True), dot_col)
+            x = r.right + 2
+        x += 14
         # levier / marge — toujours visible, pour anticiper un margin call
         st = pf_mod.margin_status(p, self.market)
         r = widgets.draw_text(surf, "LEV  ", (x, y), fonts.small(), config.COL_TEXT_DIM)

@@ -341,9 +341,12 @@ class GraphScene(Scene, PopupMixin):
             # les autres classes d'actifs retombent sur la vue "MAX".
             if kind == "stock":
                 hist = self.market.history_of(tk)
+                i = self.market.ticker_idx.get(tk)
+                vol_mult = intraday.vol_mult_for_sigma(float(self.market.sigma[i])) if i is not None else 1.0
                 return intraday.intraday_series(
                     self.market, self.app.sim_clock, self.app.gs.player.day, tk, hist,
-                    window_minutes=-self.period, n_points=60, region=self._region_of(tk))
+                    window_minutes=-self.period, n_points=60, region=self._region_of(tk),
+                    vol_mult=vol_mult)
             n = None
         else:
             n = self.period
@@ -733,7 +736,12 @@ class GraphScene(Scene, PopupMixin):
             return self._empty(surf, rect, "Historique indisponible.")
         lo, hi = min(s), max(s)
         self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:.0f}")
-        n_candles = min(60, len(s))
+        # En intraday, `s` est un échantillonnage fin animé (60 points) ; on
+        # regroupe en moins de bougies que de points pour que chaque bougie
+        # ait un vrai corps/mèche (open/high/low/close distincts) plutôt
+        # qu'un doji plat par point — la bougie la plus récente continue de
+        # bouger en direct à chaque image, tant qu'elle reste "en formation".
+        n_candles = 18 if (self.period is not None and self.period < 0) else min(60, len(s))
         widgets.draw_candles(surf, rect, s, n_candles=n_candles, sma_windows=(10, 30))
         self._x_labels(surf, rect, n_candles)
 

@@ -154,11 +154,16 @@ class MarketQueryMixin:
         """Historique par pas de l'indice. Si `sim_clock`/`day` sont fournis,
         un point animé (Round 11 Phase 3 — `core/intraday.py`) est ajouté en
         fin de série pour que le graphe bouge entre deux pas de marché —
-        affichage uniquement, n'affecte jamais `index_value()`."""
+        affichage uniquement, n'affecte jamais `index_value()`. Bruit amorti
+        (0.6x) par rapport à une société individuelle : un indice diversifié
+        bouge naturellement moins que ses constituants."""
         hist = self.index_hist.get(name, [])
         if sim_clock is not None and day is not None and hist:
             from core import intraday
-            return intraday.append_live(self, sim_clock, day, name, hist)
+            members = self.index_members.get(name, [])
+            sigma = float(np.mean(self.sigma[members])) if len(members) else 0.035
+            vol_mult = intraday.vol_mult_for_sigma(sigma, scale=0.6)
+            return intraday.append_live(self, sim_clock, day, name, hist, vol_mult=vol_mult)
         return hist
 
     def track_company(self, ticker, sim_clock=None, day=None):
@@ -172,7 +177,9 @@ class MarketQueryMixin:
             from core import intraday
             i = self.ticker_idx.get(ticker)
             region = self.companies[i].get("region") if i is not None else None
-            return intraday.append_live(self, sim_clock, day, ticker, hist, region=region)
+            vol_mult = intraday.vol_mult_for_sigma(float(self.sigma[i])) if i is not None else 1.0
+            return intraday.append_live(self, sim_clock, day, ticker, hist, region=region,
+                                         vol_mult=vol_mult)
         return hist
 
     def history_of(self, ticker, n=None, sim_clock=None, day=None):
@@ -187,7 +194,9 @@ class MarketQueryMixin:
         if sim_clock is not None and day is not None and hist:
             from core import intraday
             region = self.companies[i].get("region")
-            return intraday.append_live(self, sim_clock, day, ticker, hist, region=region)
+            vol_mult = intraday.vol_mult_for_sigma(float(self.sigma[i]))
+            return intraday.append_live(self, sim_clock, day, ticker, hist, region=region,
+                                         vol_mult=vol_mult)
         return hist
 
     def price_of(self, ticker):

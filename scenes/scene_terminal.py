@@ -196,6 +196,8 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         self._indices_panel_rect = None   # zone défilable (molette)
         self._indices_scroll = 0
         self._indices_max_scroll = 0
+        if not hasattr(self, "_index_flash"):
+            self._index_flash = widgets.TickFlash()   # flash vert/rouge du tick en direct
         self._career_panel_rect = None   # panneau CARRIÈRE (ex-priorités) → scène carrière
         self._career_content_rect = None  # zone défilable (molette)
         self._career_scroll = 0

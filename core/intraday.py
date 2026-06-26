@@ -28,9 +28,24 @@ _RESOLUTIONS = (720, 60, 5)
 _AMPLITUDES = (1.0, 0.45, 0.2)
 _NOISE_PCT = 0.0009  # amplitude relative max du bruit (~0.09%, "vraie vie")
 
+# Sigma "moyen" du roster (cf. data/companies.py, profils sectoriels ~0.018-0.055) ;
+# sert de référence pour que les sociétés volatiles (tech/semicon...) bougent
+# visiblement plus que les défensives (utilities...) à l'écran.
+_TYPICAL_SIGMA = 0.035
+_VOL_MULT_RANGE = (0.5, 2.2)
+
 
 def minutes_per_step():
     return config.DAYS_PER_STEP * MINUTES_PER_DAY
+
+
+def vol_mult_for_sigma(sigma, scale=1.0):
+    """Multiplicateur de bruit affiché à partir de la volatilité idiosyncratique
+    `sigma` d'une société (cf. `core/market.py::self.sigma`), borné pour rester
+    perceptible sans devenir illisible. `scale` permet d'amortir (indices) ou de
+    garder (sociétés individuelles) l'écart relatif."""
+    lo, hi = _VOL_MULT_RANGE
+    return max(lo, min(hi, (sigma / _TYPICAL_SIGMA) * scale))
 
 
 def _mix(h, x):
@@ -98,20 +113,25 @@ def region_open_factor(region, day, minute_of_day):
     return 1.0 if market_hours.is_region_open(region, day, minute_of_day) else 0.0
 
 
-def wiggle(seed, step_count, key, prev_close, cur_close, progress_minutes, damp=1.0):
+def wiggle(seed, step_count, key, prev_close, cur_close, progress_minutes, damp=1.0,
+           vol_mult=1.0):
     """Valeur animée entre `prev_close` (progress=0) et `cur_close`
     (progress=minutes_per_step()), avec bruit multiplicatif pondéré par
-    `damp` (0..1)."""
+    `damp` (0..1, ouverture de place/coupe-circuit) et `vol_mult` (>=0,
+    intensité relative à la volatilité propre de l'actif, cf.
+    `vol_mult_for_sigma`)."""
+    from core import anim_settings
     total = minutes_per_step()
     t = max(0.0, min(1.0, progress_minutes / total))
     base = prev_close * (1 - t) + cur_close * t
-    if damp <= 0:
+    factor = damp * vol_mult
+    if factor <= 0 or anim_settings.reduce_motion():
         return base
     pinned = _pinned_noise(seed, step_count, key, progress_minutes)
-    return base * (1 + _NOISE_PCT * damp * pinned)
+    return base * (1 + _NOISE_PCT * factor * pinned)
 
 
-def live_point(market, sim_clock, day, key, history, region=None):
+def live_point(market, sim_clock, day, key, history, region=None, vol_mult=1.0):
     """Point "en direct" à ajouter en fin d'une série historique par pas
     (`history[-1]` = clôture du pas courant, `history[-2]` = clôture
     précédente) — pour faire bouger n'importe quel graphe existant sans
@@ -122,21 +142,22 @@ def live_point(market, sim_clock, day, key, history, region=None):
     prev = history[-2] if len(history) >= 2 else cur
     progress = sim_clock.game_minutes_acc
     damp = region_open_factor(region, day, sim_clock.current_time(day)[1]) if region else 1.0
-    return wiggle(market.seed, market.step_count, key, prev, cur, progress, damp=damp)
+    return wiggle(market.seed, market.step_count, key, prev, cur, progress, damp=damp,
+                  vol_mult=vol_mult)
 
 
-def append_live(market, sim_clock, day, key, history, region=None):
+def append_live(market, sim_clock, day, key, history, region=None, vol_mult=1.0):
     """Renvoie une COPIE de `history` avec un point animé ajouté en fin
     (n'altère jamais la liste d'origine — utile quand `history` est une
     référence interne au moteur de marché, p. ex. `index_hist`)."""
-    pt = live_point(market, sim_clock, day, key, history, region=region)
+    pt = live_point(market, sim_clock, day, key, history, region=region, vol_mult=vol_mult)
     if pt is None:
         return list(history)
     return list(history) + [pt]
 
 
 def intraday_series(market, sim_clock, day, key, history, window_minutes, n_points=60,
-                     region=None):
+                     region=None, vol_mult=1.0):
     """`n_points` valeurs animées régulièrement espacées sur les
     `window_minutes` dernières minutes de jeu écoulées jusqu'à "maintenant"
     (remonte dans le(s) pas précédent(s) de `history` si la fenêtre dépasse
@@ -160,7 +181,8 @@ def intraday_series(market, sim_clock, day, key, history, window_minutes, n_poin
         idx_prev = idx_cur - 1
         cur = history[idx_cur] if 0 <= idx_cur < len(history) else history[0]
         prev = history[idx_prev] if 0 <= idx_prev < len(history) else cur
-        val = wiggle(market.seed, market.step_count - back_steps, key, prev, cur, pm, damp=damp)
+        val = wiggle(market.seed, market.step_count - back_steps, key, prev, cur, pm, damp=damp,
+                     vol_mult=vol_mult)
         out.append(val)
     return out
 

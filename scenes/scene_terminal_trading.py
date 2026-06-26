@@ -177,7 +177,7 @@ class TerminalTradingMixin:
     def _warn_if_leveraged(self):
         """Aperçu immédiat du risque pris : si le trade qui vient de s'exécuter
         approche le levier maximal autorisé, le signaler tout de suite plutôt
-        que d'attendre un appel de marge surprise au prochain ADV."""
+        que d'attendre un appel de marge surprise au prochain pas de marché."""
         st = pf_mod.margin_status(self.app.gs.player, self.market)
         if st["max_leverage"] <= 0 or st["leverage"] == float("inf"):
             return

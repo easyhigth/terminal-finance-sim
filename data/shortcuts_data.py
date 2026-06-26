@@ -79,7 +79,7 @@ SECTIONS = [
         ("Clic rail / NOM_COMMANDE", "Chaque bouton du rail correspond à une commande tapable "
                                      "(ex. SHOP, INBOX, NEWS, MORE, SHORTCUTS…)"),
         ("CTRL+M / P / I / N / J", "Marché / Portefeuille / Inbox / News / Mission"),
-        ("CTRL+A / D / F / E / V", "Mandats / Deals / M&A / Décider / ADV (avancer le temps)"),
+        ("CTRL+A / D / F / E", "Mandats / Deals / M&A / Décider"),
         ("CTRL+X / B / T / L / G", "Exam-Certif / Boutique / Tableur / Académie / Glossaire"),
         ("CTRL+O / S / H / K", "Plus (toutes les pages) / Sauvegarder / Aide / Palette de commandes"),
         ("CTRL+MAJ+lettre", "Pages disponibles seulement depuis PLUS (ex. CTRL+MAJ+E "

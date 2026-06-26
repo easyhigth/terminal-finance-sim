@@ -42,7 +42,15 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
 ## Architecture
 
 - **`main.py`** : `App` (boucle pygame, enregistrement des scènes, `ensure_market()`,
-  `advance_on_return`). `core/scene_manager.py` gère la pile de scènes + toasts.
+  `sim_clock`/`pending_market_steps`). `core/scene_manager.py` gère la pile de scènes + toasts.
+- **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
+  pause manuelle, pause automatique. Le temps avance en continu (plus de commande « ADV ») :
+  `App.run()` convertit le temps réel écoulé en pas de marché bancarisés
+  (`App.pending_market_steps`), joués au terminal par `TerminalTimeMixin._drain_pending_steps()`
+  (`scenes/scene_terminal_time.py`). `core/scene_manager.py::SceneManager.go()` met
+  automatiquement l'horloge en pause (`auto_paused`) dès qu'on quitte la scène `"terminal"`
+  (mission, examen, deal, dilemme…) et la reprend exactement au retour — aucune minute de jeu
+  n'est comptée pendant l'absence. Widget de contrôle (⏸/▶/▶▶/▶▶▶) : `ui/simclock_widget.py`.
 - **`core/market.py`** : moteur de marché **déterministe** à modèle de facteurs
   `r_i = drift + beta·F_monde + b_secteur·F_secteur + b_region·F_region + sigma·bruit`.
   Les indices émergent de leurs constituants pondérés capi. Crises = chocs sur les facteurs.

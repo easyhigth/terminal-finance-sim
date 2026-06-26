@@ -52,7 +52,7 @@ class DealScene(Scene):
         self.result = deals_mod.apply_outcome(self.app.gs.player, self.deal_id, ch["quality"])
         self.state = "result"
         # traiter un deal prend du temps : le terminal avancera d'un tour au retour
-        self.app.advance_on_return = 1
+        self.app.pending_market_steps += 1
         if self.result:
             p = self.app.gs.player
             cur = config.CONTINENTS[p.continent]["currency"]

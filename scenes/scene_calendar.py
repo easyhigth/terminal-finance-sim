@@ -190,7 +190,7 @@ class CalendarScene(Scene):
         ev_panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, ev_h)
         inner = widgets.draw_panel(surf, ev_panel, f"Évènements programmés ({len(events)})", config.COL_CYAN)
         if not events:
-            widgets.draw_text(surf, "Aucun évènement programmé. Avancez le temps (ADV) pour en recevoir.",
+            widgets.draw_text(surf, "Aucun évènement programmé. Patientez, le temps avance en direct.",
                               (inner.x, inner.y + 4), fonts.small(), config.COL_TEXT_DIM)
         else:
             y = inner.y

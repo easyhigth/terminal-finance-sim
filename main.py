@@ -13,6 +13,7 @@ from core.game_state import GameState
 from core.market import Market
 from core.pages import PageManager
 from core.scene_manager import SceneManager
+from core.sim_clock import SimClock
 from scenes.scene_academy import AcademyScene
 from scenes.scene_alerts import AlertsScene
 from scenes.scene_alm import AlmScene
@@ -169,7 +170,8 @@ class App:
         self.clock = pygame.time.Clock()
         self.running = True
         self.cheats = False           # activé par main_cheat.py (commandes de test)
-        self.advance_on_return = 0    # tics de temps à jouer au retour au terminal
+        self.sim_clock = SimClock()   # horloge de jeu temps réel (vitesse, pause)
+        self.pending_market_steps = 0  # pas de marché bancarisés par l'horloge, à jouer au terminal
 
         # état de jeu courant (créé à la sélection du continent)
         self.gs = GameState()
@@ -222,6 +224,8 @@ class App:
                     self.toggle_fullscreen()
                     continue
                 self.pages.handle_event(event)
+            if self.gs.player.market_seed:
+                self.pending_market_steps += self.sim_clock.advance(dt, config.DAYS_PER_STEP)
             self.pages.update(dt)
             self.pages.draw(self.screen)
             pygame.display.flip()

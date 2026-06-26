@@ -390,7 +390,7 @@ class FinancialsScene(Scene):
                               (plot_rect.x, plot_rect.bottom - 14), fonts.tiny(),
                               config.COL_TEXT_DIM)
         else:
-            widgets.draw_text(surf, "Historique en constitution (ADV).",
+            widgets.draw_text(surf, "Historique en constitution.",
                               (plot_rect.x, plot_rect.y), fonts.small(), config.COL_TEXT_DIM)
 
         # attribution factorielle du dernier pas (drift, monde, secteur, région,

@@ -144,8 +144,6 @@ class TerminalRenderMixin:
             acc = config.COL_AMBER
             if locked:
                 acc = config.COL_BORDER
-            elif cmd == "ADV":
-                acc = config.COL_UP
             elif cmd == "INBOX" and inbox_mod.unread_count(p):
                 acc = config.COL_CYAN
             elif cmd == "DECIDE" and p.pending_dilemmas:
@@ -576,7 +574,7 @@ class TerminalRenderMixin:
             widgets.draw_text(surf, f"échéance {d['days_left']}j · DEAL {d['id']}",
                               (inner.x, y + 16), fonts.tiny(), acc)
         else:
-            widgets.draw_text(surf, "Aucun deal — ADV pour en générer.", (inner.x, y),
+            widgets.draw_text(surf, "Aucun deal — patientez, le temps avance.", (inner.x, y),
                               fonts.tiny(), config.COL_TEXT_DIM)
         y += 36
         # prochain déblocage

@@ -193,7 +193,7 @@ class IPOScene(Scene):
         off_panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, off_h)
         inner = widgets.draw_panel(surf, off_panel, f"Offres en attente ({len(offers)})", config.COL_CYAN)
         if not offers:
-            widgets.draw_text(surf, "Aucune offre en attente. Avancez le temps (ADV) pour en recevoir.",
+            widgets.draw_text(surf, "Aucune offre en attente. Patientez, le temps avance en direct.",
                               (inner.x, inner.y + 4), fonts.small(), config.COL_TEXT_DIM)
         else:
             y = inner.y

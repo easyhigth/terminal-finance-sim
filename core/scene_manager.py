@@ -9,7 +9,8 @@ import pygame
 
 from core import config, fuzzy
 from core.i18n import get_lang
-from ui import fonts, widgets
+from core.sim_clock import LIVE_SCENE_NAMES
+from ui import fonts, simclock_widget, widgets
 
 PALETTE_W, PALETTE_H = 560, 360
 PALETTE_ROW_H = 30
@@ -90,6 +91,13 @@ class SceneManager:
         self.current.on_enter(**kwargs)
         self._fade = 1.0          # déclenche le fondu d'entrée
         self.palette_open = False
+        # pause automatique de l'horloge de jeu dès qu'on quitte la scène
+        # principale (mission, examen, deal, dilemme...) ; reprise exacte au
+        # retour, sans rattrapage — aucune minute de jeu n'est comptée
+        # pendant l'absence (cf. core/sim_clock.py).
+        clock = getattr(self.app, "sim_clock", None)
+        if clock is not None:
+            clock.set_auto_paused(name not in LIVE_SCENE_NAMES)
 
     # --- fil d'Ariane (breadcrumb) -----------------------------------------
     def _update_breadcrumb(self, name, kwargs):
@@ -338,6 +346,10 @@ class SceneManager:
         if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
                 and self._handle_breadcrumb_click(event.pos)):
             return
+        if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                and self.current_name not in BREADCRUMB_SKIP
+                and simclock_widget.handle_click(self.app, event.pos)):
+            return
         # on ignore les entrées pendant le tout début du fondu pour éviter
         # les clics fantômes hérités de la scène précédente
         if self.current and self._fade < 0.6:
@@ -357,6 +369,8 @@ class SceneManager:
             return
         self.current.draw(surf)
         self._draw_breadcrumb(surf)
+        if self.current_name not in BREADCRUMB_SKIP:
+            simclock_widget.draw(surf, self.app)
         # overlay : notifications (toasts) au-dessus de la scène, sous le fondu
         notes = getattr(self.app, "notes", None)
         if notes:

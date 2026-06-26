@@ -137,7 +137,7 @@ class NewsScene(Scene):
         ry = list_top - self.scroll
         last_day = None
         if not items:
-            widgets.draw_text(surf, "Aucune actualité pour ce filtre (avancez le temps avec ADV).",
+            widgets.draw_text(surf, "Aucune actualité pour ce filtre (patientez, le temps avance en direct).",
                               (inner.x, list_top + 4), fonts.body(), config.COL_TEXT_DIM)
         for e in items:
             if e["day"] != last_day:

@@ -217,7 +217,7 @@ class DealsScene(Scene):
         cur = config.CONTINENTS.get(p.continent, {}).get("currency", "$")
 
         if not p.deals:
-            widgets.draw_text(surf, "Aucun deal en cours. Avancez le temps (ADV) pour en générer.",
+            widgets.draw_text(surf, "Aucun deal en cours. Patientez, le temps avance en direct.",
                               (inner.x, list_top + 4), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             return

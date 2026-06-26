@@ -1,8 +1,9 @@
 """
 scene_terminal_time.py — Moteur d'avance du temps du terminal (TerminalTimeMixin) :
-un pas de marché complet (_advance_time) et l'avance jusqu'au trimestre suivant
-(_advance_to_quarter). Extrait de scene_terminal_commands.py pour limiter sa
-taille ; mixé dans TerminalScene avec les autres mixins de commandes.
+un pas de marché complet (_advance_time), et la lecture des pas bancarisés par
+l'horloge de jeu en temps réel (_drain_pending_steps, cf. core/sim_clock.py).
+Extrait de scene_terminal_commands.py pour limiter sa taille ; mixé dans
+TerminalScene avec les autres mixins de commandes.
 """
 
 from core import badges as badges_mod
@@ -520,46 +521,24 @@ class TerminalTimeMixin:
             "game_over": game_over,
         }
 
-    # libellés courts affichés quand ADV Q s'interrompt avant la fin du trimestre
-    # (fonctions et non valeurs figées : la langue peut changer en cours de partie)
-    _ADV_STOP_LABELS = {
-        "game_over": lambda: _L("fin de partie", "game over"),
-        "dilemma": lambda: _L("décision requise", "decision required"),
-        "stress_test": lambda: _L("stress test réglementaire", "regulatory stress test"),
-        "review": lambda: _L("revue de performance", "performance review"),
-        "investigation": lambda: _L("enquête réglementaire", "regulatory investigation"),
-        "mandate_offer": lambda: _L("nouvelle offre de mandat", "new mandate offer"),
-        "scenario": lambda: _L("évènement de marché", "market event"),
-        "margin_call": lambda: _L("appel de marge", "margin call"),
-    }
-
-    def _advance_to_quarter(self):
-        """ADV Q : avance jusqu'au changement de trimestre, en répétant les pas
-        de _advance_time(), MAIS s'arrête immédiatement dès qu'un évènement
-        bloquant survient (dilemme, crise, mandat offert, appel de marge,
-        convocation, game over...) — on ne saute jamais par-dessus un évènement,
-        on évite juste au joueur de spammer ADV ~18 fois sans rien d'autre à faire.
-        """
-        p = self.app.gs.player
-        start_quarter = p.quarter
-        steps = 0
-        # garde-fou anti-boucle infinie : largement au-dessus du nombre de pas
-        # attendu pour un trimestre (config.DAYS_PER_QUARTER / DAYS_PER_STEP).
-        max_steps = (config.DAYS_PER_QUARTER // config.DAYS_PER_STEP) + 4
-        while steps < max_steps:
+    def _drain_pending_steps(self):
+        """Joue les pas de marché bancarisés par l'horloge de jeu (cf.
+        core/sim_clock.py) depuis le dernier appel — normalement 0 ou 1 par
+        frame (le terminal est la seule scène où l'horloge tourne au premier
+        plan), mais peut en bancariser plusieurs d'un coup au retour d'une
+        scène bloquante (mission/éval/deal) où le temps a aussi avancé.
+        S'arrête immédiatement sur tout évènement bloquant — les pas restants
+        resteront en attente, et seront rejoués au prochain appel."""
+        steps = getattr(self.app, "pending_market_steps", 0)
+        # garde-fou anti-rattrapage massif (ex. après une longue absence de
+        # l'app) : on ne joue jamais plus que ça d'un coup, le reste reste
+        # bancarisé pour les frames suivantes.
+        max_per_call = 20
+        played = 0
+        while steps > 0 and played < max_per_call:
+            steps -= 1
+            played += 1
+            self.app.pending_market_steps = steps
             result = self._advance_time()
-            steps += 1
-            if result.get("game_over"):
+            if result.get("game_over") or result["stop"]:
                 return
-            if result["stop"]:
-                label_fn = self._ADV_STOP_LABELS.get(result["reason"])
-                label = label_fn() if label_fn else result["reason"]
-                self._log(_L(f"  ⏸ ADV Q interrompu après {steps} pas : {label}.",
-                              f"  ⏸ ADV Q stopped after {steps} step(s): {label}."))
-                return
-            if p.quarter != start_quarter:
-                self._log(_L(f"  ⏩ ADV Q : nouveau trimestre atteint en {steps} pas.",
-                              f"  ⏩ ADV Q: reached next quarter in {steps} step(s)."))
-                return
-        self._log(_L(f"  ⏸ ADV Q interrompu après {steps} pas (limite de sécurité).",
-                      f"  ⏸ ADV Q stopped after {steps} step(s) (safety limit)."))

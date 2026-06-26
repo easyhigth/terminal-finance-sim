@@ -12,8 +12,9 @@ GOAL = ("De stagiaire à Partner : gravissez 12 grades en bâtissant votre "
         "réputation et votre fortune, dans une simulation de marché vivante.")
 
 HOW = [
-    ("ADV", "Avance le temps de 5 jours. Le marché (320 sociétés fictives, "
-            "interconnectées) évolue, des actus et des crises surgissent."),
+    ("⏸▶▶▶▶▶▶", "Le temps avance en direct, à la vitesse choisie. Le marché "
+                "(320 sociétés fictives, interconnectées) évolue, des actus et "
+                "des crises surgissent."),
     ("MISSION", "Accomplis le travail de ton grade (analyse, décisions...) "
                 "pour gagner de la réputation."),
     ("EVAL", "Quand réputation + critères (missions, deals, ancienneté) sont "

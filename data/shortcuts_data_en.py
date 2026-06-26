@@ -69,7 +69,7 @@ SECTIONS_EN = [
         ("Click rail / COMMAND_NAME", "Each rail button corresponds to a typeable "
                                        "command (e.g. SHOP, INBOX, NEWS, MORE, SHORTCUTS…)"),
         ("CTRL+M / P / I / N / J", "Market / Portfolio / Inbox / News / Mission"),
-        ("CTRL+A / D / F / E / V", "Mandates / Deals / M&A / Decide / ADV (advance time)"),
+        ("CTRL+A / D / F / E", "Mandates / Deals / M&A / Decide"),
         ("CTRL+X / B / T / L / G", "Exam-Cert / Shop / Spreadsheet / Academy / Glossary"),
         ("CTRL+O / S / H / K", "More (all pages) / Save / Help / Command palette"),
         ("CTRL+SHIFT+letter", "Pages only available from MORE (e.g. CTRL+SHIFT+E "

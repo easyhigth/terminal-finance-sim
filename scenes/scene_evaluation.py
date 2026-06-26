@@ -214,7 +214,7 @@ class EvaluationScene(Scene):
         from core import career
         p = self.app.gs.player
         p.eval_state = {}                 # examen terminé : on efface l'état en pause
-        self.app.advance_on_return = 1    # passer une éval fait avancer le temps d'un tic
+        self.app.pending_market_steps += 1    # passer une éval fait avancer le temps d'un tic
         ratio = self.score / max(1, len(self.items))
         self.passed = ratio >= self.pass_threshold
         if self.mode == "cert":

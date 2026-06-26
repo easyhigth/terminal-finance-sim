@@ -51,7 +51,6 @@ RAIL_SHORTCUTS = {
     pygame.K_d: "DEALS",
     pygame.K_f: "MA",
     pygame.K_e: "DECIDE",
-    pygame.K_v: "ADV",
     pygame.K_x: "EXAMCERT",
     pygame.K_b: "SHOP",
     pygame.K_t: "SHEET",
@@ -90,8 +89,8 @@ ZONE_ORDER = ["console", "rail", "indices", "health", "topco", "career", "feed"]
 
 # Noms de commandes pour l'autocomplétion (Tab) et la suggestion fantôme
 CMD_NAMES = [
-    "HELP", "COMMANDS", "ADV", "MISSION", "EVAL", "EXAMCERT", "TRACK", "CAREER", "INBOX",
-    "RIVALS", "RECLAIM", "RECONVERT", "MANDATES", "MANDATE", "DECIDE", "MARKET", "MARKETHUB", "TOP", "MOVERS",
+    "HELP", "COMMANDS", "MISSION", "EVAL", "EXAMCERT", "TRACK", "CAREER", "INBOX",
+    "RIVALS", "RECLAIM", "RECONVERT", "MANDATES", "MANDATE", "DECIDE", "MARKET", "MARKETHUB", "HOURS", "TOP", "MOVERS",
     "COMPANY", "FA", "SEARCH", "ACCESS", "EXPLORE", "SHOP", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS", "LEGACY", "ARCHETYPE",
     "TENSION", "CRISIS",
@@ -217,7 +216,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             ("MISSION", "MISSION"), ("MANDATS", "MANDATES"),
             ("DEALS", "DEALS"), ("M&A", "MA"), ("DÉCIDE", "DECIDE"),
             (None, "AGIR & PROGRESSER"),
-            ("ADV ▸", "ADV"), ("EXAM/CERTIF", "EXAMCERT"),
+            ("EXAM/CERTIF", "EXAMCERT"),
             (None, "OUTILS"),
             ("SHOP", "SHOP"), ("EXPLORATEUR", "EXPLORER"), ("GRAPHES", "GP"),
             ("ÉQUIPES/ANALYSTES", "TEAM"), ("PLUS", "MORE"),
@@ -228,11 +227,13 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             self.networth_spark.push(v)
         if not p.cash_history:
             self.networth_spark.push(p.cash)
-        # une tâche longue (mission / deal / éval) fait passer le temps comme un ADV
-        if getattr(self.app, "advance_on_return", 0) and not p.game_over:
-            self.app.advance_on_return = 0
-            self._log(_L("  ⏱ Le temps avance pendant que vous travaillez…","  ⏱ Time advances while you work…"))
-            self._advance_time()
+        # une tâche longue (mission / deal / éval) fait passer le temps : les pas
+        # bancarisés par l'horloge pendant l'absence (cf. core/sim_clock.py) sont
+        # joués ici, au retour sur le terminal.
+        if getattr(self.app, "pending_market_steps", 0) and not p.game_over:
+            self._log(_L("  ⏱ Le temps a avancé pendant que vous travailliez…",
+                          "  ⏱ Time advanced while you were working…"))
+            self._drain_pending_steps()
         # tutoriel auto-déclenché à l'unlock d'une fonctionnalité (cf. scene_evaluation._finish)
         tid = p.flags.pop("pending_tutorial", None)
         if tid:
@@ -702,7 +703,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             if novice:
                 if get_lang() == "en":
                     self._log(
-                        "  ADV advance · ADV Q advance to next quarter · COMMANDS full catalogue",
+                        "  COMMANDS full catalogue · the clock runs live (⏸/▶/▶▶/▶▶▶ top-right)",
                         "  MARKET indices · COMPANY <tk> · SEARCH · WATCHLIST",
                         "  MISSION work · CAREER career · EVAL promotion",
                         "  LEARN academy · GLOSSARY · DEFINE <term>",
@@ -713,7 +714,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                     )
                 else:
                     self._log(
-                        "  ADV avancer · ADV Q avancer jusqu'au trimestre suivant · COMMANDS catalogue complet",
+                        "  COMMANDS catalogue complet · le temps avance en direct (⏸/▶/▶▶/▶▶▶ en haut à droite)",
                         "  MARKET indices · COMPANY <tk> · SEARCH · WATCHLIST",
                         "  MISSION travailler · CAREER carrière · EVAL promotion",
                         "  LEARN académie · GLOSSARY · DEFINE <terme>",
@@ -725,7 +726,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                 return
             if get_lang() == "en":
                 self._log(
-                    "  ADV advance · ADV Q advance to next quarter (stops on events) · COMMANDS full catalogue",
+                    "  COMMANDS full catalogue · the clock runs live (⏸/▶/▶▶/▶▶▶ top-right)",
                     "  MARKET indices · TOP [region] · MOVERS · EXPLORE explorer",
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
                     "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC charts",
@@ -743,7 +744,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                 )
             else:
                 self._log(
-                    "  ADV avancer · ADV Q avancer jusqu'au trimestre suivant (s'arrête sur évènement) · COMMANDS catalogue complet",
+                    "  COMMANDS catalogue complet · le temps avance en direct (⏸/▶/▶▶/▶▶▶ en haut à droite)",
                     "  MARKET indices · TOP [region] · MOVERS · EXPLORE explorer",
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
                     "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC graphes",
@@ -761,13 +762,10 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                 )
         elif cmd in ("COMMANDS", "?", "CMD"):
             self.app.scenes.go("commands", return_to="terminal")
-        elif cmd in ("ADV", "NEXT", "ADVANCE", "T"):
-            if arg and arg.upper() == "Q":
-                self._advance_to_quarter()
-            else:
-                self._advance_time()
         elif cmd in ("MARKET", "INDEX", "INDICES", "WEI"):
             self._cmd_market()
+        elif cmd == "HOURS":
+            self._cmd_hours()
         elif cmd == "MARKETHUB":
             self.app.scenes.go("markethub", return_to="terminal")
         elif cmd == "TOP":
@@ -1038,5 +1036,6 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         self.worldmap.update(dt)
         onboarding_mod.progress(self.app.gs.player, self.app)
         self._sync_workspace()
+        self._drain_pending_steps()
 
     # ----------------------------------------------------------------- draw

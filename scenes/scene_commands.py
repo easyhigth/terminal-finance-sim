@@ -19,8 +19,6 @@ CATALOG = [
         ("HELP", "Aide rapide (commandes essentielles)"),
         ("COMMANDS / ?", "Ce catalogue complet"),
         ("STATUS", "Votre situation : grade, cash, réputation, temps"),
-        ("ADV / NEXT / T", "Avancer le temps de 5 jours (un pas de marché)"),
-        ("ADV Q", "Avancer jusqu'au trimestre suivant (s'arrête sur tout évènement)"),
         ("MENU / ESC", "Retour au menu principal"),
         ("SAVE", "Sauvegarde manuelle (désactivée en hardcore)"),
         ("SAVES / LOAD", "Gestion des sauvegardes (slots)"),
@@ -60,6 +58,8 @@ CATALOG = [
     ]),
     ("Marché & sociétés", [
         ("MARKET / WEI", "Indices mondiaux (C&D 500, KAK 40, NKX 225…)"),
+        ("HOURS", "Statut des sessions de cotation Asie/Europe/Amériques (ouvert/fermé, "
+                  "heure de réouverture) — le trading actions est bloqué hors session"),
         ("TENSION", "Arc de tension du marché : phase, niveau, crises actives"),
         ("TOP [region] / RANKING", "Meilleures sociétés (USA / Europe / Asia…)"),
         ("MOVERS", "Plus fortes hausses / baisses du dernier pas"),

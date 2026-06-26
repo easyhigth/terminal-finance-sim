@@ -101,7 +101,7 @@ class RivalsScene(Scene):
         inner = widgets.draw_panel(surf, col_left, "Journal d'activité des rivaux", config.COL_DOWN)
         log_events = R.recent_activity(player, limit=max(1, inner.h // 16))
         if not log_events:
-            widgets.draw_text(surf, "Aucune activité rivale récente. Avancez le temps (ADV) pour en générer.",
+            widgets.draw_text(surf, "Aucune activité rivale récente. Patientez, le temps avance en direct.",
                               (inner.x, inner.y + 2), fonts.tiny(), config.COL_TEXT_DIM)
         else:
             y = inner.y
@@ -119,8 +119,8 @@ class RivalsScene(Scene):
         recent = list(reversed(getattr(player, "rival_events", None) or []))[:max_recent]
         if not recent:
             widgets.draw_text_wrapped(surf, "Rien à signaler pour l'instant. Les rivaux agissent "
-                                      "en avançant le temps (ADV) : sniping de deals, débauchage "
-                                      "de mandats, percées en cours.",
+                                      "au fil du temps (qui avance en direct) : sniping de deals, "
+                                      "débauchage de mandats, percées en cours.",
                               (inner2.x, inner2.y + 2), fonts.tiny(), config.COL_TEXT_DIM, inner2.w)
             return
         y = inner2.y

@@ -435,8 +435,8 @@ class CompanyScene(Scene):
                               (cinner.right, cinner.y), fonts.tiny(), config.COL_TEXT_DIM, align="right")
         else:
             widgets.draw_text_wrapped(
-                surf, "Historique en cours de constitution. Avancez le temps (ADV) "
-                "depuis le terminal pour voir le cours évoluer.",
+                surf, "Historique en cours de constitution. Laissez le temps avancer "
+                "(le marché évolue en direct) pour voir le cours évoluer.",
                 (cinner.x, cinner.y), fonts.small(), config.COL_TEXT_DIM, cinner.w)
 
     # --------------------------------------------------------- onglet 2
@@ -540,7 +540,7 @@ class CompanyScene(Scene):
         m = self.app.market
         hist = m.track_company(self.ticker) if m else []
         if not hist or len(hist) < 2:
-            widgets.draw_text(surf, "Historique en cours de constitution (ADV).",
+            widgets.draw_text(surf, "Historique en cours de constitution.",
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
             return
         if self.chart_kind == "candles":

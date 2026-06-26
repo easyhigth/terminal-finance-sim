@@ -400,7 +400,7 @@ class Sparkline:
 
 
 def draw_series(surf, rect, vals, color=None, baseline=True, mouse_pos=None, y_fmt=None,
-                show_pct=False, show_extrema=True, extrema_label=True):
+                show_pct=False, show_extrema=True, extrema_label=True, band_frac=None):
     """Trace une polyligne à partir d'une liste de valeurs, dans `rect`.
 
     Si `mouse_pos` est fourni et survole `rect`, affiche un curseur (ligne
@@ -411,7 +411,11 @@ def draw_series(surf, rect, vals, color=None, baseline=True, mouse_pos=None, y_f
     annote déjà ses propres extrêmes, p. ex. record/plus bas d'une carrière).
     `extrema_label=False` garde les petits triangles d'extrêmes mais omet
     leur étiquette de valeur (l'appelant l'affiche ailleurs, hors du tracé,
-    pour éviter tout chevauchement sur les graphes compacts)."""
+    pour éviter tout chevauchement sur les graphes compacts).
+    `band_frac` (fraction, p. ex. 0.0008 = 0.08%) dessine une bande
+    translucide bid/ask "respirant" autour du dernier prix — purement
+    visuelle (profondeur de marché simulée), sans rapport avec le prix
+    d'exécution réel des ordres."""
     rect = pygame.Rect(rect)
     if not vals or len(vals) < 2:
         return
@@ -423,6 +427,13 @@ def draw_series(surf, rect, vals, color=None, baseline=True, mouse_pos=None, y_f
     if baseline:
         by = rect.bottom - int((vals[0] - lo) / span * rect.h)
         pygame.draw.line(surf, config.COL_GRID, (rect.x, by), (rect.right, by), 1)
+    if band_frac:
+        last = vals[-1]
+        ask_y = rect.bottom - int((last * (1 + band_frac) - lo) / span * rect.h)
+        bid_y = rect.bottom - int((last * (1 - band_frac) - lo) / span * rect.h)
+        band = pygame.Surface((rect.w, max(1, bid_y - ask_y)), pygame.SRCALPHA)
+        band.fill((*col[:3], 40))
+        surf.blit(band, (rect.x, ask_y))
     pts = []
     n = len(vals)
     for i, v in enumerate(vals):

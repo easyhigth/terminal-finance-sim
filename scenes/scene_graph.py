@@ -28,7 +28,7 @@ from core import etfs as ETF
 from core import intraday
 from core.scene_manager import Scene
 from ui import fonts, widgets
-from ui.popups import PopupMixin
+from ui.popups import ChartPopup, PopupMixin
 
 
 def _asset_exists(market, tk):
@@ -73,7 +73,7 @@ _NO_ASSET = {"macro", "curve"}     # types sans saisie d'actif
 INTRADAY_PERIODS = [(label, -minutes) for label, minutes in intraday.INTRADAY_WINDOWS]
 STEP_PERIODS = [("1A", 73), ("3A", 219), ("5A", 365), ("MAX", None)]
 PERIODS = INTRADAY_PERIODS + STEP_PERIODS
-_INTRADAY_KINDS = {"line", "candles", "bars", "change"}
+_INTRADAY_KINDS = {"line", "candles", "bars", "change", "compare"}
 _MAX_TICKERS = 10   # au-delà, légendes/puces deviennent illisibles
 SERIES_COLS = [config.COL_AMBER, config.COL_CYAN, config.COL_UP, config.COL_WARN,
                config.COL_PRESTIGE, config.COL_DOWN]
@@ -113,6 +113,7 @@ class GraphScene(Scene, PopupMixin):
         self.input = ""
         self._type_rects = {}
         self._period_rects = {}
+        self._candle_rects = []
         self._suggest_rects = []
         self._chip_rects = []
         self._quickadd_rects = []
@@ -222,6 +223,11 @@ class GraphScene(Scene, PopupMixin):
             for steps, rect in self._period_rects.items():
                 if rect.collidepoint(event.pos):
                     self.period = steps
+            if self.kind == "candles":
+                for click_rect, sub in getattr(self, "_candle_rects", []):
+                    if click_rect.collidepoint(event.pos) and len(sub) >= 2:
+                        self._open_candle_zoom(sub)
+                        return
             if self._info_name_rect and self._info_name_rect.collidepoint(event.pos) and self.tickers:
                 self.app.scenes.go("explorer", return_to=self.return_to, search=self.tickers[0])
                 return
@@ -246,6 +252,22 @@ class GraphScene(Scene, PopupMixin):
             for attr, btn, _ in self._indicator_btns:
                 if btn.handle(event):
                     setattr(self, attr, not getattr(self, attr))
+
+    def _open_candle_zoom(self, sub):
+        """Ouvre une fenêtre flottante affichant le chemin de prix détaillé
+        sous-jacent à une bougie cliquée (drill-down) — réutilise les valeurs
+        déjà bucketées par `_track_candle_rects`, sans nouvel appel marché."""
+        col = config.COL_UP if sub[-1] >= sub[0] else config.COL_DOWN
+
+        def render(surf, content, vals=sub, color=col):
+            widgets.draw_series(surf, content, vals, color, show_pct=True,
+                                mouse_pos=pygame.mouse.get_pos())
+
+        tk = self.tickers[0] if self.tickers else "?"
+        w = ChartPopup(f"ZOOM BOUGIE — {tk}", pos=self._popup_pos(), accent=col, render_fn=render)
+        self.popups.append(w)
+        if len(self.popups) > self._MAX_POPUPS:
+            self.popups.pop(0)
 
     def _commit_input(self, ticker=None):
         # recherche intelligente : résout un nom/ticker partiel vers un ticker
@@ -744,6 +766,24 @@ class GraphScene(Scene, PopupMixin):
         n_candles = 18 if (self.period is not None and self.period < 0) else min(60, len(s))
         widgets.draw_candles(surf, rect, s, n_candles=n_candles, sma_windows=(10, 30))
         self._x_labels(surf, rect, n_candles)
+        self._track_candle_rects(rect, s, n_candles)
+
+    def _track_candle_rects(self, rect, closes, n_candles):
+        """Mémorise le rect écran + le détail brut (sous-échantillon) de
+        chaque bougie affichée, pour permettre un drill-down au clic (idée
+        « zoom bougie ») sans recalculer la moindre donnée de marché."""
+        n = len(closes)
+        n_c = max(1, min(n_candles, n))
+        bucket = max(1, n // n_c)
+        candles = widgets._aggregate_ohlc(closes, n_candles)
+        n_actual = len(candles)
+        slot = rect.w / n_actual
+        self._candle_rects = []
+        for k in range(n_actual):
+            cx = rect.x + (k + 0.5) * slot
+            click_rect = pygame.Rect(int(cx - slot / 2), rect.y, max(1, int(slot)), rect.h)
+            sub = closes[k * bucket:(k + 1) * bucket] or closes[k * bucket:k * bucket + 1]
+            self._candle_rects.append((click_rect, sub))
 
     def _draw_bars(self, surf, rect):
         if not self.tickers:

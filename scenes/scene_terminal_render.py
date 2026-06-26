@@ -695,5 +695,29 @@ class TerminalRenderMixin:
             gx = gr.right
         widgets.draw_text(surf, cursor, (r.right if not ghost else gx, rect.bottom - 20),
                           fonts.small(bold=True), config.COL_AMBER)
+        self._draw_console_spark(surf, rect)
 
         widgets.draw_hint_bar(surf, (rect.right - 10, rect.bottom - 20), self._focus_hints())
+
+    def _draw_console_spark(self, surf, rect):
+        """Mini sparkline du ticker en cours de saisie (BUY/SELL/SHORT/COVER
+        <ticker>) à côté de la barre de commande — aperçu visuel immédiat sans
+        quitter le terminal ni ouvrir la fiche société."""
+        parts = self.cmd.strip().split()
+        if len(parts) < 2 or parts[0].upper() not in ("BUY", "SELL", "SHORT", "COVER"):
+            return
+        m = self.app.market
+        if not m:
+            return
+        ticker = parts[1].upper()
+        if ticker not in m.ticker_idx:
+            return
+        hist = m.track_company(ticker, self.app.sim_clock, self.app.gs.player.day)
+        if not hist or len(hist) < 2:
+            return
+        spark_w, spark_h = 90, 16
+        spark_rect = pygame.Rect(rect.right - spark_w - 14, rect.bottom - 34, spark_w, spark_h)
+        col = config.COL_UP if hist[-1] >= hist[0] else config.COL_DOWN
+        widgets.draw_series(surf, spark_rect, hist[-30:], col, baseline=False, show_extrema=False)
+        widgets.draw_text(surf, f"{ticker} {hist[-1]:,.2f}", (spark_rect.x, spark_rect.y - 14),
+                          fonts.tiny(), config.COL_TEXT_DIM)

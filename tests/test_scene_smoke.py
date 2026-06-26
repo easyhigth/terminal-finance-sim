@@ -80,7 +80,7 @@ _KNOWN_SCENES = [
     "financials", "bonds", "governments", "commodities", "crypto", "etfs",
     "news", "notifications", "more", "structured", "credit", "alm", "swaps", "hedge",
     "options", "ipo", "fx", "review", "calendar", "graph", "rivals",
-    "analytics", "performance", "explorer", "tutorials", "splash", "markethub", "shop",
+    "analytics", "performance", "explorer", "tutorials", "splash", "markethub", "wall", "shop",
     "examcert", "stresstest", "history", "team", "alerts", "frontier_lab",
     "dashboard", "compare",
 ]

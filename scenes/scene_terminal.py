@@ -16,6 +16,7 @@ from core import career as career_mod
 from core import config
 from core import news as news_mod
 from core import onboarding as onboarding_mod
+from core import portfolio_views as pv_mod
 from core import rivals as rivals_mod
 from core import unlocks as unlocks_mod
 from core.i18n import get_lang
@@ -90,7 +91,7 @@ ZONE_ORDER = ["console", "rail", "indices", "health", "topco", "career", "feed"]
 # Noms de commandes pour l'autocomplétion (Tab) et la suggestion fantôme
 CMD_NAMES = [
     "HELP", "COMMANDS", "MISSION", "EVAL", "EXAMCERT", "TRACK", "CAREER", "INBOX",
-    "RIVALS", "RECLAIM", "RECONVERT", "MANDATES", "MANDATE", "DECIDE", "MARKET", "MARKETHUB", "HOURS", "TOP", "MOVERS",
+    "RIVALS", "RECLAIM", "RECONVERT", "MANDATES", "MANDATE", "DECIDE", "MARKET", "MARKETHUB", "WALL", "HOURS", "TOP", "MOVERS",
     "COMPANY", "FA", "SEARCH", "ACCESS", "EXPLORE", "SHOP", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS", "LEGACY", "ARCHETYPE",
     "TENSION", "CRISIS",
@@ -198,6 +199,8 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         self._indices_max_scroll = 0
         if not hasattr(self, "_index_flash"):
             self._index_flash = widgets.TickFlash()   # flash vert/rouge du tick en direct
+        if not hasattr(self, "_pnl_sign"):
+            self._pnl_sign = {}   # signe du P&L latent par ticker, pour notifier un franchissement
         self._career_panel_rect = None   # panneau CARRIÈRE (ex-priorités) → scène carrière
         self._career_content_rect = None  # zone défilable (molette)
         self._career_scroll = 0
@@ -770,6 +773,8 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             self._cmd_hours()
         elif cmd == "MARKETHUB":
             self.app.scenes.go("markethub", return_to="terminal")
+        elif cmd == "WALL":
+            self.app.scenes.go("wall", return_to="terminal")
         elif cmd == "TOP":
             self._cmd_top(arg)
         elif cmd in ("EXPLORE", "EXPLORER", "EXPLO"):
@@ -1039,5 +1044,27 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         onboarding_mod.progress(self.app.gs.player, self.app)
         self._sync_workspace()
         self._drain_pending_steps()
+        self._check_pnl_threshold()
+
+    def _check_pnl_threshold(self):
+        """Notifie un toast quand le P&L latent d'une position franchit le
+        seuil de signe (passe en perte ou en gain) pendant qu'on regarde le
+        marché en direct — purement informatif, n'affecte aucun ordre."""
+        m = self.app.market
+        if not m:
+            return
+        for h in pv_mod.holdings(self.app.gs.player, m):
+            tk, pnl = h["ticker"], h["pnl"]
+            sign = 1 if pnl > 0 else (-1 if pnl < 0 else 0)
+            prev = self._pnl_sign.get(tk)
+            if prev is not None and sign != 0 and prev != sign and prev != 0:
+                if sign > 0:
+                    self.app.notify(f"{tk} : position repassée en gain latent ({pnl:+,.0f})", "good")
+                else:
+                    self.app.notify(f"{tk} : position repassée en perte latente ({pnl:+,.0f})", "warn")
+            self._pnl_sign[tk] = sign
+        for tk in list(self._pnl_sign):
+            if tk not in self.app.gs.player.portfolio:
+                del self._pnl_sign[tk]
 
     # ----------------------------------------------------------------- draw

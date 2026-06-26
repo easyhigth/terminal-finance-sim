@@ -12,6 +12,9 @@ import pygame
 from core import charts as charts
 from core import config
 from core import financials as F
+from core import intraday
+from core import liquidity
+from core import market_hours as mh_mod
 from core import news as N
 from core.scene_manager import Scene
 from ui import fonts, widgets
@@ -547,12 +550,36 @@ class CompanyScene(Scene):
                                             config.COL_WHITE)
         widgets.draw_text(surf, f"{hist[-1]:,.2f} {self.cur}", (panel_rect.right - 12, panel_rect.y + 4),
                           fonts.small(bold=True), flash_col, align="right")
+        i = m.ticker_idx.get(self.ticker)
+        badge_x = panel_rect.x
+        if i is not None:
+            vol_mult = intraday.vol_mult_for_sigma(float(m.sigma[i]))
+            widgets.draw_text(surf, f"Volatilité relative ×{vol_mult:.1f}",
+                              (badge_x, panel_rect.y + 4), fonts.tiny(), config.COL_TEXT_DIM)
+            badge_x += 170
+            region = m.companies[i].get("region")
+            day = self.app.gs.player.day
+            minute_of_day = self.app.sim_clock.current_time(day)[1]
+            if region and not mh_mod.is_region_open(region, day, minute_of_day):
+                widgets.draw_text(surf, "MARCHÉ FERMÉ — prix gelé", (badge_x, panel_rect.y + 4),
+                                  fonts.tiny(bold=True), config.COL_WARN)
+                badge_x += 180
+            recent = hist[-12:]
+            if len(recent) >= 6:
+                rets = [abs(recent[k] / recent[k - 1] - 1) for k in range(1, len(recent))]
+                avg_ret = sum(rets) / len(rets)
+                if avg_ret > 0.0009 * vol_mult * 1.6:
+                    widgets.draw_text(surf, "🔥 forte variation", (badge_x, panel_rect.y + 4),
+                                      fonts.tiny(bold=True), config.COL_DOWN)
         if self.chart_kind == "candles":
             widgets.draw_candles(surf, inner, hist, n_candles=32, sma_windows=(10, 30))
         elif self.chart_kind == "line":
             col = config.COL_UP if hist[-1] >= hist[0] else config.COL_DOWN
+            tier = liquidity.equity_tier(m, self.ticker)
+            half_spread = liquidity.params(tier)[0]
             widgets.draw_series(surf, inner, hist, col, mouse_pos=pygame.mouse.get_pos(),
-                                y_fmt=lambda v: f"{v:,.2f} {self.cur}", show_pct=True)
+                                y_fmt=lambda v: f"{v:,.2f} {self.cur}", show_pct=True,
+                                band_frac=half_spread)
         elif self.chart_kind == "vol":
             vol = [v for v in charts.rolling_vol(hist, 20) if v is not None]
             if len(vol) < 2:

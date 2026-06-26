@@ -103,6 +103,14 @@ def _pinned_noise(seed, step, key, minute):
     return raw - (raw0 * (1 - t) + raw1 * t)
 
 
+def speed_factor(sim_clock):
+    """Intensité de bruit relative à la vitesse de jeu (x1/x2/x3) : plus le temps
+    défile vite, plus le marché doit sembler "vivant" à l'écran (sans toucher au
+    pas du moteur ni au prix d'exécution)."""
+    speed = getattr(sim_clock, "speed", 1)
+    return 1.0 + 0.15 * (speed - 1)
+
+
 def region_open_factor(region, day, minute_of_day):
     """1.0 si la place régionale est ouverte, 0.0 sinon (gèle le bruit —
     la dérive linéaire vers la prochaine clôture continue malgré tout : c'est
@@ -143,7 +151,7 @@ def live_point(market, sim_clock, day, key, history, region=None, vol_mult=1.0):
     progress = sim_clock.game_minutes_acc
     damp = region_open_factor(region, day, sim_clock.current_time(day)[1]) if region else 1.0
     return wiggle(market.seed, market.step_count, key, prev, cur, progress, damp=damp,
-                  vol_mult=vol_mult)
+                  vol_mult=vol_mult * speed_factor(sim_clock))
 
 
 def append_live(market, sim_clock, day, key, history, region=None, vol_mult=1.0):
@@ -182,7 +190,7 @@ def intraday_series(market, sim_clock, day, key, history, window_minutes, n_poin
         cur = history[idx_cur] if 0 <= idx_cur < len(history) else history[0]
         prev = history[idx_prev] if 0 <= idx_prev < len(history) else cur
         val = wiggle(market.seed, market.step_count - back_steps, key, prev, cur, pm, damp=damp,
-                     vol_mult=vol_mult)
+                     vol_mult=vol_mult * speed_factor(sim_clock))
         out.append(val)
     return out
 

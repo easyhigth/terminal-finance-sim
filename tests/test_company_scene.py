@@ -55,6 +55,43 @@ def test_company_unknown_ticker_shows_error(app):
     scene = app.scenes.current
     scene.update(0.016)
     scene.draw(app.screen)
+    assert scene.metrics is None
+    assert scene.search == "ZZZZ_NOPE"
+
+
+def test_company_no_ticker_opens_picker_with_top_companies(app):
+    """Arriver sans ticker (depuis PLUS) doit afficher le sélecteur de
+    recherche plutôt qu'un simple panneau d'erreur, pré-rempli avec les plus
+    grandes capitalisations."""
+    app.scenes.go("company")
+    scene = app.scenes.current
+    assert scene.metrics is None
+    assert scene.search == ""
+    items = scene._picker_items()
+    assert len(items) > 0
+    scene.update(0.016)
+    scene.draw(app.screen)
+    assert len(scene._picker_rects) == len(items)
+
+
+def test_company_picker_search_filters_results(app):
+    tk = app.market.companies[5]["ticker"]
+    app.scenes.go("company")
+    scene = app.scenes.current
+    scene.search = tk
+    items = scene._picker_items()
+    assert any(c["ticker"] == tk for c in items)
+    scene.draw(app.screen)
+
+
+def test_company_picker_select_navigates_to_company(app):
+    tk = app.market.companies[3]["ticker"]
+    app.scenes.go("company")
+    scene = app.scenes.current
+    scene._select_company(tk)
+    new_scene = app.scenes.current
+    assert new_scene.ticker == tk
+    assert new_scene.metrics is not None
 
 
 def test_company_news_tab_filters_by_ticker_or_name(app):

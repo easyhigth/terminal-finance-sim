@@ -297,7 +297,7 @@ def contest_target(player, ticker, rng=None):
     cost = round(ma.ask_price(target) * CONTEST_COST_PCT, 2)
     if player.cash < cost:
         return {"ok": False, "reason": "cash", "cost": cost}
-    player.adjust_cash(-cost)
+    player.adjust_cash(-cost, category="evenements")
     ensure(player, rng)
     r = _rival_of_track(player, "M&A", rng)
     success = rng.random() < CONTEST_BASE_PROB

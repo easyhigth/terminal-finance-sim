@@ -82,7 +82,7 @@ def hire(player, profile_id):
         return {"ok": False, "reason": "unknown_profile"}
     if player.cash < HIRE_COST:
         return {"ok": False, "reason": "budget"}
-    player.adjust_cash(-HIRE_COST)
+    player.adjust_cash(-HIRE_COST, category="evenements")
     player.analysts.append({
         "profile_id": profile_id,
         "hired_step": getattr(player, "market_step", 0),

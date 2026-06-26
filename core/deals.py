@@ -222,7 +222,7 @@ def age_deals(player):
     for d in player.deals:
         d["days_left"] -= config.DAYS_PER_STEP
         if d["days_left"] <= 0:
-            player.adjust_cash(-d["penalty_cash"])
+            player.adjust_cash(-d["penalty_cash"], category="deals")
             reason = (f"Deal expired: {d['title']}" if en
                       else f"Deal expiré : {d['title']}")
             player.adjust_reputation(-d["penalty_rep"], reason=reason)
@@ -266,7 +266,7 @@ def apply_outcome(player, deal_id, quality):
         cash_delta = deal["reward_cash"]
         rep_delta = deal["reward_rep"]
         reason = (f"Deal closed: {deal['title']}" if en else f"Deal conclu : {deal['title']}")
-        player.adjust_cash(cash_delta)
+        player.adjust_cash(cash_delta, category="deals")
         player.adjust_reputation(rep_delta, reason=reason)
         player.deals_won += 1
         player.grade_deals += 1
@@ -276,7 +276,7 @@ def apply_outcome(player, deal_id, quality):
         rep_delta = max(1, deal["reward_rep"] // 2)
         reason = (f"Deal partially closed: {deal['title']}" if en
                   else f"Deal partiellement conclu : {deal['title']}")
-        player.adjust_cash(cash_delta)
+        player.adjust_cash(cash_delta, category="deals")
         player.adjust_reputation(rep_delta, reason=reason)
         player.deals_won += 1
         player.grade_deals += 1
@@ -285,7 +285,7 @@ def apply_outcome(player, deal_id, quality):
         cash_delta = -deal["penalty_cash"]
         rep_delta = -round(deal["penalty_rep"] * archetypes.perk(player, "rep_loss_mult"))
         reason = (f"Deal failed: {deal['title']}" if en else f"Deal échoué : {deal['title']}")
-        player.adjust_cash(cash_delta)
+        player.adjust_cash(cash_delta, category="deals")
         player.adjust_reputation(rep_delta, reason=reason)
         outcome = "fail"
     player.deals = [d for d in player.deals if d["id"] != deal_id]
@@ -309,13 +309,13 @@ def resolve_deal(player, deal_id, rng=None):
     success = rng.random() < prob
     if success:
         reason = (f"Deal closed: {deal['title']}" if en else f"Deal conclu : {deal['title']}")
-        player.adjust_cash(deal["reward_cash"])
+        player.adjust_cash(deal["reward_cash"], category="deals")
         player.adjust_reputation(deal["reward_rep"], reason=reason)
         player.deals_won += 1
         player.grade_deals += 1
     else:
         reason = (f"Deal failed: {deal['title']}" if en else f"Deal échoué : {deal['title']}")
-        player.adjust_cash(-deal["penalty_cash"])
+        player.adjust_cash(-deal["penalty_cash"], category="deals")
         player.adjust_reputation(-round(deal["penalty_rep"] * archetypes.perk(player, "rep_loss_mult")), reason=reason)
     player.deals = [d for d in player.deals if d["id"] != deal_id]
     return {"ok": True, "success": success, "deal": deal, "prob": prob}

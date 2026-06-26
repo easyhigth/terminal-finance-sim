@@ -41,6 +41,28 @@ def unrealized_pnl(player, market):
     return total
 
 
+def sector_heatmap(player, market):
+    """Agrège les positions actions par secteur (valeur signée, P&L latent,
+    P&L % du coût de base). Lecture pure, sans modification d'état."""
+    comp = {c["ticker"]: c for c in market.companies}
+    agg = {}
+    for h in holdings(player, market):
+        c = comp.get(h["ticker"])
+        if not c:
+            continue
+        sec = c["sector"]
+        a = agg.setdefault(sec, {"sector": sec, "value": 0.0, "pnl": 0.0, "cost": 0.0})
+        a["value"] += h["value"]
+        a["pnl"] += h["pnl"]
+        a["cost"] += abs(h["value"] - h["pnl"])
+    out = list(agg.values())
+    for a in out:
+        a["pnl_pct"] = (a["pnl"] / a["cost"] * 100.0) if a["cost"] else 0.0
+        del a["cost"]
+    out.sort(key=lambda a: abs(a["value"]), reverse=True)
+    return out
+
+
 def allocation_by(player, market, key):
     """Répartition de l'exposition (brute) des positions par `key`."""
     comp = {c["ticker"]: c for c in market.companies}

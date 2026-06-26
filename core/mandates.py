@@ -544,7 +544,7 @@ def evaluate_due(player, market):
             continue
         ok = check["ok"] and due
         if ok:
-            player.adjust_cash(m["reward_cash"])
+            player.adjust_cash(m["reward_cash"], category="mandats")
             player.adjust_reputation(m["reward_rep"], reason=_L(
                 f"Mandat réussi : {m['client']}", f"Mandate succeeded: {m['client']}"))
             player.flags["mandates_won"] = player.flags.get("mandates_won", 0) + 1

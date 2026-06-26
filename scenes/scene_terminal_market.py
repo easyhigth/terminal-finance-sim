@@ -5,6 +5,7 @@ Extrait de scene_terminal_commands.py pour limiter sa taille ; mixé dans
 TerminalScene avec les autres mixins de commandes.
 """
 
+from core import audio
 from core import config
 from core import etfs as etfs_mod
 from core import inbox as inbox_mod
@@ -529,6 +530,7 @@ class TerminalMarketMixin:
                 continue
             crossed = (price >= a["price"]) if a["above"] else (price <= a["price"])
             if crossed:
+                audio.play("alert")
                 self._log(_L(f"  ⚠ ALERTE {a['ticker']} : cours {price:.2f} a franchi {a['price']:.2f}.", f"  ⚠ ALERT {a['ticker']}: price {price:.2f} crossed {a['price']:.2f}."))
                 self.app.notify(f"Alerte {a['ticker']} @ {price:.2f}", "warn")
                 inbox_mod.push(p, "desk", "Desk", f"Alerte cours : {a['ticker']}",

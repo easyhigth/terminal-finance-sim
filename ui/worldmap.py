@@ -197,6 +197,18 @@ class WorldMap:
         for region, hub in REGION_HUBS.items():
             cx, cy = self._to_screen(rect, *hub["pos"])
             self._hub_rects[region] = (cx, cy)
+            # halo de performance régionale (heatmap monde) : auréole verte/rouge
+            # dont l'intensité et le rayon suivent la variation moyenne des
+            # indices de la région — un coup d'œil suffit à voir « où ça chauffe ».
+            idxs = self._region_indices(market, region)
+            if idxs:
+                chg = sum(market.index_change_pct(n) for n in idxs) / len(idxs)
+                halo = config.COL_UP if chg >= 0 else config.COL_DOWN
+                radius = int(10 + min(18, abs(chg) * 6))
+                alpha = int(min(120, 30 + abs(chg) * 30))
+                ring = pygame.Surface((radius * 2 + 2, radius * 2 + 2), pygame.SRCALPHA)
+                pygame.draw.circle(ring, (*halo[:3], alpha), (radius + 1, radius + 1), radius)
+                surf.blit(ring, (cx - radius - 1, cy - radius - 1))
             color = hub["color"]
             pulse = self.hub_pulse[region]
             r = int(4 + 3 * (0.5 + 0.5 * math.sin(self.t * 2)) + pulse * 6)

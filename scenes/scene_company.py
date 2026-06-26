@@ -580,6 +580,7 @@ class CompanyScene(Scene):
             widgets.draw_series(surf, inner, hist, col, mouse_pos=pygame.mouse.get_pos(),
                                 y_fmt=lambda v: f"{v:,.2f} {self.cur}", show_pct=True,
                                 band_frac=half_spread)
+            self._draw_orderbook(surf, inner, hist[-1], tier, half_spread)
         elif self.chart_kind == "vol":
             vol = [v for v in charts.rolling_vol(hist, 20) if v is not None]
             if len(vol) < 2:
@@ -593,6 +594,47 @@ class CompanyScene(Scene):
                                   (inner.x, inner.y), fonts.tiny(bold=True), config.COL_WARN)
         elif self.chart_kind == "beta":
             self._draw_beta(surf, inner, m, hist)
+
+    # Tailles indicatives (en lots) du carnet simulé par tier de liquidité :
+    # un carnet liquide est profond, un carnet illiquide est mince — cohérent
+    # avec core/liquidity (la profondeur conditionne l'impact de marché).
+    _DEPTH_LOTS = {"Liquide": (140, 90, 55), "Peu liquide": (45, 28, 16),
+                   "Illiquide": (9, 6, 4)}
+
+    def _draw_orderbook(self, surf, rect, mid, tier, half):
+        """Mini carnet d'ordres simulé (#4) : 3 niveaux bid/ask déterministes
+        autour du prix, avec une barre proportionnelle à la profondeur du tier.
+        Lecture seule, purement illustrative — donne l'intuition de la
+        profondeur de marché avant un gros ordre."""
+        lots = self._DEPTH_LOTS.get(tier, self._DEPTH_LOTS["Peu liquide"])
+        bw, rh = 116, 13
+        panel = pygame.Rect(rect.x + 6, rect.y + 6, bw, rh * 7 + 6)
+        bg = pygame.Surface((panel.w, panel.h), pygame.SRCALPHA)
+        bg.fill((10, 12, 18, 180))
+        surf.blit(bg, panel.topleft)
+        pygame.draw.rect(surf, config.COL_BORDER, panel, 1)
+        widgets.draw_text(surf, f"CARNET · {tier}", (panel.x + 5, panel.y + 3),
+                          fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        maxlot = max(lots)
+        yy = panel.y + 3 + rh
+        for k in range(2, -1, -1):     # asks décroissants (le meilleur en bas)
+            price = mid * (1 + half * (k + 1))
+            self._ob_row(surf, panel, yy, price, lots[k], maxlot, config.COL_DOWN)
+            yy += rh
+        widgets.draw_text(surf, f"{mid:,.2f}", (panel.centerx, yy), fonts.tiny(bold=True),
+                          config.COL_WHITE, align="center")
+        yy += rh
+        for k in range(0, 3):          # bids
+            price = mid * (1 - half * (k + 1))
+            self._ob_row(surf, panel, yy, price, lots[k], maxlot, config.COL_UP)
+            yy += rh
+
+    def _ob_row(self, surf, panel, y, price, lot, maxlot, col):
+        bar_w = max(1, int((panel.w - 56) * lot / maxlot))
+        bar = pygame.Surface((bar_w, 9), pygame.SRCALPHA)
+        bar.fill((*col[:3], 90))
+        surf.blit(bar, (panel.right - 4 - bar_w, y + 1))
+        widgets.draw_text(surf, f"{price:,.2f}", (panel.x + 5, y), fonts.tiny(), col)
 
     def _draw_beta(self, surf, rect, m, hist):
         i = m.ticker_idx.get(self.ticker)

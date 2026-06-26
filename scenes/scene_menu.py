@@ -39,6 +39,9 @@ class MenuScene(Scene):
         # bouton "réduire les animations" (accessibilité/perf — sous LANG)
         self.anim_btn = widgets.Button((config.SCREEN_WIDTH-150, 80, 110, 34),
                                        self._anim_label(), config.COL_NEUTRAL)
+        # bouton réglages complets (affichage, son, langue… — sous ANIM)
+        self.settings_btn = widgets.Button((config.SCREEN_WIDTH-150, 120, 110, 34),
+                                           "⚙ RÉGLAGES", config.COL_AMBER)
         self.buttons["continue"].enabled = self.auto is not None
         self.buttons["load"].enabled = len(GameState.list_saves()) > 0
         self.t = 0.0
@@ -63,6 +66,9 @@ class MenuScene(Scene):
             anim_settings.toggle_reduce_motion()
             self.anim_btn.label = self._anim_label()
             return
+        if self.settings_btn.handle(event):
+            self.app.scenes.go("settings", return_to="menu")
+            return
         for key, btn in self.buttons.items():
             if btn.handle(event):
                 if key == "continue" and btn.enabled:
@@ -83,6 +89,7 @@ class MenuScene(Scene):
             btn.update(mp, dt)
         self.lang_btn.update(mp, dt)
         self.anim_btn.update(mp, dt)
+        self.settings_btn.update(mp, dt)
 
     def _draw_backdrop(self, surf):
         """Fond animé discret : chandeliers boursiers stylisés qui défilent."""
@@ -136,6 +143,7 @@ class MenuScene(Scene):
         self.lang_btn.label = f"LANG : {get_lang().upper()}"
         self.lang_btn.draw(surf)
         self.anim_btn.draw(surf)
+        self.settings_btn.draw(surf)
 
         widgets.draw_text(surf, "v0.3.0 — alpha",
                           (config.SCREEN_WIDTH-10, config.SCREEN_HEIGHT-22),

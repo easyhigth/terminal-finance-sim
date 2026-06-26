@@ -8,7 +8,9 @@ import sys
 
 import pygame
 
+from core import audio
 from core import config
+from core import display_settings
 from core.game_state import GameState
 from core.market import Market
 from core.pages import PageManager
@@ -70,6 +72,7 @@ from scenes.scene_rivals import RivalsScene
 from scenes.scene_runsetup import RunSetupScene
 from scenes.scene_sandbox import SandboxScene
 from scenes.scene_saves import SavesScene
+from scenes.scene_settings import SettingsScene
 from scenes.scene_shop import ShopScene
 from scenes.scene_splash import SplashScene
 from scenes.scene_spreadsheet import SpreadsheetScene
@@ -153,6 +156,7 @@ def build_scene_manager(app):
     m.register("splash", SplashScene(app))
     m.register("markethub", MarketHubScene(app))
     m.register("wall", TradingWallScene(app))
+    m.register("settings", SettingsScene(app))
     m.register("shop", ShopScene(app))
     m.register("examcert", ExamCertScene(app))
     m.register("stresstest", StressTestScene(app))
@@ -166,9 +170,9 @@ class App:
         pygame.init()
         pygame.display.set_caption(config.TITLE)
         pygame.display.set_icon(make_icon_surface(64))
-        self.fullscreen = False
-        self.screen = pygame.display.set_mode(
-            (config.SCREEN_WIDTH, config.WINDOW_HEIGHT))
+        self.window_mode = display_settings.get_mode()
+        self.screen = None
+        self._apply_window_mode()
         self.clock = pygame.time.Clock()
         self.running = True
         self.cheats = False           # activé par main_cheat.py (commandes de test)
@@ -196,12 +200,36 @@ class App:
         """Pousse une notification (toast) affichée en overlay."""
         self.notes.push(text, kind)
 
+    def _apply_window_mode(self):
+        """(Ré)applique le mode d'affichage courant. La résolution LOGIQUE reste
+        toujours (SCREEN_WIDTH x WINDOW_HEIGHT) : en plein écran on s'appuie sur
+        pygame.SCALED pour que l'image soit mise à l'échelle du moniteur (net sur
+        écran Retina/Mac) sans rien recalculer dans les scènes."""
+        size = (config.SCREEN_WIDTH, config.WINDOW_HEIGHT)
+        if self.window_mode == "fullscreen":
+            flags = pygame.FULLSCREEN | pygame.SCALED
+        elif self.window_mode == "borderless":
+            flags = pygame.NOFRAME | pygame.SCALED
+        else:
+            flags = 0
+        try:
+            self.screen = pygame.display.set_mode(size, flags)
+        except Exception:
+            # repli sûr : fenêtré classique si le mode plein écran échoue
+            # (driver vidéo restreint, environnement headless…)
+            self.window_mode = "windowed"
+            self.screen = pygame.display.set_mode(size, 0)
+
+    def set_window_mode(self, mode):
+        """Change le mode d'affichage (fenêtré / plein écran / plein écran
+        fenêtré), l'applique immédiatement et le persiste."""
+        self.window_mode = display_settings.set_mode(mode)
+        self._apply_window_mode()
+
     def toggle_fullscreen(self):
-        """Bascule entre mode fenêtré et plein écran (résolution logique inchangée)."""
-        self.fullscreen = not self.fullscreen
-        flags = pygame.FULLSCREEN if self.fullscreen else 0
-        self.screen = pygame.display.set_mode(
-            (config.SCREEN_WIDTH, config.WINDOW_HEIGHT), flags)
+        """Bascule rapide (touche F11) fenêtré <-> plein écran."""
+        self.set_window_mode("windowed" if self.window_mode == "fullscreen"
+                             else "fullscreen")
 
     def ensure_market(self):
         """Crée/synchronise le moteur de marché avec l'état du joueur.

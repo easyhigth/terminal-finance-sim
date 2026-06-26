@@ -26,6 +26,21 @@ MAX_ACTIVE_DEALS = 4        # au-delà, plus de génération
 GEN_PROBABILITY = 0.45      # proba de générer un deal à un tour donné
 MISS_PENALTY_FRAC = 0.05    # un deal manqué coûte surtout de la réputation,
                             # et seulement une petite fraction du gain en cash
+MAX_DEALS_HISTORY = 20      # nb de deals résolus conservés pour le replay (UI)
+
+
+def _record_history(player, deal, outcome, cash_delta, rep_delta):
+    """Ajoute un deal résolu (conclu/partiel/échoué/expiré) à l'historique de
+    replay du joueur (cf. PlayerState.deals_history), capé à MAX_DEALS_HISTORY
+    entrées les plus récentes."""
+    player.deals_history.append({
+        "day": player.day, "quarter": player.quarter,
+        "title": deal["title"], "kind": deal["kind"], "outcome": outcome,
+        "cash_delta": cash_delta, "rep_delta": rep_delta,
+        "difficulty": deal["difficulty"],
+    })
+    if len(player.deals_history) > MAX_DEALS_HISTORY:
+        player.deals_history.pop(0)
 
 
 # Modèles de deals par voie. Les montants seront mis à l'échelle du grade.
@@ -226,6 +241,7 @@ def age_deals(player):
             reason = (f"Deal expired: {d['title']}" if en
                       else f"Deal expiré : {d['title']}")
             player.adjust_reputation(-d["penalty_rep"], reason=reason)
+            _record_history(player, d, "expired", -d["penalty_cash"], -d["penalty_rep"])
             expired.append(d)
         else:
             still_active.append(d)
@@ -289,6 +305,7 @@ def apply_outcome(player, deal_id, quality):
         player.adjust_reputation(rep_delta, reason=reason)
         outcome = "fail"
     player.deals = [d for d in player.deals if d["id"] != deal_id]
+    _record_history(player, deal, outcome, cash_delta, rep_delta)
     return {"ok": True, "outcome": outcome, "deal": deal, "quality": quality,
             "cash_delta": cash_delta, "rep_delta": rep_delta}
 
@@ -313,9 +330,12 @@ def resolve_deal(player, deal_id, rng=None):
         player.adjust_reputation(deal["reward_rep"], reason=reason)
         player.deals_won += 1
         player.grade_deals += 1
+        _record_history(player, deal, "success", deal["reward_cash"], deal["reward_rep"])
     else:
+        rep_delta = -round(deal["penalty_rep"] * archetypes.perk(player, "rep_loss_mult"))
         reason = (f"Deal failed: {deal['title']}" if en else f"Deal échoué : {deal['title']}")
         player.adjust_cash(-deal["penalty_cash"], category="deals")
-        player.adjust_reputation(-round(deal["penalty_rep"] * archetypes.perk(player, "rep_loss_mult")), reason=reason)
+        player.adjust_reputation(rep_delta, reason=reason)
+        _record_history(player, deal, "fail", -deal["penalty_cash"], rep_delta)
     player.deals = [d for d in player.deals if d["id"] != deal_id]
     return {"ok": True, "success": success, "deal": deal, "prob": prob}

@@ -36,6 +36,10 @@ class PortfolioUnifiedScene(Scene):
         self._pnl_rects = []     # [(Rect, row)] cellules valeur/P&L (clic -> graphe pnl(t))
         self._sort_rects = {}    # key -> Rect (en-têtes cliquables)
         self.chart_row = None    # row sélectionnée pour le graphe pnl(t), ou None (vue liste)
+        self.chart_mode = "pnl"  # "pnl" ou "ytm" (obligations uniquement, cf. _draw_chart_view)
+        self._mode_rects = {}    # mode -> Rect (boutons P&L/YTM en vue graphe, obligations)
+        self.heat_mode = "sector"  # "sector" ou "corr" (panneau latéral, cf. _draw_side_panel)
+        self._heat_mode_rects = {}
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.chart_back_btn = widgets.Button(
@@ -108,6 +112,12 @@ class PortfolioUnifiedScene(Scene):
             hist = []
         return [(price - row["avg"]) * row["qty"] for price in hist]
 
+    def _ytm_series(self, row):
+        """Historique du rendement exigé (YTM, en %) d'une obligation détenue
+        (cf. core/bonds.py::ytm_history) — courbe de taux/spread plutôt que
+        P&L, pour comprendre POURQUOI le prix de la position a bougé."""
+        return [y * 100.0 for y in bonds.ytm_history(self.market, row["id"])]
+
     def _click_sort(self, key):
         if self.sort_key == key:
             self.sort_rev = not self.sort_rev
@@ -117,6 +127,11 @@ class PortfolioUnifiedScene(Scene):
 
     def handle_event(self, event):
         if self.chart_row is not None:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                for mode, rect in self._mode_rects.items():
+                    if rect.collidepoint(event.pos):
+                        self.chart_mode = mode
+                        return
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 self.chart_row = None
                 return
@@ -135,6 +150,10 @@ class PortfolioUnifiedScene(Scene):
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 5:
             self.scroll = min(self._max_scroll, self.scroll + 40)
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for mode, rect in self._heat_mode_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.heat_mode = mode
+                    return
             for key, rect in self._sort_rects.items():
                 if rect.collidepoint(event.pos):
                     self._click_sort(key)
@@ -142,6 +161,7 @@ class PortfolioUnifiedScene(Scene):
             for rect, row in self._pnl_rects:
                 if rect.collidepoint(event.pos):
                     self.chart_row = row
+                    self.chart_mode = "pnl"
                     return
             for rect, row in self._row_rects:
                 if rect.collidepoint(event.pos):
@@ -175,7 +195,7 @@ class PortfolioUnifiedScene(Scene):
         panel = pygame.Rect(40, top, table_w, total_h)
         inner = widgets.draw_panel(surf, panel, "Positions", config.COL_CYAN)
         heat_rect = pygame.Rect(40 + table_w + gap, top, heat_w, total_h)
-        self._draw_sector_heatmap(surf, heat_rect)
+        self._draw_heat_panel(surf, heat_rect)
 
         rows = self._rows()
         cols = [("cls", "Classe", 110), ("id", "Actif", 130), ("qty", "Qté", 110),
@@ -248,6 +268,70 @@ class PortfolioUnifiedScene(Scene):
 
         self.back_btn.draw(surf)
 
+    def _draw_heat_panel(self, surf, rect):
+        """Panneau latéral à deux modes : heatmap sectorielle (actions) ou
+        matrice de corrélation multi-classes des positions détenues. Boutons
+        de bascule en haut du panneau, même convention que `_mode_rects`
+        (P&L/YTM) plus haut dans cette scène."""
+        btn_h, gap_b = 22, 6
+        btn_w = (rect.w - gap_b) // 2
+        self._heat_mode_rects = {}
+        x = rect.x
+        for mode, label in (("sector", "SECTEUR"), ("corr", "CORRÉL.")):
+            btn = pygame.Rect(x, rect.y, btn_w, btn_h)
+            active = self.heat_mode == mode
+            accent = config.COL_AMBER if active else config.COL_TEXT_DIM
+            pygame.draw.rect(surf, config.COL_PANEL, btn)
+            pygame.draw.rect(surf, accent, btn, 2 if active else 1)
+            widgets.draw_text(surf, label, btn.center, fonts.tiny(bold=active), accent, align="center")
+            self._heat_mode_rects[mode] = btn
+            x += btn_w + gap_b
+
+        sub_rect = pygame.Rect(rect.x, rect.y + btn_h + gap_b, rect.w, rect.h - btn_h - gap_b)
+        if self.heat_mode == "corr":
+            self._draw_corr_heatmap(surf, sub_rect)
+        else:
+            self._draw_sector_heatmap(surf, sub_rect)
+
+    def _draw_corr_heatmap(self, surf, rect):
+        """Matrice de corrélation multi-classes des positions RÉELLEMENT
+        détenues (actions, obligations, commodities, crypto, ETF), cf.
+        `portfolio_views.holdings_correlation`. Même convention de couleur
+        que `scene_analytics.py::_draw_corr` (lerp COL_PANEL -> COL_UP/DOWN),
+        limitée aux N plus grosses positions pour tenir dans le panneau."""
+        p = self.app.gs.player
+        inner = widgets.draw_panel(surf, rect, "Corrélation (multi-actifs)", config.COL_AMBER)
+        labels, corr = portfolio_views.holdings_correlation(p, self.market)
+        if len(labels) < 2:
+            widgets.draw_text(surf, "Pas assez de positions avec un historique exploitable.",
+                              (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
+            return
+        max_labels = min(len(labels), 6)
+        labels = labels[:max_labels]
+        corr = corr[:max_labels, :max_labels]
+        n = len(labels)
+        cell = inner.w // (n + 1)
+        cell = max(18, min(cell, (inner.h // (n + 1)) if n else cell))
+        lbl_font = fonts.tiny()
+        for j, lab in enumerate(labels):
+            ly = inner.y + (j + 1) * cell + cell // 2
+            widgets.draw_text(surf, widgets.fit_text(str(lab), lbl_font, cell),
+                              (inner.x, ly), lbl_font, config.COL_TEXT_DIM, align="left")
+        for i, lab in enumerate(labels):
+            lx = inner.x + cell + i * cell + cell // 2
+            widgets.draw_text(surf, widgets.fit_text(str(lab), lbl_font, cell),
+                              (lx, inner.y + cell // 2), lbl_font, config.COL_TEXT_DIM, align="center")
+        for i in range(n):
+            for j in range(n):
+                v = float(corr[i, j])
+                cx = inner.x + cell + i * cell
+                cy = inner.y + (j + 1) * cell
+                cell_rect = pygame.Rect(cx, cy, cell - 1, cell - 1)
+                col = (widgets._lerp_col(config.COL_PANEL, config.COL_UP, v) if v >= 0
+                       else widgets._lerp_col(config.COL_PANEL, config.COL_DOWN, -v))
+                pygame.draw.rect(surf, col, cell_rect)
+                widgets.draw_text(surf, f"{v:+.1f}", cell_rect.center, fonts.tiny(), config.COL_TEXT, align="center")
+
     def _draw_sector_heatmap(self, surf, rect):
         """Heatmap sectorielle (actions uniquement) : une cellule par secteur,
         hauteur proportionnelle à |exposition|, couleur = P&L % du coût de
@@ -281,18 +365,41 @@ class PortfolioUnifiedScene(Scene):
         row = self.chart_row
         p = self.app.gs.player
         cur = config.CONTINENTS[p.continent]["currency"]
-        widgets.draw_text(surf, f"P&L — {row['id']} ({_CLASS_LABEL[row['cls']]})", (40, 22),
-                          fonts.title(bold=True), config.COL_AMBER)
+        is_bond = row["cls"] == "bond"
+        if is_bond and self.chart_mode == "ytm":
+            title = f"Taux exigé (YTM) — {row['id']} ({_CLASS_LABEL[row['cls']]})"
+        else:
+            title = f"P&L — {row['id']} ({_CLASS_LABEL[row['cls']]})"
+        widgets.draw_text(surf, title, (40, 22), fonts.title(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, f"Qté {row['qty']:+,.2f}  ·  PM {row['avg']:,.2f}  ·  "
                                 f"Cours {row['price']:,.2f}  ·  P&L latent "
                                 f"{row['pnl']:+,.0f} {cur}",
                           (42, 72), fonts.tiny(), config.COL_TEXT_DIM)
 
+        self._mode_rects = {}
+        if is_bond:
+            btn_w, btn_h, gap = 110, 28, 8
+            x = config.SCREEN_WIDTH - 40 - 2 * btn_w - gap
+            for mode, label in (("pnl", "P&L"), ("ytm", "TAUX (YTM)")):
+                rect = pygame.Rect(x, 18, btn_w, btn_h)
+                active = self.chart_mode == mode
+                accent = config.COL_AMBER if active else config.COL_TEXT_DIM
+                pygame.draw.rect(surf, config.COL_PANEL, rect)
+                pygame.draw.rect(surf, accent, rect, 2 if active else 1)
+                widgets.draw_text(surf, label, rect.center, fonts.tiny(), accent, align="center")
+                self._mode_rects[mode] = rect
+                x += btn_w + gap
+
         top = config.content_top()
         panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - top)
-        inner = widgets.draw_panel(surf, panel, "P&L latent dans le temps", config.COL_CYAN)
+        panel_title = "Taux exigé (YTM) dans le temps" if (is_bond and self.chart_mode == "ytm") \
+            else "P&L latent dans le temps"
+        inner = widgets.draw_panel(surf, panel, panel_title, config.COL_CYAN)
 
-        series = self._pnl_series(row)
+        if is_bond and self.chart_mode == "ytm":
+            series = self._ytm_series(row)
+        else:
+            series = self._pnl_series(row)
         if len(series) < 2:
             widgets.draw_text(surf, "Historique insuffisant pour tracer ce graphe.",
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
@@ -300,12 +407,19 @@ class PortfolioUnifiedScene(Scene):
             return
 
         chart_rect = pygame.Rect(inner.x + 80, inner.y + 8, inner.w - 100, inner.h - 30)
+        if is_bond and self.chart_mode == "ytm":
+            y_fmt = lambda v: f"{v:.2f}%"
+        else:
+            y_fmt = lambda v: widgets.format_money(v, cur)
         lo, hi, span = widgets.draw_chart_axes(
-            surf, chart_rect, min(series), max(series),
-            y_fmt=lambda v: widgets.format_money(v, cur), rows=5)
-        col = config.COL_UP if series[-1] >= 0 else config.COL_DOWN
+            surf, chart_rect, min(series), max(series), y_fmt=y_fmt, rows=5)
+        if is_bond and self.chart_mode == "ytm":
+            col = config.COL_CYAN
+        else:
+            col = config.COL_UP if series[-1] >= 0 else config.COL_DOWN
         widgets.draw_series(surf, chart_rect, series, col, baseline=False,
                             mouse_pos=pygame.mouse.get_pos())
-        widgets.draw_chart_zero_line(surf, chart_rect, lo, span)
+        if not (is_bond and self.chart_mode == "ytm"):
+            widgets.draw_chart_zero_line(surf, chart_rect, lo, span)
 
         self.chart_back_btn.draw(surf)

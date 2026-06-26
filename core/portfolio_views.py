@@ -4,8 +4,12 @@ positions, P&L latent, allocation, dividendes, bêta net). Lecture pure, sans
 exécuter d'ordres ni modifier l'état du joueur (sauf, indirectement, aucune
 modification du tout — ce module ne fait que lire).
 """
-from core import firms
+import numpy as np
+
+from core import charts, firms
 from core.portfolio_margin import net_worth
+
+_CORR_HIST = 120  # fenêtre d'historique pour la corrélation multi-classes
 
 
 def holdings(player, market):
@@ -61,6 +65,37 @@ def sector_heatmap(player, market):
         del a["cost"]
     out.sort(key=lambda a: abs(a["value"]), reverse=True)
     return out
+
+
+def holdings_correlation(player, market, n=_CORR_HIST):
+    """Matrice de corrélation des positions RÉELLEMENT détenues, toutes
+    classes d'actifs confondues (actions, obligations, commodities, crypto,
+    ETF), sur leurs historiques de prix/NAV respectifs (cf.
+    charts.correlation_matrix). Retourne (labels, matrice np) ; labels vide
+    si moins de 2 positions ont un historique exploitable."""
+    smap = {}
+    for h in holdings(player, market):
+        smap[h["ticker"]] = market.history_of(h["ticker"], n)
+    if getattr(player, "bonds", None):
+        from core import bonds
+        for bid in player.bonds:
+            smap[bid] = bonds.price_history(market, bid, n)
+    if getattr(player, "commodities", None):
+        from core import commodities
+        for cid in player.commodities:
+            smap[cid] = commodities.history(market, cid, n)
+    if getattr(player, "crypto", None):
+        from core import crypto
+        for cid in player.crypto:
+            smap[cid] = crypto.history(market, cid, n)
+    if getattr(player, "etfs", None):
+        from core import etfs
+        for eid in player.etfs:
+            smap[eid] = etfs.nav_history(market, eid, n)
+    smap = {k: v for k, v in smap.items() if v and len(v) >= 2}
+    if len(smap) < 2:
+        return [], np.zeros((0, 0))
+    return charts.correlation_matrix(smap)
 
 
 def allocation_by(player, market, key):

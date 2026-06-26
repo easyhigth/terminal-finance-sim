@@ -200,6 +200,16 @@ def quote(market, bond_id):
             "liquidity": liq_mod.bond_tier(b)}
 
 
+def _history_spread(market, b):
+    """Composantes du spread supposées constantes sur la période (faute
+    d'historique stocké pour elles) — partagé par price_history/ytm_history."""
+    spread = term_premium(market, b["years"]) + credit_spread(market, b["rating"]) \
+        + _region_bump(market, b["region"])
+    if b["kind"] == "Souverain" and b["gov"]:
+        spread += gov_mod.country_premium(gov_mod.get(b["gov"]))
+    return spread
+
+
 def price_history(market, bond_id, n=None):
     """Historique approximatif du prix, reconstruit depuis l'historique du taux
     directeur (les autres composantes du spread sont supposées constantes sur
@@ -210,13 +220,26 @@ def price_history(market, bond_id, n=None):
     rates = getattr(market, "macro_hist", {}).get("rate", [])
     if not rates:
         return []
-    spread = term_premium(market, b["years"]) + credit_spread(market, b["rating"]) \
-        + _region_bump(market, b["region"])
-    if b["kind"] == "Souverain" and b["gov"]:
-        spread += gov_mod.country_premium(gov_mod.get(b["gov"]))
+    spread = _history_spread(market, b)
     prices = [finmath.bond_price(FACE, b["coupon"], r / 100.0 + spread, b["years"])
               for r in rates]
     return prices[-n:] if n else prices
+
+
+def ytm_history(market, bond_id, n=None):
+    """Historique approximatif du rendement exigé (YTM), même reconstruction
+    que price_history (taux directeur historique + spread constant sur la
+    période) — pour visualiser la courbe de taux d'une obligation détenue
+    dans le temps plutôt que son seul prix."""
+    b = _BY_ID.get(bond_id)
+    if not b or market is None:
+        return []
+    rates = getattr(market, "macro_hist", {}).get("rate", [])
+    if not rates:
+        return []
+    spread = _history_spread(market, b)
+    ytms = [r / 100.0 + spread for r in rates]
+    return ytms[-n:] if n else ytms
 
 
 def fill_price(market, bond_id, qty, side):

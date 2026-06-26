@@ -138,6 +138,43 @@ def test_resolve_deal_removes_deal_on_resolution():
     assert deals.find_deal(p, deal["id"]) is None
 
 
+def test_apply_outcome_records_history_entry():
+    p = _player()
+    deal = _force_deal(p)
+    deals.apply_outcome(p, deal["id"], "good")
+    assert len(p.deals_history) == 1
+    h = p.deals_history[0]
+    assert h["title"] == deal["title"]
+    assert h["outcome"] == "success"
+    assert h["cash_delta"] == deal["reward_cash"]
+    assert h["rep_delta"] == deal["reward_rep"]
+
+
+def test_resolve_deal_records_history_entry():
+    p = _player()
+    deal = _force_deal(p)
+    deals.resolve_deal(p, deal["id"], rng=random.Random(0))
+    assert len(p.deals_history) == 1
+    assert p.deals_history[0]["outcome"] in ("success", "fail")
+
+
+def test_age_deals_records_expired_history_entry():
+    p = _player()
+    deal = _force_deal(p)
+    deal["days_left"] = 1
+    deals.age_deals(p)
+    assert len(p.deals_history) == 1
+    assert p.deals_history[0]["outcome"] == "expired"
+
+
+def test_deals_history_capped_to_max_entries():
+    p = _player()
+    for _ in range(deals.MAX_DEALS_HISTORY + 5):
+        deal = _force_deal(p)
+        deals.apply_outcome(p, deal["id"], "good")
+    assert len(p.deals_history) == deals.MAX_DEALS_HISTORY
+
+
 def test_maybe_government_deal_requires_associate_grade():
     p = _player(grade=2)
     event = {"kind": "good", "country": "Testland", "region": "Europe"}

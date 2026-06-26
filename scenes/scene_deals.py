@@ -30,6 +30,11 @@ class DealsScene(Scene):
         self.row_cursor = 0  # curseur clavier dans la liste filtrée/triée
         self._row_list = []
         self._tooltip = None
+        self.view_mode = "active"  # "active" (en cours) ou "history" (résolus, replay)
+        self._mode_rects = {}
+        self.scroll_hist = 0
+        self._max_scroll_hist = 0
+        self._hist_list_rect = None
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
@@ -61,6 +66,23 @@ class DealsScene(Scene):
 
     # ------------------------------------------------------------- events
     def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for mode, rect in self._mode_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.view_mode = mode
+                    return
+        if self.view_mode == "history":
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                self.app.scenes.go(self.return_to)
+                return
+            if self.back_btn.handle(event):
+                self.app.scenes.go(self.return_to)
+                return
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+                if self._hist_list_rect and self._hist_list_rect.collidepoint(event.pos):
+                    self.scroll_hist = max(0, min(self._max_scroll_hist,
+                                             self.scroll_hist + (-48 if event.button == 4 else 48)))
+            return
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 if self.search:
@@ -111,6 +133,20 @@ class DealsScene(Scene):
         self.back_btn.update(pygame.mouse.get_pos(), dt)
 
     # ------------------------------------------------------------- draw
+    def _draw_mode_toggle(self, surf):
+        btn_w, btn_h, gap = 120, 28, 8
+        x = config.SCREEN_WIDTH - 40 - 2 * btn_w - gap
+        self._mode_rects = {}
+        for mode, label in (("active", "EN COURS"), ("history", "HISTORIQUE")):
+            rect = pygame.Rect(x, 18, btn_w, btn_h)
+            active = self.view_mode == mode
+            accent = config.COL_AMBER if active else config.COL_TEXT_DIM
+            pygame.draw.rect(surf, config.COL_PANEL, rect)
+            pygame.draw.rect(surf, accent, rect, 2 if active else 1)
+            widgets.draw_text(surf, label, rect.center, fonts.tiny(bold=active), accent, align="center")
+            self._mode_rects[mode] = rect
+            x += btn_w + gap
+
     def draw(self, surf):
         surf.fill(config.COL_BG)
         widgets.draw_text(surf, "DEALS — OPPORTUNITÉS EN COURS", (40, 22),
@@ -120,6 +156,11 @@ class DealsScene(Scene):
             g = unlocks.effective_required_grade(self.app.gs.player, "deals")
             widgets.draw_text(surf, f"⊘ Deals débloqués au grade {config.GRADES[g]}.",
                               (42, 56), fonts.small(), config.COL_TEXT_DIM)
+            self.back_btn.draw(surf)
+            return
+        self._draw_mode_toggle(surf)
+        if self.view_mode == "history":
+            self._draw_history(surf, p)
             self.back_btn.draw(surf)
             return
         widgets.draw_text(surf, "Chaque deal expire au bout d'un nombre de jours ; cliquez une ligne pour le lancer.",
@@ -247,3 +288,51 @@ class DealsScene(Scene):
         self.back_btn.draw(surf)
         if self._tooltip:
             widgets.draw_tooltip(surf, *self._tooltip)
+
+    # --------------------------------------------------------- historique
+    def _draw_history(self, surf, p):
+        widgets.draw_text(surf, "Replay des derniers deals résolus (succès, échecs, expirations).",
+                          (42, 64), fonts.small(), config.COL_TEXT_DIM)
+        top = 94
+        panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - top)
+        history = list(reversed(p.deals_history))
+        inner = widgets.draw_panel(surf, panel, f"Historique ({len(history)})", config.COL_CYAN)
+        list_area = pygame.Rect(inner.x - 6, inner.y, inner.w + 12, inner.h)
+        self._hist_list_rect = list_area
+        cur = config.CONTINENTS.get(p.continent, {}).get("currency", "$")
+        if not history:
+            widgets.draw_text(surf, "Aucun deal résolu pour l'instant.",
+                              (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
+            self._max_scroll_hist = 0
+            return
+
+        row_h = 30
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        y = inner.y - self.scroll_hist
+        for h in history:
+            visible = (list_area.top - row_h) < y < list_area.bottom
+            if visible:
+                col = {"success": config.COL_UP, "partial": config.COL_UP,
+                       "fail": config.COL_DOWN, "expired": config.COL_WARN}.get(h["outcome"], config.COL_TEXT_DIM)
+                label = {"success": "RÉUSSI", "partial": "PARTIEL",
+                         "fail": "ÉCHEC", "expired": "EXPIRÉ"}.get(h["outcome"], h["outcome"].upper())
+                widgets.draw_text(surf, f"J{h['day']} (T{h['quarter']})",
+                                  (inner.x, y + 6), fonts.tiny(), config.COL_TEXT_DIM)
+                widgets.draw_text(surf, widgets.fit_text(h["title"], fonts.small(), 360),
+                                  (inner.x + 90, y + 4), fonts.small(), config.COL_TEXT)
+                widgets.draw_badge(surf, h["kind"], (inner.x + 460, y + 2), accent=config.COL_PRESTIGE)
+                widgets.draw_badge(surf, label, (inner.x + 560, y + 2), accent=col)
+                sign = "+" if h["cash_delta"] >= 0 else ""
+                widgets.draw_text(surf, f"{sign}{widgets.format_money(h['cash_delta'], cur)}",
+                                  (inner.right - 220, y + 6), fonts.tiny(), col)
+                rsign = "+" if h["rep_delta"] >= 0 else ""
+                widgets.draw_text(surf, f"{rsign}{h['rep_delta']} rép.",
+                                  (inner.right - 90, y + 6), fonts.tiny(), col)
+            y += row_h
+        surf.set_clip(prev_clip)
+        content_h = (y + self.scroll_hist) - inner.y
+        self._max_scroll_hist = max(0, content_h - list_area.h)
+        self.scroll_hist = min(self.scroll_hist, self._max_scroll_hist)
+        self.scroll_hist = widgets.draw_scrollbar(surf, panel, list_area, self.scroll_hist,
+                                                   self._max_scroll_hist, content_h)

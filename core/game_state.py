@@ -30,6 +30,7 @@ class PlayerState:
     competencies: dict = field(default_factory=dict)  # compétence -> niveau 0-100
     flags: dict = field(default_factory=dict)         # événements/déblocages
     deals: list = field(default_factory=list)         # deals actifs (dicts)
+    deals_history: list = field(default_factory=list)  # derniers deals résolus (UI, replay, capé)
     event_log: list = field(default_factory=list)     # historique d'événements récents
     cash_history: list = field(default_factory=list)  # net worth au fil du temps
     next_deal_id: int = 1                              # compteur d'identifiants de deals

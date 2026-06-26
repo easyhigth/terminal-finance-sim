@@ -178,3 +178,35 @@ def test_drawdowns_current_and_max_after_a_dip():
     cur, mx = _drawdowns([100.0, 200.0, 100.0, 180.0])
     assert mx == pytest.approx(50.0)
     assert cur == pytest.approx(10.0)
+
+
+# ---------------------------------------------------------------------------
+# marqueurs de crise sur le graphe — scenes/scene_history.py::_crisis_markers
+# ---------------------------------------------------------------------------
+class _FakeMarket:
+    def __init__(self, step_count, crisis_log):
+        self.step_count = step_count
+        self.crisis_log = crisis_log
+
+
+def test_crisis_markers_maps_step_to_visible_index():
+    from scenes.scene_history import _crisis_markers
+
+    hist = [100.0] * 10  # 10 relevés -> steps couvrant [step_count-9, step_count]
+    market = _FakeMarket(step_count=50, crisis_log=[
+        {"step": 50, "name": "Crash récent", "kind": "bad", "severity": 2.0},
+        {"step": 41, "name": "Crash limite", "kind": "bad", "severity": 1.0},
+        {"step": 5, "name": "Trop ancien", "kind": "bad", "severity": 1.0},
+    ])
+    out = _crisis_markers(market, hist)
+    idxs = {c["name"]: idx for idx, c in out}
+    assert idxs["Crash récent"] == 9
+    assert idxs["Crash limite"] == 0
+    assert "Trop ancien" not in idxs
+
+
+def test_crisis_markers_empty_without_market_or_history():
+    from scenes.scene_history import _crisis_markers
+
+    assert _crisis_markers(None, [1.0, 2.0]) == []
+    assert _crisis_markers(_FakeMarket(5, []), []) == []

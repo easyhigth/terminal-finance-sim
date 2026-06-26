@@ -79,6 +79,7 @@ from scenes.scene_swaps import SwapsScene
 from scenes.scene_team import TeamScene
 from scenes.scene_terminal import TerminalScene
 from scenes.scene_track import TrackScene
+from scenes.scene_tradingwall import TradingWallScene
 from scenes.scene_tutorials import TutorialsScene
 from ui.logo import make_icon_surface
 from ui.notifications import NotificationCenter
@@ -151,6 +152,7 @@ def build_scene_manager(app):
     m.register("alerts", AlertsScene(app))
     m.register("splash", SplashScene(app))
     m.register("markethub", MarketHubScene(app))
+    m.register("wall", TradingWallScene(app))
     m.register("shop", ShopScene(app))
     m.register("examcert", ExamCertScene(app))
     m.register("stresstest", StressTestScene(app))

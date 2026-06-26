@@ -224,7 +224,6 @@ class CompanyScene(Scene):
     # ------------------------------------------------------------- draw
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        m = self.app.market
         mt = self.metrics
         if not mt:
             self._draw_picker(surf)

@@ -16,6 +16,7 @@ from core import risk as risk_mod
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
+
 def _draw_wrapped_tooltip(surf, text, pos, max_width=320):
     """Bulle d'info multi-lignes (texte replié à `max_width` px)."""
     font = fonts.tiny()
@@ -320,7 +321,7 @@ class RiskScene(Scene):
         mp = pygame.mouse.get_pos()
         y = inner.y+58
         for label, val, col, hint in rows:
-            lr = widgets.draw_text(surf, label, (inner.x, y), fonts.small(), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, label, (inner.x, y), fonts.small(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, val, (inner.x+250, y), fonts.body(bold=True), col)
             hover_rect = pygame.Rect(inner.x, y - 2, 250, 22)
             if hover_rect.collidepoint(mp):

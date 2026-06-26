@@ -55,7 +55,6 @@ def draw(surf, app):
         return
     rects = _btn_rects()
     mp = pygame.mouse.get_pos()
-    paused_now = clock.paused or clock.auto_paused
     btn = rects["pause"]
     hover = btn.collidepoint(mp)
     active = clock.paused

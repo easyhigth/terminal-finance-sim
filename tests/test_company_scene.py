@@ -12,7 +12,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pytest
 
 import main
-from scenes.scene_company import _TABS, _CHART_KINDS
+from scenes.scene_company import _CHART_KINDS, _TABS
 
 
 @pytest.fixture(scope="module")
@@ -110,7 +110,6 @@ def test_company_news_tab_filters_by_ticker_or_name(app):
     ], day=1)
 
     app.scenes.go("company", ticker=tk)
-    scene = app.scenes.current
     items = N.query(p)
     needles = {tk.lower(), (name or "").lower()}
     filtered = [e for e in items if any(nd and nd in e["text"].lower() for nd in needles)]

@@ -40,6 +40,10 @@ _KIND_TABS = [("Ligne", "line"), ("Chandel.", "candles"), ("Var %", "change"), (
 # les appelants doivent en tenir compte dans le calcul de leur plot_rect.
 LABEL_H = 16
 
+# marge entre le cadre du graphe (cf. _draw_series_plot) et le tracé lui-même,
+# pour que la courbe ne touche jamais la bordure.
+_PLOT_INSET = 6
+
 
 def _x_labels(surf, rect, n):
     """Libellés d'axe X (début / milieu / aujourd'hui) sous une série
@@ -84,40 +88,52 @@ def _draw_kind_plot(surf, rect, market, ticker, kind):
 
 def _draw_series_plot(surf, rect, s, kind):
     """Dessine le graphe sélectionné pour une série de valeurs déjà extraite
-    (utilisé pour les actifs sans ticker boursier : obligations, commodities).
+    (utilisé pour les actifs sans ticker boursier : obligations, commodities),
+    dans un cadre dédié (cf. `_PLOT_INSET`) — le tracé reste à l'intérieur de
+    ce cadre, et tous les libellés (axe X, haut/bas) sont dessinés à
+    l'extérieur pour ne jamais se chevaucher avec le tracé ou entre eux.
     Retourne un libellé de légende (ou None s'il n'y a rien à afficher)."""
+    rect = pygame.Rect(rect)
+    pygame.draw.rect(surf, config.COL_PANEL, rect)
+    pygame.draw.rect(surf, config.COL_BORDER, rect, 1)
+    inner = rect.inflate(-_PLOT_INSET * 2, -_PLOT_INSET * 2)
     if len(s) < 2:
         widgets.draw_text(surf, "Historique insuffisant (avancez le temps).",
-                          (rect.x, rect.y), fonts.tiny(), config.COL_TEXT_DIM)
+                          (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
         return None
     if kind == "candles":
         n_candles = min(48, len(s))
-        widgets.draw_candles(surf, rect, s, n_candles=n_candles)
+        widgets.draw_candles(surf, inner, s, n_candles=n_candles)
         _x_labels(surf, rect, n_candles)
         return None
     mp = pygame.mouse.get_pos()
     if kind == "change":
         pct = _charts.normalize(s)
         col = config.COL_UP if pct[-1] >= 0 else config.COL_DOWN
-        widgets.draw_series(surf, rect, pct, col, mouse_pos=mp, y_fmt=lambda v: f"{v:+.1f}%")
+        widgets.draw_series(surf, inner, pct, col, mouse_pos=mp, y_fmt=lambda v: f"{v:+.1f}%",
+                            extrema_label=False)
         _x_labels(surf, rect, len(pct))
-        return f"variation cumulée {pct[-1]:+.1f}%"
+        return (f"variation cumulée {pct[-1]:+.1f}%  ·  "
+                f"haut {max(pct):+.1f}% · bas {min(pct):+.1f}%")
     if kind == "vol":
         vol = [v for v in _charts.rolling_vol(s, 20) if v is not None]
         if len(vol) < 2:
-            widgets.draw_text(surf, "Historique insuffisant.", (rect.x, rect.y),
+            widgets.draw_text(surf, "Historique insuffisant.", (inner.x, inner.y),
                               fonts.tiny(), config.COL_TEXT_DIM)
             return None
-        widgets.draw_series(surf, rect, vol, config.COL_WARN, baseline=False,
-                            mouse_pos=mp, y_fmt=lambda v: f"{v:.1f}%")
+        widgets.draw_series(surf, inner, vol, config.COL_WARN, baseline=False,
+                            mouse_pos=mp, y_fmt=lambda v: f"{v:.1f}%", extrema_label=False)
         _x_labels(surf, rect, len(vol))
-        return f"vol. annualisée (20 pas) {vol[-1]:.1f}%"
+        return (f"vol. annualisée (20 pas) {vol[-1]:.1f}%  ·  "
+                f"haut {max(vol):.1f}% · bas {min(vol):.1f}%")
     # ligne (défaut)
     col = config.COL_UP if s[-1] >= s[0] else config.COL_DOWN
-    widgets.draw_series(surf, rect, s, col, mouse_pos=mp, y_fmt=lambda v: f"{v:,.2f}", show_pct=True)
+    widgets.draw_series(surf, inner, s, col, mouse_pos=mp, y_fmt=lambda v: f"{v:,.2f}", show_pct=True,
+                        extrema_label=False)
     _x_labels(surf, rect, len(s))
     chg = (s[-1] / s[0] - 1) * 100 if s[0] else 0.0
-    return f"{s[-1]:,.2f}  ({'+' if chg>=0 else ''}{chg:.1f}%)"
+    return (f"{s[-1]:,.2f}  ({'+' if chg>=0 else ''}{chg:.1f}%)  ·  "
+            f"haut {max(s):,.2f} · bas {min(s):,.2f}")
 
 
 class CompanyPopup(DataWindow):
@@ -133,6 +149,7 @@ class CompanyPopup(DataWindow):
         self.nav_request = None
         self._kind_rects = {}
         self._expand_rect = None
+        self._detail_rect = None
         self._name_rect = None
         self._sector_rect = None
         self._region_rect = None
@@ -152,6 +169,9 @@ class CompanyPopup(DataWindow):
                 return True
         if self._expand_rect and self._expand_rect.collidepoint(pos):
             self.expand_requested = True
+            return True
+        if self._detail_rect and self._detail_rect.collidepoint(pos):
+            self.nav_request = {"to": "company", "ticker": self.ticker}
             return True
         if self._name_rect and self._name_rect.collidepoint(pos):
             self.nav_request = {"to": "explorer", "search": self.ticker}
@@ -222,12 +242,19 @@ class CompanyPopup(DataWindow):
                                 max(20, content.bottom - y - legend_h - LABEL_H - 22))
         legend = _draw_kind_plot(surf, plot_rect, self.market, self.ticker, self.kind)
         if legend:
-            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4 + LABEL_H),
+            widgets.draw_text(surf, widgets.fit_text(legend, fonts.tiny(), content.w),
+                              (content.x, plot_rect.bottom + 4 + LABEL_H),
                               fonts.tiny(), config.COL_TEXT_DIM)
+        mp = pygame.mouse.get_pos()
         self._expand_rect = pygame.Rect(content.right - 90, content.bottom - 18, 90, 18)
-        hov = self._expand_rect.collidepoint(pygame.mouse.get_pos())
+        hov = self._expand_rect.collidepoint(mp)
         widgets.draw_text(surf, "AGRANDIR ⤢", (self._expand_rect.centerx, self._expand_rect.y + 2),
                           fonts.tiny(bold=True), self.accent if hov else config.COL_TEXT_DIM,
+                          align="center")
+        self._detail_rect = pygame.Rect(self._expand_rect.x - 8 - 150, content.bottom - 18, 150, 18)
+        hov2 = self._detail_rect.collidepoint(mp)
+        widgets.draw_text(surf, "ANALYSE COMPLÈTE →", (self._detail_rect.centerx, self._detail_rect.y + 2),
+                          fonts.tiny(bold=True), self.accent if hov2 else config.COL_TEXT_DIM,
                           align="center")
 
 
@@ -271,7 +298,8 @@ class ChartPopup(DataWindow):
         plot_rect = pygame.Rect(content.x, content.y + 28, content.w, content.h - 28 - 18 - LABEL_H)
         legend = _draw_kind_plot(surf, plot_rect, self.market, self.ticker, self.kind)
         if legend:
-            widgets.draw_text(surf, f"{self.ticker}  {legend}", (content.x, plot_rect.bottom + 4 + LABEL_H),
+            widgets.draw_text(surf, widgets.fit_text(f"{self.ticker}  {legend}", fonts.tiny(bold=True), content.w),
+                              (content.x, plot_rect.bottom + 4 + LABEL_H),
                               fonts.tiny(bold=True), config.COL_TEXT)
 
 
@@ -359,7 +387,8 @@ class CommodityPopup(DataWindow):
         series = commodities_mod.history(self.market, self.cid, 365) if self.market else []
         legend = _draw_series_plot(surf, plot_rect, series, self.kind)
         if legend:
-            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4 + LABEL_H),
+            widgets.draw_text(surf, widgets.fit_text(legend, fonts.tiny(), content.w),
+                              (content.x, plot_rect.bottom + 4 + LABEL_H),
                               fonts.tiny(), config.COL_TEXT_DIM)
 
 
@@ -443,7 +472,8 @@ class CryptoPopup(DataWindow):
         series = crypto_mod.history(self.market, self.cid, 365) if self.market else []
         legend = _draw_series_plot(surf, plot_rect, series, self.kind)
         if legend:
-            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4 + LABEL_H),
+            widgets.draw_text(surf, widgets.fit_text(legend, fonts.tiny(), content.w),
+                              (content.x, plot_rect.bottom + 4 + LABEL_H),
                               fonts.tiny(), config.COL_TEXT_DIM)
 
 
@@ -536,7 +566,8 @@ class BondPopup(DataWindow):
         series = bonds_mod.price_history(self.market, self.bond_id, 365) if self.market else []
         legend = _draw_series_plot(surf, plot_rect, series, self.kind)
         if legend:
-            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4 + LABEL_H),
+            widgets.draw_text(surf, widgets.fit_text(legend, fonts.tiny(), content.w),
+                              (content.x, plot_rect.bottom + 4 + LABEL_H),
                               fonts.tiny(), config.COL_TEXT_DIM)
 
 
@@ -634,7 +665,8 @@ class ETFPopup(DataWindow):
         series = etfs_mod.nav_history(self.market, self.eid, 365) if self.market else []
         legend = _draw_series_plot(surf, plot_rect, series, self.kind)
         if legend:
-            widgets.draw_text(surf, legend, (content.x, plot_rect.bottom + 4 + LABEL_H),
+            widgets.draw_text(surf, widgets.fit_text(legend, fonts.tiny(), content.w),
+                              (content.x, plot_rect.bottom + 4 + LABEL_H),
                               fonts.tiny(), config.COL_TEXT_DIM)
 
 

@@ -83,6 +83,17 @@ class CompanyScene(Scene):
         self.accent = config.CONTINENTS.get(self.metrics["region"], {}).get("color", config.COL_AMBER) \
             if self.metrics else config.COL_AMBER
 
+        # mode recherche : actif quand on arrive sans ticker valide (depuis PLUS,
+        # ou ticker introuvable) — permet de choisir une société sans changer
+        # de scène ni passer par le terminal.
+        self.search = kwargs.get("search", "")
+        if self.ticker and not self.metrics and not self.search:
+            self.search = self.ticker
+        self._picker_cursor = 0
+        self._picker_rects = []
+        self._search_clear_rect = None
+        self._t = 0.0
+
         self.back_btn = widgets.Button(config.back_button_rect(180),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.buy_btn = widgets.Button(
@@ -98,15 +109,30 @@ class CompanyScene(Scene):
         p = self.app.gs.player
         return F.fiscal_year(p, config.BASE_FISCAL_YEAR)
 
+    def _picker_items(self):
+        m = self.app.market
+        if not m:
+            return []
+        q = self.search.strip()
+        if q:
+            return [mt for tk, _nm in m.suggest(q, limit=12)
+                   if (mt := m.metrics(tk))]
+        return m.top_companies(n=12, by="mktcap")
+
+    def _select_company(self, ticker):
+        self.app.scenes.go("company", ticker=ticker, return_to=self.return_to,
+                           return_kwargs=self.return_kwargs)
+
     # ------------------------------------------------------------- events
     def handle_event(self, event):
+        if not self.metrics:
+            self._handle_picker_event(event)
+            return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.go(self.return_to, **self.return_kwargs)
             return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to, **self.return_kwargs)
-            return
-        if not self.metrics:
             return
         if self.buy_btn.handle(event):
             self.app.pending_input = f"BUY {self.ticker} "
@@ -142,7 +168,49 @@ class CompanyScene(Scene):
                     self._news_list_rect.collidepoint(event.pos):
                 self.news_scroll = max(0, min(self._news_max_scroll, self.news_scroll + delta))
 
+    def _handle_picker_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                if self.search:
+                    self.search = ""
+                    self._picker_cursor = 0
+                else:
+                    self.app.scenes.go(self.return_to, **self.return_kwargs)
+                return
+            if event.key == pygame.K_BACKSPACE:
+                self.search = self.search[:-1]
+                self._picker_cursor = 0
+                return
+            if event.key in (pygame.K_UP, pygame.K_DOWN):
+                items = self._picker_items()
+                if items:
+                    d = -1 if event.key == pygame.K_UP else 1
+                    self._picker_cursor = max(0, min(len(items) - 1, self._picker_cursor + d))
+                return
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                items = self._picker_items()
+                if items:
+                    self._select_company(items[min(self._picker_cursor, len(items) - 1)]["ticker"])
+                return
+            if event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
+                self.search += event.unicode
+                self._picker_cursor = 0
+                return
+        if self.back_btn.handle(event):
+            self.app.scenes.go(self.return_to, **self.return_kwargs)
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
+                self.search = ""
+                self._picker_cursor = 0
+                return
+            for rect, tk in self._picker_rects:
+                if rect.collidepoint(event.pos):
+                    self._select_company(tk)
+                    return
+
     def update(self, dt):
+        self._t += dt
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp, dt)
         if self.metrics:
@@ -159,8 +227,7 @@ class CompanyScene(Scene):
         m = self.app.market
         mt = self.metrics
         if not mt:
-            widgets.draw_error_panel(surf, f"Société introuvable : {self.ticker}",
-                                     "Utilisez SEARCH <texte> depuis le terminal.")
+            self._draw_picker(surf)
             self.back_btn.draw(surf)
             return
 
@@ -208,6 +275,63 @@ class CompanyScene(Scene):
             self.graph_btn.draw(surf)
         if self._tooltip:
             widgets.draw_tooltip(surf, *self._tooltip)
+
+    # ------------------------------------------------------ mode recherche
+    def _draw_picker(self, surf):
+        widgets.draw_text(surf, "FICHE SOCIÉTÉ", (40, 22), fonts.title(bold=True), config.COL_AMBER)
+        if self.ticker and self.search == self.ticker:
+            msg = f"Société introuvable : {self.ticker}. Recherchez-en une ci-dessous."
+        else:
+            msg = "Recherchez une société par ticker ou nom pour ouvrir sa fiche."
+        widgets.draw_text(surf, msg, (42, 72), fonts.small(), config.COL_TEXT_DIM)
+
+        search_rect = pygame.Rect(40, config.content_top(), 360, 26)
+        pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_AMBER, search_rect, 1, border_radius=4)
+        cursor = "_" if int(self._t * 2) % 2 == 0 else " "
+        label = (self.search + cursor) if self.search else (cursor + "Ticker ou nom…")
+        col = config.COL_TEXT if self.search else config.COL_TEXT_DIM
+        widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
+                          (search_rect.x + 8, search_rect.y + 5), fonts.small(), col)
+        self._search_clear_rect = None
+        if self.search:
+            self._search_clear_rect = pygame.Rect(search_rect.right - 24, search_rect.y,
+                                                   24, search_rect.h)
+            widgets.draw_text(surf, "✕", self._search_clear_rect.center, fonts.small(bold=True),
+                              config.COL_TEXT_DIM, align="center")
+
+        items = self._picker_items()
+        list_top = search_rect.bottom + 16
+        panel = pygame.Rect(40, list_top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - list_top)
+        inner = widgets.draw_panel(
+            surf, panel, "Résultats" if self.search else "Plus grandes capitalisations",
+            config.COL_AMBER)
+        self._picker_rects = []
+        if not items:
+            widgets.draw_text(surf, "Aucune société ne correspond.", (inner.x, inner.y),
+                              fonts.small(), config.COL_TEXT_DIM)
+        row_h = 26
+        mp = pygame.mouse.get_pos()
+        self._picker_cursor = min(self._picker_cursor, max(0, len(items) - 1))
+        for i, c in enumerate(items):
+            rect = pygame.Rect(inner.x, inner.y + i * row_h, inner.w, row_h - 4)
+            self._picker_rects.append((rect, c["ticker"]))
+            hover = rect.collidepoint(mp) or i == self._picker_cursor
+            if hover:
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect, border_radius=3)
+            widgets.draw_text(surf, c["ticker"], (rect.x + 8, rect.y + 4),
+                              fonts.small(bold=True), config.COL_AMBER)
+            widgets.draw_text(surf, widgets.fit_text(c["name"], fonts.small(), 260),
+                              (rect.x + 90, rect.y + 4), fonts.small(), config.COL_WHITE)
+            widgets.draw_text(surf, c["sector"], (rect.x + 360, rect.y + 4),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, c["region"], (rect.x + 500, rect.y + 4),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+            cur = config.CONTINENTS.get(c["region"], {}).get("currency", "$")
+            widgets.draw_text(surf, f"{c['price']:,.2f} {cur}", (rect.right - 8, rect.y + 4),
+                              fonts.small(), config.COL_TEXT, align="right")
+        widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.SCREEN_HEIGHT - 56),
+                              [("↑↓", "naviguer"), ("ENTRÉE", "ouvrir"), ("ESC", "retour")])
 
     def _draw_tabs(self, surf, y):
         self._tab_rects = {}

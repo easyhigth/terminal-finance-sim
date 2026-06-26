@@ -400,7 +400,7 @@ class Sparkline:
 
 
 def draw_series(surf, rect, vals, color=None, baseline=True, mouse_pos=None, y_fmt=None,
-                show_pct=False, show_extrema=True):
+                show_pct=False, show_extrema=True, extrema_label=True):
     """Trace une polyligne à partir d'une liste de valeurs, dans `rect`.
 
     Si `mouse_pos` est fourni et survole `rect`, affiche un curseur (ligne
@@ -408,7 +408,10 @@ def draw_series(surf, rect, vals, color=None, baseline=True, mouse_pos=None, y_f
     la variation en % depuis le début) à l'abscisse la plus proche du curseur
     — cf. `draw_chart_crosshair`. Marque aussi les extrêmes de la série
     (cf. `draw_chart_extrema`), sauf si `show_extrema=False` (l'appelant
-    annote déjà ses propres extrêmes, p. ex. record/plus bas d'une carrière)."""
+    annote déjà ses propres extrêmes, p. ex. record/plus bas d'une carrière).
+    `extrema_label=False` garde les petits triangles d'extrêmes mais omet
+    leur étiquette de valeur (l'appelant l'affiche ailleurs, hors du tracé,
+    pour éviter tout chevauchement sur les graphes compacts)."""
     rect = pygame.Rect(rect)
     if not vals or len(vals) < 2:
         return
@@ -430,7 +433,8 @@ def draw_series(surf, rect, vals, color=None, baseline=True, mouse_pos=None, y_f
         pygame.draw.aalines(surf, col, False, pts)
     pygame.draw.circle(surf, col, pts[-1], 2)
     if show_extrema:
-        draw_chart_extrema(surf, rect, vals, lo, span, y_fmt=y_fmt, color=config.COL_TEXT_DIM)
+        draw_chart_extrema(surf, rect, vals, lo, span, y_fmt=y_fmt, color=config.COL_TEXT_DIM,
+                           label=extrema_label)
     if mouse_pos is not None:
         draw_chart_crosshair(surf, rect, vals, lo, span, mouse_pos, y_fmt=y_fmt, color=col,
                              show_pct=show_pct)
@@ -769,12 +773,16 @@ def draw_chart_crosshair(surf, rect, series, lo, span, mouse_pos, x_fmt=None, y_
     draw_text(surf, label, (box.x + 5, box.y + 4), font, config.COL_TEXT)
 
 
-def draw_chart_extrema(surf, rect, series, lo, span, y_fmt=None, color=config.COL_TEXT_DIM):
+def draw_chart_extrema(surf, rect, series, lo, span, y_fmt=None, color=config.COL_TEXT_DIM,
+                       label=True):
     """Repère le plus haut et le plus bas d'une série affichée dans `rect`
-    (même mapping que `draw_series`/`_polyline`) par un petit triangle et une
-    étiquette de valeur, pour situer les extrêmes d'un coup d'œil sans avoir
-    à survoler toute la courbe. N'affiche rien sur les graphes trop étroits
-    (sparklines) où l'étiquette surchargerait le tracé."""
+    (même mapping que `draw_series`/`_polyline`) par un petit triangle et,
+    si `label=True`, une étiquette de valeur, pour situer les extrêmes d'un
+    coup d'œil sans avoir à survoler toute la courbe. N'affiche rien sur les
+    graphes trop étroits (sparklines) où l'étiquette surchargerait le tracé.
+    `label=False` ne garde que les triangles (l'appelant affiche les valeurs
+    haut/bas ailleurs, hors du tracé, sur les graphes compacts où le texte
+    chevaucherait sinon les libellés d'axe)."""
     rect = pygame.Rect(rect)
     n = len(series)
     if n < 3 or rect.w < 130:
@@ -792,12 +800,15 @@ def draw_chart_extrema(surf, rect, series, lo, span, y_fmt=None, color=config.CO
         tip = (px, py - 7) if up else (px, py + 7)
         base = [(px - 4, py - 1 if up else py + 1), (px + 4, py - 1 if up else py + 1)]
         pygame.draw.polygon(surf, color, [tip] + base)
-        label = y_fmt(v) if y_fmt else f"{v:,.2f}"
+        if not label:
+            continue
+        txt = y_fmt(v) if y_fmt else f"{v:,.2f}"
         font = fonts.tiny()
-        lw, lh = font.size(label)
+        lw, lh = font.size(txt)
         lx = max(rect.x, min(px - lw // 2, rect.right - lw))
         ly = py - lh - 10 if up else py + 10
-        draw_text(surf, label, (lx, ly), font, color)
+        ly = max(rect.y, min(ly, rect.bottom - lh))
+        draw_text(surf, txt, (lx, ly), font, color)
 
 
 _hover_sync = {"frac": None, "source": None}

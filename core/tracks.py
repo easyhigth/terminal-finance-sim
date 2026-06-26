@@ -27,6 +27,11 @@ Clés de perk (toutes optionnelles ; valeur par défaut = neutre) :
                           tension de la voie est un contrôle permanent, pas un pic isolé.
 """
 
+from core import config
+
+TOP_GRADE_INDEX = len(config.GRADES) - 1   # grade max : reconversion libre et gratuite
+
+
 def _L(fr, en):
     from core.i18n import get_lang
     return en if get_lang() == "en" else fr
@@ -109,7 +114,10 @@ def _ramp_factor(player):
 
 def reconversion_cost(player, market=None):
     """Coût cash d'une reconversion, proportionnel à la valeur nette courante
-    (ou au cash si le marché n'est pas disponible)."""
+    (ou au cash si le marché n'est pas disponible). Gratuit au grade max,
+    où la reconversion redevient totalement libre."""
+    if getattr(player, "grade_index", 0) >= TOP_GRADE_INDEX:
+        return 0.0
     nw = player.cash
     if market is not None:
         try:
@@ -122,19 +130,30 @@ def reconversion_cost(player, market=None):
 
 def switch_track(player, market, new_track):
     """Change de voie après le choix initial (gratuit, via TRACK), contre un
-    coût tangible. Retourne un dict {ok, ...} : si ok, {cost, ramp_days} ;
-    sinon {reason} parmi {"invalid_track", "same_track", "cash"}."""
+    coût tangible. Verrouillé tant que le grade max n'est pas atteint : la
+    voie engage vraiment la suite de la carrière. Au grade max, la
+    reconversion redevient libre, gratuite et instantanée (pas de rodage).
+    Retourne un dict {ok, ...} : si ok, {cost, ramp_days} ; sinon {reason}
+    parmi {"invalid_track", "same_track", "locked_until_top_grade", "cash"}."""
     if new_track not in PERKS or new_track == "General":
         return {"ok": False, "reason": "invalid_track"}
     if getattr(player, "track", "General") == new_track:
         return {"ok": False, "reason": "same_track"}
+    if player.grade_index < TOP_GRADE_INDEX:
+        return {"ok": False, "reason": "locked_until_top_grade"}
     cost = reconversion_cost(player, market)
     if player.cash < cost:
         return {"ok": False, "reason": "cash", "cost": cost}
     player.cash -= cost
     player.track = new_track
-    player.flags["track_switch_day"] = player.day
-    return {"ok": True, "cost": cost, "ramp_days": RAMP_DAYS}
+    player.flags["track_chosen_day"] = player.day
+    if cost > 0:
+        player.flags["track_switch_day"] = player.day
+        ramp_days = RAMP_DAYS
+    else:
+        player.flags.pop("track_switch_day", None)
+        ramp_days = 0
+    return {"ok": True, "cost": cost, "ramp_days": ramp_days}
 
 
 def perk(player, key):
@@ -156,11 +175,32 @@ def perk(player, key):
     return default + (raw - default) * ramp
 
 
+LOYALTY_MAX_BONUS = 0.05
+LOYALTY_RAMP_DAYS = 720   # ~2 ans de jeu pour atteindre le bonus plein
+
+
+def _loyalty_bonus(player):
+    """Bonus de proba de réussite croissant avec l'ancienneté ININTERROMPUE
+    dans la voie courante (depuis track_chosen_day) : rester fidèle à sa
+    voie paie, en plus des perks fixes de la voie elle-même."""
+    chosen_day = player.flags.get("track_chosen_day") if hasattr(player, "flags") else None
+    if chosen_day is None or getattr(player, "track", "General") == "General":
+        return 0.0
+    elapsed = player.day - chosen_day
+    return LOYALTY_MAX_BONUS * max(0.0, min(1.0, elapsed / LOYALTY_RAMP_DAYS))
+
+
 def deal_edge(player, deal):
     """Bonus de proba de réussite (+ allègement de difficulté) si le deal
     relève de la voie du joueur. Retourne (bonus_prob, diff_relief)."""
     if deal.get("kind") and deal["kind"] == getattr(player, "track", None):
-        return perk(player, "deal_bonus"), perk(player, "diff_relief")
+        bonus = perk(player, "deal_bonus") + _loyalty_bonus(player)
+        try:
+            from core import firms
+            bonus += firms.track_synergy_bonus(player)
+        except Exception:
+            pass
+        return bonus, perk(player, "diff_relief")
     return 0.0, 0.0
 
 

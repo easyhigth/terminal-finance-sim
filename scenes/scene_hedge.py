@@ -107,9 +107,13 @@ class HedgeScene(Scene):
         widgets.draw_text(surf, "DESK DE COUVERTURE — PUT PROTECTEUR", (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         if not self._can():
-            g = unlocks.effective_required_grade(self.app.gs.player, "hedge")
+            p = self.app.gs.player
+            g = unlocks.effective_required_grade(p, "hedge")
             widgets.draw_text(surf, f"⊘ Couverture débloquée au grade {config.GRADES[g]}.",
                               (42, 74), fonts.small(), config.COL_TEXT_DIM)
+            note = unlocks.track_lock_note(p, "hedge")
+            if note:
+                widgets.draw_text(surf, note.strip(), (42, 94), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             self.tuto_btn.draw(surf)
             return

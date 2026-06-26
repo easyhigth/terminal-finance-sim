@@ -286,6 +286,9 @@ class StructuredScene(Scene):
             else:
                 g = unlocks.effective_required_grade(p, "structured")
                 lock_msg = f"⊘ trading débloqué au grade {config.GRADES[g]}."
+                note = unlocks.track_lock_note(p, "structured")
+                if note:
+                    lock_msg += " " + note.strip()
             widgets.draw_text(surf, lock_msg, (pinner.x, pinner.y), fonts.small(), config.COL_TEXT_DIM)
         else:
             y = pinner.y

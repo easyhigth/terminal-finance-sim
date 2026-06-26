@@ -77,6 +77,9 @@ def promotion_requirements(player):
     if req_tenure > 0:
         reqs.append({"label": "Ancienneté (trimestres)", "current": tenure,
                      "target": req_tenure, "met": tenure >= req_tenure, "kind": "count"})
+    if gi >= 2 and player.track == "General":
+        reqs.append({"label": "Voie de spécialisation choisie (TRACK)", "current": 0,
+                     "target": 1, "met": False, "kind": "track"})
     return reqs
 
 
@@ -103,6 +106,22 @@ _TRACK_TITLES = {
     "Advisory": "Trusted Advisor",
 }
 
+_TRACK_TITLES_10 = {
+    "Portfolio": "Chief Investment Officer",
+    "M&A": "Head of M&A",
+    "Risk": "Chief Risk Officer",
+    "Quant": "Head of Quant Strategies",
+    "Advisory": "Head of Advisory",
+}
+
+_TRACK_TITLES_11 = {
+    "Portfolio": "Légende de l'allocation d'actifs",
+    "M&A": "Légende des fusions-acquisitions",
+    "Risk": "Légende de la gestion des risques",
+    "Quant": "Légende de la finance quantitative",
+    "Advisory": "Légende du conseil stratégique",
+}
+
 
 def award_promotion(player):
     """Attribue éventuellement un titre de prestige lors d'une promotion."""
@@ -110,9 +129,9 @@ def award_promotion(player):
     if player.grade_index == 6:        # accès au top management
         title = _TRACK_TITLES.get(player.track, "Senior Banker")
     elif player.grade_index == 10:
-        title = "Managing Director émérite"
+        title = _TRACK_TITLES_10.get(player.track, "Managing Director émérite")
     elif player.grade_index == 11:
-        title = "Legend of the Street"
+        title = _TRACK_TITLES_11.get(player.track, "Legend of the Street")
     if title and title not in player.titles:
         player.titles.append(title)
     return title

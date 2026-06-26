@@ -684,6 +684,9 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             lines = [_L(f"  ⊘ {unlocks_mod.feature_label(feat)}", f"  ⊘ {unlocks_mod.feature_label(feat)}"),
                      _L(f"     débloqué au grade {config.GRADES[g]} (vous : {p.grade}).",
                         f"     unlocked at grade {config.GRADES[g]} (you: {p.grade}).")]
+            track_note = unlocks_mod.track_lock_note(p, feat)
+            if track_note:
+                lines.append(track_note)
             tid = unlocks_mod.FEATURE_TUTORIAL.get(feat)
             if tid:
                 lines.append(_L(f"     en attendant, tapez TUTO {tid} pour voir comment ça marche.",

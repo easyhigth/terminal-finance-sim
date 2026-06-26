@@ -102,9 +102,13 @@ class MAScene(Scene):
         widgets.draw_text(surf, "M&A — ACQUISITIONS, PORTEFEUILLE & OUTILS", (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         if not self._can_ma():
-            g = unlocks.effective_required_grade(self.app.gs.player, "ma")
+            p = self.app.gs.player
+            g = unlocks.effective_required_grade(p, "ma")
             widgets.draw_text(surf, f"⊘ M&A débloqué au grade {config.GRADES[g]}.",
                               (42, 72), fonts.small(), config.COL_TEXT_DIM)
+            note = unlocks.track_lock_note(p, "ma")
+            if note:
+                widgets.draw_text(surf, note.strip(), (42, 92), fonts.small(), config.COL_TEXT_DIM)
         else:
             widgets.draw_text(surf, "Cibles privées non cotées : analyse complète, financement "
                                     "cash + dette (LBO), pilotage et sortie.",

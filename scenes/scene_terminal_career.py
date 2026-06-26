@@ -122,16 +122,23 @@ class TerminalCareerMixin:
             self._log(_L("  Vous n'avez pas encore choisi de voie : utilisez TRACK.",
                          "  You haven't chosen a track yet: use TRACK."))
             return
+        if p.grade_index < tracks_mod.TOP_GRADE_INDEX:
+            self._log(_L(
+                f"  Voie verrouillée : la reconversion redevient libre et gratuite "
+                f"au grade {config.GRADES[tracks_mod.TOP_GRADE_INDEX]} (vous : {p.grade}).",
+                f"  Track locked: switching becomes free at grade "
+                f"{config.GRADES[tracks_mod.TOP_GRADE_INDEX]} (you: {p.grade})."))
+            return
         if not args:
             cost = tracks_mod.reconversion_cost(p, self.market)
             self._log(_L(
                 f"  Usage : RECONVERT <voie>  (voies : {', '.join(names)}).",
                 f"  Usage: RECONVERT <track>  (tracks: {', '.join(names)})."))
             self._log(_L(
-                f"  Coût actuel : {widgets.format_money(cost, self._cur())} "
-                f"+ {tracks_mod.RAMP_DAYS}j de rodage avant pleine efficacité.",
-                f"  Current cost: {widgets.format_money(cost, self._cur())} "
-                f"+ {tracks_mod.RAMP_DAYS}d break-in before full perk strength."))
+                f"  Grade max atteint : reconversion libre, gratuite et instantanée "
+                f"(coût actuel : {widgets.format_money(cost, self._cur())}).",
+                f"  Top grade reached: free, instant track switch "
+                f"(current cost: {widgets.format_money(cost, self._cur())})."))
             return
         target = next((n for n in names if n.upper() == args[0].upper()), None)
         if not target:
@@ -145,14 +152,22 @@ class TerminalCareerMixin:
                                   "  You are already on that track."),
                 "cash": _L(f"  Trésorerie insuffisante (coût : {widgets.format_money(res.get('cost', 0), self._cur())}).",
                            f"  Insufficient cash (cost: {widgets.format_money(res.get('cost', 0), self._cur())})."),
+                "locked_until_top_grade": _L(
+                    f"  Voie verrouillée jusqu'au grade {config.GRADES[tracks_mod.TOP_GRADE_INDEX]}.",
+                    f"  Track locked until grade {config.GRADES[tracks_mod.TOP_GRADE_INDEX]}."),
             }
             self._log(reasons.get(res["reason"], _L("  Échec.", "  Failed.")))
             return
-        self._log(_L(
-            f"  ⊕ Reconversion vers {target} : -{widgets.format_money(res['cost'], self._cur())}, "
-            f"rodage {res['ramp_days']}j avant pleine efficacité des avantages.",
-            f"  ⊕ Switched to {target}: -{widgets.format_money(res['cost'], self._cur())}, "
-            f"{res['ramp_days']}d break-in before full perk strength."))
+        if res["ramp_days"] > 0:
+            self._log(_L(
+                f"  ⊕ Reconversion vers {target} : -{widgets.format_money(res['cost'], self._cur())}, "
+                f"rodage {res['ramp_days']}j avant pleine efficacité des avantages.",
+                f"  ⊕ Switched to {target}: -{widgets.format_money(res['cost'], self._cur())}, "
+                f"{res['ramp_days']}d break-in before full perk strength."))
+        else:
+            self._log(_L(
+                f"  ⊕ Reconversion libre vers {target} : gratuite, pleinement effective immédiatement.",
+                f"  ⊕ Free switch to {target}: no cost, fully effective immediately."))
         career_mod.log(p, "info", _L(f"Reconversion vers la voie {target}", f"Switched to {target} track"))
         self.app.notify(_L(f"Reconversion : {target}", f"Track switch: {target}"), "info")
 

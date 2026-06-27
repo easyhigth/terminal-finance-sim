@@ -6,6 +6,7 @@ import pygame
 
 from core import career as career_mod
 from core import config
+from core import fx as fx_mod
 from core import inbox as inbox_mod
 from core import liquidity as liq_mod
 from core import market_hours as mh_mod
@@ -310,6 +311,15 @@ class TerminalRenderMixin:
             tag = "▾" if h.get("short") else "▴"
             sign = "+" if pct >= 0 else ""
             parts.append(f"{tag}{h['ticker']} {h['price']:,.2f} {sign}{pct:.2f}%")
+        # bandeau FX permanent : taux de change + variation de chaque paire,
+        # visibles en continu sans ouvrir le desk FX.
+        for pair in fx_mod.PAIRS:
+            sp = fx_mod.spot(self.market, pair)
+            if sp is None:
+                continue
+            chg = fx_mod.change_pct(self.market, pair, 1)
+            sign = "+" if chg >= 0 else ""
+            parts.append(f"{pair} {sp:.4f} {sign}{chg:.2f}%")
         line = "    •    ".join(parts) + "    •    "
         offset = int(self.t * 50) % max(1, fonts.small().size(line)[0])
         widgets.draw_text(surf, line + line, (10 - offset, y + 3),

@@ -67,9 +67,13 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   Les indices émergent de leurs constituants pondérés capi. Crises = chocs sur les facteurs.
   **L'état est reconstruit via (seed, nb de pas)** : le save ne stocke que
   `market_seed`/`market_step`, jamais les prix. Ne pas sérialiser les prix.
-- **`core/intraday.py`** : animation intraday **déterministe et display-only** des prix
-  (pont brownien pinné aux bornes du pas via bruit fBm multi-octave). Aucun état persisté :
-  reconstruit à partir de `(seed, step_count, clé, minute)`. `SimClock.game_minutes_acc`
+- **`core/intraday.py`** : animation intraday **déterministe et display-only** des prix,
+  **forward-looking** : la courbe simule le chemin de la clôture COURANTE vers la clôture du
+  **prochain pas** (déterministe, `Market.next_step_snapshot()`/`next_price_of`/`next_index_value`
+  — clone + un step, jeté, caché par pas), passé en `target` à `live_point`/`append_live` ;
+  `live_pct(series)` donne la variation « en direct » (part de ~0 % et se dirige vers la
+  variation du prochain pas, bouge chaque frame). Bruit fBm multi-octave en surcouche. Aucun
+  état persisté : reconstruit à partir de `(seed, step_count, clé, minute)`. `SimClock.game_minutes_acc`
   fournit la progression dans le pas courant. Branché via des paramètres optionnels
   `sim_clock=None, day=None` sur `core/market_query.py` (`index_history`, `track_company`,
   `history_of` — comportement inchangé si omis), consommé par les sparklines d'indices du

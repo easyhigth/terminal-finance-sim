@@ -8,6 +8,7 @@ from core import career as career_mod
 from core import config
 from core import fx as fx_mod
 from core import inbox as inbox_mod
+from core import intraday
 from core import liquidity as liq_mod
 from core import market_hours as mh_mod
 from core import onboarding as onboarding_mod
@@ -326,11 +327,12 @@ class TerminalRenderMixin:
         for name, *_ in defs:
             visible = (inner.top - step) < y < inner.bottom
             if visible:
-                v = self.market.index_value(name)
-                chg = self.market.index_change_pct(name)
-                col = config.COL_UP if chg >= 0 else config.COL_DOWN
                 hist = self.market.index_history(name, self.app.sim_clock, self.app.gs.player.day)
-                live_v = hist[-1] if hist else v
+                live_v = hist[-1] if hist else self.market.index_value(name)
+                # variation EN DIRECT : se dirige vers le prochain pas (déterministe),
+                # bouge chaque frame (cf. core/intraday.live_pct).
+                chg = intraday.live_pct(hist)
+                col = config.COL_UP if chg >= 0 else config.COL_DOWN
                 flash_col = self._index_flash.tick(name, live_v, config.COL_UP, config.COL_DOWN,
                                                     config.COL_WHITE)
                 row = pygame.Rect(inner.x - 4, y - 1, inner.w + 8, step - 2)
@@ -338,7 +340,7 @@ class TerminalRenderMixin:
                 if row.collidepoint(mp):
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
                 widgets.draw_text(surf, name, (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
-                widgets.draw_text(surf, f"{v:,.0f}", (inner.x + 96, y), fonts.small(), flash_col)
+                widgets.draw_text(surf, f"{live_v:,.0f}", (inner.x + 96, y), fonts.small(), flash_col)
                 widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.2f}%", (inner.right, y),
                                   fonts.small(bold=True), col, align="right")
                 widgets.draw_series(surf, pygame.Rect(inner.x, y + 16, inner.w, spark_h),

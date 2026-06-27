@@ -138,26 +138,44 @@ def wiggle(seed, step_count, key, prev_close, cur_close, progress_minutes, damp=
     return base * (1 + _NOISE_PCT * factor * pinned)
 
 
-def live_point(market, sim_clock, day, key, history, region=None, vol_mult=1.0):
-    """Point "en direct" à ajouter en fin d'une série historique par pas
-    (`history[-1]` = clôture du pas courant, `history[-2]` = clôture
-    précédente) — pour faire bouger n'importe quel graphe existant sans
-    changer sa résolution de données."""
+def live_point(market, sim_clock, day, key, history, region=None, vol_mult=1.0, target=None):
+    """Point "en direct" à ajouter en fin d'une série historique par pas.
+
+    Modèle **forward-looking** : si `target` (clôture DÉTERMINISTE du prochain
+    pas, cf. `Market.next_price_of/next_index_value`) est fourni, la valeur
+    animée simule le chemin de la clôture COURANTE (`history[-1]`) vers cette
+    destination au fil du pas — la courbe « se dirige » réellement vers le
+    prochain pas et le % bouge en continu. Sans `target` (classes d'actifs sans
+    anticipation), on retombe sur l'ancien pont `history[-2] → history[-1]`."""
     if not history:
         return None
     cur = history[-1]
-    prev = history[-2] if len(history) >= 2 else cur
+    if target is not None:
+        start, end = cur, float(target)
+    else:
+        start, end = (history[-2] if len(history) >= 2 else cur), cur
     progress = sim_clock.game_minutes_acc
     damp = region_open_factor(region, market.step_count) if region else 1.0
-    return wiggle(market.seed, market.step_count, key, prev, cur, progress, damp=damp,
+    return wiggle(market.seed, market.step_count, key, start, end, progress, damp=damp,
                   vol_mult=vol_mult * speed_factor(sim_clock))
 
 
-def append_live(market, sim_clock, day, key, history, region=None, vol_mult=1.0):
+def live_pct(series):
+    """Variation « en direct » d'une série animée par `append_live` : valeur
+    animée (`series[-1]`) vs la clôture du pas COURANT (`series[-2]`). Part de
+    ~0 % au début du pas et se dirige vers la variation du prochain pas — bouge
+    donc à chaque frame, de façon directionnelle."""
+    if len(series) < 2 or not series[-2]:
+        return 0.0
+    return (series[-1] / series[-2] - 1.0) * 100.0
+
+
+def append_live(market, sim_clock, day, key, history, region=None, vol_mult=1.0, target=None):
     """Renvoie une COPIE de `history` avec un point animé ajouté en fin
     (n'altère jamais la liste d'origine — utile quand `history` est une
     référence interne au moteur de marché, p. ex. `index_hist`)."""
-    pt = live_point(market, sim_clock, day, key, history, region=region, vol_mult=vol_mult)
+    pt = live_point(market, sim_clock, day, key, history, region=region,
+                    vol_mult=vol_mult, target=target)
     if pt is None:
         return list(history)
     return list(history) + [pt]

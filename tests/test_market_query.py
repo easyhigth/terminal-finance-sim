@@ -170,3 +170,33 @@ def test_factor_attribution_components_sum_to_total(m):
 def test_factor_attribution_unknown_ticker_ignored(m):
     out = m.factor_attribution({"NOPE_TICKER_XYZ": 5})
     assert out["total"] == 0.0
+
+
+# ---------------------------------------------------- anticipation forward-looking
+def test_next_step_snapshot_matches_real_next_step():
+    """next_price_of / next_index_value doivent coïncider avec ce que le PROCHAIN
+    market.step() produit réellement (clone déterministe, état réel non muté)."""
+    import copy
+    mk = Market(seed=321)
+    mk.fast_forward(50)
+    tk = mk.companies[0]["ticker"]
+    name = list(mk.index_hist)[0]
+    nxt_price = mk.next_price_of(tk)
+    nxt_index = mk.next_index_value(name)
+    step_before = mk.step_count
+    ref = copy.deepcopy(mk)
+    ref.step()
+    assert mk.step_count == step_before          # état réel non muté par la lookahead
+    assert abs(nxt_price - float(ref.price[mk.ticker_idx[tk]])) < 1e-9
+    assert abs(nxt_index - ref.index_value(name)) < 1e-6
+
+
+def test_next_step_snapshot_cached_per_step():
+    mk = Market(seed=321)
+    mk.fast_forward(20)
+    a = mk.next_step_snapshot()
+    b = mk.next_step_snapshot()
+    assert a is b                                # même objet -> caché (un seul clone)
+    mk.step()
+    c = mk.next_step_snapshot()
+    assert c is not a                            # invalidé au pas suivant

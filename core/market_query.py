@@ -138,6 +138,39 @@ class MarketQueryMixin:
         else:
             self.region_credit_bump[region] = amount
 
+    # ------------------------------------------------- anticipation (forward-looking)
+    def next_step_snapshot(self):
+        """Clôtures DÉTERMINISTES du PROCHAIN pas (step_count+1), calculées sans
+        muter l'état réel (clone du marché + un step, jeté ensuite). Sert à
+        l'animation intraday « forward-looking » : la courbe simule le chemin du
+        pas COURANT vers sa destination (le prochain pas), au lieu de rejouer le
+        passé. Le déterminisme du moteur est préservé (le clone copie le rng).
+        Caché par step_count → un seul clonage par pas, négligeable."""
+        if getattr(self, "_next_snap_step", None) == self.step_count:
+            return self._next_snap
+        import copy
+        prev = getattr(self, "_next_snap", None)
+        self._next_snap = None                 # ne pas recopier l'ancien snapshot
+        try:
+            clone = copy.deepcopy(self)
+        finally:
+            self._next_snap = prev
+        clone.step()
+        snap = {"price": clone.price.copy(),
+                "index": {name: clone.index_value(name) for name in self.index_hist}}
+        self._next_snap_step = self.step_count
+        self._next_snap = snap
+        return snap
+
+    def next_index_value(self, name):
+        return self.next_step_snapshot()["index"].get(name)
+
+    def next_price_of(self, ticker):
+        i = self.ticker_idx.get(ticker)
+        if i is None:
+            return None
+        return float(self.next_step_snapshot()["price"][i])
+
     # -------------------------------------------------------------- requêtes
     def index_value(self, name):
         members = self.index_members[name]
@@ -163,7 +196,8 @@ class MarketQueryMixin:
             members = self.index_members.get(name, [])
             sigma = float(np.mean(self.sigma[members])) if len(members) else 0.035
             vol_mult = intraday.vol_mult_for_sigma(sigma, scale=0.6)
-            return intraday.append_live(self, sim_clock, day, name, hist, vol_mult=vol_mult)
+            return intraday.append_live(self, sim_clock, day, name, hist, vol_mult=vol_mult,
+                                        target=self.next_index_value(name))
         return hist
 
     def track_company(self, ticker, sim_clock=None, day=None):
@@ -179,7 +213,7 @@ class MarketQueryMixin:
             region = self.companies[i].get("region") if i is not None else None
             vol_mult = intraday.vol_mult_for_sigma(float(self.sigma[i])) if i is not None else 1.0
             return intraday.append_live(self, sim_clock, day, ticker, hist, region=region,
-                                         vol_mult=vol_mult)
+                                         vol_mult=vol_mult, target=self.next_price_of(ticker))
         return hist
 
     def history_of(self, ticker, n=None, sim_clock=None, day=None):
@@ -196,7 +230,7 @@ class MarketQueryMixin:
             region = self.companies[i].get("region")
             vol_mult = intraday.vol_mult_for_sigma(float(self.sigma[i]))
             return intraday.append_live(self, sim_clock, day, ticker, hist, region=region,
-                                         vol_mult=vol_mult)
+                                         vol_mult=vol_mult, target=self.next_price_of(ticker))
         return hist
 
     def price_of(self, ticker):

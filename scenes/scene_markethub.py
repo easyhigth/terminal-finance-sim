@@ -11,6 +11,7 @@ import pygame
 
 from core import config
 from core import fx as FX
+from core import intraday
 from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.popups import PopupMixin
@@ -254,8 +255,11 @@ class MarketHubScene(Scene, PopupMixin):
         surf.set_clip(list_area)
         y = inner.y - st.scroll
         for name, *_ in self.market.index_defs:
-            v = self.market.index_value(name)
-            chg = self.market.index_change_pct(name)
+            # valeur + variation EN DIRECT (se dirigent vers le prochain pas,
+            # bougent chaque frame — cf. core/intraday).
+            hist = self.market.index_history(name, self.app.sim_clock, self.app.gs.player.day)
+            v = hist[-1] if hist else self.market.index_value(name)
+            chg = intraday.live_pct(hist)
             ccol = config.COL_UP if chg >= 0 else config.COL_DOWN
             row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 22)
             visible = list_area.top - 24 < y < list_area.bottom

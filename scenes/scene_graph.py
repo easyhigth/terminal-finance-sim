@@ -393,7 +393,8 @@ class GraphScene(Scene, PopupMixin):
         hist = self.market.history_of(tk, n)
         return intraday.append_live(self.market, self.app.sim_clock,
                                     self.app.gs.player.day, tk, hist,
-                                    region=self._region_of(tk), vol_mult=vol_mult)
+                                    region=self._region_of(tk), vol_mult=vol_mult,
+                                    target=self.market.next_price_of(tk))
 
     # -------------------------------------------------------------- draw
     def draw(self, surf):

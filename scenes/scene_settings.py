@@ -18,6 +18,7 @@ from core import anim_settings, audio, config, display_settings
 from core.i18n import get_lang, set_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
+from ui.shortcutspanel import ShortcutsPanel
 
 # Libellés bilingues locaux (le contenu fin du jeu reste FR, mais le chrome
 # des réglages mérite l'anglais comme le reste du menu).
@@ -30,6 +31,7 @@ class SettingsScene(Scene):
 
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "menu")
+        self.shortcuts_panel = None   # overlay raccourcis clavier (déplaçable)
         self._build()
 
     # --- construction des contrôles (rejouée à chaque changement de langue) ---
@@ -67,6 +69,12 @@ class SettingsScene(Scene):
         self.rows.append((_L("Vitesse du jeu", "Game speed"),
                           self._seg([(("speed", s), f"×{s}", cur_speed == s) for s in (1, 2, 3)])))
         self._layout()
+        # bouton dédié : ouvre le panneau des raccourcis clavier (déplacé ici
+        # depuis la barre du terminal pour la désencombrer).
+        ry = self.rows[-1][1][0].rect.bottom + 18
+        self.shortcuts_btn = widgets.Button((360, ry, 320, 38),
+                                            _L("⌨ Raccourcis clavier", "⌨ Keyboard shortcuts"),
+                                            config.COL_CYAN)
 
     def _seg(self, options):
         """Construit une rangée de boutons-segments ; `options` = liste de
@@ -97,11 +105,20 @@ class SettingsScene(Scene):
 
     # ----------------------------------------------------------------- events
     def handle_event(self, event):
+        # le panneau des raccourcis (overlay) capte tout tant qu'il est ouvert
+        if self.shortcuts_panel is not None:
+            if self.shortcuts_panel.handle(event):
+                if self.shortcuts_panel.closed:
+                    self.shortcuts_panel = None
+                return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.go(self.return_to)
             return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+            return
+        if self.shortcuts_btn.handle(event):
+            self.shortcuts_panel = ShortcutsPanel()
             return
         for _label, btns in self.rows:
             for b in btns:
@@ -132,6 +149,7 @@ class SettingsScene(Scene):
     def update(self, dt):
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp, dt)
+        self.shortcuts_btn.update(mp, dt)
         for _label, btns in self.rows:
             for b in btns:
                 b.update(mp, dt)
@@ -156,9 +174,12 @@ class SettingsScene(Scene):
                 if getattr(b, "active", False):
                     pygame.draw.rect(surf, config.COL_CYAN, b.rect, 2, border_radius=6)
 
+        self.shortcuts_btn.draw(surf)
         # aide contextuelle bas d'écran
-        hint = _L("Astuce : F11 bascule plein écran à tout moment.",
-                  "Tip: F11 toggles fullscreen anytime.")
+        hint = _L("Astuce : F11 bascule plein écran · Espace met le jeu en pause.",
+                  "Tip: F11 toggles fullscreen · Space pauses the game.")
         widgets.draw_text(surf, hint, (60, config.footer_y() - 30),
                           fonts.small(), config.COL_TEXT_DIM)
         self.back_btn.draw(surf)
+        if self.shortcuts_panel is not None:
+            self.shortcuts_panel.draw(surf)

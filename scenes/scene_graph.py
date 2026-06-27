@@ -82,7 +82,9 @@ SERIES_COLS = [config.COL_AMBER, config.COL_CYAN, config.COL_UP, config.COL_WARN
 class GraphScene(Scene, PopupMixin):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
-        self.kind = kwargs.get("kind", "line")
+        # type de graphe : explicite (kwargs) sinon dernier choisi (mémoire),
+        # sinon "line" par défaut.
+        self.kind = kwargs.get("kind") or getattr(self, "_mem_kind", None) or "line"
         self.market = self.app.ensure_market()
         self.init_popups()
         tickers = kwargs.get("tickers")
@@ -105,6 +107,8 @@ class GraphScene(Scene, PopupMixin):
         # Sans objet pour les graphes statistiques/multi-actifs (vol/bêta/
         # corrélation/macro/courbe/spread/comparer) : retombent sur 1A.
         default_period = INTRADAY_PERIODS[0][1] if self.kind in _INTRADAY_KINDS else 73
+        if "period" not in kwargs and getattr(self, "_mem_period", None) is not None:
+            default_period = self._mem_period   # restitue la dernière fenêtre choisie
         self.period = kwargs.get("period", default_period)
         if self.kind not in _INTRADAY_KINDS and self.period is not None and self.period < 0:
             self.period = 73
@@ -298,6 +302,9 @@ class GraphScene(Scene, PopupMixin):
         if self.kind == "line":
             for _, btn, _accent in self._indicator_btns:
                 btn.update(mp, dt)
+        # mémorise le dernier type de graphe + fenêtre choisis, pour les
+        # restituer à la prochaine ouverture (instance de scène réutilisée).
+        self._mem_kind, self._mem_period = self.kind, self.period
 
     # -------------------------------------------------------------- data
     def _info_for(self, tk):

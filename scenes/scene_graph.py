@@ -71,7 +71,7 @@ _NO_ASSET = {"macro", "curve"}     # types sans saisie d'actif
 # de graphe à série unique (ligne/chandeliers/barres/variation %), où la
 # liste de clôtures suffit (`_aggregate_ohlc` re-agrège lui-même l'OHLC).
 INTRADAY_PERIODS = [(label, -minutes) for label, minutes in intraday.INTRADAY_WINDOWS]
-STEP_PERIODS = [("1A", 73), ("3A", 219), ("5A", 365), ("MAX", None)]
+STEP_PERIODS = [("1M", 6), ("3M", 18), ("1A", 73), ("3A", 219), ("5A", 365), ("MAX", None)]
 PERIODS = INTRADAY_PERIODS + STEP_PERIODS
 _INTRADAY_KINDS = {"line", "candles", "bars", "change", "compare"}
 _MAX_TICKERS = 10   # au-delà, légendes/puces deviennent illisibles
@@ -351,7 +351,7 @@ class GraphScene(Scene, PopupMixin):
 
     def _period_choices(self):
         """Périodes proposées pour le type de graphe courant — les fenêtres
-        intraday (5M..2H) n'ont de sens que pour les graphes à série unique
+        courtes animées (1J/1W) n'ont de sens que pour les graphes à série unique
         (ligne/chandeliers/barres/variation %)."""
         if self.kind in _INTRADAY_KINDS:
             return PERIODS

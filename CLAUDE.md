@@ -69,7 +69,7 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   `sim_clock=None, day=None` sur `core/market_query.py` (`index_history`, `track_company`,
   `history_of` — comportement inchangé si omis), consommé par les sparklines d'indices du
   terminal, le popup société (onglet graphe) et `scenes/scene_graph.py` (qui ajoute des
-  fenêtres intraday 5M/10M/30M/1H/2H, en plus de 1A/3A/5A/MAX, pour les graphes mono-actif
+  fenêtres courtes animées 1J/1W, en plus des périodes par pas 1M/3M/1A/3A/5A/MAX, pour les graphes mono-actif
   ligne/bougies/barres/variation). N'affecte jamais les prix d'exécution (`BUY/SELL/...`),
   qui restent sur `market.price[i]`. Amplitude de bruit modulée par la volatilité propre de
   chaque actif (`vol_mult_for_sigma(sigma, scale)`, basé sur `market.sigma`) ; les bougies

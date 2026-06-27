@@ -31,7 +31,7 @@ la barre. Les coordonnées souris (en repère fenêtre) sont translatées de
 import pygame
 
 from core import config
-from ui import fonts, widgets
+from ui import fonts, simclock_widget, widgets
 
 TAB_BAR_H = config.TAB_BAR_H
 TAB_W = 168
@@ -213,9 +213,18 @@ class PageManager:
             if i != self.active and page.popup:
                 page.manager.update(dt)
 
+    def _clock_visible(self):
+        """Les contrôles d'horloge (pause/vitesse/⚙) ne s'affichent que pendant
+        une partie en cours (pas sur le menu / la création de run)."""
+        gs = getattr(self.app, "gs", None)
+        return bool(gs and getattr(gs.player, "market_seed", None))
+
     def _tab_viewport_w(self):
-        """Largeur disponible pour les onglets, avant le bouton « + »."""
-        return config.SCREEN_WIDTH - NEW_TAB_W - 8
+        """Largeur disponible pour les onglets, avant le bouton « + ». Quand
+        les contrôles d'horloge sont visibles, on réserve leur largeur à droite
+        pour qu'aucun onglet ne passe dessous."""
+        reserve = simclock_widget.cluster_width() if self._clock_visible() else 0
+        return config.SCREEN_WIDTH - NEW_TAB_W - 8 - reserve
 
     def _tab_metrics(self):
         """Largeur d'un onglet et défilement max : les onglets se compressent
@@ -259,6 +268,9 @@ class PageManager:
             return
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and raw_pos and raw_pos[1] < TAB_BAR_H:
+            # contrôles d'horloge + ⚙ (repère fenêtre, à droite de la bande)
+            if self._clock_visible() and simclock_widget.handle_click(self.app, raw_pos):
+                return
             tab_rects, new_rect = self._tab_rects()
             if new_rect.collidepoint(raw_pos):
                 if self.can_switch():
@@ -421,3 +433,8 @@ class PageManager:
         if blocked:
             widgets.draw_text(surf, "🔒 examen en cours — onglets verrouillés",
                               (new_rect.right + 12, 6), fonts.tiny(), config.COL_WARN)
+        # contrôles d'horloge (pause / x1 / x2 / x3) + ⚙ RÉGLAGES, sur leur
+        # propre ligne (bande d'onglets), à droite — ne chevauchent jamais le
+        # bandeau d'info des scènes.
+        if self._clock_visible():
+            simclock_widget.draw(surf, self.app)

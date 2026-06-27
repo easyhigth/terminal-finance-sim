@@ -10,7 +10,7 @@ import pygame
 from core import config, fuzzy
 from core.i18n import get_lang
 from core.sim_clock import LIVE_SCENE_NAMES
-from ui import fonts, simclock_widget, widgets
+from ui import fonts, widgets
 
 PALETTE_W, PALETTE_H = 560, 360
 PALETTE_ROW_H = 30
@@ -346,10 +346,6 @@ class SceneManager:
         if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
                 and self._handle_breadcrumb_click(event.pos)):
             return
-        if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
-                and self.current_name not in BREADCRUMB_SKIP
-                and simclock_widget.handle_click(self.app, event.pos)):
-            return
         # on ignore les entrées pendant le tout début du fondu pour éviter
         # les clics fantômes hérités de la scène précédente
         if self.current and self._fade < 0.6:
@@ -369,8 +365,6 @@ class SceneManager:
             return
         self.current.draw(surf)
         self._draw_breadcrumb(surf)
-        if self.current_name not in BREADCRUMB_SKIP:
-            simclock_widget.draw(surf, self.app)
         # overlay : notifications (toasts) au-dessus de la scène, sous le fondu
         notes = getattr(self.app, "notes", None)
         if notes:

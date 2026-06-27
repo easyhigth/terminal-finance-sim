@@ -195,8 +195,11 @@ def intraday_series(market, sim_clock, day, key, history, window_minutes, n_poin
     return out
 
 
-# Granularités intraday proposées dans les sélecteurs de période, en minutes
-# de jeu — toutes en plus des périodes "par pas" existantes (1A/3A/5A/MAX).
+# Fenêtres « courtes » proposées dans les sélecteurs de période, en minutes de
+# jeu — reconstruites par animation intraday (pont brownien) car plus fines que
+# le pas du moteur (DAYS_PER_STEP=5 jours). En plus des périodes « par pas »
+# (1M/3M/1A/3A/5A/MAX). 1J = 1 jour (1440 min), 1W = 1 semaine (7×1440 min).
 INTRADAY_WINDOWS = [
-    ("1H", 60),
+    ("1J", 1440),
+    ("1W", 10080),
 ]

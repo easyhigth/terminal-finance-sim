@@ -1094,13 +1094,13 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         if not m:
             return
         p = self.app.gs.player
-        day, minute = self.app.sim_clock.current_time(p.day)
-        labels = (mh_mod.SESSION_LABEL_EN if get_lang() == "en" else mh_mod.SESSION_LABEL)
-        weekday = mh_mod.is_weekday_open(day)
-        cur = {s: (weekday and mh_mod.is_session_open(s, minute)) for s in mh_mod.SESSION_HOURS}
+        labels = mh_mod.session_labels(get_lang())
+        # sessions par pas : 2 ouvertes / 1 fermée, en rotation. On signale la
+        # bascule (une place ferme, une autre rouvre) à chaque changement de pas.
+        cur = {s: mh_mod.is_session_open(s, m.step_count) for s in mh_mod.SESSIONS}
         if self._session_open is not None:
             for s, is_open in cur.items():
-                was = self._session_open.get(s, False)
+                was = self._session_open.get(s, True)
                 if is_open and not was:
                     audio.play("bell")
                     self.app.notify(_L(f"🔔 Ouverture {labels[s]}", f"🔔 {labels[s]} open"), "good")
@@ -1108,6 +1108,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                     self.app.notify(_L(f"🔔 Clôture {labels[s]}", f"🔔 {labels[s]} close"), "info")
         self._session_open = cur
         # résumé de séance : émis une fois par changement de jour de jeu
+        day = self.app.sim_clock.current_time(p.day)[0]
         if self._session_day is None:
             self._session_day, self._day_start_nw = day, pf_mod.net_worth(p, m)
         elif day != self._session_day:

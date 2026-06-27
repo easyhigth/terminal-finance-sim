@@ -35,28 +35,25 @@ class TerminalMarketMixin:
         self._log(_L("  Indices ouverts (fenêtre).","  Indices opened (window)."))
 
     def _cmd_hours(self):
-        """HOURS : statut des 3 sessions de cotation (Asie/Europe/Amériques) —
-        ouvert/fermé et heure de réouverture si fermé (cf. core/market_hours.py)."""
-        p = self.app.gs.player
-        day, minute = self.app.sim_clock.current_time(p.day)
+        """HOURS : statut des 3 sessions (Asie/Europe/Amériques) au pas courant —
+        2 ouvertes / 1 fermée en rotation (cf. core/market_hours.py)."""
+        m = self.market
+        step = m.step_count
         lang = get_lang()
+        labels = mh_mod.session_labels(lang)
         rows = []
         for sess in ("ASIA", "EUROPE", "AMERICAS"):
-            open_m, close_m = mh_mod.SESSION_HOURS[sess]
-            labels = mh_mod.SESSION_LABEL_EN if lang == "en" else mh_mod.SESSION_LABEL
-            name = labels[sess]
-            is_open = mh_mod.is_weekday_open(day) and mh_mod.is_session_open(sess, minute)
+            is_open = mh_mod.is_session_open(sess, step)
             status = _L("OUVERT", "OPEN") if is_open else _L("FERMÉ", "CLOSED")
             col = config.COL_UP if is_open else config.COL_DOWN
-            rows.append(((name, config.COL_AMBER),
-                         f"{mh_mod.fmt_hhmm(open_m)}–{mh_mod.fmt_hhmm(close_m)}",
-                         (status, col)))
-        self._open_window(_L("HORAIRES DES MARCHÉS", "MARKET HOURS"),
+            when = _L("ce pas", "this step") if is_open else _L("rouvre au prochain pas", "reopens next step")
+            rows.append(((labels[sess], config.COL_AMBER), when, (status, col)))
+        self._open_window(_L("SESSIONS DE MARCHÉ", "MARKET SESSIONS"),
                           [(_L("Session", "Session"), 110),
-                           (_L("Plage horaire", "Window"), 130),
+                           (_L("Quand", "When"), 170),
                            (_L("Statut", "Status"), 90)], rows)
-        self._log(_L(f"  Jour {day} — {mh_mod.fmt_hhmm(minute)} (heure de jeu).",
-                     f"  Day {day} — {mh_mod.fmt_hhmm(minute)} (game time)."))
+        self._log(_L("  Sessions par pas : 2 ouvertes / 1 fermée, en rotation à chaque pas.",
+                     "  Sessions per step: 2 open / 1 closed, rotating each step."))
 
     def _match_region(self, name):
         if not name:

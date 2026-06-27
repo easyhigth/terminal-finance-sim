@@ -202,26 +202,23 @@ class TerminalRenderMixin:
         r = widgets.draw_text(surf, f"{p.reputation}/100", (r.right, y), fonts.small(bold=True),
                               config.COL_WHITE)
         x = r.right + 18
-        # day + heure de jeu (cf. core/sim_clock.py)
-        day_now, minute_now = self.app.sim_clock.current_time(p.day)
+        # day + heure de jeu (cf. core/sim_clock.py) — horloge cosmétique
+        minute_now = self.app.sim_clock.current_time(p.day)[1]
         widgets.draw_text(surf, "DAY  ", (x, y), fonts.small(), config.COL_TEXT_DIM)
         r = widgets.draw_text(surf, f"{p.day} (T{p.quarter}) {mh_mod.fmt_hhmm(minute_now)}",
                               (x + fonts.small().size("DAY  ")[0], y), fonts.small(bold=True),
                               config.COL_WHITE)
         x = r.right + 14
-        # pastilles de sessions de marché ouvertes/fermées (Asie/Europe/Amériques)
-        for sess in ("ASIA", "EUROPE", "AMERICAS"):
-            open_now = mh_mod.is_weekday_open(day_now) and mh_mod.is_session_open(sess, minute_now)
-            dot_col = config.COL_UP if open_now else config.COL_TEXT_DIM
-            r = widgets.draw_text(surf, "●", (x, y), fonts.small(bold=True), dot_col)
-            x = r.right + 2
-        # repère « marché fermé » quand aucune session n'est ouverte (nuit/week-end)
-        any_open = mh_mod.is_weekday_open(day_now) and any(
-            mh_mod.is_session_open(s, minute_now) for s in ("ASIA", "EUROPE", "AMERICAS"))
-        if not any_open:
-            r = widgets.draw_text(surf, " FERMÉ", (x, y), fonts.small(bold=True), config.COL_TEXT_DIM)
-            x = r.right
-        x += 14
+        # sessions par pas (cf. core/market_hours.py) : 2 ouvertes / 1 fermée,
+        # en rotation à chaque pas. On affiche l'initiale + une pastille
+        # verte (ouvert) / rouge (fermé ce pas) pour chaque place.
+        step = self.market.step_count
+        for sess, letter in (("ASIA", "A"), ("EUROPE", "E"), ("AMERICAS", "M")):
+            open_now = mh_mod.is_session_open(sess, step)
+            col = config.COL_UP if open_now else config.COL_DOWN
+            r = widgets.draw_text(surf, f"{letter}●", (x, y), fonts.small(bold=True), col)
+            x = r.right + 6
+        x += 8
         # badge régime de marché (contexte macro en permanence, code couleur)
         reg = getattr(self.market, "regime", None)
         if reg:

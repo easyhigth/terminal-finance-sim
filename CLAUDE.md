@@ -54,12 +54,14 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   automatiquement l'horloge en pause (`auto_paused`) dès qu'on quitte la scène `"terminal"`
   (mission, examen, deal, dilemme…) et la reprend exactement au retour — aucune minute de jeu
   n'est comptée pendant l'absence. Widget de contrôle (⏸/▶/▶▶/▶▶▶) : `ui/simclock_widget.py`.
-- **`core/market_hours.py`** : calendrier des sessions de cotation par région (Asie/Europe/
-  Amériques, lundi-vendredi, plages horaires partiellement chevauchantes — jamais les 3
-  ouvertes en même temps). `SimClock.current_time(player.day)` donne le (jour, minute du
-  jour) courant ; `BUY/SELL/SHORT/COVER` (`scenes/scene_terminal_trading.py`) refusent le
-  trade actions hors session avec l'heure de réouverture ; commande `HOURS` au terminal pour
-  consulter le statut des 3 sessions.
+- **`core/market_hours.py`** : sessions de cotation par région (Asie/Europe/Amériques) au
+  modèle **par pas de marché** (et non par heure de la journée, sinon ça clignote avec le
+  temps accéléré) : à chaque pas, **2 sessions ouvertes / 1 fermée en rotation**
+  (`closed_session(step)`), de sorte que chaque paire se croise une fois par cycle de 3 pas ;
+  une place fermée rouvre toujours au pas suivant. `is_region_open(region, step)` /
+  `is_session_open(session, step)` consommés par `BUY/SELL/SHORT/COVER`
+  (`scenes/scene_terminal_trading.py`, refus si fermée), les pastilles A/E/M de la topbar,
+  le gel intraday (`core/intraday.region_open_factor(region, step)`) et la commande `HOURS`.
 - **`core/market.py`** : moteur de marché **déterministe** à modèle de facteurs
   `r_i = drift + beta·F_monde + b_secteur·F_secteur + b_region·F_region + sigma·bruit`.
   Les indices émergent de leurs constituants pondérés capi. Crises = chocs sur les facteurs.

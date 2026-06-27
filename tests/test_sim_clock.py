@@ -2,7 +2,12 @@
 (Round 11 Phase 2) : horloge de jeu temps réel et calendrier des sessions
 de cotation par région."""
 from core import market_hours as mh
-from core.sim_clock import SimClock
+from core.sim_clock import GAME_MINUTES_PER_REAL_SECOND_AT_X1 as _GMS, SimClock
+
+# secondes réelles équivalentes à `m` minutes de jeu à x1 (indépendant de la
+# cadence exacte choisie : les tests valident la LOGIQUE de bancarisation).
+def _real_secs(game_minutes):
+    return game_minutes / _GMS
 
 # --------------------------------------------------------------- SimClock
 
@@ -36,12 +41,12 @@ def test_advance_banks_one_step_at_threshold():
     c = SimClock()
     minutes_per_step = 5 * 24 * 60  # DAYS_PER_STEP=5
     # juste sous le seuil : 0 pas
-    steps = c.advance(minutes_per_step - 1, 5)
+    steps = c.advance(_real_secs(minutes_per_step - 1), 5)
     assert steps == 0
     # le complément déclenche exactement 1 pas, sans reste
-    steps = c.advance(1, 5)
+    steps = c.advance(_real_secs(1), 5)
     assert steps == 1
-    assert c.game_minutes_acc == 0
+    assert abs(c.game_minutes_acc) < 1e-6
 
 
 def test_advance_zero_when_paused():
@@ -56,7 +61,7 @@ def test_advance_scales_with_speed():
     c.set_speed(3)
     minutes_per_step = 5 * 24 * 60
     # à vitesse x3, 1/3 du temps réel suffit pour banquer 1 pas
-    steps = c.advance(minutes_per_step / 3, 5)
+    steps = c.advance(_real_secs(minutes_per_step / 3), 5)
     assert steps == 1
 
 

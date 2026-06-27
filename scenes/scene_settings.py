@@ -93,12 +93,14 @@ class SettingsScene(Scene):
         y = config.content_top() + 30
         row_h, gap = 58, 10
         for _label, btns in self.rows:
-            # largeur d'un segment adaptée au nombre d'options de la rangée
-            n = len(btns)
-            seg_w = 150 if n <= 3 else 120
             x = x0
             for b in btns:
-                w = 56 if b.label in ("−", "+") else seg_w
+                # largeur ajustée au libellé (jamais de texte qui déborde sur le
+                # bouton voisin — ex. « Plein écran fenêtré »).
+                if b.label in ("−", "+"):
+                    w = 56
+                else:
+                    w = max(96, fonts.body(bold=True).size(b.label)[0] + 28)
                 b.rect = pygame.Rect(x, y, w, 40)
                 x += w + 8
             y += row_h + gap

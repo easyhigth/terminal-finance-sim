@@ -183,7 +183,7 @@ class RiskScene(Scene):
     def update(self, dt):
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp)
-        self.mode_btn.label = "MODE : PORTEFEUILLE RÉEL" if self.real else "MODE : DÉMO"
+        self.mode_btn.label = "MODE : RÉEL" if self.real else "MODE : DÉMO"
         self.mode_btn.update(mp)
         self.tuto_btn.update(mp)
 
@@ -333,24 +333,30 @@ class RiskScene(Scene):
         inner = widgets.draw_panel(surf, panel, "Stress Tests — scénarios", config.COL_WARN)
         self._scenario_btns = {}
         names = list(risk_mod.STRESS) if self.real else list(STRESS_SCENARIOS)
-        w = max(110, (inner.w - 6 * (len(names) - 1)) // len(names))
-        x = inner.x
-        for name in names:
-            rect = pygame.Rect(x, inner.y, w, 30)
+        # grille de boutons (plusieurs lignes) pour ne jamais déborder du panneau
+        # quel que soit le nombre de scénarios (le mode réel en a 9).
+        cols = 3
+        bh = 28
+        bw = (inner.w - (cols - 1) * 6) // cols
+        for i, name in enumerate(names):
+            cx, ry = i % cols, i // cols
+            rect = pygame.Rect(inner.x + cx * (bw + 6), inner.y + ry * (bh + 6), bw, bh)
             self._scenario_btns[name] = rect
             sel = (self.scenario == name)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect)
             pygame.draw.rect(surf, config.COL_WARN if sel else config.COL_BORDER, rect, 1)
             font = fonts.tiny(bold=sel)
-            img = font.render(widgets.fit_text(name, font, w - 8), True,
+            img = font.render(widgets.fit_text(name, font, bw - 8), True,
                               config.COL_WARN if sel else config.COL_TEXT)
             surf.blit(img, img.get_rect(center=rect.center))
-            x += w + 6
+        n_rows = (len(names) + cols - 1) // cols
+        self._scenario_btns_bottom = inner.y + n_rows * (bh + 6) + 6
 
+        body_top = self._scenario_btns_bottom
         if self.real:
             if self.scenario and self.stress_real is not None:
                 s = self.stress_real
-                y = inner.y + 52
+                y = body_top
                 widgets.draw_text(surf, f"Scénario : {self.scenario} (sur votre book)",
                                   (inner.x, y), fonts.small(bold=True), config.COL_WARN)
                 y += 30
@@ -368,11 +374,11 @@ class RiskScene(Scene):
                                   (inner.x+200, y+6), fonts.head(bold=True), tcol)
             else:
                 widgets.draw_text(surf, "Sélectionnez un scénario pour stresser votre book réel.",
-                                  (inner.x, inner.y+52), fonts.small(), config.COL_TEXT_DIM)
+                                  (inner.x, body_top), fonts.small(), config.COL_TEXT_DIM)
             return
 
         if self.scenario and self.scenario_pnl is not None:
-            y = inner.y+44
+            y = body_top
             widgets.draw_text(surf, f"Scénario : {self.scenario}", (inner.x, y),
                               fonts.small(bold=True), config.COL_WARN)
             y += 28
@@ -392,7 +398,7 @@ class RiskScene(Scene):
                               (inner.x+180, y+4), fonts.head(bold=True), tcol)
         else:
             widgets.draw_text(surf, "Sélectionnez un scénario pour voir l'impact.",
-                              (inner.x, inner.y+50), fonts.small(), config.COL_TEXT_DIM)
+                              (inner.x, body_top), fonts.small(), config.COL_TEXT_DIM)
 
     def _draw_sensitivity(self, surf):
         panel = pygame.Rect(992, 110, 248, 280)

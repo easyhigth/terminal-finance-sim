@@ -11,6 +11,7 @@ import pygame
 
 from core import config, unlocks
 from core import fx as FX
+from core import intraday
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
 
@@ -163,6 +164,33 @@ class FXScene(Scene):
                             self.app.gs.save(config.AUTOSAVE_SLOT)
                     return
 
+    def _draw_fx_graph(self, surf, rect):
+        """Graphe du taux de change de la paire sélectionnée : historique par
+        pas + point « en direct » animé (pont brownien déterministe, comme les
+        actions/indices), cours courant et variation en gros — pour suivre
+        l'évolution de la monnaie en temps réel."""
+        m = self.app.market
+        pair = self._pair()
+        inner = widgets.draw_panel(surf, rect, f"{pair} — cours & évolution", config.COL_CYAN)
+        hist = FX.history(m, pair, 80)
+        if len(hist) < 2:
+            widgets.draw_text(surf, "Historique en constitution (avancez le temps).",
+                              (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
+            return
+        # amplitude d'animation proportionnelle à la volatilité de la paire
+        vmult = max(0.4, min(2.5, FX.pair_vol(pair) / 0.08))
+        series = intraday.append_live(m, self.app.sim_clock, self.app.gs.player.day,
+                                      pair, hist, vol_mult=vmult)
+        cur = series[-1]
+        chg = FX.change_pct(m, pair, 1)
+        col = config.COL_UP if chg >= 0 else config.COL_DOWN
+        widgets.draw_text(surf, f"{cur:.4f}", (inner.x, inner.y - 2), fonts.head(bold=True), col)
+        widgets.draw_text(surf, f"{chg:+.2f}% / pas · vol {FX.pair_vol(pair)*100:.0f}%",
+                          (inner.x + 160, inner.y + 6), fonts.small(), config.COL_TEXT_DIM)
+        chart = pygame.Rect(inner.x, inner.y + 36, inner.w, inner.bottom - (inner.y + 36))
+        widgets.draw_series(surf, chart, series, col, mouse_pos=pygame.mouse.get_pos(),
+                            y_fmt=lambda v: f"{v:.4f}", show_pct=True)
+
     def update(self, dt):
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp, dt)
@@ -193,25 +221,34 @@ class FXScene(Scene):
 
         widgets.draw_text(surf, "Paire", (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 22
+        # Tableau des paires : chaque case montre la paire, son cours courant et
+        # sa variation depuis le pas précédent (indicateur de change permanent).
         self.pair_rects = {}
         self._all_rects = {}
         x = inner.x
         for i, pair in enumerate(FX.PAIRS):
-            rect = pygame.Rect(x, y, 96, 26)
+            rect = pygame.Rect(x, y, 108, 38)
             sel = i == self.pair_idx
+            sp = FX.spot(m, pair)
+            chg = FX.change_pct(m, pair, 1)
+            ccol = config.COL_UP if chg >= 0 else config.COL_DOWN
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect, border_radius=4)
             pygame.draw.rect(surf, config.COL_CYAN if sel else config.COL_BORDER, rect, 1, border_radius=4)
-            widgets.draw_text(surf, pair, rect.center, fonts.tiny(bold=True),
-                              config.COL_CYAN if sel else config.COL_TEXT, align="center")
+            widgets.draw_text(surf, pair, (rect.x + 6, rect.y + 3), fonts.tiny(bold=True),
+                              config.COL_CYAN if sel else config.COL_TEXT)
+            widgets.draw_text(surf, f"{sp:.4f}" if sp else "—", (rect.x + 6, rect.y + 20),
+                              fonts.tiny(bold=True), config.COL_TEXT)
+            widgets.draw_text(surf, f"{chg:+.2f}%", (rect.right - 6, rect.y + 20),
+                              fonts.tiny(bold=True), ccol, align="right")
             self.pair_rects[i] = rect
             fk = ("pair", i)
             self._all_rects[fk] = rect
             keynav.draw_focus_ring(surf, rect, self.focus == fk)
-            x += 102
-            if x + 102 > inner.right:
+            x += 114
+            if x + 114 > inner.right:
                 x = inner.x
-                y += 30
-        y += 36
+                y += 42
+        y += 48
 
         widgets.draw_text(surf, "Sens (long = pari sur hausse de la devise de base)",
                           (inner.x, y), fonts.small(), config.COL_TEXT)
@@ -301,8 +338,11 @@ class FXScene(Scene):
                               (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
             self.forward_btn = None
 
-        # ---- positions en cours (droite) ----
-        pos_rect = pygame.Rect(540, 110, config.SCREEN_WIDTH - 580, 420)
+        # ---- graphe du taux de la paire sélectionnée (droite, haut) ----
+        self._draw_fx_graph(surf, pygame.Rect(540, 110, config.SCREEN_WIDTH - 580, 232))
+
+        # ---- positions en cours (droite, bas) ----
+        pos_rect = pygame.Rect(540, 354, config.SCREEN_WIDTH - 580, 176)
         pinner = widgets.draw_panel(surf, pos_rect, "Positions en cours", config.COL_UP)
         yy = pinner.y
         self.close_rects = {}

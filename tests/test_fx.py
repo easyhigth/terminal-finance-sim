@@ -185,3 +185,30 @@ def test_quote_forward_rejects_unknown_tenor():
     p, m = _mk()
     q = FX.quote_forward(m, "EUR/USD", 99)
     assert q["ok"] is False
+
+
+# ---------------------------------------------------------------- historique / variation
+def test_history_length_and_endpoint_matches_spot():
+    p, m = _mk()
+    h = FX.history(m, "EUR/USD", 30)
+    assert 1 <= len(h) <= 30
+    assert h[-1] == FX.spot(m, "EUR/USD")   # dernier point = cours courant
+
+
+def test_history_deterministic_same_seed_step():
+    m1 = market.Market(seed=99); m1.sync_to(40)
+    m2 = market.Market(seed=99); m2.sync_to(40)
+    assert FX.history(m1, "USD/JPY", 50) == FX.history(m2, "USD/JPY", 50)
+
+
+def test_change_pct_consistent_with_path():
+    p, m = _mk()
+    h = FX.history(m, "EUR/USD", 3)
+    if len(h) >= 2 and h[-2]:
+        expected = (h[-1] / h[-2] - 1.0) * 100.0
+        assert abs(FX.change_pct(m, "EUR/USD", 1) - expected) < 1e-9
+
+
+def test_pair_vol_known_and_unknown():
+    assert FX.pair_vol("USD/ZAR") > FX.pair_vol("EUR/USD")
+    assert FX.pair_vol("XXX/YYY") == 0.08

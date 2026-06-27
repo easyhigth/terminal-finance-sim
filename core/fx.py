@@ -79,6 +79,37 @@ def spot(market, pair):
     return p[step]
 
 
+def history(market, pair, n=120):
+    """Série déterministe des taux de change par pas, du début de partie
+    jusqu'au pas courant inclus (derniers `n` points). Sert de base aux
+    graphes FX — même source que `spot()`, donc parfaitement cohérente."""
+    if pair not in _BY_PAIR:
+        return []
+    step = int(getattr(market, "step_count", 0))
+    p = _path(market, pair, step)
+    series = p[:step + 1]
+    return series[-n:] if n else series
+
+
+def change_pct(market, pair, lookback=1):
+    """Variation en % du taux sur les `lookback` derniers pas (0 si historique
+    trop court). `lookback=1` ≈ « variation depuis le pas précédent »."""
+    if pair not in _BY_PAIR:
+        return 0.0
+    step = int(getattr(market, "step_count", 0))
+    if step < lookback:
+        return 0.0
+    p = _path(market, pair, step)
+    base = p[step - lookback]
+    return (p[step] / base - 1.0) * 100.0 if base else 0.0
+
+
+def pair_vol(pair):
+    """Volatilité annuelle de la paire (paramètre du modèle)."""
+    d = _BY_PAIR.get(pair)
+    return d[3] if d else 0.08
+
+
 def quote_spot(market, pair):
     """Cote spot courante de la paire."""
     sp = spot(market, pair)

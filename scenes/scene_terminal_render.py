@@ -16,7 +16,7 @@ from core import portfolio_views as pv_mod
 from core import unlocks as unlocks_mod
 from core.i18n import get_lang
 from core.i18n import t as _t
-from ui import fonts, keynav, simclock_widget, widgets
+from ui import fonts, keynav, widgets
 
 
 def _L(fr, en):
@@ -274,25 +274,12 @@ class TerminalRenderMixin:
             widgets.draw_text(surf, "🛠 CHEAT", btn.center, fonts.tiny(bold=True),
                               config.COL_DOWN, align="center")
             self._cheat_btn_rect = btn
-        # coin haut-droit : icône ⚙ RÉGLAGES compacte, dans l'espace réservé à
-        # droite des boutons d'horloge (cf. ui/simclock_widget.GEAR_RESERVE).
-        # Le panneau des raccourcis clavier a migré DANS les réglages (plus de
-        # bouton ⌨ dédié ici) pour désencombrer la barre.
-        mp = pygame.mouse.get_pos()
+        # Les contrôles d'horloge (pause/vitesse) et l'icône ⚙ RÉGLAGES vivent
+        # désormais dans la bande d'onglets (cf. core/pages.py + ui/simclock_widget),
+        # sur leur propre ligne au-dessus de la scène — ils ne chevauchent donc
+        # plus jamais ce bandeau d'info. Plus aucun bouton ici.
         self._shortcuts_btn_rect = None
-        gbtn = simclock_widget.gear_rect()
-        ghover = gbtn.collidepoint(mp)
-        pygame.draw.rect(surf, config.COL_PANEL_HEAD if ghover else config.COL_PANEL,
-                         gbtn, border_radius=5)
-        pygame.draw.rect(surf, config.COL_AMBER if ghover else config.COL_BORDER,
-                         gbtn, 1, border_radius=5)
-        widgets.draw_text(surf, "⚙", gbtn.center, fonts.body(bold=True),
-                          config.COL_AMBER, align="center")
-        self._settings_btn_rect = gbtn
-        if ghover:
-            widgets.draw_tooltip(surf, _L("Réglages (affichage, son, langue, raccourcis)",
-                                          "Settings (display, sound, language, shortcuts)"),
-                                 (gbtn.left, gbtn.bottom + 4))
+        self._settings_btn_rect = None
 
     def _draw_ticker(self, surf):
         y = config.TOPBAR_H + 4

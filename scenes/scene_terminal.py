@@ -318,12 +318,6 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             if self._onboarding_skip_rect and self._onboarding_skip_rect.collidepoint(event.pos):
                 onboarding_mod.skip(self.app.gs.player)
                 return
-            if self._shortcuts_btn_rect and self._shortcuts_btn_rect.collidepoint(event.pos):
-                self._toggle_shortcuts_panel()
-                return
-            if self._settings_btn_rect and self._settings_btn_rect.collidepoint(event.pos):
-                self.app.scenes.go("settings", return_to="terminal")
-                return
             if (getattr(self.app, "cheats", False) and self._cheat_btn_rect
                     and self._cheat_btn_rect.collidepoint(event.pos)):
                 if self.cheat_panel is None:

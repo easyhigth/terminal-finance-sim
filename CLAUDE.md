@@ -44,7 +44,10 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
 - **`main.py`** : `App` (boucle pygame, enregistrement des scènes, `ensure_market()`,
   `sim_clock`/`pending_market_steps`). `core/scene_manager.py` gère la pile de scènes + toasts.
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
-  pause manuelle, pause automatique. Le temps avance en continu (plus de commande « ADV ») :
+  pause manuelle, pause automatique. Cadence : à x1, **1 minute réelle = 1 pas de marché**
+  (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 120`), soit un nouveau pas toutes les ~60 s (x1) /
+  ~20 s (x3) ; entre deux pas, l'animation intraday fait glisser les graphes en continu.
+  Le temps avance en continu (plus de commande « ADV ») :
   `App.run()` convertit le temps réel écoulé en pas de marché bancarisés
   (`App.pending_market_steps`), joués au terminal par `TerminalTimeMixin._drain_pending_steps()`
   (`scenes/scene_terminal_time.py`). `core/scene_manager.py::SceneManager.go()` met

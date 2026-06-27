@@ -363,6 +363,8 @@ class GraphScene(Scene, PopupMixin):
 
     def _series(self, tk):
         kind = _asset_kind(tk)
+        i = self.market.ticker_idx.get(tk)
+        vol_mult = intraday.vol_mult_for_sigma(float(self.market.sigma[i])) if i is not None else 1.0
         if self.period is not None and self.period < 0:
             # fenêtre intraday animée (Round 11 Phase 3) : uniquement pour les
             # actions (seule classe avec un historique par pas exploitable
@@ -370,8 +372,6 @@ class GraphScene(Scene, PopupMixin):
             # les autres classes d'actifs retombent sur la vue "MAX".
             if kind == "stock":
                 hist = self.market.history_of(tk)
-                i = self.market.ticker_idx.get(tk)
-                vol_mult = intraday.vol_mult_for_sigma(float(self.market.sigma[i])) if i is not None else 1.0
                 return intraday.intraday_series(
                     self.market, self.app.sim_clock, self.app.gs.player.day, tk, hist,
                     window_minutes=-self.period, n_points=60, region=self._region_of(tk),
@@ -387,7 +387,13 @@ class GraphScene(Scene, PopupMixin):
             return CRY.history(self.market, tk, n)
         if kind == "etf":
             return ETF.nav_history(self.market, tk, n)
-        return self.market.history_of(tk, n)
+        # action, période « par pas » (1M/3M/1A/…) : on ajoute un point « en
+        # direct » animé en bout de courbe pour qu'elle respire entre deux pas
+        # (sinon le graphe ne bougeait qu'au changement de pas).
+        hist = self.market.history_of(tk, n)
+        return intraday.append_live(self.market, self.app.sim_clock,
+                                    self.app.gs.player.day, tk, hist,
+                                    region=self._region_of(tk), vol_mult=vol_mult)
 
     # -------------------------------------------------------------- draw
     def draw(self, surf):

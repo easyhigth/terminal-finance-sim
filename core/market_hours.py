@@ -1,25 +1,31 @@
 """
-market_hours.py — Horaires d'ouverture des marchés par région (Round 11 Phase 2).
+market_hours.py — Ouverture des places régionales, modèle **par pas de marché**.
 
-Trois sessions de cotation (Asie, Europe, Amériques), chacune ouverte du lundi
-au vendredi sur une plage horaire fixe exprimée en minutes depuis minuit
-« heure de jeu » (0..1439, commune à toute la partie — pas de fuseaux
-horaires réels à gérer). Les plages se chevauchent partiellement comme dans
-la réalité (Asie/Europe, Europe/Amériques) mais ne sont jamais toutes les
-trois ouvertes en même temps. `core.sim_clock.SimClock` fournit le couple
-(jour, minute du jour) courant ; ce module ne fait que la calendaristique.
+Avec le temps de jeu accéléré (cf. core/sim_clock : 1 min réelle = 1 pas à x1),
+un modèle d'horaires « dans la journée » faisait clignoter les sessions toutes
+les quelques secondes — injouable. On adopte donc un modèle plus digeste, par
+PAS de marché :
+
+  À chaque pas, exactement DEUX des trois sessions (Asie / Europe / Amériques)
+  sont OUVERTES et UNE est FERMÉE. La session fermée tourne à chaque pas. Sur un
+  cycle de 3 pas, chaque PAIRE de sessions est ouverte simultanément exactement
+  une fois — donc chaque place « croise » les deux autres tour à tour :
+
+    pas %3 == 0 : fermé AMÉRIQUES   → ouverts ASIE + EUROPE
+    pas %3 == 1 : fermé ASIE        → ouverts EUROPE + AMÉRIQUES
+    pas %3 == 2 : fermé EUROPE      → ouverts AMÉRIQUES + ASIE
+
+Une session reste donc ouverte tout un pas (~60 s à x1 / ~20 s à x3) puis se
+ferme un seul pas avant de rouvrir : on a toujours le temps de trader, et une
+place fermée rouvre toujours au pas suivant. Réalisme volontairement sacrifié
+au profit de la jouabilité.
 """
 MINUTES_PER_DAY = 24 * 60
 
-# (minute d'ouverture, minute de fermeture) — bornes [open, close).
-SESSION_HOURS = {
-    "ASIA":     (0 * 60,    8 * 60),         # 00:00–08:00
-    "EUROPE":   (7 * 60,    15 * 60 + 30),   # 07:00–15:30
-    "AMERICAS": (13 * 60 + 30, 20 * 60),     # 13:30–20:00
-}
+SESSIONS = ("ASIA", "EUROPE", "AMERICAS")
 
-# Les 7 continents jouables (cf. config.CONTINENTS) regroupés sur la session
-# de cotation la plus proche géographiquement.
+# Les 7 continents jouables (cf. config.CONTINENTS) regroupés sur la session de
+# cotation la plus proche géographiquement.
 REGION_SESSION = {
     "Asia": "ASIA",
     "Océanie": "ASIA",
@@ -41,58 +47,56 @@ SESSION_LABEL_EN = {
     "AMERICAS": "Americas",
 }
 
+# Session fermée selon le pas (rotation). L'ordre garantit que chaque paire de
+# sessions est ouverte simultanément une fois par cycle de 3 pas.
+_CLOSED_BY_STEP = ("AMERICAS", "ASIA", "EUROPE")
+
 
 def session_for_region(region):
     return REGION_SESSION.get(region, "AMERICAS")
 
 
-def is_weekday_open(day):
-    """Lundi=jour 1 (convention de jeu) ; marché fermé le week-end."""
-    return (day - 1) % 7 < 5
+def closed_session(step):
+    """Session fermée au pas `step`."""
+    return _CLOSED_BY_STEP[int(step) % len(_CLOSED_BY_STEP)]
 
 
-def is_session_open(session, minute_of_day):
-    open_m, close_m = SESSION_HOURS[session]
-    return open_m <= minute_of_day < close_m
+def is_session_open(session, step):
+    """Une session est ouverte tant qu'elle n'est pas la session fermée du pas."""
+    return session != closed_session(step)
 
 
-def is_region_open(region, day, minute_of_day):
+def is_region_open(region, step):
+    return is_session_open(session_for_region(region), step)
+
+
+def open_sessions(step):
+    return tuple(s for s in SESSIONS if is_session_open(s, step))
+
+
+def steps_until_reopen(region, step):
+    """Nombre de pas avant réouverture (0 si déjà ouvert). Une place fermée
+    rouvre toujours au pas suivant -> 1."""
+    return 0 if is_region_open(region, step) else 1
+
+
+def session_labels(lang="fr"):
+    return SESSION_LABEL_EN if lang == "en" else SESSION_LABEL
+
+
+def region_status_label(region, step, lang="fr"):
+    """Texte court pour l'UI : « Europe ouvert » / « Asie fermé, réouvre au
+    prochain pas »."""
     session = session_for_region(region)
-    return is_weekday_open(day) and is_session_open(session, minute_of_day)
+    name = session_labels(lang).get(session, session)
+    if is_region_open(region, step):
+        return f"{name} {'open' if lang == 'en' else 'ouvert'}"
+    return (f"{name} closed, reopens next step" if lang == "en"
+            else f"{name} fermé, réouvre au prochain pas")
 
 
 def fmt_hhmm(minute_of_day):
+    """Affichage de l'heure de jeu (le bandeau du terminal garde une horloge
+    HH:MM purement cosmétique, indépendante des sessions par pas)."""
     minute_of_day = int(minute_of_day) % MINUTES_PER_DAY
     return f"{minute_of_day // 60:02d}:{minute_of_day % 60:02d}"
-
-
-def next_open(region, day, minute_of_day):
-    """Renvoie (jour, minute) de la prochaine ouverture de `region` à partir
-    de (day, minute_of_day) — strictement après l'instant courant si le
-    marché est déjà ouvert pile à cet instant n'a pas d'importance ici (on
-    n'appelle ceci que quand c'est fermé)."""
-    session = session_for_region(region)
-    open_m, _close_m = SESSION_HOURS[session]
-    d = day
-    if minute_of_day < open_m and is_weekday_open(d):
-        return d, open_m
-    d += 1
-    while not is_weekday_open(d):
-        d += 1
-    return d, open_m
-
-
-def region_status_label(region, day, minute_of_day, lang="fr"):
-    """Texte court pour l'UI : « Europe ouvert » / « Asie fermé, réouverture
-    lundi 00:00 »."""
-    session = session_for_region(region)
-    labels = SESSION_LABEL_EN if lang == "en" else SESSION_LABEL
-    name = labels.get(session, session)
-    if is_region_open(region, day, minute_of_day):
-        return f"{name} {'open' if lang=='en' else 'ouvert'}"
-    nd, nm = next_open(region, day, minute_of_day)
-    when = "auj." if nd == day else ("dem." if nd == day + 1 else f"j{nd}")
-    when_en = "today" if nd == day else ("tomorrow" if nd == day + 1 else f"day {nd}")
-    if lang == "en":
-        return f"{name} closed, reopens {when_en} {fmt_hhmm(nm)}"
-    return f"{name} fermé, réouvre {when} {fmt_hhmm(nm)}"

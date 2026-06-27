@@ -558,9 +558,7 @@ class CompanyScene(Scene):
                               (badge_x, panel_rect.y + 4), fonts.tiny(), config.COL_TEXT_DIM)
             badge_x += 170
             region = m.companies[i].get("region")
-            day = self.app.gs.player.day
-            minute_of_day = self.app.sim_clock.current_time(day)[1]
-            if region and not mh_mod.is_region_open(region, day, minute_of_day):
+            if region and not mh_mod.is_region_open(region, m.step_count):
                 widgets.draw_text(surf, "MARCHÉ FERMÉ — prix gelé", (badge_x, panel_rect.y + 4),
                                   fonts.tiny(bold=True), config.COL_WARN)
                 badge_x += 180

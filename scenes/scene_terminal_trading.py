@@ -96,25 +96,20 @@ class TerminalTradingMixin:
         return config.CONTINENTS[self.app.gs.player.continent]["currency"]
 
     def _market_closed_msg(self, tk):
-        """Renvoie un message de refus si le marché actions de `tk` est fermé
-        à l'heure de jeu courante (cf. core/market_hours.py, Round 11 Phase
-        2 : sessions Asie/Europe/Amériques, lundi-vendredi), sinon None.
-        Ticker inconnu : on laisse pf_mod.buy/sell/short renvoyer l'erreur
-        normale plutôt que de la masquer derrière un faux « marché fermé »."""
+        """Renvoie un message de refus si la place régionale de `tk` est fermée
+        au pas de marché courant (cf. core/market_hours.py : sessions par pas,
+        2 ouvertes / 1 fermée en rotation), sinon None. Ticker inconnu : on
+        laisse pf_mod.buy/sell/short renvoyer l'erreur normale plutôt que de la
+        masquer derrière un faux « marché fermé »."""
         idx = self.market.ticker_idx.get(tk)
         if idx is None:
             return None
         region = self.market.companies[idx]["region"]
-        p = self.app.gs.player
-        day, minute = self.app.sim_clock.current_time(p.day)
-        if mh_mod.is_region_open(region, day, minute):
+        if mh_mod.is_region_open(region, self.market.step_count):
             return None
-        nd, nm = mh_mod.next_open(region, day, minute)
-        when = "aujourd'hui" if nd == day else ("demain" if nd == day + 1 else f"jour {nd}")
-        when_en = "today" if nd == day else ("tomorrow" if nd == day + 1 else f"day {nd}")
         return _L(
-            f"  ⊘ Marché {region} fermé — réouverture {when} à {mh_mod.fmt_hhmm(nm)}.",
-            f"  ⊘ {region} market closed — reopens {when_en} at {mh_mod.fmt_hhmm(nm)}.")
+            f"  ⊘ Marché {region} fermé ce pas — réouvre au prochain pas.",
+            f"  ⊘ {region} market closed this step — reopens next step.")
 
     def _after_trade(self):
         p = self.app.gs.player

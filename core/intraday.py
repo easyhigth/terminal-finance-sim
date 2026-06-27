@@ -111,14 +111,13 @@ def speed_factor(sim_clock):
     return 1.0 + 0.15 * (speed - 1)
 
 
-def region_open_factor(region, day, minute_of_day):
-    """1.0 si la place régionale est ouverte, 0.0 sinon (gèle le bruit —
-    la dérive linéaire vers la prochaine clôture continue malgré tout : c'est
-    une approximation volontaire, le moteur de marché n'a pas de notion de
-    "prix de clôture exact à l'instant de fermeture")."""
+def region_open_factor(region, step):
+    """1.0 si la place régionale est ouverte au pas `step`, 0.0 sinon (gèle le
+    bruit intraday quand la place est fermée — modèle de sessions par pas, cf.
+    core/market_hours.py)."""
     if region is None:
         return 1.0
-    return 1.0 if market_hours.is_region_open(region, day, minute_of_day) else 0.0
+    return 1.0 if market_hours.is_region_open(region, step) else 0.0
 
 
 def wiggle(seed, step_count, key, prev_close, cur_close, progress_minutes, damp=1.0,
@@ -149,7 +148,7 @@ def live_point(market, sim_clock, day, key, history, region=None, vol_mult=1.0):
     cur = history[-1]
     prev = history[-2] if len(history) >= 2 else cur
     progress = sim_clock.game_minutes_acc
-    damp = region_open_factor(region, day, sim_clock.current_time(day)[1]) if region else 1.0
+    damp = region_open_factor(region, market.step_count) if region else 1.0
     return wiggle(market.seed, market.step_count, key, prev, cur, progress, damp=damp,
                   vol_mult=vol_mult * speed_factor(sim_clock))
 
@@ -175,8 +174,6 @@ def intraday_series(market, sim_clock, day, key, history, window_minutes, n_poin
         return []
     total_minutes = minutes_per_step()
     progress = sim_clock.game_minutes_acc
-    minute_of_day = sim_clock.current_time(day)[1] if region else 0
-    damp = region_open_factor(region, day, minute_of_day) if region else 1.0
     out = []
     for k in range(n_points):
         ago = window_minutes * (n_points - 1 - k) / (n_points - 1)
@@ -189,7 +186,9 @@ def intraday_series(market, sim_clock, day, key, history, window_minutes, n_poin
         idx_prev = idx_cur - 1
         cur = history[idx_cur] if 0 <= idx_cur < len(history) else history[0]
         prev = history[idx_prev] if 0 <= idx_prev < len(history) else cur
-        val = wiggle(market.seed, market.step_count - back_steps, key, prev, cur, pm, damp=damp,
+        step_k = market.step_count - back_steps
+        damp = region_open_factor(region, step_k) if region else 1.0
+        val = wiggle(market.seed, step_k, key, prev, cur, pm, damp=damp,
                      vol_mult=vol_mult * speed_factor(sim_clock))
         out.append(val)
     return out

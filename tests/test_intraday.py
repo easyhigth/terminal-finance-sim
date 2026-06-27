@@ -78,8 +78,10 @@ def test_append_live_empty_history_returns_copy():
 
 
 def test_region_closed_freezes_noise_to_linear_base():
-    assert intraday.region_open_factor("USA", 6, 14 * 60) == 0.0   # samedi
-    assert intraday.region_open_factor(None, 6, 14 * 60) == 1.0    # pas de région -> pas de gel
+    # sessions par pas : USA -> AMERICAS, fermé au pas 0, ouvert au pas 1
+    assert intraday.region_open_factor("USA", 0) == 0.0
+    assert intraday.region_open_factor("USA", 1) == 1.0
+    assert intraday.region_open_factor(None, 0) == 1.0    # pas de région -> pas de gel
 
 
 def test_intraday_series_ends_at_live_point():

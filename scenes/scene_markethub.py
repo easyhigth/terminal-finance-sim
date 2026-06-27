@@ -10,6 +10,7 @@ latéral « MARCHÉ ».
 import pygame
 
 from core import config
+from core import fx as FX
 from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.popups import PopupMixin
@@ -26,7 +27,7 @@ _ECO_NOTES = {
 }
 
 _TABS = [("overview", "Vue d'ensemble"), ("sectors", "Secteurs"), ("topflop", "Top/Flop"),
-         ("heatmap", "Heatmap"), ("watchlist", "Watchlist")]
+         ("heatmap", "Heatmap"), ("fx", "FX / Devises"), ("watchlist", "Watchlist")]
 _SECTOR_BAR_MAX = 1.5    # % de variation correspondant à une jauge pleine
 
 _TOPFLOP_PERIODS = [("1 pas", 1), ("1 mois", 6), ("3 mois", 18), ("1 an", 73)]
@@ -46,6 +47,7 @@ class MarketHubScene(Scene, PopupMixin):
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self._tab_rects = {}
         self._ticker_rects = {}
+        self._fx_rects = {}
         self._region_rects = {}
         self._index_row_rects = {}
         self._eco_row_rects = {}
@@ -90,6 +92,10 @@ class MarketHubScene(Scene, PopupMixin):
             for tk, rect in self._ticker_rects.items():
                 if rect.collidepoint(event.pos):
                     self.app.scenes.go("company", ticker=tk, return_to="markethub")
+                    return
+            for _pair, rect in getattr(self, "_fx_rects", {}).items():
+                if rect.collidepoint(event.pos):
+                    self.app.scenes.go("fx", return_to="markethub")
                     return
             for name, rect in self._index_row_rects.items():
                 if rect.collidepoint(event.pos):
@@ -215,6 +221,8 @@ class MarketHubScene(Scene, PopupMixin):
             self._draw_topflop(surf, pygame.Rect(M, top, config.SCREEN_WIDTH - 2 * M, bottom - top))
         elif self.tab == "heatmap":
             self._draw_heatmap(surf, pygame.Rect(M, top, config.SCREEN_WIDTH - 2 * M, bottom - top))
+        elif self.tab == "fx":
+            self._draw_fx(surf, pygame.Rect(M, top, config.SCREEN_WIDTH - 2 * M, bottom - top))
         else:
             self._draw_watchlist(surf, pygame.Rect(M, top, config.SCREEN_WIDTH - 2 * M, bottom - top))
 
@@ -556,6 +564,38 @@ class MarketHubScene(Scene, PopupMixin):
                     txt_col = config.COL_BG if abs(v) / _HEATMAP_MAX > 0.5 else config.COL_TEXT
                     widgets.draw_text(surf, f"{'+' if v>=0 else ''}{v:.2f}%", cell.center,
                                       fonts.tiny(bold=True), txt_col, align="center")
+            y += row_h
+
+    def _draw_fx(self, surf, rect):
+        """Tableau des taux de change : cours, variation par pas, volatilité et
+        mini-courbe pour chaque paire — les indicateurs FX en permanence dans
+        le hub Marché, sans ouvrir le desk. Clic sur une ligne = desk FX."""
+        m = self.market
+        inner = widgets.draw_panel(
+            surf, rect, "FX / Devises — taux de change en direct (clic = desk FX)", config.COL_CYAN)
+        mp = pygame.mouse.get_pos()
+        self._fx_rects = {}
+        row_h = max(30, min(46, (inner.h - 6) // max(1, len(FX.PAIRS))))
+        y = inner.y
+        for pair in FX.PAIRS:
+            sp = FX.spot(m, pair)
+            if sp is None:
+                continue
+            chg = FX.change_pct(m, pair, 1)
+            col = config.COL_UP if chg >= 0 else config.COL_DOWN
+            row = pygame.Rect(inner.x - 4, y, inner.w + 8, row_h - 4)
+            if row.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=4)
+            self._fx_rects[pair] = row
+            widgets.draw_text(surf, pair, (inner.x, y + 6), fonts.body(bold=True), config.COL_TEXT)
+            widgets.draw_text(surf, f"{sp:.4f}", (inner.x + 150, y + 6), fonts.body(bold=True), col)
+            widgets.draw_text(surf, f"{chg:+.2f}% / pas", (inner.x + 280, y + 8), fonts.small(bold=True), col)
+            widgets.draw_text(surf, f"vol {FX.pair_vol(pair)*100:.0f}%", (inner.x + 410, y + 9),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+            hist = FX.history(m, pair, 40)
+            if len(hist) >= 2:
+                spark = pygame.Rect(inner.x + 510, y + 4, max(60, inner.right - (inner.x + 520)), row_h - 12)
+                widgets.draw_series(surf, spark, hist, col, baseline=False, show_extrema=False)
             y += row_h
 
     def _draw_watchlist(self, surf, rect):

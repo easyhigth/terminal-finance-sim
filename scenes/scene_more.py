@@ -40,9 +40,11 @@ SECTIONS = [
         ("Desk FX", "fx", {}),
         ("Desk d'options (calls/puts)", "options", {}),
         ("IPO", "ipo", {}),
+        ("Mur de trading (live)", "wall", {}),
     ]),
     ("Analyse & outils", [
         ("Fiche société", "company", {}),
+        ("États financiers", "financials", {}),
         ("Comparateur", "compare", {}),
         ("Graphes", "graph", {"kind": "line"}),
         ("Tableau de bord", "dashboard", {}),
@@ -53,6 +55,7 @@ SECTIONS = [
         ("Quant (options)", "quant", {}),
         ("M&A (cibles & LBO)", "ma", {}),
         ("Frontière efficiente", "portfolio", {}),
+        ("Laboratoire frontière efficiente", "frontier_lab", {}),
         ("Couverture (hedge)", "hedge", {}),
         ("ALM bancaire", "alm", {}),
         ("Tableur", "spreadsheet", {}),
@@ -62,6 +65,8 @@ SECTIONS = [
         ("Portefeuille unifié", "portfolio_unified", {}),
         ("Carrière", "career", {}),
         ("Mission", "mission", {}),
+        ("Examen de promotion (EVAL)", "evaluation", {}),
+        ("Décisions (dilemmes)", "dilemma", {}),
         ("Exam / Certif", "examcert", {}),
         ("Revue annuelle (bonus)", "review", {}),
         ("Voie (Track)", "track", {}),
@@ -84,6 +89,7 @@ SECTIONS = [
         ("Aide / Commandes", "commands", {}),
     ]),
     ("Système", [
+        ("Réglages (affichage, son, langue)", "settings", {}),
         ("Sauvegardes", "saves", {}),
     ]),
 ]

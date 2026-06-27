@@ -39,6 +39,12 @@ class FinancialsScene(Scene):
         base = config.BASE_FISCAL_YEAR
         self.fy = F.fiscal_year(p, base)
         m = self.app.market
+        # ouverture sans ticker (ex. bouton « États financiers » du hub PLUS) :
+        # on retombe sur la plus grosse société pour avoir un écran utile.
+        if not self.ticker and m:
+            top = m.top_companies(n=1)
+            if top:
+                self.ticker = top[0]["ticker"].upper()
         self.block = F.statements(m, self.ticker, self.fy, n_years=N_YEARS) if m else []
         self.metrics = m.metrics(self.ticker) if m else None
         self.sector_med = (m.sector_medians(self.metrics["sector"])

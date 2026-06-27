@@ -105,7 +105,11 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   securitisation, risk/VaR, alm, missions, exam, certifications, dilemmas, inbox, rivals,
   scenarios, mandates, deals, tracks, unlocks, financials, history…).
 - **`scenes/`** : un écran par fichier (`scene_*.py`). **`scenes/scene_terminal.py`** est le
-  hub central (rail latéral, carte monde, console de commandes).
+  hub central (rail latéral, carte monde, console de commandes). **`scenes/scene_more.py`**
+  (hub PLUS) doit exposer un **bouton** vers chaque scène jouable — invariant gardé par
+  `tests/test_more_buttons.py` (seules les scènes de flux menu/intro/gameover… et les vues de
+  détail contextuelles ma_target/deal sont exclues). Taux FX visibles en permanence dans le
+  ticker du terminal et dans l'onglet « FX / Devises » du hub Marché (`scene_markethub.py`).
 - **`ui/`** : widgets (worldmap, globe, datawindow, calculator, notifications…).
 - **`data/`** : contenu (companies, lessons, glossary, question_bank, worldmap_geo).
 

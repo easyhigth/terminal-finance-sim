@@ -2,8 +2,8 @@
 shortcutspanel.py — Panneau déplaçable et défilable listant tous les
 raccourcis clavier du jeu (catalogue dans data/shortcuts_data.py), pour
 permettre de jouer entièrement au clavier, sans la souris. Ouvert depuis
-le bouton « ⌨ RACCOURCIS » en haut à droite du terminal, ou la commande
-SHORTCUTS/KEYS.
+l'écran RÉGLAGES (bouton « ⌨ Raccourcis clavier ») ou la commande
+SHORTCUTS/KEYS au terminal.
 """
 import pygame
 

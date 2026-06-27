@@ -222,18 +222,23 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         # (observer → décider → agir) plutôt que par domaine métier — les entrées
         # (None, "TITRE") sont des en-têtes de section, ignorées par le clic
         # (cf. TerminalRenderMixin._draw_rail).
+        # Rail des commandes rapides : on privilégie les accès utilisés en
+        # permanence. ALERTES (surveillance de prix) et MUR (vue live du marché)
+        # rejoignent le rail ; M&A et ÉQUIPES/ANALYSTES — plus conditionnels
+        # (voie M&A, gestion d'équipe ponctuelle) — restent accessibles via la
+        # commande, la palette Ctrl+K et le hub PLUS, sans encombrer le rail.
         self.rail = [
             (None, "OBSERVER"),
             ("MARCHÉ", "MARKETHUB"), ("PORTEF.", "PORTFOLIO"),
-            ("INBOX", "INBOX"), ("NEWS", "NEWS"),
+            ("ALERTES", "ALERT"), ("INBOX", "INBOX"), ("NEWS", "NEWS"),
             (None, "DÉCIDER"),
             ("MISSION", "MISSION"), ("MANDATS", "MANDATES"),
-            ("DEALS", "DEALS"), ("M&A", "MA"), ("DÉCIDE", "DECIDE"),
+            ("DEALS", "DEALS"), ("DÉCIDE", "DECIDE"),
             (None, "AGIR & PROGRESSER"),
             ("EXAM/CERTIF", "EXAMCERT"),
             (None, "OUTILS"),
-            ("SHOP", "SHOP"), ("EXPLORATEUR", "EXPLORER"), ("GRAPHES", "GP"),
-            ("ÉQUIPES/ANALYSTES", "TEAM"), ("PLUS", "MORE"),
+            ("MUR", "WALL"), ("SHOP", "SHOP"), ("EXPLORATEUR", "EXPLORER"),
+            ("GRAPHES", "GP"), ("PLUS", "MORE"),
             ("SAUVER", "SAVE"), ("AIDE", "COMMANDS"),
         ]
         self.networth_spark = widgets.Sparkline(80)
@@ -424,6 +429,11 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                     self._scroll_console(-(self._console_visible_lines() - 1))
                 elif event.key == pygame.K_TAB:
                     self._autocomplete()
+                elif event.key == pygame.K_SPACE and not self.cmd:
+                    # barre d'espace, ligne de commande vide → pause/reprise du
+                    # jeu (raccourci naturel ; n'interfère jamais avec la saisie
+                    # de commandes à espaces type « BUY AAPL 100 », non vides).
+                    self.app.sim_clock.toggle_pause()
                 else:
                     if event.unicode and event.unicode.isprintable():
                         self.cmd += event.unicode

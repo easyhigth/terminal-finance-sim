@@ -15,7 +15,7 @@ from core import portfolio_views as pv_mod
 from core import unlocks as unlocks_mod
 from core.i18n import get_lang
 from core.i18n import t as _t
-from ui import fonts, keynav, widgets
+from ui import fonts, keynav, simclock_widget, widgets
 
 
 def _L(fr, en):
@@ -214,6 +214,12 @@ class TerminalRenderMixin:
             dot_col = config.COL_UP if open_now else config.COL_TEXT_DIM
             r = widgets.draw_text(surf, "●", (x, y), fonts.small(bold=True), dot_col)
             x = r.right + 2
+        # repère « marché fermé » quand aucune session n'est ouverte (nuit/week-end)
+        any_open = mh_mod.is_weekday_open(day_now) and any(
+            mh_mod.is_session_open(s, minute_now) for s in ("ASIA", "EUROPE", "AMERICAS"))
+        if not any_open:
+            r = widgets.draw_text(surf, " FERMÉ", (x, y), fonts.small(bold=True), config.COL_TEXT_DIM)
+            x = r.right
         x += 14
         # badge régime de marché (contexte macro en permanence, code couleur)
         reg = getattr(self.market, "regime", None)
@@ -267,28 +273,25 @@ class TerminalRenderMixin:
             widgets.draw_text(surf, "🛠 CHEAT", btn.center, fonts.tiny(bold=True),
                               config.COL_DOWN, align="center")
             self._cheat_btn_rect = btn
-        # boutons coin haut-droit : RACCOURCIS (rétréci) + RÉGLAGES (⚙) à sa
-        # gauche, alignés sur la même rangée.
+        # coin haut-droit : icône ⚙ RÉGLAGES compacte, dans l'espace réservé à
+        # droite des boutons d'horloge (cf. ui/simclock_widget.GEAR_RESERVE).
+        # Le panneau des raccourcis clavier a migré DANS les réglages (plus de
+        # bouton ⌨ dédié ici) pour désencombrer la barre.
         mp = pygame.mouse.get_pos()
-        sw, sh = 132, 26
-        sbtn = pygame.Rect(config.SCREEN_WIDTH - 10 - sw, 4, sw, sh)
-        hover = sbtn.collidepoint(mp)
-        pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL,
-                         sbtn, border_radius=5)
-        pygame.draw.rect(surf, config.COL_CYAN, sbtn, 1, border_radius=5)
-        widgets.draw_text(surf, "⌨ RACCOURCIS", sbtn.center, fonts.small(bold=True),
-                          config.COL_CYAN, align="center")
-        self._shortcuts_btn_rect = sbtn
-        # bouton réglages, juste à gauche des raccourcis
-        gw = 116
-        gbtn = pygame.Rect(sbtn.x - 8 - gw, 4, gw, sh)
+        self._shortcuts_btn_rect = None
+        gbtn = simclock_widget.gear_rect()
         ghover = gbtn.collidepoint(mp)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if ghover else config.COL_PANEL,
                          gbtn, border_radius=5)
-        pygame.draw.rect(surf, config.COL_AMBER, gbtn, 1, border_radius=5)
-        widgets.draw_text(surf, "⚙ RÉGLAGES", gbtn.center, fonts.small(bold=True),
+        pygame.draw.rect(surf, config.COL_AMBER if ghover else config.COL_BORDER,
+                         gbtn, 1, border_radius=5)
+        widgets.draw_text(surf, "⚙", gbtn.center, fonts.body(bold=True),
                           config.COL_AMBER, align="center")
         self._settings_btn_rect = gbtn
+        if ghover:
+            widgets.draw_tooltip(surf, _L("Réglages (affichage, son, langue, raccourcis)",
+                                          "Settings (display, sound, language, shortcuts)"),
+                                 (gbtn.left, gbtn.bottom + 4))
 
     def _draw_ticker(self, surf):
         y = config.TOPBAR_H + 4

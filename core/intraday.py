@@ -198,5 +198,5 @@ def intraday_series(market, sim_clock, day, key, history, window_minutes, n_poin
 # Granularités intraday proposées dans les sélecteurs de période, en minutes
 # de jeu — toutes en plus des périodes "par pas" existantes (1A/3A/5A/MAX).
 INTRADAY_WINDOWS = [
-    ("5M", 5), ("10M", 10), ("30M", 30), ("1H", 60), ("2H", 120),
+    ("1H", 60),
 ]

@@ -18,11 +18,17 @@ Y = 4
 _LABELS = {1: "▶", 2: "▶▶", 3: "▶▶▶"}
 
 
+# Largeur réservée à droite des boutons d'horloge pour le bouton ⚙ RÉGLAGES
+# (icône compacte du terminal, cf. scene_terminal_render). Sur les autres
+# scènes ce coin reste simplement vide — alignement cohérent partout.
+GEAR_RESERVE = 38
+
+
 def _btn_rects():
-    """Rects des boutons (pause, x1, x2, x3), de droite à gauche, ancrés en
-    haut à droite — à gauche du bouton ⌨ RACCOURCIS (qui occupe déjà ce coin)."""
+    """Rects des boutons (pause, x1, x2, x3), de gauche à droite, ancrés en
+    haut à droite, juste à gauche de l'icône ⚙ RÉGLAGES."""
     n = 1 + len(SPEEDS)
-    right = config.SCREEN_WIDTH - 10 - 178  # laisse la place au bouton raccourcis
+    right = config.SCREEN_WIDTH - 10 - GEAR_RESERVE
     rects = {}
     x = right - n * (BTN_W + GAP)
     rects["pause"] = pygame.Rect(x, Y, BTN_W, BTN_H)
@@ -31,6 +37,14 @@ def _btn_rects():
         rects[sp] = pygame.Rect(x, Y, BTN_W, BTN_H)
         x += BTN_W + GAP
     return rects
+
+
+def gear_rect():
+    """Rect de l'icône ⚙ RÉGLAGES dans le coin haut-droit (réservé par
+    GEAR_RESERVE). Dessinée et gérée par le terminal, mais la géométrie vit
+    ici pour rester alignée avec les boutons d'horloge."""
+    w = 30
+    return pygame.Rect(config.SCREEN_WIDTH - 10 - w, Y, w, BTN_H)
 
 
 def handle_click(app, pos):

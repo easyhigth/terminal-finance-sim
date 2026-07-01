@@ -359,9 +359,17 @@ class Parser:
             args = self.arglist()
             self.expect(Tok.RP)
             fn = FUNCTIONS.get(t.val)
-            if not fn:
-                raise ValueError(f"Fonction inconnue : {t.val}")
-            return fn(args)
+            if fn:
+                return fn(args)
+            # fonctions EXTERNES (données vivantes injectées par l'app, ex.
+            # PRICE/INDEX/FX/NETWORTH — cf. apps/app_sheet.py). Le moteur reste
+            # pur : il ne connaît pas le marché, il délègue au résolveur.
+            ext = getattr(self.sheet, "external", None)
+            if ext is not None:
+                val = ext(t.val, args)
+                if val is not None:
+                    return val
+            raise ValueError(f"Fonction inconnue : {t.val}")
         raise ValueError("Atome inattendu")
 
     def arglist(self):
@@ -397,6 +405,16 @@ class Spreadsheet:
         self.cells = {}
         self._cache = {}
         self._evaluating = set()
+        # résolveur de fonctions EXTERNES optionnel : callable(name, args)->valeur
+        # (ou None si la fonction n'est pas reconnue). Injecté par l'app pour
+        # les données vivantes (PRICE/INDEX/FX…) — le moteur reste pur.
+        self.external = None
+
+    def invalidate(self):
+        """Vide le cache d'évaluation — à appeler quand une source EXTERNE
+        (marché) a changé sans qu'aucune cellule n'ait été éditée, pour que les
+        formules à données vivantes (PRICE/INDEX…) se recalculent."""
+        self._cache.clear()
 
     def set(self, ref, raw):
         self.cells[ref] = raw

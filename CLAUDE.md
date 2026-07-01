@@ -164,6 +164,17 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   bureau (round-robin déterministe trié par clé, pas par ordre de focus récent — cycle complet
   prévisible même avec beaucoup de fenêtres) ; câblé en tout premier dans
   `DesktopScene.handle_event` (Alt+Maj+Tab = sens inverse).
+  **Étape 8 : formules de MARCHÉ EN DIRECT dans le tableur.** Le moteur
+  (`core/spreadsheet_engine.py`) reste PUR mais accepte un résolveur de fonctions
+  EXTERNES injecté (`Spreadsheet.external = callable(name, args) -> valeur|None`) :
+  si une fonction n'est pas dans `FUNCTIONS`, le parseur délègue à ce résolveur. L'app
+  (`apps/app_sheet.py::_market_fn`) fournit `PRICE("MVC")`, `INDEX(nom)`, `FX("USD/JPY")`,
+  `SHARES("MVC")`, `NETWORTH()`, `CASH()` — lues sur `app.market`/`gs.player`. Comme le
+  marché avance par pas déterministes, `_sync_market()` (appelé à chaque `draw`) invalide le
+  cache (`Spreadsheet.invalidate()`) quand `market.step_count` change → les cellules et donc
+  les graphiques qui en dépendent se recalculent en direct au fil du temps qui passe (un
+  modèle « attend le bon moment » tout seul). Un ticker inconnu renvoie `"#N/A"` (pas de
+  crash). Catégorie « Marché (en direct) » ajoutée au catalogue `fx ▾`.
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, **1 minute réelle = 1 pas de marché**
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 120`), soit un nouveau pas toutes les ~60 s (x1) /

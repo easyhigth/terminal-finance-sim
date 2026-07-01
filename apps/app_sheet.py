@@ -49,6 +49,12 @@ FUNCTION_CATALOG = [
                  ("PMT", "Mensualité d'emprunt"), ("PV", "Valeur actuelle"),
                  ("FV", "Valeur future")]),
     ("Logique", [("IF", "Condition SI")]),
+    ("Marché (en direct)", [("PRICE", 'Cours d\'une action ("MVC")'),
+                            ("INDEX", "Valeur d'un indice"),
+                            ("FX", 'Taux de change ("USD/JPY")'),
+                            ("SHARES", "Actions détenues d'un titre"),
+                            ("NETWORTH", "Patrimoine net (sans arg)"),
+                            ("CASH", "Trésorerie (sans arg)")]),
 ]
 
 CHART_TYPES = [("line", "Ligne"), ("bar", "Barres"), ("scatter", "Nuage")]
@@ -102,10 +108,66 @@ class SheetApp(DesktopApp):
         self._chart_drag_off = (0, 0)
         self._chart_resize = None
         self._chart_resize_rects = {}
+        self._last_market_step = None
+        self.sheet.external = self._market_fn   # dès l'ouverture (avant 1er draw)
 
     @property
     def sheet(self):
         return self.workbook.active.sheet
+
+    # ------------------------------------------------- données de marché vives
+    def _market_fn(self, name, args):
+        """Résolveur de fonctions EXTERNES injecté dans le moteur (cf.
+        core/spreadsheet_engine). Renvoie une valeur (nombre ou "#N/A") si la
+        fonction est une fonction de marché, None sinon (fonction inconnue)."""
+        m = getattr(self.app, "market", None)
+        p = self.app.gs.player
+        name = name.upper()
+        if name == "PRICE":
+            if not args or m is None:
+                return "#N/A"
+            v = m.price_of(str(args[0]).upper())
+            return float(v) if v is not None else "#N/A"
+        if name == "INDEX":
+            if not args or m is None:
+                return "#N/A"
+            try:
+                return float(m.index_value(str(args[0])))
+            except Exception:
+                return "#N/A"
+        if name == "FX":
+            if not args or m is None:
+                return "#N/A"
+            from core import fx as fx_mod
+            pair = str(args[0]).upper()
+            if pair not in fx_mod.PAIRS and len(pair) == 6:
+                pair = f"{pair[:3]}/{pair[3:]}"
+            v = fx_mod.spot(m, pair)
+            return float(v) if v is not None else "#N/A"
+        if name == "SHARES":
+            if not args:
+                return "#N/A"
+            pos = p.portfolio.get(str(args[0]).upper())
+            return float(pos["shares"]) if pos else 0.0
+        if name == "NETWORTH":
+            if m is None:
+                return float(p.cash)
+            from core import portfolio_margin as pm
+            return float(pm.net_worth(p, m))
+        if name == "CASH":
+            return float(p.cash)
+        return None
+
+    def _sync_market(self):
+        """Branche le résolveur de marché sur la feuille active et invalide le
+        cache quand le marché a avancé d'un pas (pour que PRICE/INDEX/FX… se
+        recalculent en direct sans qu'aucune cellule n'ait été éditée)."""
+        self.sheet.external = self._market_fn
+        m = getattr(self.app, "market", None)
+        step = getattr(m, "step_count", None) if m is not None else None
+        if step != self._last_market_step:
+            self._last_market_step = step
+            self.sheet.invalidate()
 
     # --------------------------------------------------------------- import
     def import_data(self, data):
@@ -347,6 +409,7 @@ class SheetApp(DesktopApp):
 
     # --------------------------------------------------------------- draw
     def draw(self, surf, rect):
+        self._sync_market()
         surf.fill(config.COL_PANEL, rect)
         pad = 8
         self._draw_tab_bar(surf, rect, pad)

@@ -28,7 +28,7 @@ MINUTES_PER_DAY = 24 * 60
 
 # Nom de la seule scène où le temps avance « au premier plan » (Phase 1).
 # Les scènes de trading rejoindront cet ensemble en Phase 3.
-LIVE_SCENE_NAMES = {"terminal"}
+LIVE_SCENE_NAMES = {"terminal", "desktop"}
 
 SPEEDS = (1, 2, 3)
 

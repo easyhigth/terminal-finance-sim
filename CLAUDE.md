@@ -43,6 +43,21 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
 
 - **`main.py`** : `App` (boucle pygame, enregistrement des scènes, `ensure_market()`,
   `sim_clock`/`pending_market_steps`). `core/scene_manager.py` gère la pile de scènes + toasts.
+- **Bureau « Jeu PC » (refonte UI, étape 1)** : `scenes/scene_desktop.py` (`DesktopScene`,
+  scène `"desktop"`) est un BUREAU façon poste de travail — fond + icônes d'apps, barre
+  supérieure (horloge/trésorerie/vitesse/⚙), barre des tâches. Les applications s'ouvrent
+  dans des FENÊTRES déplaçables/redimensionnables/minimisables cohabitant à l'écran, gérées
+  par `ui/window_manager.py` (`Window` + `WindowManager` : z-order, focus, routage des
+  évènements vers l'app focalisée). Chaque app hérite de `apps/base.DesktopApp` et dessine
+  dans le rectangle de contenu qu'on lui passe (coords absolues) : `apps/app_research.py`
+  (recherche sociétés type Bloomberg), `apps/app_trading.py` (achat/vente actions, réutilise
+  `core/portfolio`), `apps/app_sheet.py` (tableur libre + formules, réutilise
+  `core/spreadsheet_engine` et partage `app.sheet`). Le bureau est une scène « live »
+  (`sim_clock.LIVE_SCENE_NAMES` inclut `"desktop"`) : le temps avance et les pas de marché
+  sont joués via `TerminalScene._drain_pending_steps()` (le terminal reste le moteur de la
+  boucle de jeu). Accès depuis le terminal (commande `DESKTOP`/`BUREAU`, rail « 🖥 BUREAU »).
+  Étapes suivantes prévues : migrer toutes les scènes en fenêtres, promouvoir le bureau en
+  écran principal. Le terminal classique reste accessible (icône « Terminal »).
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, **1 minute réelle = 1 pas de marché**
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 120`), soit un nouveau pas toutes les ~60 s (x1) /

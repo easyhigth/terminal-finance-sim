@@ -72,7 +72,7 @@ def _visit(app, name):
 # Un test par scène enregistrée dans main.py, afin que l'échec pointe
 # directement sur la scène fautive plutôt qu'un test générique.
 _KNOWN_SCENES = [
-    "menu", "continent", "runsetup", "sandbox", "terminal", "glossary", "evaluation", "portfolio",
+    "menu", "continent", "runsetup", "sandbox", "terminal", "desktop", "glossary", "evaluation", "portfolio",
     "portfolio_unified",
     "ma", "ma_target", "mandates", "deals", "track", "risk", "quant",
     "spreadsheet", "saves", "gameover", "company", "commands", "mission",

@@ -198,6 +198,18 @@ class TerminalTimeMixin:
             if res["bets_resolved"]:
                 self.app.notify(_L(f"Évènement résolu : {ev['event_type']}", f"Event resolved: {ev['event_type']}"),
                                  "good" if won_bets else "bad")
+        for exe in (summary.get("conditional_orders_executed") or []):
+            order, res = exe["order"], exe["result"]
+            kind_label = _L("Stop-loss", "Stop-loss") if order["kind"] == "stop" else _L("Take-profit", "Take-profit")
+            sign = "+" if res["realized"] >= 0 else ""
+            self._log(_L(
+                f"  ⚑ {kind_label} déclenché : {order['ticker']} vendu à {res['price']:,.2f} "
+                f"(seuil {order['trigger']:,.2f}) — P&L réalisé {sign}{widgets.format_money(res['realized'], cur)}.",
+                f"  ⚑ {kind_label} triggered: {order['ticker']} sold at {res['price']:,.2f} "
+                f"(trigger {order['trigger']:,.2f}) — realized P&L {sign}{widgets.format_money(res['realized'], cur)}."))
+            self.app.notify(_L(f"{kind_label} déclenché : {order['ticker']}",
+                               f"{kind_label} triggered: {order['ticker']}"),
+                             "good" if res["realized"] >= 0 else "warn")
         mc = summary.get("margin_call")
         if mc:
             self._log(_L(

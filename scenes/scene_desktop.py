@@ -119,6 +119,10 @@ class DesktopScene(Scene):
         self.app.ensure_market()
         if not hasattr(self, "wm"):
             self.wm = WindowManager(self.app)
+        # zone utile pour l'ancrage des fenêtres : entre la barre supérieure et
+        # la barre des tâches (les fenêtres ancrées ne passent pas dessous).
+        self.wm.work_area = pygame.Rect(0, TOPBAR_H, config.SCREEN_WIDTH,
+                                        config.SCREEN_HEIGHT - TOPBAR_H - TASKBAR_H)
         self.start_open = False
         self._icon_rects = {}       # clé -> (Rect, icon_kind, label) — icônes du bureau
         self._launch_rects = {}     # clé app -> Rect (barre des tâches quick-launch)

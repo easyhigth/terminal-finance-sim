@@ -35,6 +35,7 @@ class Window:
         self.minimized = False
         self._drag_off = None     # (dx, dy) pendant un déplacement
         self._resizing = False    # redimensionnement en cours
+        self._restore_rect = None # taille/pos avant ancrage/maximisation (toggle)
 
     # --- sous-rectangles du chrome (recalculés à la volée depuis self.rect) ---
     @property
@@ -112,6 +113,12 @@ class WindowManager:
     def __init__(self, app):
         self.app = app
         self.windows = []     # ordre = z-order (fin de liste = au premier plan)
+        # zone de travail utile (sous la barre supérieure, au-dessus de la barre
+        # des tâches) — cible des ancrages ; le bureau l'ajuste (cf. DesktopScene).
+        self.work_area = pygame.Rect(0, config.TOPBAR_H, config.SCREEN_WIDTH,
+                                     config.SCREEN_HEIGHT - config.TOPBAR_H)
+        self._snap_preview = None     # Rect d'aperçu d'ancrage pendant un glisser
+        self._last_title_click = (None, -10000)   # (window, ms) pour le double-clic
 
     # --------------------------------------------------------------- ouverture
     def open(self, key, factory, x=None, y=None):
@@ -192,8 +199,15 @@ class WindowManager:
         if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
             drag = self._active_drag()
             if drag is not None:
+                was_moving = drag._drag_off is not None
                 drag._drag_off = None
                 drag._resizing = False
+                # relâché sur une zone d'ancrage -> on y colle la fenêtre
+                if was_moving and self._snap_preview is not None:
+                    if drag._restore_rect is None:
+                        drag._restore_rect = drag.rect.copy()
+                    drag.rect = self._snap_preview.copy()
+                self._snap_preview = None
                 return True
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -211,6 +225,14 @@ class WindowManager:
                 w._resizing = True
                 return True
             if w.title_rect.collidepoint(event.pos):
+                # double-clic sur la barre de titre = maximiser / restaurer
+                now = pygame.time.get_ticks()
+                lw, lt = self._last_title_click
+                if lw is w and now - lt < 400:
+                    self.maximize_toggle(w)
+                    self._last_title_click = (None, -10000)
+                    return True
+                self._last_title_click = (w, now)
                 w._drag_off = (event.pos[0] - w.rect.x, event.pos[1] - w.rect.y)
                 return True
             # sinon : clic dans le contenu → application
@@ -249,6 +271,33 @@ class WindowManager:
             nx = max(-w.rect.w + 80, min(config.SCREEN_WIDTH - 80, nx))
             ny = max(config.TOPBAR_H, min(config.SCREEN_HEIGHT - TITLE_H, ny))
             w.rect.topleft = (nx, ny)
+            # aperçu d'ancrage si le curseur touche un bord de la zone de travail
+            self._snap_preview = self._snap_target(pos)
+
+    EDGE = 16
+
+    def _snap_target(self, pos):
+        """Zone d'ancrage selon la position du curseur près d'un bord de la
+        `work_area` : bord haut = maximiser, gauche/droite = moitié d'écran."""
+        wa = self.work_area
+        mx, my = pos
+        if my <= wa.y + self.EDGE:
+            return wa.copy()
+        if mx <= wa.x + self.EDGE:
+            return pygame.Rect(wa.x, wa.y, wa.w // 2, wa.h)
+        if mx >= wa.right - self.EDGE:
+            return pygame.Rect(wa.x + wa.w // 2, wa.y, wa.w - wa.w // 2, wa.h)
+        return None
+
+    def maximize_toggle(self, w):
+        """Maximise la fenêtre sur la zone de travail, ou la restaure si elle
+        l'est déjà (double-clic sur la barre de titre)."""
+        if w.rect == self.work_area and w._restore_rect is not None:
+            w.rect = w._restore_rect.copy()
+            w._restore_rect = None
+        else:
+            w._restore_rect = w.rect.copy()
+            w.rect = self.work_area.copy()
 
     # --------------------------------------------------------------- cycle
     def update(self, dt):
@@ -257,6 +306,12 @@ class WindowManager:
                 w.app_obj.update(dt)
 
     def draw(self, surf):
+        # aperçu d'ancrage (sous les fenêtres) pendant un glisser vers un bord
+        if self._snap_preview is not None:
+            overlay = pygame.Surface((self._snap_preview.w, self._snap_preview.h), pygame.SRCALPHA)
+            overlay.fill((*config.COL_CYAN, 40))
+            surf.blit(overlay, self._snap_preview.topleft)
+            pygame.draw.rect(surf, config.COL_CYAN, self._snap_preview, 2)
         focused = self.focused
         for w in self.windows:
             if not w.minimized:

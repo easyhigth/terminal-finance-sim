@@ -183,6 +183,15 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   .add_quote` insère `ticker`/`=PRICE("ticker")` en 1re ligne libre, cours vivant), **Analyse**
   (`_open_scene_window("company", ticker=…)` → fiche Refinitiv en fenêtre). Transforme les
   fenêtres juxtaposées en vrai flux de travail (repérer → trader/modéliser sans re-saisir).
+  **Étape 10 : ancrage/maximisation + palette Ctrl+K en fenêtres.** `ui/window_manager.py`
+  gère l'**ancrage** (glisser une fenêtre vers un bord de `WindowManager.work_area` → aperçu
+  cyan puis, au relâcher, moitié gauche/droite ou plein — `_snap_target`/`_snap_preview`, la
+  fenêtre garde `_restore_rect` pour revenir) et la **maximisation** (double-clic sur la barre
+  de titre → `maximize_toggle`, re-double-clic restaure). Le bureau règle `wm.work_area` entre
+  la barre supérieure et la barre des tâches (`DesktopScene.on_enter`) pour que rien ne passe
+  dessous. La **palette Ctrl+K** (`core/scene_manager.py`) route désormais via
+  `_palette_navigate` : sur le bureau, ouvre l'entrée choisie EN FENÊTRE (`App.route_scene`)
+  au lieu de basculer plein écran ; ailleurs, comportement classique inchangé.
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, **1 minute réelle = 1 pas de marché**
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 120`), soit un nouveau pas toutes les ~60 s (x1) /

@@ -214,6 +214,15 @@ class SceneManager:
     def close_palette(self):
         self.palette_open = False
 
+    def _palette_navigate(self, scene, kw):
+        """Ouvre une entrée de palette : sur le BUREAU, en FENÊTRE (via
+        App.route_scene, cohérent avec « tout se passe sur le bureau ») ;
+        ailleurs, bascule plein écran classique."""
+        if self.current_name == "desktop" and hasattr(self.app, "route_scene"):
+            self.app.route_scene(scene, **kw)
+        else:
+            self.go(scene, return_to=self.current_name or "terminal", **kw)
+
     def _handle_palette_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             filtered = self._palette_filtered()
@@ -228,7 +237,7 @@ class SceneManager:
                 if row.collidepoint(event.pos):
                     self._palette_remember(label, scene, kw)
                     self.close_palette()
-                    self.go(scene, return_to=self.current_name or "terminal", **kw)
+                    self._palette_navigate(scene, kw)
                     return
             return
         if event.type != pygame.KEYDOWN:
@@ -250,7 +259,7 @@ class SceneManager:
                 label, scene, kw = filtered[self.palette_sel % len(filtered)]
                 self._palette_remember(label, scene, kw)
                 self.close_palette()
-                self.go(scene, return_to=self.current_name or "terminal", **kw)
+                self._palette_navigate(scene, kw)
         elif event.unicode and event.unicode.isprintable():
             self.palette_query += event.unicode
             self.palette_sel = 0

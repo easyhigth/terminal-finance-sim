@@ -111,6 +111,24 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   `_draw_pause`/`_draw_speed`/`_draw_gear` pour des contrôles identiques). Chrome de fenêtre
   (`ui/window_manager.py`) et titres de fenêtres hébergées (`DesktopApp.icon_kind`,
   `apps/base.py`) migrés au même système d'icônes vectorielles.
+  **Étape 5 : le rail latéral du terminal a été RETIRÉ** — ses ~17 accès rapides
+  (MARCHÉ/PORTEF./ALERTES/INBOX/NEWS/MISSION/MANDATS/DEALS/DÉCIDE/EXAM-CERTIF/MUR/SHOP/
+  EXPLORATEUR/GRAPHES/PLUS/SAUVER/AIDE) sont désormais des ICÔNES DU BUREAU
+  (`QUICK_APPS` dans `scene_desktop.py`), ouvrant chacune la scène correspondante EN FENÊTRE
+  via `_open_scene_window` (même mécanisme que le menu Démarrer) — "SAUVER" (`"save"`) est la
+  seule action instantanée (pas une fenêtre, `_quick_save`). `scenes/scene_terminal.py` n'a
+  plus de `self.rail`/`self.rail_w` : la colonne qu'occupait le rail (150px) revient aux 3
+  colonnes du terminal (`gx = 2 * M` dans `scene_terminal_render.py`, plus de
+  `_draw_rail`/`_rail_rects`) ; la zone clavier `"rail"` a disparu de `ZONE_ORDER` (les
+  raccourcis Ctrl+<lettre>, `RAIL_SHORTCUTS`, restent inchangés — indépendants du rendu
+  visuel). Le terminal reste accessible en fenêtre (icône « Terminal », cf. étape 4) mais tout
+  ce qu'il exposait en boutons latéraux vit maintenant sur le bureau. Les icônes du bureau
+  s'organisent en **grille multi-colonnes** (`_draw_desktop_icons`) pour absorber ce volume.
+  **Atterrissage sur le bureau généralisé** : `scene_menu.py::_continue()` (bouton CONTINUER,
+  reprise de l'autosave) va sur `"desktop"` (plus `"terminal"`) ; `PageManager` — système
+  d'onglets, `core/pages.py` — a son `main_scene_name` par défaut à `"desktop"`, et un
+  **nouvel onglet** (bouton « + » / Ctrl+T, `PageManager.open_new_tab()`, ex-`duplicate_current`)
+  ouvre TOUJOURS sur le bureau plutôt que de dupliquer l'onglet courant.
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, **1 minute réelle = 1 pas de marché**
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 120`), soit un nouveau pas toutes les ~60 s (x1) /

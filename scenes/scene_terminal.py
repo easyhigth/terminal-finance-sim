@@ -89,7 +89,7 @@ MORE_SHORTCUTS = {
 # ordre de parcours Tab des blocs du terminal (sens horaire approximatif) ;
 # la navigation aux flèches utilise la position réelle des blocs
 # (cf. ui/keynav.nearest_in_direction), Tab suit cet ordre fixe.
-ZONE_ORDER = ["console", "rail", "indices", "health", "topco", "career", "feed"]
+ZONE_ORDER = ["console", "indices", "health", "topco", "career", "feed"]
 
 # Noms de commandes pour l'autocomplétion (Tab) et la suggestion fantôme
 CMD_NAMES = [
@@ -186,7 +186,6 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             self.zones = keynav.ZoneStack(ZONE_ORDER)
             self.zones.inside = True
         self._zone_rects = {}     # rects des blocs (zone -> Rect), pour les flèches
-        self._rail_rects = {}     # boutons du rail latéral (label -> Rect)
         self._topco_rects = {}    # sociétés cliquables (panneau top sociétés)
         self._topco_header_rect = None   # titre du panneau (clic → explorateur)
         self._topco_panel_rect = None    # zone défilable (molette)
@@ -216,32 +215,13 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         self._career_max_scroll = 0
         self._feed_header_rect = None    # panneau FLUX & ÉVÉNEMENTS → scène historique
         self._onboarding_skip_rect = None  # bouton « passer » du bandeau d'intégration
-        self.rail_w = 150         # largeur du rail latéral
         self._map_rect = None     # rect de la carte (pour le clic)
-        # rail latéral : (libellé, commande), regroupé par phase de la boucle de jeu
-        # (observer → décider → agir) plutôt que par domaine métier — les entrées
-        # (None, "TITRE") sont des en-têtes de section, ignorées par le clic
-        # (cf. TerminalRenderMixin._draw_rail).
-        # Rail des commandes rapides : on privilégie les accès utilisés en
-        # permanence. ALERTES (surveillance de prix) et MUR (vue live du marché)
-        # rejoignent le rail ; M&A et ÉQUIPES/ANALYSTES — plus conditionnels
-        # (voie M&A, gestion d'équipe ponctuelle) — restent accessibles via la
-        # commande, la palette Ctrl+K et le hub PLUS, sans encombrer le rail.
-        self.rail = [
-            (None, "OBSERVER"),
-            ("MARCHÉ", "MARKETHUB"), ("PORTEF.", "PORTFOLIO"),
-            ("ALERTES", "ALERT"), ("INBOX", "INBOX"), ("NEWS", "NEWS"),
-            (None, "DÉCIDER"),
-            ("MISSION", "MISSION"), ("MANDATS", "MANDATES"),
-            ("DEALS", "DEALS"), ("DÉCIDE", "DECIDE"),
-            (None, "AGIR & PROGRESSER"),
-            ("EXAM/CERTIF", "EXAMCERT"),
-            (None, "OUTILS"),
-            ("🖥 BUREAU", "DESKTOP"),
-            ("MUR", "WALL"), ("SHOP", "SHOP"), ("EXPLORATEUR", "EXPLORER"),
-            ("GRAPHES", "GP"), ("PLUS", "MORE"),
-            ("SAUVER", "SAVE"), ("AIDE", "COMMANDS"),
-        ]
+        # le rail latéral de commandes rapides a été retiré (refonte UI « Jeu
+        # PC ») : ces accès sont désormais des ICÔNES DU BUREAU, ouvertes en
+        # fenêtre au même titre que les autres apps (cf.
+        # scenes/scene_desktop.py::QUICK_APP). Les raccourcis Ctrl+<lettre>
+        # (RAIL_SHORTCUTS, ci-dessus) restent fonctionnels : ils appellent
+        # directement _run_command(), indépendamment de tout bouton visuel.
         self.networth_spark = widgets.Sparkline(80)
         for v in p.cash_history[-80:]:
             self.networth_spark.push(v)
@@ -336,10 +316,6 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                         self._scroll_console(3)
                     elif key == "down":
                         self._scroll_console(-3)
-                    return
-            for label, rect in self._rail_rects.items():
-                if rect.collidepoint(event.pos):
-                    self._run_command(dict(self.rail)[label])
                     return
             if self._topco_header_rect and self._topco_header_rect.collidepoint(event.pos):
                 self.app.scenes.go("explorer", return_to="terminal")
@@ -485,7 +461,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         ex. les entrées d'actualité sous-jacentes pour le clic-pour-naviguer)."""
         from ui.datawindow import DataWindow
         offset = 16 * (len(self.datawins) % 6)
-        pos = (self.rail_w + 30 + offset, 90 + offset)
+        pos = (config.MARGIN + 30 + offset, 90 + offset)
         w = DataWindow(title, columns, rows, pos=pos, accent=accent)
         self.datawins.append(w)
         if len(self.datawins) > 5:
@@ -515,7 +491,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         if not ticker or not self.market or self.market.metrics(ticker.upper()) is None:
             return
         offset = 16 * (len(self.datawins) % 6)
-        pos = (self.rail_w + 30 + offset, 90 + offset)
+        pos = (config.MARGIN + 30 + offset, 90 + offset)
         self.datawins.append(CompanyPopup(ticker, self.market, pos=pos))
         if len(self.datawins) > 5:
             self.datawins.pop(0)
@@ -526,7 +502,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         from ui.datawindow import DataWindow
         self.datawins.append(DataWindow(
             f"{name} — historique", [], [],
-            pos=(self.rail_w + 40, 100),
+            pos=(config.MARGIN + 40, 100),
             accent=config.COL_AMBER,
             chart=list(self.market.index_history(name)),
             resizable=True, min_size=(320, 220)))
@@ -535,8 +511,6 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
 
     def _zone_items(self, zone):
         """Items navigables aux flèches à l'intérieur d'un bloc (id -> Rect)."""
-        if zone == "rail":
-            return dict(self._rail_rects)
         if zone == "indices":
             return dict(self._index_rects)
         if zone == "topco":
@@ -556,7 +530,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         if not self.zones.inside:
             return [("↑↓←→", _L("blocs", "blocks")), (enter_key, _L("entrer", "enter")),
                     ("TAB", _L("suivant", "next")), (esc_key, _L("menu", "menu"))]
-        if z in ("rail", "indices", "topco"):
+        if z in ("indices", "topco"):
             return [("↑↓←→", _L("items", "items")), (enter_key, _L("activer", "activate")),
                     (esc_key, _L("bloc", "block"))]
         return []
@@ -567,7 +541,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         hiérarchique bloc → contenu interne."""
         z = self.zones.zone
         if not self.zones.inside:
-            if z in ("rail", "indices", "topco"):
+            if z in ("indices", "topco"):
                 items = self._zone_items(z)
                 if items:
                     self.zones.enter()
@@ -581,9 +555,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             elif z == "feed":
                 self.app.scenes.go("history", return_to="terminal")
             return
-        if z == "rail" and self.zones.item is not None:
-            self._run_command(dict(self.rail)[self.zones.item])
-        elif z == "indices" and self.zones.item is not None:
+        if z == "indices" and self.zones.item is not None:
             self._open_index_chart(self.zones.item)
         elif z == "topco" and self.zones.item is not None:
             self._open_company_popup(self.zones.item)
@@ -600,7 +572,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         """Ouvre le gestionnaire « accès rapide » des favoris (watchlist)."""
         from ui.popups import QuickAccessWindow
         offset = 16 * (len(self.datawins) % 6)
-        pos = (self.rail_w + 30 + offset, 90 + offset)
+        pos = (config.MARGIN + 30 + offset, 90 + offset)
         p = self.app.gs.player
         self.datawins.append(QuickAccessWindow(p, self.market, self._open_company_popup, pos=pos))
         if len(self.datawins) > 5:
@@ -610,7 +582,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         """Ouvre un graphe flottant agrandi (en cascade) pour un ticker donné."""
         from ui.popups import ChartPopup
         offset = 16 * (len(self.datawins) % 6)
-        pos = (self.rail_w + 30 + offset, 90 + offset)
+        pos = (config.MARGIN + 30 + offset, 90 + offset)
         self.datawins.append(ChartPopup(f"GRAPHE — {ticker.upper()}", market=self.market,
                                         ticker=ticker, kind=kind, pos=pos))
         if len(self.datawins) > 5:

@@ -49,11 +49,10 @@ class TerminalRenderMixin:
         bottom = config.SCREEN_HEIGHT - console_h - M     # bas de la zone de contenu
         avail_h = bottom - top
 
-        # --- rail latéral (commandes cliquables) ---
-        self._draw_rail(surf, pygame.Rect(M, top, self.rail_w, avail_h), p)
-
-        # --- 3 colonnes à droite du rail ---
-        gx = M + self.rail_w + M
+        # le rail latéral de commandes rapides a été retiré (refonte UI « Jeu
+        # PC ») : ces accès sont désormais des icônes du bureau (fenêtres),
+        # cf. scenes/scene_desktop.py. Son espace revient aux 3 colonnes.
+        gx = 2 * M
         col_l_w = 280
         col_r_w = 320
         cx = gx + col_l_w + M
@@ -83,7 +82,6 @@ class TerminalRenderMixin:
         # zones que celles dessinées ci-dessus.
         self._zone_rects = {
             "console": self._console_rect(),
-            "rail": pygame.Rect(M, top, self.rail_w, avail_h),
             "indices": pygame.Rect(gx, top, col_l_w, half),
             "health": pygame.Rect(gx, top + half + gap, col_l_w, avail_h - half - gap),
             "topco": pygame.Rect(rx, top, col_r_w, half),
@@ -122,63 +120,6 @@ class TerminalRenderMixin:
         pygame.draw.rect(surf, config.COL_BORDER, skip, 1, border_radius=3)
         widgets.draw_text(surf, _L("✕ Passer", "✕ Skip"), skip.center, fonts.tiny(bold=True),
                           config.COL_TEXT_DIM, align="center")
-
-    def _draw_rail(self, surf, rect, p):
-        inner = widgets.draw_panel(surf, rect, _t("term.commands"), config.COL_AMBER)
-        self._rail_rects = {}
-        gap = 4
-        n_headers = sum(1 for label, _ in self.rail if label is None)
-        n_buttons = max(1, len(self.rail) - n_headers)
-        hh = 16  # hauteur d'un en-tête de section
-        # pas adaptatif borné à la hauteur du panneau (jamais de débordement vers le bas)
-        avail = inner.h - n_headers * (hh + gap) - gap * (n_buttons - 1)
-        bh = max(13, min(24, avail // n_buttons))
-        y = inner.y
-        mp = pygame.mouse.get_pos()
-        for label, cmd in self.rail:
-            if label is None:
-                widgets.draw_text(surf, cmd, (inner.x + 2, y + 2), fonts.tiny(bold=True),
-                                  config.COL_TEXT_DIM)
-                y += hh + gap
-                continue
-            br = pygame.Rect(inner.x, y, inner.w, bh)
-            self._rail_rects[label] = br
-            hover = br.collidepoint(mp)
-            locked = not unlocks_mod.cmd_unlocked(p, cmd)
-            # accent spécial pour quelques entrées
-            acc = config.COL_AMBER
-            if locked:
-                acc = config.COL_BORDER
-            elif cmd == "INBOX" and inbox_mod.unread_count(p):
-                acc = config.COL_CYAN
-            elif cmd == "DECIDE" and p.pending_dilemmas:
-                acc = config.COL_WARN
-            border_acc = widgets.hover_accent(hover and not locked, acc)
-            pygame.draw.rect(surf, config.COL_PANEL_HEAD if (hover and not locked) else config.COL_PANEL,
-                             br, border_radius=4)
-            pygame.draw.rect(surf, border_acc, br, 1, border_radius=4)
-            ty = br.y + (bh - fonts.small().get_height()) // 2
-            if locked:
-                g = unlocks_mod.effective_required_grade(p, unlocks_mod.CMD_FEATURE[cmd])
-                widgets.draw_text(surf, widgets.fit_text(f"⊘ {label}", fonts.small(), br.w - 36),
-                                  (br.x + 8, ty),
-                                  fonts.small(), config.COL_TEXT_DIM)
-                widgets.draw_text(surf, f"G{g}", (br.right - 8, ty),
-                                  fonts.tiny(), config.COL_TEXT_DIM, align="right")
-            else:
-                txt = _t("rail." + cmd)
-                if cmd == "INBOX":
-                    u = inbox_mod.unread_count(p)
-                    if u:
-                        txt = f"{txt} ({u})"
-                elif cmd == "DECIDE" and p.pending_dilemmas:
-                    txt = f"{txt} !"
-                widgets.draw_text(surf, widgets.fit_text(txt, fonts.small(bold=hover), br.w - 16),
-                                  (br.x + 10, ty),
-                                  fonts.small(bold=hover), border_acc if hover else config.COL_TEXT)
-            if self.zones.zone == "rail" and self.zones.inside and self.zones.item == label:
-                keynav.draw_focus_ring(surf, br, True)
-            y += bh + gap
 
     def _draw_topbar(self, surf, p, info, accent):
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, (0, 0, config.SCREEN_WIDTH, config.TOPBAR_H))

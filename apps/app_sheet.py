@@ -1,17 +1,21 @@
 """
-app_sheet.py — Application « Tableur » du bureau (type Excel, cellules libres).
+app_sheet.py — Application « Tableur » du bureau (type Excel, classeur multi-
+feuilles, cellules libres).
 
-Grille de cellules éditables avec barre de formule et moteur de calcul complet
-(`=A1*B2`, SUM, NPV, IRR, POWER, IF…). Réutilise `core/spreadsheet_engine`
-(le même moteur que la scène tableur historique) et PARTAGE `app.sheet`, si
-bien que le classeur est le même que celui exporté depuis un état financier.
+Grille de cellules éditables avec barre de formule, onglets de feuilles (comme
+Excel) et moteur de calcul complet (`=A1*B2`, SUM, NPV, IRR, POWER, IF…).
+Réutilise `core/spreadsheet_engine` et PARTAGE `app.workbook` (`core/workbook.py`),
+si bien qu'un export depuis un état financier ou une fiche M&A arrive dans CE
+classeur : la feuille ACTIVE si elle est vierge, sinon une NOUVELLE feuille —
+jamais d'écrasement silencieux d'un modèle en cours (cf. `Workbook.import_financial`).
 Feuille vierge par défaut : un vrai bac à sable pour les calculs du joueur.
 """
 import pygame
 
 from apps.base import DesktopApp
 from core import config
-from core.spreadsheet_engine import Spreadsheet, idx_to_col
+from core.spreadsheet_engine import idx_to_col
+from core.workbook import Workbook
 from ui import fonts, widgets
 
 N_ROWS = 24
@@ -20,24 +24,42 @@ CELL_W = 92
 CELL_H = 20
 HEAD_W = 34
 FORMULA_H = 30
+TAB_BAR_H = 22
+TAB_W = 108
 
 
 class SheetApp(DesktopApp):
     title = "Tableur"
     icon = "▦"
-    default_size = (720, 460)
-    min_size = (420, 260)
+    default_size = (720, 480)
+    min_size = (420, 280)
 
     def on_open(self):
-        if not getattr(self.app, "sheet", None):
-            self.app.sheet = Spreadsheet(N_ROWS, N_COLS)
-        self.sheet = self.app.sheet
+        if not getattr(self.app, "workbook", None):
+            self.app.workbook = Workbook(N_ROWS, N_COLS)
+        self.workbook = self.app.workbook
         self.sel = "A1"
         self.editing = False
         self.edit_buf = ""
         self.scroll_y = 0
+        self.tab_scroll = 0
         self._grid_origin = None   # (x, y) du coin haut-gauche des cellules
         self._cell_rects = {}
+        self._tab_rects = {}       # index -> Rect
+        self._add_tab_rect = None
+
+    @property
+    def sheet(self):
+        return self.workbook.active.sheet
+
+    # --------------------------------------------------------------- import
+    def import_data(self, data):
+        """Reçoit un export (état financier, fiche M&A…) : remplit la feuille
+        active si vierge, sinon ouvre une nouvelle feuille (cf. Workbook)."""
+        self.workbook.import_financial(data)
+        self.sel = "A1"
+        self.scroll_y = 0
+        self.editing = False
 
     # --------------------------------------------------------------- helpers
     def _move(self, dc, dr):
@@ -59,16 +81,29 @@ class SheetApp(DesktopApp):
 
     # --------------------------------------------------------------- events
     def handle_event(self, event, rect):
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
-            self.scroll_y = max(0, self.scroll_y + (-1 if event.button == 4 else 1))
-            return True
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._add_tab_rect and self._add_tab_rect.collidepoint(event.pos):
+                self._commit()
+                self.workbook.add_tab()
+                self.sel = "A1"
+                self.scroll_y = 0
+                return True
+            for idx, r in self._tab_rects.items():
+                if r.collidepoint(event.pos):
+                    self._commit()
+                    self.workbook.active_index = idx
+                    self.sel = "A1"
+                    self.scroll_y = 0
+                    return True
             for ref, r in self._cell_rects.items():
                 if r.collidepoint(event.pos):
                     self._commit()
                     self.sel = ref
                     return True
             return False
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            self.scroll_y = max(0, self.scroll_y + (-1 if event.button == 4 else 1))
+            return True
         if event.type == pygame.KEYDOWN:
             if self.editing:
                 if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
@@ -122,8 +157,9 @@ class SheetApp(DesktopApp):
     def draw(self, surf, rect):
         surf.fill(config.COL_PANEL, rect)
         pad = 8
+        self._draw_tab_bar(surf, rect, pad)
         # barre de formule
-        fr = pygame.Rect(rect.x + pad, rect.y + pad, rect.w - 2 * pad, FORMULA_H)
+        fr = pygame.Rect(rect.x + pad, rect.y + pad + TAB_BAR_H, rect.w - 2 * pad, FORMULA_H)
         pygame.draw.rect(surf, config.COL_BG, fr)
         pygame.draw.rect(surf, config.COL_BORDER, fr, 1)
         widgets.draw_text(surf, self.sel, (fr.x + 8, fr.y + 6), fonts.small(bold=True), config.COL_CYAN)
@@ -187,3 +223,31 @@ class SheetApp(DesktopApp):
                 else:
                     widgets.draw_text(surf, widgets.fit_text(text, fonts.tiny(), CELL_W - 8),
                                       (cell.x + 4, cell.y + 3), fonts.tiny(), col)
+
+    def _draw_tab_bar(self, surf, rect, pad):
+        bar = pygame.Rect(rect.x + pad, rect.y + pad, rect.w - 2 * pad, TAB_BAR_H)
+        self._tab_rects = {}
+        mp = pygame.mouse.get_pos()
+        prev_clip = surf.get_clip()
+        surf.set_clip(bar)
+        x = bar.x
+        for idx, tab in enumerate(self.workbook.tabs):
+            r = pygame.Rect(x, bar.y, TAB_W, TAB_BAR_H - 2)
+            self._tab_rects[idx] = r
+            active = (idx == self.workbook.active_index)
+            bg = config.COL_BG if active else config.COL_PANEL_HEAD
+            if r.collidepoint(mp) and not active:
+                bg = config.COL_PANEL
+            pygame.draw.rect(surf, bg, r, border_radius=3)
+            pygame.draw.rect(surf, config.COL_AMBER if active else config.COL_BORDER, r, 1, border_radius=3)
+            widgets.draw_text(surf, widgets.fit_text(tab.name, fonts.tiny(bold=active), TAB_W - 10),
+                              (r.x + 6, r.y + 4), fonts.tiny(bold=active),
+                              config.COL_AMBER if active else config.COL_TEXT_DIM)
+            x += TAB_W + 3
+        surf.set_clip(prev_clip)
+        self._add_tab_rect = pygame.Rect(min(x, bar.right - 22), bar.y, 22, TAB_BAR_H - 2)
+        hov = self._add_tab_rect.collidepoint(mp)
+        pygame.draw.rect(surf, config.COL_PANEL if hov else config.COL_PANEL_HEAD,
+                         self._add_tab_rect, border_radius=3)
+        widgets.draw_text(surf, "+", self._add_tab_rect.center, fonts.small(bold=True),
+                          config.COL_AMBER, align="center")

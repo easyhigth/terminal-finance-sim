@@ -513,7 +513,10 @@ class TerminalTimeMixin:
         if game_over:
             self.app.scenes.go("gameover")
         elif dil:
-            self.app.scenes.go("dilemma", return_to="terminal")
+            # popup de choix déclenché par le jeu (pas un clic joueur) : sur le
+            # bureau, s'ouvre en fenêtre parmi les autres plutôt que de
+            # basculer tout l'écran (cf. App.route_scene).
+            self.app.route_scene("dilemma", return_to="terminal")
         return {
             "stop": stop_reason is not None,
             "reason": stop_reason,

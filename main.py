@@ -3,10 +3,19 @@ main.py — Point d'entrée du jeu.
 Lancement :  python main.py
 Dépendances : pygame  (pip install pygame)
 """
+import os
 import random
 import sys
 
 import pygame
+
+# Qualité de mise à l'échelle de pygame.SCALED (plein écran / sans bordure) :
+# "photo" demande un filtre linéaire (net) au lieu du filtre par défaut
+# (plus flou). Doit être posé AVANT pygame.init(). Le driver vidéo factice
+# (SDL_VIDEODRIVER=dummy, utilisé par les tests headless / CI) n'a pas de
+# renderer matériel : forcer "photo" y fait échouer pygame.display.set_mode.
+if os.environ.get("SDL_VIDEODRIVER") != "dummy":
+    os.environ.setdefault("PYGAME_FORCE_SCALE", "photo")
 
 from core import audio
 from core import config

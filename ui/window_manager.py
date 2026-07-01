@@ -238,14 +238,20 @@ class WindowManager:
                 self._last_title_click = (w, now)
                 w._drag_off = (event.pos[0] - w.rect.x, event.pos[1] - w.rect.y)
                 return True
-            # sinon : clic dans le contenu → application
-            return bool(w.app_obj.handle_event(event, w.content_rect))
+            # sinon : clic dans le contenu → application. Le clic est de toute
+            # façon dans le rectangle de la fenêtre : il ne doit JAMAIS
+            # « traverser » vers le bureau (icônes/barre des tâches) derrière,
+            # que l'appli fasse quelque chose de ce clic ou non.
+            w.app_obj.handle_event(event, w.content_rect)
+            return True
 
-        # molette / autres clics souris : à la fenêtre sous le curseur
+        # molette / autres clics souris : à la fenêtre sous le curseur (même
+        # règle : absorbés dès qu'ils tombent dans une fenêtre)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (3, 4, 5):
             w = self._topmost_at(event.pos)
             if w is not None:
-                return bool(w.app_obj.handle_event(event, w.content_rect))
+                w.app_obj.handle_event(event, w.content_rect)
+                return True
             return False
 
         # clavier et mouvements : à la fenêtre focalisée

@@ -71,7 +71,10 @@ class _ProxyApp:
 
 
 class SceneHostApp(DesktopApp):
-    default_size = (940, 560)
+    # Proche de la résolution logique (1280x720) pour limiter le facteur de
+    # réduction du smoothscale (source de flou visible) — les scènes hébergées
+    # couvrent la majorité des écrans du jeu, contrairement aux apps natives.
+    default_size = (1180, 620)
     min_size = (420, 300)
     icon_kind = "generic"
 

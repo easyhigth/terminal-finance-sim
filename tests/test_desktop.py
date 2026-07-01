@@ -1426,3 +1426,79 @@ def test_search_draw_does_not_raise_with_no_results(app):
     desk._open_search()
     desk._search_query = "zzz_no_match_zzz"
     desk.draw(app.screen)   # ne doit pas lever
+
+
+# ------------------------------------------------ clic ne traverse pas les fenêtres
+class _DeadApp:
+    """Appli factice dont handle_event ne réagit jamais (comme une zone morte
+    du tableur) — utilisée pour vérifier que WindowManager absorbe quand même
+    le clic plutôt que de le laisser retomber sur ce qu'il y a derrière."""
+    default_size = (400, 300)
+    min_size = (200, 150)
+    icon_kind = "generic"
+
+    def __init__(self, app):
+        pass
+
+    def on_open(self):
+        pass
+
+    def update(self, dt):
+        pass
+
+    def draw(self, surf, rect):
+        pass
+
+    def handle_event(self, event, rect):
+        return False
+
+
+def test_dead_click_inside_window_content_is_still_consumed(app):
+    wm = WindowManager(app)
+    w = wm.open("dead", lambda: _DeadApp(app), x=50, y=50)
+    inside = (w.content_rect.centerx, w.content_rect.centery)
+    consumed = wm.handle_event(_click(*inside))
+    assert consumed is True
+
+
+def test_dead_scroll_inside_window_content_is_still_consumed(app):
+    wm = WindowManager(app)
+    w = wm.open("dead", lambda: _DeadApp(app), x=50, y=50)
+    inside = (w.content_rect.centerx, w.content_rect.centery)
+    ev = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=4, pos=inside)
+    assert wm.handle_event(ev) is True
+
+
+def test_click_outside_all_windows_not_consumed(app):
+    wm = WindowManager(app)
+    wm.open("dead", lambda: _DeadApp(app), x=50, y=50)
+    consumed = wm.handle_event(_click(1, 1))
+    assert consumed is False
+
+
+def test_click_on_dead_window_does_not_reach_desktop_behind(app):
+    """Reproduction directe du bug rapporté : une fenêtre (ex. Tableur) posée
+    par-dessus une icône du bureau — cliquer dans une zone morte de la fenêtre
+    ne doit JAMAIS déclencher l'icône du bureau située dessous."""
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)   # peuple desk._icon_rects
+    icon_key = desk._icon_list()[0][0]
+    icon_rect = desk._icon_rects[icon_key][0]
+    w = desk.wm.open("dead", lambda: _DeadApp(app), x=icon_rect.x, y=icon_rect.y)
+    before = len(desk.wm.windows)
+    inside = (w.content_rect.centerx, w.content_rect.centery)
+    desk.handle_event(_click(*inside))
+    # aucune nouvelle fenêtre n'a été ouverte par un double-déclenchement de l'icône
+    assert len(desk.wm.windows) == before
+
+
+def test_scene_host_default_size_close_to_full_resolution():
+    """Le facteur de réduction (smoothscale) doit rester modéré pour éviter le
+    flou signalé : la fenêtre par défaut ne doit pas être ridiculement petite
+    par rapport à la résolution logique (1280x720)."""
+    from apps.scene_host import SceneHostApp
+    from core import config
+    dw, dh = SceneHostApp.default_size
+    assert dw >= config.SCREEN_WIDTH * 0.8
+    assert dh >= 600

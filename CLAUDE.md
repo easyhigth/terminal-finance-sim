@@ -276,6 +276,27 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   (`DesktopScene.open_trading`), inbox/mandats/deals → la scène hébergée correspondante. Réutilise
   `core/fuzzy.filter_sorted` (même moteur de correspondance floue que Ctrl+K) sur un haystack
   concaténé par entrée (ticker+nom, sujet+expéditeur+corps, nom client, titre de deal).
+  **Étape 16 : les clics ne traversent plus les fenêtres + rendu moins flou.**
+  `ui/window_manager.py::WindowManager.handle_event` renvoyait `bool(app_obj.handle_event(...))`
+  quand un clic tombait dans le CONTENU d'une fenêtre — si l'appli ne réagissait pas à ce clic
+  précis (zone morte du Tableur…), la méthode renvoyait `False`, et `DesktopScene.handle_event`
+  continuait alors à tester les cibles du bureau EN DESSOUS (icônes, barre des tâches) à ces
+  mêmes coordonnées écran, déclenchant potentiellement un élément sans rapport (ex. cliquer
+  dans le Tableur activait le Mur posé derrière). Corrigé : dès qu'une fenêtre est trouvée sous
+  le clic (`_topmost_at`), l'évènement est transmis à l'appli pour ses effets de bord mais la
+  méthode renvoie désormais TOUJOURS `True` — un clic dans les limites d'une fenêtre est
+  absorbé, point final, jamais de fallthrough vers ce qu'il y a derrière (même règle pour la
+  molette/clic droit, branche `button in (3, 4, 5)`). Par ailleurs, deux causes de flou visuel
+  corrigées : (1) `main.py` pose `PYGAME_FORCE_SCALE=photo` avant `pygame.init()` (filtre de
+  mise à l'échelle linéaire plutôt que le filtre par défaut pour les modes plein écran/sans
+  bordure `pygame.SCALED`) — désactivé quand `SDL_VIDEODRIVER=dummy` (tests headless/CI), le
+  driver factice n'ayant pas de renderer matériel et échouant sur `set_mode` avec ce réglage ;
+  (2) `apps/scene_host.py::SceneHostApp.default_size` relevé de `(940, 560)` à `(1180, 620)` —
+  les scènes hébergées (la grande majorité des écrans du jeu) sont rendues dans une surface
+  hors-champ à résolution logique pleine (1280×720) puis réduites par `smoothscale` à la
+  taille de la fenêtre ; une fenêtre par défaut plus proche de cette résolution réduit
+  nettement le facteur de réduction (donc le flou) sans toucher à la résolution logique
+  elle-même (jugé trop risqué à changer globalement, cf. décision précédente).
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, un jour de jeu dure ~16 s réelles
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 90`), soit un nouveau pas de marché (5 jours) toutes

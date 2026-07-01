@@ -309,6 +309,66 @@ def test_calculator_desktop_icon_opens_window(app):
     assert any(w.key == "calculator" for w in desk.wm.windows)
 
 
+# ------------------------------------------- formules de marché en direct (PR1)
+def test_sheet_live_price_formula(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    tk = app.market.companies[0]["ticker"]
+    sa.sheet.set("A1", f'=PRICE("{tk}")')
+    assert sa.sheet.get_value("A1") == pytest.approx(app.market.price_of(tk))
+
+
+def test_sheet_live_price_updates_after_market_step(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    tk = app.market.companies[0]["ticker"]
+    sa.sheet.set("A1", f'=PRICE("{tk}")')
+    v0 = sa.sheet.get_value("A1")
+    for _ in range(3):
+        app.market.step()
+    sa._sync_market()   # comme le fait draw() à chaque frame
+    v1 = sa.sheet.get_value("A1")
+    assert v1 == pytest.approx(app.market.price_of(tk))
+    assert v1 != v0     # le marché a bougé -> la cellule aussi
+
+
+def test_sheet_networth_cash_and_shares_formulas(app):
+    from core import portfolio as PF
+    from core import portfolio_margin as PM
+    sa = SheetApp(app)
+    sa.on_open()
+    tk = app.market.companies[0]["ticker"]
+    PF.buy(app.gs.player, app.market, tk, 4)
+    sa._sync_market()
+    sa.sheet.set("A1", "=CASH()")
+    sa.sheet.set("A2", "=NETWORTH()")
+    sa.sheet.set("A3", f'=SHARES("{tk}")')
+    assert sa.sheet.get_value("A1") == pytest.approx(app.gs.player.cash)
+    assert sa.sheet.get_value("A2") == pytest.approx(PM.net_worth(app.gs.player, app.market))
+    assert sa.sheet.get_value("A3") == 4.0
+
+
+def test_sheet_unknown_ticker_returns_na_not_crash(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    sa.sheet.set("A1", '=PRICE("ZZZZ")')
+    assert sa.sheet.get_value("A1") == "#N/A"
+
+
+def test_sheet_live_formula_feeds_a_chart(app):
+    """Une colonne de =PRICE(...) alimente un graphique qui reflète le marché."""
+    sa = SheetApp(app)
+    sa.on_open()
+    tks = [c["ticker"] for c in app.market.top_companies(n=3)]
+    for i, tk in enumerate(tks, start=1):
+        sa.sheet.set(f"A{i}", f'=PRICE("{tk}")')
+    sa.range_anchor, sa.range_end = "A1", "A3"
+    sa._add_chart("bar")
+    assert len(sa.workbook.active.charts) == 1
+    data = sa._chart_data(sa.workbook.active.charts[0])
+    assert data["y"] == [pytest.approx(app.market.price_of(t)) for t in tks]
+
+
 def test_desktop_export_routes_to_native_sheet_app(app):
     """Le bouton « → TABLEUR » d'un écran hébergé (financials, ma_target…)
     doit atterrir dans l'app Tableur native (classeur multi-feuilles), pas

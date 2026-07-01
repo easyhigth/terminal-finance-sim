@@ -33,7 +33,7 @@ from apps.app_sheet import SheetApp
 from apps.app_trading import TradingApp
 from apps.app_watchlist import WatchlistApp
 from apps.scene_host import SceneHostApp
-from core import config, portfolio as pf_mod, portfolio_margin as pm_mod
+from core import config, desktop_onboarding, portfolio as pf_mod, portfolio_margin as pm_mod
 from core.scene_manager import Scene
 from core.sim_clock import SPEEDS
 from scenes.scene_more import SECTIONS
@@ -136,6 +136,9 @@ class DesktopScene(Scene):
         self._menu_rect = None
         self._gear_rect = None
         self._ambient_rect = None    # widget patrimoine (clic → portefeuille)
+        self._ctx_menu = None        # menu contextuel (clic droit) : dict ou None
+        self._onboard_card = None    # carte d'accueil (rect) — 1re visite
+        self._onboard_btn = None
         # le terminal reste le MOTEUR de la boucle de jeu : instance persistante,
         # créée une seule fois par partie, hébergée dans SA PROPRE fenêtre (comme
         # les autres apps) — le temps s'écoule qu'elle soit ouverte ou non.
@@ -166,10 +169,32 @@ class DesktopScene(Scene):
 
     # ------------------------------------------------------------- events
     def handle_event(self, event):
+        # menu contextuel ouvert : il capture les clics/échap en priorité
+        if self._ctx_menu is not None and self._handle_ctx_event(event):
+            return
+        # carte d'accueil (1re visite) : NON modale — un clic sur son bouton (ou
+        # ailleurs) la referme ; les clics sur la carte elle-même sont avalés,
+        # les autres continuent (on peut ouvrir une app du même clic).
+        if not desktop_onboarding.seen():
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if self._onboard_btn and self._onboard_btn.collidepoint(event.pos):
+                    desktop_onboarding.mark_seen()
+                    return
+                if self._onboard_card and self._onboard_card.collidepoint(event.pos):
+                    return
+                desktop_onboarding.mark_seen()
+            elif event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
+                desktop_onboarding.mark_seen()
+                return
         # Alt+Tab : passe à la fenêtre suivante (façon OS), prioritaire sur tout
         if event.type == pygame.KEYDOWN and event.key == pygame.K_TAB and (event.mod & pygame.KMOD_ALT):
             self.wm.cycle_focus(reverse=bool(event.mod & pygame.KMOD_SHIFT))
             return
+        # clic droit : menu contextuel (icône, chrome de fenêtre, barre des
+        # tâches ou fond du bureau) — avant le routage classique des fenêtres.
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            if self._open_context_menu(event.pos):
+                return
         # menu Démarrer ouvert : priorité à ses items / fermeture au clic dehors
         if self.start_open and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for r, name, kw in self._launcher_rects:
@@ -349,6 +374,183 @@ class DesktopScene(Scene):
         self.start_open = False
         return w
 
+    # ------------------------------------------------- menus contextuels (clic droit)
+    def _snap_window(self, w, side):
+        """Ancre une fenêtre sur une moitié de la zone de travail (comme le
+        glisser-vers-le-bord), en gardant `_restore_rect` pour revenir."""
+        wa = self.wm.work_area
+        if w._restore_rect is None:
+            w._restore_rect = w.rect.copy()
+        if side == "left":
+            w.rect = pygame.Rect(wa.x, wa.y, wa.w // 2, wa.h)
+        else:
+            w.rect = pygame.Rect(wa.x + wa.w // 2, wa.y, wa.w - wa.w // 2, wa.h)
+
+    def _close_all_windows(self):
+        """Ferme toutes les fenêtres SAUF le terminal (moteur de la partie) —
+        celui-ci est seulement minimisé, pour ne jamais arrêter le temps."""
+        for w in list(self.wm.windows):
+            if w.key == "scene:terminal":
+                w.minimized = True
+            else:
+                self.wm.close(w)
+
+    def _open_context_menu(self, pos):
+        """Construit le menu contextuel selon la cible sous le curseur. Retourne
+        True si un menu a été ouvert."""
+        items = None
+        # 1) entrée de la barre des tâches
+        for w, r in self._task_rects.items():
+            if r.collidepoint(pos):
+                items = self._window_menu_items(w)
+                break
+        # 2) barre de titre d'une fenêtre (le contenu reste à l'app)
+        if items is None:
+            w = self.wm._topmost_at(pos)
+            if w is not None and w.title_rect.collidepoint(pos):
+                items = self._window_menu_items(w)
+        # 3) icône du bureau (seulement si aucune fenêtre ne la recouvre)
+        if items is None and self.wm._topmost_at(pos) is None:
+            for key, (r, _kind, _label) in self._icon_rects.items():
+                if r.collidepoint(pos):
+                    items = self._icon_menu_items(key)
+                    break
+        # 4) fond du bureau (ni barre supérieure ni barre des tâches ni fenêtre)
+        if items is None:
+            area = pygame.Rect(0, TOPBAR_H, config.SCREEN_WIDTH,
+                               config.SCREEN_HEIGHT - TOPBAR_H - TASKBAR_H)
+            if area.collidepoint(pos) and self.wm._topmost_at(pos) is None:
+                items = self._desktop_menu_items()
+        if not items:
+            return False
+        self._ctx_menu = {"pos": pos, "items": items, "rects": []}
+        self.start_open = False
+        return True
+
+    def _window_menu_items(self, w):
+        maximized = (w.rect == self.wm.work_area)
+        return [
+            (_L("Restaurer" if w.minimized else "Réduire", "Restore" if w.minimized else "Minimize"),
+             lambda: (setattr(w, "minimized", False), self.wm.focus(w)) if w.minimized
+             else self.wm.toggle_minimize(w)),
+            (_L("Restaurer la taille" if maximized else "Agrandir",
+                "Restore size" if maximized else "Maximize"),
+             lambda: self.wm.maximize_toggle(w)),
+            (_L("Ancrer à gauche", "Snap left"), lambda: self._snap_window(w, "left")),
+            (_L("Ancrer à droite", "Snap right"), lambda: self._snap_window(w, "right")),
+            (_L("Fermer", "Close"), lambda: self.wm.close(w)),
+        ]
+
+    def _icon_menu_items(self, key):
+        return [
+            (_L("Ouvrir", "Open"), lambda: self._launch(key)),
+            (_L("Ouvrir puis ancrer à gauche", "Open and snap left"),
+             lambda: self._launch_and_snap(key, "left")),
+            (_L("Ouvrir puis ancrer à droite", "Open and snap right"),
+             lambda: self._launch_and_snap(key, "right")),
+        ]
+
+    def _desktop_menu_items(self):
+        return [
+            (_L("Menu Applications", "Applications menu"), lambda: setattr(self, "start_open", True)),
+            (_L("Réglages", "Settings"), lambda: self.app.scenes.go("settings", return_to="desktop")),
+            (_L("Fermer toutes les fenêtres", "Close all windows"), self._close_all_windows),
+            (_L("Revoir l'accueil", "Show welcome again"), desktop_onboarding.reset),
+        ]
+
+    def _launch_and_snap(self, key, side):
+        w = self._launch(key)
+        if w is not None:
+            self._snap_window(w, side)
+        return w
+
+    def _handle_ctx_event(self, event):
+        """Le menu contextuel capture le clic sur un item (exécute son action),
+        et se referme à tout autre clic ou sur Échap."""
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self._ctx_menu = None
+            return True
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (1, 3):
+            for r, cb in self._ctx_menu["rects"]:
+                if r.collidepoint(event.pos):
+                    self._ctx_menu = None
+                    cb()
+                    return True
+            self._ctx_menu = None       # clic hors menu : referme (et avale le clic)
+            return True
+        return False
+
+    def _draw_context_menu(self, surf):
+        menu = self._ctx_menu
+        items = menu["items"]
+        pad, ih, w = 6, 24, 210
+        h = pad * 2 + ih * len(items)
+        x, y = menu["pos"]
+        x = min(x, config.SCREEN_WIDTH - w - 4)
+        y = min(y, config.SCREEN_HEIGHT - h - 4)
+        panel = pygame.Rect(x, y, w, h)
+        shadow = pygame.Surface((w + 8, h + 8), pygame.SRCALPHA)
+        shadow.fill((0, 0, 0, 110))
+        surf.blit(shadow, (x + 3, y + 4))
+        pygame.draw.rect(surf, config.COL_PANEL, panel)
+        pygame.draw.rect(surf, config.COL_AMBER, panel, 1)
+        mp = pygame.mouse.get_pos()
+        menu["rects"] = []
+        iy = y + pad
+        for label, cb in items:
+            r = pygame.Rect(x + 3, iy, w - 6, ih - 2)
+            menu["rects"].append((r, cb))
+            if r.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, r, border_radius=3)
+            widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), w - 20),
+                              (r.x + 8, r.y + 4), fonts.small(), config.COL_TEXT)
+            iy += ih
+
+    def _draw_onboarding(self, surf):
+        """Carte d'accueil (1re visite du bureau) : quelques repères pour
+        comprendre le poste de travail. NON modale — se referme au clic."""
+        shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
+        shade.fill((0, 0, 0, 150))
+        surf.blit(shade, (0, 0))
+        W, H = 560, 300
+        x = (config.SCREEN_WIDTH - W) // 2
+        y = (config.SCREEN_HEIGHT - H) // 2
+        card = pygame.Rect(x, y, W, H)
+        self._onboard_card = card
+        pygame.draw.rect(surf, config.COL_PANEL, card, border_radius=8)
+        pygame.draw.rect(surf, config.COL_AMBER, card, 2, border_radius=8)
+        widgets.draw_text(surf, _L("Bienvenue sur votre poste de travail",
+                                   "Welcome to your workstation"),
+                          (x + 24, y + 20), fonts.head(bold=True), config.COL_AMBER)
+        lines = [
+            _L("• Les icônes ouvrent des APPLICATIONS en fenêtres déplaçables.",
+               "• Icons open APPLICATIONS as draggable windows."),
+            _L("• Glissez une fenêtre vers un bord pour l'ancrer ; double-clic sur",
+               "• Drag a window to an edge to snap it; double-click the title bar"),
+            _L("  la barre de titre pour l'agrandir. Alt+Tab pour changer de fenêtre.",
+               "  to maximize. Alt+Tab to switch windows."),
+            _L("• Le TERMINAL (icône dédiée) reste le moteur : le temps s'écoule même",
+               "• The TERMINAL (its own icon) stays the engine: time flows even when"),
+            _L("  fenêtre fermée. ⏸/▶▶ en haut à droite règlent la vitesse.",
+               "  its window is closed. ⏸/▶▶ top-right control speed."),
+            _L("• Clic DROIT sur une icône, une fenêtre ou le fond : menu d'actions.",
+               "• RIGHT-click an icon, a window or the background: action menu."),
+            _L("• Le widget en bas à droite suit votre patrimoine en direct.",
+               "• The bottom-right widget tracks your net worth live."),
+        ]
+        ly = y + 58
+        for ln in lines:
+            widgets.draw_text(surf, ln, (x + 24, ly), fonts.small(), config.COL_TEXT)
+            ly += 24
+        btn = pygame.Rect(x + W - 160, y + H - 44, 136, 30)
+        self._onboard_btn = btn
+        hov = btn.collidepoint(pygame.mouse.get_pos())
+        pygame.draw.rect(surf, config.COL_AMBER if hov else config.COL_PANEL_HEAD, btn, border_radius=5)
+        pygame.draw.rect(surf, config.COL_AMBER, btn, 1, border_radius=5)
+        widgets.draw_text(surf, _L("Commencer", "Get started"), btn.center,
+                          fonts.small(bold=True), config.COL_BG if hov else config.COL_AMBER,
+                          align="center")
+
     # -------------------------------------------------------------- draw
     @property
     def _track_scene(self):
@@ -366,6 +568,10 @@ class DesktopScene(Scene):
         self._draw_taskbar(surf)
         if self.start_open:
             self._draw_launcher(surf)
+        if self._ctx_menu is not None:
+            self._draw_context_menu(surf)
+        if not desktop_onboarding.seen():
+            self._draw_onboarding(surf)
 
     def _draw_wallpaper(self, surf):
         # léger quadrillage « poste de travail »

@@ -152,6 +152,60 @@ def test_load_unexpected_top_level_structure_falls_back_to_defaults(isolated_sav
     assert gs.player.name == "Trainee"
 
 
+# ------------------------------------ export/import (sauvegarde portable) ====
+def test_export_then_import_round_trip_at_arbitrary_path(tmp_path):
+    """export_to/import_from écrivent/lisent à un chemin ARBITRAIRE (pas
+    forcément config.SAVE_DIR) — c'est le mécanisme de transport entre
+    machines : le fichier peut être copié à la main (clé USB, cloud perso)."""
+    gs, m = _populated_state()
+    dest = tmp_path / "sous_dossier" / "ma_sauvegarde.json"   # dossier à créer
+    returned = gs.export_to(str(dest))
+    assert returned == str(dest)
+    assert dest.exists()
+    imported = GameState.import_from(str(dest))
+    assert imported is not None
+    assert imported.player.name == gs.player.name
+    assert imported.player.cash == gs.player.cash
+    assert imported.player.market_seed == gs.player.market_seed
+    assert imported.player.market_step == gs.player.market_step
+
+
+def test_export_works_even_in_sandbox_mode(tmp_path):
+    """Contrairement à save() (no-op en sandbox), export_to() est une action
+    explicite du joueur : elle doit fonctionner même en mode bac à sable."""
+    gs, m = _populated_state()
+    gs.player.sandbox = True
+    dest = tmp_path / "export_sandbox.json"
+    gs.export_to(str(dest))
+    assert dest.exists()
+
+
+def test_import_from_missing_file_returns_none(tmp_path):
+    assert GameState.import_from(str(tmp_path / "does_not_exist.json")) is None
+
+
+def test_import_from_empty_path_returns_none():
+    assert GameState.import_from("") is None
+    assert GameState.import_from(None) is None
+
+
+def test_import_from_corrupted_file_returns_none_without_raising(tmp_path):
+    path = tmp_path / "broken_export.json"
+    path.write_text("{not valid json", encoding="utf-8")
+    assert GameState.import_from(str(path)) is None
+
+
+def test_export_does_not_touch_the_configured_save_dir(isolated_save_dir, tmp_path_factory):
+    """export_to() écrit exactement où on le lui demande, jamais dans
+    config.SAVE_DIR (qui reste réservé aux slots gérés par save()/load())."""
+    gs, m = _populated_state()
+    other_dir = tmp_path_factory.mktemp("export_elsewhere")
+    outside = other_dir / "outside_export.json"
+    gs.export_to(str(outside))
+    assert outside.exists()
+    assert list(isolated_save_dir.iterdir()) == []
+
+
 def test_delete_removes_existing_slot(isolated_save_dir):
     gs, _ = _populated_state()
     gs.save(slot="to_delete")

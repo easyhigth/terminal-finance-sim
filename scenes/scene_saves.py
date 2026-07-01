@@ -4,6 +4,7 @@ Affiche les slots (autosave + slots manuels), leurs métadonnées (grade, jour,
 trésorerie, mode hardcore, date), et permet de charger ou supprimer un slot.
 Accessible depuis le menu (CHARGER) et depuis le terminal (commande SAVES).
 """
+import os
 import time
 
 import pygame
@@ -17,6 +18,12 @@ from ui import fonts, keynav, widgets
 
 def _L(fr, en):
     return en if get_lang() == "en" else fr
+
+
+# Dossier par défaut proposé pour l'export (dossier personnel de l'utilisateur,
+# visible/accessible depuis n'importe quel explorateur de fichiers du système —
+# pertinent pour copier le fichier vers une autre machine).
+_DEFAULT_EXPORT_DIR = os.path.expanduser("~")
 
 
 class SavesScene(Scene):
@@ -36,6 +43,20 @@ class SavesScene(Scene):
                                        "OUI, CONFIRMER", config.COL_DOWN)
         self._no_btn = widgets.Button((config.SCREEN_WIDTH // 2 + 10, box_bottom - 50, 160, 36),
                                       "ANNULER", config.COL_TEXT_DIM)
+        # export/import de sauvegarde en fichier portable (transport entre
+        # machines) : self.path_prompt = {"kind": "export"/"import", "slot": ...}
+        # en attente de saisie d'un chemin, self.path_buf = texte en cours.
+        self.path_prompt = None
+        self.path_buf = ""
+        self._path_box = pygame.Rect(0, 0, 560, 190)
+        self._path_box.center = (config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2)
+        pb_bottom = self._path_box.bottom
+        self._import_btn = widgets.Button((config.SCREEN_WIDTH - 240, 24, 200, 36),
+                                          f"⇩ {_L('IMPORTER', 'IMPORT')}", config.COL_CYAN)
+        self._path_ok_btn = widgets.Button((self._path_box.centerx - 170, pb_bottom - 50, 160, 36),
+                                           _L("VALIDER", "CONFIRM"), config.COL_CYAN)
+        self._path_cancel_btn = widgets.Button((self._path_box.centerx + 10, pb_bottom - 50, 160, 36),
+                                                _L("ANNULER", "CANCEL"), config.COL_TEXT_DIM)
         self._refresh()
 
     def _refresh(self):
@@ -47,9 +68,13 @@ class SavesScene(Scene):
         self._load_rects = {}
         self._del_rects = {}
         self._save_rects = {}
+        self._export_rects = {}
         self.slot_cursor = 0  # curseur clavier dans la liste des slots
 
     def handle_event(self, event):
+        if self.path_prompt is not None:
+            self._handle_path_prompt_event(event)
+            return
         if self.confirm is not None:
             self._handle_confirm_event(event)
             return
@@ -58,6 +83,10 @@ class SavesScene(Scene):
             return
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
+            return
+        if self._import_btn.handle(event):
+            self.path_prompt = {"kind": "import"}
+            self.path_buf = ""
             return
         if event.type == pygame.KEYDOWN and event.key in (pygame.K_UP, pygame.K_DOWN,
                                                             pygame.K_RETURN, pygame.K_KP_ENTER):
@@ -87,6 +116,69 @@ class SavesScene(Scene):
                 if rect.collidepoint(event.pos) and self.meta.get(slot):
                     self.confirm = {"kind": "delete", "slot": slot}
                     return
+            for slot, rect in self._export_rects.items():
+                if rect.collidepoint(event.pos) and self.meta.get(slot):
+                    self.path_prompt = {"kind": "export", "slot": slot}
+                    default_name = f"{slot}_{self.meta[slot]['name']}.json".replace(" ", "_")
+                    self.path_buf = os.path.join(_DEFAULT_EXPORT_DIR, default_name)
+                    return
+
+    def _handle_path_prompt_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.path_prompt = None
+                return
+            if event.key == pygame.K_BACKSPACE:
+                self.path_buf = self.path_buf[:-1]
+                return
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                self._confirm_path_prompt()
+                return
+            if event.unicode and event.unicode.isprintable():
+                self.path_buf += event.unicode
+                return
+        if self._path_ok_btn.handle(event):
+            self._confirm_path_prompt()
+            return
+        if self._path_cancel_btn.handle(event):
+            self.path_prompt = None
+            return
+
+    def _confirm_path_prompt(self):
+        kind = self.path_prompt["kind"]
+        path = self.path_buf.strip()
+        if not path:
+            self.message = _L("Chemin vide.", "Empty path.")
+            return
+        if kind == "export":
+            slot = self.path_prompt["slot"]
+            gs = GameState.load(slot)
+            if not gs:
+                self.message = _L("Échec de l'export (slot introuvable).", "Export failed (slot not found).")
+                self.path_prompt = None
+                return
+            try:
+                gs.export_to(path)
+                self.message = _L(f"Sauvegarde exportée vers « {path} ».",
+                                  f"Save exported to “{path}”.")
+            except Exception:
+                self.message = _L(f"Échec de l'export vers « {path} » (chemin invalide ou inaccessible).",
+                                  f"Export to “{path}” failed (invalid or inaccessible path).")
+        else:  # import
+            gs = GameState.import_from(path)
+            if not gs:
+                self.message = _L(f"Échec de l'import depuis « {path} » (fichier introuvable ou invalide).",
+                                  f"Import from “{path}” failed (file not found or invalid).")
+                self.path_prompt = None
+                return
+            self.app.gs = gs
+            self.path_prompt = None
+            if gs.player.game_over:
+                self.app.scenes.go("gameover")
+            else:
+                self.app.scenes.go("desktop")
+            return
+        self.path_prompt = None
 
     def _handle_confirm_event(self, event):
         if event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_n):
@@ -131,9 +223,13 @@ class SavesScene(Scene):
     def update(self, dt):
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp, dt)
+        self._import_btn.update(mp, dt)
         if self.confirm is not None:
             self._yes_btn.update(mp, dt)
             self._no_btn.update(mp, dt)
+        if self.path_prompt is not None:
+            self._path_ok_btn.update(mp, dt)
+            self._path_cancel_btn.update(mp, dt)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -143,10 +239,12 @@ class SavesScene(Scene):
         if self.can_save:
             subtitle = "Cliquez sur ENREGISTRER pour sauvegarder ici, CHARGER pour reprendre, ou SUPPRIMER pour libérer un slot."
         widgets.draw_text(surf, subtitle, (42, 80), fonts.small(), config.COL_TEXT_DIM)
+        self._import_btn.draw(surf)
 
         self._load_rects = {}
         self._del_rects = {}
         self._save_rects = {}
+        self._export_rects = {}
         mp = pygame.mouse.get_pos()
         x, y = 120, 130
         cw, ch, gap = config.SCREEN_WIDTH - 240, 110, 16
@@ -169,6 +267,43 @@ class SavesScene(Scene):
 
         if self.confirm is not None:
             self._draw_confirm(surf)
+        if self.path_prompt is not None:
+            self._draw_path_prompt(surf)
+
+    def _draw_path_prompt(self, surf):
+        """Boîte de dialogue modale pour saisir un chemin de fichier (export
+        vers/import depuis un fichier de sauvegarde portable, transportable
+        entre machines)."""
+        overlay = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 170))
+        surf.blit(overlay, (0, 0))
+
+        is_export = self.path_prompt["kind"] == "export"
+        box = self._path_box
+        title = _L("EXPORTER LA SAUVEGARDE", "EXPORT SAVE") if is_export else \
+            _L("IMPORTER UNE SAUVEGARDE", "IMPORT SAVE")
+        widgets.draw_panel(surf, box, title, config.COL_CYAN)
+        hint = _L("Chemin du fichier de destination (.json) :", "Destination file path (.json):") if is_export \
+            else _L("Chemin du fichier à importer (.json) :", "Path of the file to import (.json):")
+        widgets.draw_text(surf, hint, (box.x + 20, box.y + 46), fonts.small(), config.COL_TEXT_DIM)
+
+        field = pygame.Rect(box.x + 20, box.y + 70, box.w - 40, 30)
+        pygame.draw.rect(surf, config.COL_BG, field, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN, field, 1, border_radius=4)
+        cur = "_" if pygame.time.get_ticks() % 1000 < 500 else ""
+        widgets.draw_text(surf, widgets.fit_text(self.path_buf + cur, fonts.small(), field.w - 16),
+                          (field.x + 8, field.y + 6), fonts.small(), config.COL_TEXT)
+
+        widgets.draw_text(surf, _L("Copiez ce fichier vers l'autre machine (clé USB, cloud…) puis "
+                                   "utilisez IMPORTER là-bas.",
+                                   "Copy this file to the other machine (USB, cloud…), then use "
+                                   "IMPORT there.") if is_export else
+                          _L("Le fichier remplace la partie en cours et vous ramène au bureau.",
+                             "The file replaces the current game and takes you back to the desktop."),
+                          (box.x + 20, field.bottom + 10), fonts.tiny(), config.COL_TEXT_DIM)
+
+        self._path_ok_btn.draw(surf)
+        self._path_cancel_btn.draw(surf)
 
     def _draw_confirm(self, surf):
         """Boîte de dialogue modale bloquant le reste de l'écran, demandant
@@ -246,15 +381,18 @@ class SavesScene(Scene):
             widgets.draw_badge(surf, "HARDCORE", (bx, rect.y + 40),
                                config.COL_WARN, align="right")
 
-        # boutons (ENREGISTRER) / CHARGER / SUPPRIMER
+        # boutons (ENREGISTRER) / CHARGER / SUPPRIMER / EXPORTER
         del_rect = pygame.Rect(rect.right - 120, rect.bottom - 38, 104, 26)
         load_rect = pygame.Rect(del_rect.x - 108, rect.bottom - 38, 100, 26)
+        export_rect = pygame.Rect(load_rect.x - 108, rect.bottom - 38, 100, 26)
         self._load_rects[slot] = load_rect
         self._del_rects[slot] = del_rect
+        self._export_rects[slot] = export_rect
         self._mini_button(surf, load_rect, "CHARGER", config.COL_UP, mp)
         self._mini_button(surf, del_rect, "SUPPRIMER", config.COL_DOWN, mp)
+        self._mini_button(surf, export_rect, "EXPORTER", config.COL_CYAN, mp)
         if self.can_save and not is_auto:
-            save_rect = pygame.Rect(load_rect.x - 124, rect.bottom - 38, 116, 26)
+            save_rect = pygame.Rect(export_rect.x - 124, rect.bottom - 38, 116, 26)
             self._save_rects[slot] = save_rect
             self._mini_button(surf, save_rect, "ENREGISTRER", config.COL_CYAN, mp)
 

@@ -757,3 +757,104 @@ def test_new_tab_opens_on_desktop():
     a.pages.open_new_tab()
     assert len(a.pages.pages) == n_before + 1
     assert a.pages.current_page.manager.current_name == "desktop"
+
+
+# ============================================= PR4 : conscience ambiante ========
+# ------------------------------------------------------- app Watchlist
+def test_research_star_toggles_watchlist(app):
+    """L'étoile ★ de l'app Recherche ajoute/retire la valeur sélectionnée de
+    `player.watchlist` (source partagée avec la commande WATCHLIST)."""
+    r = ResearchApp(app)
+    r.desktop = None
+    r.on_open()
+    tk = r.sel
+    assert tk not in app.gs.player.watchlist
+    r._do_action("watch")
+    assert tk in app.gs.player.watchlist
+    r._do_action("watch")                       # re-clic = retire
+    assert tk not in app.gs.player.watchlist
+
+
+def test_research_watchlist_capped_at_ten(app):
+    r = ResearchApp(app)
+    r.on_open()
+    app.gs.player.watchlist = [f"X{i}" for i in range(10)]
+    r._do_action("watch")                       # plein : n'ajoute pas
+    assert r.sel not in app.gs.player.watchlist
+    assert len(app.gs.player.watchlist) == 10
+
+
+def test_watchlist_app_lists_and_removes(app):
+    from apps.app_watchlist import WatchlistApp
+    tk = app.market.top_companies(n=1)[0]["ticker"]
+    app.gs.player.watchlist = [tk]
+    w = WatchlistApp(app)
+    w.desktop = None
+    w.on_open()
+    rect = pygame.Rect(40, 40, 420, 460)
+    w.draw(app.screen, rect)                    # ne doit pas lever
+    assert tk in w._row_rects
+    # clic sur le × retire la valeur
+    dr = w._del_rects[tk]
+    w.handle_event(_click(dr.centerx, dr.centery), rect)
+    assert tk not in app.gs.player.watchlist
+
+
+def test_watchlist_row_click_opens_trading(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    tk = app.market.top_companies(n=1)[0]["ticker"]
+    app.gs.player.watchlist = [tk]
+    w = desk._launch("watchlist")
+    assert w is not None
+    rect = pygame.Rect(40, 40, 420, 460)
+    w.app_obj.draw(app.screen, rect)
+    r = w.app_obj._row_rects[tk]
+    w.app_obj.handle_event(_click(r.centerx, r.centery), rect)
+    tw = next((win for win in desk.wm.windows if win.key == "trading"), None)
+    assert tw is not None
+    assert tw.app_obj.search == tk.upper()
+
+
+def test_watchlist_desktop_icon_opens_app(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)
+    assert "watchlist" in desk._icon_rects
+    rect, kind, _label = desk._icon_rects["watchlist"]
+    assert kind == "star"
+    desk.handle_event(_click(rect.centerx, rect.centery))
+    assert any(win.key == "watchlist" for win in desk.wm.windows)
+
+
+# ------------------------------------------------- barre des tâches clignotante
+def test_forced_popup_flags_attention_and_focus_clears_it():
+    a = main.App()
+    a.ensure_market()
+    a.gs.player.grade_index = 9
+    a.gs.player.cash = 5_000_000.0
+    a.scenes.go("desktop")
+    desk = a.scenes.current
+    a.route_scene("dilemma", return_to="terminal")   # popup FORCÉ
+    w = next(win for win in desk.wm.windows if win.key == "scene:dilemma")
+    assert w.attention is True                       # clignote dans la barre des tâches
+    desk.wm.focus(w)                                 # la regarder éteint le clignotement
+    assert w.attention is False
+
+
+def test_player_launched_window_has_no_attention(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._open_scene_window("markethub")         # ouverture par le joueur
+    assert getattr(w, "attention", False) is False
+
+
+# ---------------------------------------------------- widget patrimoine ambiant
+def test_ambient_widget_opens_portfolio(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)                            # calcule self._ambient_rect
+    assert desk._ambient_rect is not None
+    r = desk._ambient_rect
+    desk.handle_event(_click(r.centerx, r.centery))
+    assert any(win.key == "scene:book" for win in desk.wm.windows)

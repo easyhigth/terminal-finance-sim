@@ -79,8 +79,17 @@ class ResearchApp(DesktopApp):
 
     def _do_action(self, kind):
         """Liens inter-apps (cf. DesktopScene) : ouvrir Trading pré-filtré,
-        pousser le cours dans le Tableur, ou ouvrir la fiche société complète."""
-        if not self.sel or self.desktop is None:
+        pousser le cours dans le Tableur, suivre la valeur, ou ouvrir la fiche."""
+        if not self.sel:
+            return
+        if kind == "watch":
+            wl = self.app.gs.player.watchlist
+            if self.sel in wl:
+                wl.remove(self.sel)
+            elif len(wl) < 10:
+                wl.append(self.sel)
+            return
+        if self.desktop is None:
             return
         if kind == "trade":
             self.desktop.open_trading(self.sel)
@@ -214,9 +223,11 @@ class ResearchApp(DesktopApp):
             self._draw_actions(surf, rect)
 
     def _draw_actions(self, surf, rect):
-        actions = [("trade", "▸ Trader", config.COL_UP),
-                   ("sheet", "→ Tableur", config.COL_CYAN),
-                   ("analyse", "Analyse", config.COL_AMBER)]
+        watched = self.sel in self.app.gs.player.watchlist
+        actions = [("watch", "Suivi" if watched else "Suivre", config.COL_PRESTIGE, watched),
+                   ("trade", "Trader", config.COL_UP, False),
+                   ("sheet", "→ Tableur", config.COL_CYAN, False),
+                   ("analyse", "Analyse", config.COL_AMBER, False)]
         mp = pygame.mouse.get_pos()
         n = len(actions)
         gap = 6
@@ -224,11 +235,14 @@ class ResearchApp(DesktopApp):
         bx = rect.x + 10
         by = rect.bottom - 30
         self._action_rects = {}
-        for kind, label, acc in actions:
+        for kind, label, acc, active in actions:
             r = pygame.Rect(bx, by, bw, 22)
             self._action_rects[kind] = r
             hov = r.collidepoint(mp)
-            pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL, r, border_radius=4)
+            bg = acc if active else (config.COL_PANEL_HEAD if hov else config.COL_PANEL)
+            pygame.draw.rect(surf, bg, r, border_radius=4)
             pygame.draw.rect(surf, acc, r, 1, border_radius=4)
-            widgets.draw_text(surf, label, r.center, fonts.tiny(bold=True), acc, align="center")
+            txtcol = config.COL_BG if active else acc
+            widgets.draw_text(surf, widgets.fit_text(label, fonts.tiny(bold=True), bw - 6),
+                              r.center, fonts.tiny(bold=True), txtcol, align="center")
             bx += bw + gap

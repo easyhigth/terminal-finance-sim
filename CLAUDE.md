@@ -192,6 +192,22 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   dessous. La **palette Ctrl+K** (`core/scene_manager.py`) route désormais via
   `_palette_navigate` : sur le bureau, ouvre l'entrée choisie EN FENÊTRE (`App.route_scene`)
   au lieu de basculer plein écran ; ailleurs, comportement classique inchangé.
+  **Étape 11 : conscience ambiante du bureau.** Trois ajouts pour garder le pouls de la partie
+  visible même « toutes fenêtres fermées » : (1) **widget patrimoine ambiant**
+  (`DesktopScene._draw_ambient`) dessiné dans le coin bas-droit du bureau (sous les fenêtres,
+  au-dessus de la barre des tâches) — patrimoine net (couleur up/down vs `player.cash_history[0]`),
+  cash, levier (`core/portfolio_margin.leverage`, ambre >1x / rouge >2x) et une mini-sparkline de
+  `cash_history` ; cliquer ouvre le portefeuille en fenêtre (`_open_scene_window("book")`). (2)
+  **app Watchlist** (`apps/app_watchlist.py`, icône « star » vectorielle dans `ui/desktop_icons.py`,
+  clé `"watchlist"` dans `APPS`) : liste `player.watchlist` (max 10) avec cours + variation du
+  dernier pas EN DIRECT ; clic sur une ligne → Trading pré-filtré (`desktop.open_trading`), « × »
+  retire la valeur. La watchlist est alimentée par la commande `WATCHLIST` du terminal ET par une
+  action **Suivre/Suivi** ajoutée à la barre d'actions de l'app Recherche (`app_research._do_action
+  ("watch")`, fond plein quand suivie). (3) **barre des tâches clignotante** : `Window.attention`
+  (posé par `_open_scene_window(..., attention=True)`, câblé depuis `App.route_scene` pour les
+  popups FORCÉS par le jeu — dilemmes) fait clignoter l'entrée de la fenêtre dans la barre des
+  tâches (`_draw_taskbar`) jusqu'au premier `WindowManager.focus` (un coup d'œil éteint le
+  clignotement).
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, **1 minute réelle = 1 pas de marché**
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 120`), soit un nouveau pas toutes les ~60 s (x1) /

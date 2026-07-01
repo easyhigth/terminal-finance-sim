@@ -210,7 +210,9 @@ class App:
         d'autres fenêtres) au lieu de basculer tout l'écran ; sinon,
         comportement classique (bascule plein écran)."""
         if self.scenes.current_name == "desktop":
-            self.scenes.current._open_scene_window(name, **kwargs)
+            # popup FORCÉ (pas un clic joueur) : clignote dans la barre des
+            # tâches tant qu'on ne l'a pas regardé (cf. Window.attention).
+            self.scenes.current._open_scene_window(name, attention=True, **kwargs)
         else:
             self.scenes.go(name, **kwargs)
 

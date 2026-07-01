@@ -189,6 +189,16 @@ def _help(surf, cx, cy, col):
     pygame.draw.circle(surf, col, (cx, cy + 7), 1)
 
 
+def _star(surf, cx, cy, col):
+    import math
+    pts = []
+    for k in range(10):
+        ang = -math.pi / 2 + k * math.pi / 5
+        rad = 12 if k % 2 == 0 else 5
+        pts.append((cx + rad * math.cos(ang), cy + rad * math.sin(ang)))
+    pygame.draw.polygon(surf, col, pts, 2)
+
+
 def _calc(surf, cx, cy, col):
     r = pygame.Rect(cx - 11, cy - 13, 22, 26)
     pygame.draw.rect(surf, col, r, 2, border_radius=2)
@@ -206,7 +216,7 @@ _ICONS = {
     "inbox": _inbox, "news": _news, "mission": _mission, "deals": _deals,
     "decide": _decide, "examcert": _examcert, "wall": _wall, "shop": _shop,
     "explorer": _explorer, "graph": _graph, "save": _save, "help": _help,
-    "calc": _calc,
+    "calc": _calc, "star": _star,
 }
 
 

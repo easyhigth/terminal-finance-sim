@@ -31,8 +31,9 @@ from apps.app_calculator import CalculatorApp
 from apps.app_research import ResearchApp
 from apps.app_sheet import SheetApp
 from apps.app_trading import TradingApp
+from apps.app_watchlist import WatchlistApp
 from apps.scene_host import SceneHostApp
-from core import config, portfolio as pf_mod
+from core import config, portfolio as pf_mod, portfolio_margin as pm_mod
 from core.scene_manager import Scene
 from core.sim_clock import SPEEDS
 from scenes.scene_more import SECTIONS
@@ -53,6 +54,7 @@ APPS = [
     ("research", "Recherche", "research", ResearchApp),
     ("trading", "Trading", "trading", TradingApp),
     ("sheet", "Tableur", "sheet", SheetApp),
+    ("watchlist", "Watchlist", "star", WatchlistApp),
     ("calculator", "Calculatrice", "calc", CalculatorApp),
 ]
 
@@ -133,6 +135,7 @@ class DesktopScene(Scene):
         self._pause_rect = None
         self._menu_rect = None
         self._gear_rect = None
+        self._ambient_rect = None    # widget patrimoine (clic → portefeuille)
         # le terminal reste le MOTEUR de la boucle de jeu : instance persistante,
         # créée une seule fois par partie, hébergée dans SA PROPRE fenêtre (comme
         # les autres apps) — le temps s'écoule qu'elle soit ouverte ou non.
@@ -202,6 +205,10 @@ class DesktopScene(Scene):
                     w.minimized = False
                 self.wm.focus(w)
                 return
+        # widget patrimoine ambiant → ouvre le portefeuille en fenêtre
+        if self._ambient_rect and self._ambient_rect.collidepoint(pos):
+            self._open_scene_window("book")
+            return
         if self._menu_rect and self._menu_rect.collidepoint(pos):
             self.app.scenes.go("menu")
             return
@@ -283,10 +290,12 @@ class DesktopScene(Scene):
         self.start_open = False
         return w
 
-    def _open_scene_window(self, name, **kwargs):
+    def _open_scene_window(self, name, attention=False, **kwargs):
         """Ouvre (ou ramène au premier plan) une fenêtre hébergeant la scène
         `name`. C'est aussi le point d'entrée du routeur de navigation des
-        scènes hébergées (cf. apps/scene_host.py)."""
+        scènes hébergées (cf. apps/scene_host.py). `attention=True` (popup
+        FORCÉ par le jeu, cf. App.route_scene) fait clignoter son entrée dans
+        la barre des tâches jusqu'à ce qu'elle soit focalisée."""
         if name == "terminal":
             return self._open_terminal_window()
         if name == "spreadsheet":
@@ -322,6 +331,9 @@ class DesktopScene(Scene):
         w = self.wm.open(key, factory)
         if existing is not None and kw:
             w.app_obj.reenter(**kw)   # met à jour le contexte (ticker…) si déjà ouverte
+        if attention:
+            w.attention = True        # clignote dans la barre des tâches jusqu'au 1er
+                                      # coup d'œil (popup FORCÉ, éteint par wm.focus)
         self.start_open = False
         return w
 
@@ -348,6 +360,7 @@ class DesktopScene(Scene):
         surf.fill(config.COL_BG)
         self._draw_wallpaper(surf)
         self._draw_desktop_icons(surf)
+        self._draw_ambient(surf)
         self.wm.draw(surf)
         self._draw_topbar(surf)
         self._draw_taskbar(surf)
@@ -402,6 +415,45 @@ class DesktopScene(Scene):
             widgets.draw_text(surf, widgets.fit_text(label, fonts.small(bold=True), ICON_W - 6),
                               (r.centerx, r.bottom - 18), fonts.small(bold=True),
                               config.COL_TEXT, align="center")
+
+    def _draw_ambient(self, surf):
+        """Widget « ambiant » du bureau (coin bas-droit, au-dessus de la barre
+        des tâches, sous les fenêtres) : patrimoine net, cash, levier et une
+        mini-courbe de `player.cash_history` — le pouls du compte reste visible
+        même quand toutes les fenêtres sont fermées ou minimisées. Cliquer ouvre
+        le portefeuille (fenêtre « book »)."""
+        p = self.app.gs.player
+        m = self.app.market
+        cur = config.CONTINENTS[p.continent]["currency"]
+        W, H = 208, 96
+        x = config.SCREEN_WIDTH - W - 16
+        y = config.SCREEN_HEIGHT - TASKBAR_H - H - 12
+        r = pygame.Rect(x, y, W, H)
+        self._ambient_rect = r
+        hov = r.collidepoint(pygame.mouse.get_pos())
+        panel = pygame.Surface((W, H), pygame.SRCALPHA)
+        panel.fill((*config.COL_PANEL, 232))
+        surf.blit(panel, (x, y))
+        pygame.draw.rect(surf, config.COL_AMBER if hov else config.COL_BORDER, r, 1, border_radius=6)
+        nw = pm_mod.net_worth(p, m) if m else p.cash
+        lev = pm_mod.leverage(p, m) if m else 0.0
+        widgets.draw_text(surf, "PATRIMOINE NET", (x + 10, y + 8), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        # variation depuis le début de l'historique (couleur up/down)
+        hist = [v for v in (p.cash_history or []) if v]
+        base = hist[0] if hist else nw
+        up = nw >= base
+        widgets.draw_text(surf, widgets.format_money(nw, cur), (x + 10, y + 20),
+                          fonts.small(bold=True), config.COL_UP if up else config.COL_DOWN)
+        widgets.draw_text(surf, f"Cash {widgets.format_money(p.cash, cur)}", (x + 10, y + 40),
+                          fonts.tiny(), config.COL_TEXT)
+        levcol = config.COL_DOWN if lev > 2.0 else config.COL_AMBER if lev > 1.0 else config.COL_TEXT_DIM
+        widgets.draw_text(surf, f"Levier {lev:.2f}x", (x + 10, y + 54), fonts.tiny(bold=True), levcol)
+        # mini-sparkline du patrimoine
+        spark = pygame.Rect(x + 10, y + H - 20, W - 20, 14)
+        if len(hist) >= 2:
+            gcol = config.COL_UP if hist[-1] >= hist[0] else config.COL_DOWN
+            widgets.draw_series(surf, spark, hist[-40:], gcol, baseline=False,
+                                show_extrema=False, y_fmt=None)
 
     def _draw_topbar(self, surf):
         bar = pygame.Rect(0, 0, config.SCREEN_WIDTH, TOPBAR_H)
@@ -486,11 +538,16 @@ class DesktopScene(Scene):
             r = pygame.Rect(x, bar.y + 4, 150, TASKBAR_H - 8)
             self._task_rects[w] = r
             focused = (w is self.wm.focused)
-            bg = config.COL_PANEL if (focused and not w.minimized) else config.COL_PANEL_HEAD
+            # fenêtre qui réclame l'attention (popup FORCÉ non encore regardé) :
+            # clignote (cf. Window.attention, éteint au focus).
+            flash = getattr(w, "attention", False) and (pygame.time.get_ticks() % 900 < 450)
+            bg = (config.COL_DOWN if flash
+                  else config.COL_PANEL if (focused and not w.minimized) else config.COL_PANEL_HEAD)
             pygame.draw.rect(surf, bg, r, border_radius=4)
-            pygame.draw.rect(surf, config.COL_AMBER if focused and not w.minimized else config.COL_BORDER,
-                             r, 1, border_radius=4)
-            col = config.COL_TEXT_DIM if w.minimized else config.COL_TEXT
+            border = (config.COL_WHITE if flash
+                      else config.COL_AMBER if focused and not w.minimized else config.COL_BORDER)
+            pygame.draw.rect(surf, border, r, 1, border_radius=4)
+            col = config.COL_WHITE if flash else config.COL_TEXT_DIM if w.minimized else config.COL_TEXT
             kind = getattr(w.app_obj, "icon_kind", "generic")
             desktop_icons.draw(surf, (r.x + 12, r.centery), kind, col)
             widgets.draw_text(surf, widgets.fit_text(w.app_obj.title, fonts.tiny(), r.w - 26),

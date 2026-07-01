@@ -38,9 +38,9 @@ class IntroScene(Scene):
 
     def handle_event(self, event):
         if self.start_btn.handle(event):
-            self.app.scenes.go("terminal")
+            self.app.scenes.go("desktop")
         if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
-            self.app.scenes.go("terminal")
+            self.app.scenes.go("desktop")
 
     def update(self, dt):
         self.start_btn.update(pygame.mouse.get_pos(), dt)

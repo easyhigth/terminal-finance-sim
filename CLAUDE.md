@@ -56,8 +56,18 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   (`sim_clock.LIVE_SCENE_NAMES` inclut `"desktop"`) : le temps avance et les pas de marché
   sont joués via `TerminalScene._drain_pending_steps()` (le terminal reste le moteur de la
   boucle de jeu). Accès depuis le terminal (commande `DESKTOP`/`BUREAU`, rail « 🖥 BUREAU »).
-  Étapes suivantes prévues : migrer toutes les scènes en fenêtres, promouvoir le bureau en
-  écran principal. Le terminal classique reste accessible (icône « Terminal »).
+  **Étape 2 (« tout en fenêtres »)** : `apps/scene_host.py` (`SceneHostApp`) héberge
+  N'IMPORTE QUELLE scène plein écran existante dans une fenêtre — la scène dessine dans une
+  surface hors-champ à taille logique pleine, mise à l'échelle dans la fenêtre ; les
+  coordonnées souris sont retransformées et `pygame.mouse.get_pos` redirigé pendant
+  update/draw/handle_event pour aligner le survol. La navigation des scènes (`app.scenes.go`)
+  est interceptée par un routeur (App *proxy* dont `.scenes` route `go()` vers l'ouverture
+  d'une fenêtre au lieu de changer de scène). Un **menu Démarrer** (bouton « ⊞ Apps » de la
+  barre des tâches) liste toutes les scènes (groupées comme le hub PLUS,
+  `scene_more.SECTIONS`) : chaque item ouvre la scène en fenêtre. Le bureau est désormais
+  l'**écran d'atterrissage** d'une nouvelle partie (`scene_intro` → `desktop` ; le terminal
+  est initialisé au 1er `on_enter` du bureau pour piloter le temps). Le terminal classique
+  reste accessible (icône « Terminal »).
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, **1 minute réelle = 1 pas de marché**
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 120`), soit un nouveau pas toutes les ~60 s (x1) /

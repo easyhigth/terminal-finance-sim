@@ -202,3 +202,33 @@ def test_blue_chip_streak_badge_uses_legacy_profit_streak_flag():
     p.flags["profit_streak"] = 6
     earned, _ = badges.check_streaks(p)
     assert any(b["id"] == "blue_chip" for b in earned)
+
+
+# --------------------------------------------------------------- progress_for
+def test_progress_for_returns_current_and_target_for_numeric_badge():
+    p, m = _mk()
+    p.deals_won = 3
+    b = badges.get("dealmaker")
+    cur, target = badges.progress_for(b, p, m)
+    assert cur == 3.0 and target == 10.0
+
+
+def test_progress_for_returns_none_for_binary_badge():
+    p, m = _mk()
+    b = badges.get("top_dog")   # pas de clé "progress" définie
+    assert badges.progress_for(b, p, m) is None
+
+
+def test_progress_for_never_raises_on_error():
+    p, m = _mk()
+    b = dict(badges.get("dealmaker"))
+    b["progress"] = lambda p, m: 1 / 0   # force une exception
+    assert badges.progress_for(b, p, m) is None
+
+
+def test_all_numeric_progress_badges_computable_without_raising():
+    """Chaque badge qui déclare une jauge doit pouvoir la calculer sur un
+    joueur/marché frais sans lever — l'écran Succès ne doit jamais planter."""
+    p, m = _mk()
+    for b in badges.all_badges():
+        badges.progress_for(b, p, m)   # ne doit jamais lever

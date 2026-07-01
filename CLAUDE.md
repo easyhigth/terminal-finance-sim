@@ -358,6 +358,17 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   no-op en sandbox) car c'est une action explicite du joueur, pas un point de sauvegarde
   automatique. Un import réussi remplace `app.gs` et ramène au bureau, comme un chargement de
   slot classique.
+- **`scenes/scene_achievements.py`** (scène `"achievements"`, commande `ACHIEVEMENTS`/`SUCCES`/
+  `BADGES`) : écran dédié listant TOUS les badges (`core/badges.py::all_badges()` +
+  `all_streak_badges()`), obtenus en couleur (`✓`), VERROUILLÉS grisés (`·`) avec une jauge de
+  progression (`widgets.draw_progress`) pour les badges à seuil NUMÉRIQUE clair — distinct de la
+  galerie inline de `scene_career.py` (bouton « SUCCÈS → »), qui ne montre que les badges déjà
+  obtenus, sans vue d'ensemble de ce qu'il reste à débloquer. La jauge vient d'une clé optionnelle
+  `"progress": callable(player, market) -> (actuel, cible)` ajoutée à certaines entrées de
+  `BADGES` (résolue sans jamais lever via `badges.progress_for`, absente pour les badges
+  binaires/composites comme « avoir un titre » ou « être n°1 » où une jauge n'aurait pas de
+  sens) ; les badges à enjeu (`STREAK_BADGES`) réutilisent directement leur `streak_flag`/`target`
+  existants comme progression. Accessible aussi depuis le hub PLUS (« Succès (badges) »).
 - **`data/companies.py`** : roster fictif déterministe (320 sociétés, `ROSTER_SEED` fixe,
   noms déformés exprès : LVMH→LWNH, NVIDIA→MVC…).
 - **`core/`** : systèmes de jeu (career, portfolio, bonds, commodities, crypto, structured,

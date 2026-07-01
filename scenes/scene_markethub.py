@@ -255,11 +255,12 @@ class MarketHubScene(Scene, PopupMixin):
         surf.set_clip(list_area)
         y = inner.y - st.scroll
         for name, *_ in self.market.index_defs:
-            # valeur + variation EN DIRECT (se dirigent vers le prochain pas,
-            # bougent chaque frame — cf. core/intraday).
+            # valeur EN DIRECT (se dirige vers le prochain pas, glisse jour par
+            # jour) + variation CUMULÉE « depuis la durée affichée » (~3 mois),
+            # qui ne repart pas de 0 % à chaque pas (cf. core/intraday.window_pct).
             hist = self.market.index_history(name, self.app.sim_clock, self.app.gs.player.day)
             v = hist[-1] if hist else self.market.index_value(name)
-            chg = intraday.live_pct(hist)
+            chg = intraday.window_pct(hist)
             ccol = config.COL_UP if chg >= 0 else config.COL_DOWN
             row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 22)
             visible = list_area.top - 24 < y < list_area.bottom

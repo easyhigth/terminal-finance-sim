@@ -70,15 +70,22 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
 - **`core/intraday.py`** : animation intraday **déterministe et display-only** des prix,
   **forward-looking** : la courbe simule le chemin de la clôture COURANTE vers la clôture du
   **prochain pas** (déterministe, `Market.next_step_snapshot()`/`next_price_of`/`next_index_value`
-  — clone + un step, jeté, caché par pas), passé en `target` à `live_point`/`append_live` ;
-  `live_pct(series)` donne la variation « en direct » (part de ~0 % et se dirige vers la
-  variation du prochain pas, bouge chaque frame). Bruit fBm multi-octave en surcouche. Aucun
+  — clone + un step, jeté, caché par pas), passé en `target` à `live_point`/`append_live`.
+  La progression dans le pas est **quantifiée au JOUR de jeu** (`quantize_to_day()`,
+  paliers de 1440 min) : la valeur animée ne se met à jour qu'une fois par jour de jeu
+  écoulé (≈12 s réelles à x1), par paliers vers la destination du prochain pas, au lieu de
+  glisser en continu à chaque frame (trop rapide/illisible). Deux mesures de variation :
+  `window_pct(series, lookback=18)` = variation CUMULÉE « depuis la durée affichée » (~3 mois,
+  ne repart PAS de 0 % à chaque pas — utilisée par les bandeaux d'indices du terminal et du
+  hub Marché) ; `live_pct(series)` = variation vs la clôture du pas courant (repart de ~0 %,
+  conservée pour compat). Bruit fBm multi-octave en surcouche. Aucun
   état persisté : reconstruit à partir de `(seed, step_count, clé, minute)`. `SimClock.game_minutes_acc`
   fournit la progression dans le pas courant. Branché via des paramètres optionnels
   `sim_clock=None, day=None` sur `core/market_query.py` (`index_history`, `track_company`,
   `history_of` — comportement inchangé si omis), consommé par les sparklines d'indices du
   terminal, le popup société (onglet graphe) et `scenes/scene_graph.py` (qui ajoute des
-  fenêtres courtes animées 1J/1W, en plus des périodes par pas 1M/3M/1A/3A/5A/MAX, pour les graphes mono-actif
+  fenêtres courtes animées 1J/1W, en plus des périodes par pas 1M/3M/1A/3A/5A/MAX — **3M par
+  défaut** — pour les graphes mono-actif
   ligne/bougies/barres/variation). N'affecte jamais les prix d'exécution (`BUY/SELL/...`),
   qui restent sur `market.price[i]`. Amplitude de bruit modulée par la volatilité propre de
   chaque actif (`vol_mult_for_sigma(sigma, scale)`, basé sur `market.sigma`) ; les bougies

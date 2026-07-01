@@ -102,11 +102,12 @@ class GraphScene(Scene, PopupMixin):
                 self.error = f"Actif introuvable : {', '.join(requested)}"
             tickers = valid
         self.tickers = [t.upper() for t in tickers][:_MAX_TICKERS]
-        # Par défaut : fenêtre intraday "5 dernières minutes" (Round 11 Phase 3)
-        # — bien plus représentatif/interactif qu'une vue figée sur l'année.
+        # Par défaut : 3 mois (18 pas) — vue « par pas » assez large pour lire une
+        # vraie tendance, tout en restant animée jour par jour via la couche
+        # intraday forward-looking (le dernier point glisse vers le prochain pas).
         # Sans objet pour les graphes statistiques/multi-actifs (vol/bêta/
-        # corrélation/macro/courbe/spread/comparer) : retombent sur 1A.
-        default_period = INTRADAY_PERIODS[0][1] if self.kind in _INTRADAY_KINDS else 73
+        # corrélation/macro/courbe/spread/comparer) : retombent aussi sur 3M.
+        default_period = 18
         if "period" not in kwargs and getattr(self, "_mem_period", None) is not None:
             default_period = self._mem_period   # restitue la dernière fenêtre choisie
         self.period = kwargs.get("period", default_period)

@@ -159,6 +159,19 @@ class WindowManager:
     def open_windows(self):
         return [w for w in self.windows if not w.minimized]
 
+    def cycle_focus(self, reverse=False):
+        """Alt+Tab : passe à la fenêtre suivante (round-robin déterministe,
+        trié par clé — pas par ordre de focus récent, pour un cycle complet
+        et prévisible même avec beaucoup de fenêtres ouvertes)."""
+        visible = self.open_windows()
+        if len(visible) < 2:
+            return
+        order = sorted(visible, key=lambda w: w.key)
+        cur = self.focused
+        i = order.index(cur) if cur in order else 0
+        ni = (i - 1) % len(order) if reverse else (i + 1) % len(order)
+        self.focus(order[ni])
+
     # --------------------------------------------------------------- évènements
     def _topmost_at(self, pos):
         for w in reversed(self.windows):

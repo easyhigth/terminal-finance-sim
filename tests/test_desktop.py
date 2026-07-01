@@ -234,6 +234,64 @@ def test_sheet_app_drag_chart_moves_it(app):
     assert (chart.x, chart.y) != (x0, y0)
 
 
+def test_sheet_app_resize_chart_via_grip(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    for i, v in enumerate((1, 2, 3), start=1):
+        sa.sheet.set(f"A{i}", str(v))
+    sa.range_anchor, sa.range_end = "A1", "A3"
+    sa._add_chart("line")
+    rect = pygame.Rect(50, 50, 900, 600)
+    sa.draw(app.screen, rect)
+    chart = sa.workbook.active.charts[0]
+    grip = sa._chart_resize_rects[chart.id]
+    w0, h0 = chart.w, chart.h
+    sa.handle_event(_click(grip.centerx, grip.centery), rect)
+    assert sa._chart_resize is chart
+    new_pos = (grip.centerx + 60, grip.centery + 40)
+    sa.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=new_pos, buttons=(1, 0, 0)), rect)
+    sa.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, button=1, pos=new_pos), rect)
+    assert sa._chart_resize is None
+    assert (chart.w, chart.h) != (w0, h0)
+    assert chart.w >= 160 and chart.h >= 110   # taille plancher respectée
+
+
+def test_sheet_app_chart_clamped_to_shrunk_window(app):
+    """Si la fenêtre est redimensionnée plus petite après coup, le graphique
+    reste visible/utilisable (borné à la zone de contenu courante)."""
+    sa = SheetApp(app)
+    sa.on_open()
+    for i, v in enumerate((1, 2, 3), start=1):
+        sa.sheet.set(f"A{i}", str(v))
+    sa.range_anchor, sa.range_end = "A1", "A3"
+    sa._add_chart("line")
+    big_rect = pygame.Rect(0, 0, 900, 600)
+    sa.draw(app.screen, big_rect)
+    chart = sa.workbook.active.charts[0]
+    chart.x, chart.y = 700, 500   # pousse le graphe loin dans le coin
+    small_rect = pygame.Rect(0, 0, 460, 320)   # taille mini de la fenêtre
+    sa.draw(app.screen, small_rect)
+    assert chart.x + chart.w <= small_rect.w
+    assert chart.y + chart.h <= small_rect.h
+
+
+# --------------------------------------------------------- navigation Alt+Tab
+def test_alt_tab_cycles_focused_window(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    for key in ("research", "trading", "sheet"):
+        desk._launch(key)
+    windows_by_key = {w.key: w for w in desk.wm.windows}
+    focused_before = desk.wm.focused
+    ev = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_TAB, mod=pygame.KMOD_ALT)
+    desk.handle_event(ev)
+    assert desk.wm.focused is not focused_before
+    # un second Alt+Tab avance encore (round-robin, pas juste un aller-retour)
+    focused_mid = desk.wm.focused
+    desk.handle_event(ev)
+    assert desk.wm.focused is not focused_mid
+
+
 # ------------------------------------------------------------ calculatrice
 def test_calculator_app_computes_expression(app):
     from apps.app_calculator import CalculatorApp

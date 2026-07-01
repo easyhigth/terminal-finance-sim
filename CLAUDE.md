@@ -224,9 +224,12 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   arrêter le moteur). Le menu se referme au clic sur un item (exécute son action), à tout clic
   hors menu, ou sur Échap ; un clic droit sur le CONTENU d'une fenêtre reste routé vers l'app.
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
-  pause manuelle, pause automatique. Cadence : à x1, **1 minute réelle = 1 pas de marché**
-  (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 120`), soit un nouveau pas toutes les ~60 s (x1) /
-  ~20 s (x3) ; entre deux pas, l'animation intraday fait glisser les graphes en continu.
+  pause manuelle, pause automatique. Cadence : à x1, un jour de jeu dure ~16 s réelles
+  (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 90`), soit un nouveau pas de marché (5 jours) toutes
+  les ~80 s (x1) / ~27 s (x3) ; entre deux pas, l'animation intraday fait bouger les graphes
+  par petits paliers plusieurs fois par jour de jeu (cf. `core/intraday.QUANTIZE_MINUTES`),
+  pas juste au changement de pas. (Réglage plus rapide, 120, jugé trop expéditif : le
+  marché semblait figé malgré des jours qui filaient.)
   Le temps avance en continu (plus de commande « ADV ») :
   `App.run()` convertit le temps réel écoulé en pas de marché bancarisés
   (`App.pending_market_steps`), joués au terminal par `TerminalTimeMixin._drain_pending_steps()`
@@ -251,10 +254,13 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   **forward-looking** : la courbe simule le chemin de la clôture COURANTE vers la clôture du
   **prochain pas** (déterministe, `Market.next_step_snapshot()`/`next_price_of`/`next_index_value`
   — clone + un step, jeté, caché par pas), passé en `target` à `live_point`/`append_live`.
-  La progression dans le pas est **quantifiée au JOUR de jeu** (`quantize_to_day()`,
-  paliers de 1440 min) : la valeur animée ne se met à jour qu'une fois par jour de jeu
-  écoulé (≈12 s réelles à x1), par paliers vers la destination du prochain pas, au lieu de
-  glisser en continu à chaque frame (trop rapide/illisible). Deux mesures de variation :
+  La progression dans le pas est **quantifiée par paliers** (`quantize_to_day()`,
+  `QUANTIZE_MINUTES = 360`, soit 4 rafraîchissements par jour de jeu — ≈4 s réelles à x1) :
+  la valeur animée se met à jour par petits sauts vers la destination du prochain pas, plus
+  réactif qu'un unique saut par jour tout en restant lisible (pas un glissement continu à
+  chaque frame). Amplitude du bruit affiché (`_NOISE_PCT`, `_VOL_MULT_RANGE`) relevée pour
+  que le marché semble vivant à l'écran entre deux pas, sans jamais toucher au prix
+  d'exécution réel (`market.price`/`index_value`, inchangés). Deux mesures de variation :
   `window_pct(series, lookback=18)` = variation CUMULÉE « depuis la durée affichée » (~3 mois,
   ne repart PAS de 0 % à chaque pas — utilisée par les bandeaux d'indices du terminal et du
   hub Marché) ; `live_pct(series)` = variation vs la clôture du pas courant (repart de ~0 %,
@@ -271,8 +277,11 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   chaque actif (`vol_mult_for_sigma(sigma, scale)`, basé sur `market.sigma`) ; les bougies
   intraday de `scene_graph.py` regroupent les points bruts en 18 bougies réelles (open/high/
   low/close) au lieu d'une bougie dégénérée par point. Le flash couleur vert/rouge sur tick
-  (sparklines d'indices, popup société) vit dans `ui/widgets.py::TickFlash` (horloge murale
-  `pygame.time.get_ticks()`, pas de dépendance à `dt`).
+  (sparklines d'indices, popup société, app Watchlist, cellules `=PRICE()/INDEX()/FX()/...`
+  du Tableur, cf. `apps/app_sheet._LIVE_FN_NAMES`) vit dans `ui/widgets.py::TickFlash` — reste
+  à PLEINE saturation pendant `HOLD_MS` avant de s'éteindre sur `DECAY_MS` (horloge murale
+  `pygame.time.get_ticks()`, pas de dépendance à `dt`), pour un tick bien visible plutôt
+  qu'une simple teinte.
 - **`core/anim_settings.py`** : réglage persisté « réduire les animations » (fichier JSON
   séparé sous `config.SAVE_DIR`, distinct de `core/i18n.py`/`settings.json`). Unique point de
   gating dans `core/intraday.py::wiggle()` : si actif, toutes les courbes intraday retombent

@@ -45,6 +45,22 @@ def test_wiggle_differs_by_key_and_step():
     assert a != c
 
 
+def test_quantize_to_day_snaps_to_quantize_minutes():
+    q = intraday.QUANTIZE_MINUTES
+    assert intraday.quantize_to_day(0) == 0
+    assert intraday.quantize_to_day(q - 1) == 0
+    assert intraday.quantize_to_day(q) == q
+    assert intraday.quantize_to_day(q + q // 2) == q
+    assert intraday.quantize_to_day(intraday.MINUTES_PER_DAY) == intraday.MINUTES_PER_DAY
+
+
+def test_quantize_is_finer_than_a_full_day():
+    """La progression se rafraîchit plusieurs fois par jour de jeu (pas un
+    seul saut quotidien) pour que le marché semble vivant à l'écran."""
+    assert intraday.QUANTIZE_MINUTES < intraday.MINUTES_PER_DAY
+    assert intraday.MINUTES_PER_DAY % intraday.QUANTIZE_MINUTES == 0
+
+
 def test_wiggle_damp_zero_is_pure_linear():
     m = _FakeMarket()
     val = intraday.wiggle(m.seed, m.step_count, "AAA", 100.0, 110.0, 1800.0, damp=0.0)

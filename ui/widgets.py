@@ -645,18 +645,21 @@ def draw_scrollbar(surf, panel_rect, list_area, scroll, max_scroll, content_h):
 
 class TickFlash:
     """Suit, pour un ensemble de clés (ticker/indice...), la dernière valeur
-    "en direct" vue et renvoie une couleur de flash qui s'éteint en ~300ms à
-    chaque variation perceptible — l'effet "tick vert/rouge" des terminaux de
-    marché, posé sur l'animation intraday (Round 11 Phase 3, `core/intraday.py`)
-    sans dépendre d'un `dt` explicite (décroissance basée sur l'horloge murale
-    `pygame.time.get_ticks()`, donc utilisable depuis `draw()` seul).
+    "en direct" vue et renvoie une couleur de flash vert/rouge (up/down) à
+    chaque variation perceptible — l'effet "tick" des terminaux de marché,
+    posé sur l'animation intraday (`core/intraday.py`) sans dépendre d'un `dt`
+    explicite (décroissance basée sur l'horloge murale
+    `pygame.time.get_ticks()`, donc utilisable depuis `draw()` seul). Le flash
+    reste à PLEINE saturation pendant `HOLD_MS` (bien visible, pas juste une
+    teinte) puis s'éteint sur `DECAY_MS`.
 
     Usage :
         flash = widgets.TickFlash()                  # un par panneau, stocké sur self
         col = flash.tick(name, live_value, up_color, down_color, base_color)
         widgets.draw_text(surf, txt, pos, font, col)
     """
-    DECAY_MS = 300
+    HOLD_MS = 260
+    DECAY_MS = 550
 
     def __init__(self):
         self._last = {}   # key -> (value, dir, t_ms)
@@ -678,7 +681,11 @@ class TickFlash:
             self._last[key] = (value, prev_dir, prev_t)
         if prev_dir == 0:
             return base_color
-        intensity = max(0.0, 1.0 - (now - prev_t) / self.DECAY_MS)
+        age = now - prev_t
+        if age <= self.HOLD_MS:
+            intensity = 1.0
+        else:
+            intensity = max(0.0, 1.0 - (age - self.HOLD_MS) / self.DECAY_MS)
         if intensity <= 0.0:
             return base_color
         flash = up_color if prev_dir > 0 else down_color

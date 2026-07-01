@@ -121,7 +121,7 @@ class SavesScene(Scene):
         if gs.player.game_over:
             self.app.scenes.go("gameover")
         else:
-            self.app.scenes.go("terminal")
+            self.app.scenes.go("desktop")
 
     def _save(self, slot):
         self.app.gs.save(slot)

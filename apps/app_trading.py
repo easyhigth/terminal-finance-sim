@@ -22,7 +22,7 @@ QTY_PRESETS = [1, 5, 10, 25, 100]
 
 class TradingApp(DesktopApp):
     title = "Trading — Ordres"
-    icon = "💹"
+    icon_kind = "trading"
     default_size = (840, 520)
     min_size = (560, 340)
 

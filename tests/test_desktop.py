@@ -146,9 +146,7 @@ def test_research_app_selects_and_draws(app):
 
 # ------------------------------------------------------- avance du temps
 def test_desktop_drains_market_steps(app):
-    # le terminal doit être initialisé (moteur de la boucle de jeu)
-    app.scenes.go("terminal")
-    app.scenes.current.update(0.016)
+    # le bureau crée et initialise lui-même le moteur (terminal persistant)
     app.scenes.go("desktop")
     desk = app.scenes.current
     step_before = app.market.step_count
@@ -162,11 +160,57 @@ def test_desktop_launch_opens_windows(app):
     app.scenes.go("desktop")
     desk = app.scenes.current
     desk.draw(app.screen)
+    n_before = len(desk.wm.windows)   # le terminal (moteur) est déjà ouvert, minimisé
     for key in ("research", "trading", "sheet"):
         desk._launch(key)
-    assert len(desk.wm.windows) == 3
+    assert len(desk.wm.windows) == n_before + 3
     desk.update(0.016)
     desk.draw(app.screen)
+
+
+# ------------------------------------------------- le terminal comme fenêtre
+def test_terminal_is_a_persistent_window_on_the_desktop(app):
+    """Le terminal n'est plus une scène plein écran à part : c'est une app
+    hébergée, ouverte (minimisée) dès l'arrivée sur le bureau — le moteur
+    tourne qu'elle soit visible ou non — et ramenée au premier plan par
+    l'icône, TOUJOURS la même instance (état préservé)."""
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = next(win for win in desk.wm.windows if win.key == "scene:terminal")
+    assert w.minimized is True                 # bureau propre au démarrage
+    assert w.app_obj is desk._terminal_host     # même instance que le moteur
+    # l'icône "Terminal" ouvre/ramène cette MÊME fenêtre (pas de doublon)
+    desk._launch("terminal")
+    assert w.minimized is False
+    assert desk.wm.focused is w
+    assert sum(1 for win in desk.wm.windows if win.key == "scene:terminal") == 1
+    # fermer la fenêtre ne tue pas le moteur : le temps continue de s'écouler
+    desk.wm.close(w)
+    assert desk._terminal_host is not None
+    step_before = app.market.step_count
+    app.pending_market_steps = 1
+    desk.update(0.016)
+    assert app.market.step_count >= step_before + 1
+    # réouvrir via l'icône recrée la fenêtre autour de la MÊME instance persistante
+    desk._launch("terminal")
+    assert any(win.key == "scene:terminal" and win.app_obj is desk._terminal_host
+              for win in desk.wm.windows)
+
+
+def test_terminal_internal_navigation_opens_desktop_window():
+    """Une commande tapée DANS le terminal hébergé (ex. SHOP) ouvre une
+    fenêtre sur le bureau plutôt que de basculer tout l'écran — le terminal
+    se comporte comme n'importe quelle autre app du bureau."""
+    a = main.App()
+    a.ensure_market()
+    a.gs.player.grade_index = 9
+    a.gs.player.cash = 5_000_000.0
+    a.scenes.go("desktop")
+    desk = a.scenes.current
+    term = desk._terminal_host.scene
+    term.app.scenes.go("shop", return_to="terminal")
+    assert a.scenes.current_name == "desktop"          # jamais de bascule plein écran
+    assert any(w.key == "scene:shop" for w in desk.wm.windows)
 
 
 # --------------------------------------------------- scènes hébergées (étape 2)
@@ -240,12 +284,13 @@ def test_track_icon_appears_after_choosing_a_track_and_opens_scene(app):
     app.scenes.go("desktop")
     desk = app.scenes.current
     desk.draw(app.screen)
-    assert desk._track_rect is None            # "General" -> pas d'icône dédiée
+    assert "track" not in desk._icon_rects      # "General" -> pas d'icône dédiée
     app.gs.player.track = "M&A"
     desk.draw(app.screen)
-    assert desk._track_rect is not None
-    scene_name, rect = desk._track_rect
-    assert scene_name == TRACK_APP["M&A"][0] == "ma"
+    assert "track" in desk._icon_rects
+    assert desk._track_scene == TRACK_APP["M&A"][0] == "ma"
+    rect, kind, _label = desk._icon_rects["track"]
+    assert kind == "ma"
     desk.handle_event(_click(rect.centerx, rect.centery))
     assert any(w.key == "scene:ma" for w in desk.wm.windows)
 

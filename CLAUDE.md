@@ -247,6 +247,24 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   pile de rétablissement. Les raccourcis Ctrl+C/V/Z/Y ne s'activent que HORS édition d'une
   cellule (`not self.editing`) pour ne jamais intercepter la frappe normale dans la barre de
   formule.
+  **Étape 14 : ordres conditionnels (stop-loss / take-profit).** `core/conditional_orders.py`
+  (logique pure) : un ordre (`{"id","ticker","kind","trigger","qty"}`, `kind` = `"stop"` ou
+  `"target"`) posé sur une position LONGUE détenue (short/cover hors scope — la notion de
+  « perte » s'y inverse et mériterait sa propre UI) ; `execute_due(player, market)` vend
+  (`core/portfolio.sell`) dès que le cours franchit le seuil (`<=` pour stop, `>=` pour target),
+  retire l'ordre (usage unique) et abandonne SILENCIEUSEMENT tout ordre dont la position a
+  disparu entre-temps (vente manuelle...). Câblé dans `GameState.advance_step` : exécuté à
+  CHAQUE pas de marché, juste avant `check_margin_call` (un ordre voulu par le joueur passe
+  avant une liquidation forcée sur la position déjà réduite), résultat exposé dans
+  `summary["conditional_orders_executed"]` et loggé/notifié par
+  `scenes/scene_terminal_time.py`. Contrairement à l'ALERTE de prix (notifie sans agir), un
+  ordre conditionnel EXÉCUTE une vente réelle, même fenêtre Trading fermée (le terminal reste
+  le moteur). UI : `apps/app_trading.py` — bouton « ORD » (texte plain, pas de glyphe
+  pictographique) sur chaque ligne détenue ouvre une boîte de dialogue (choix stop/target +
+  seuil) ; une bande « ORDRES CONDITIONNELS » sous la liste des valeurs récapitule les ordres en
+  cours de la partie (tous titres confondus, pas seulement celui affiché), avec annulation (×)
+  individuelle — rétrécit dynamiquement la liste de valeurs pour rester visible sans la
+  recouvrir.
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, un jour de jeu dure ~16 s réelles
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 90`), soit un nouveau pas de marché (5 jours) toutes

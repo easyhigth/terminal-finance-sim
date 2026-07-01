@@ -1215,3 +1215,124 @@ def test_sheet_app_export_csv_empty_sheet_shows_message(app):
     sa.on_open()
     sa._export_csv()
     assert "vide" in sa.msg.lower()
+
+
+# ================================= Ordres conditionnels (stop-loss/take-profit) ==
+def test_trading_app_order_button_appears_only_for_held_positions(app):
+    tk = app.market.companies[0]["ticker"]
+    ta = TradingApp(app)
+    ta.on_open()
+    rect = pygame.Rect(0, 0, 840, 520)
+    ta.draw(app.screen, rect)
+    assert tk not in ta._order_rects       # pas détenu -> pas de bouton ORD
+    ta.qty_text = "5"
+    ta._do_buy(tk)
+    ta.draw(app.screen, rect)
+    assert tk in ta._order_rects
+
+
+def test_trading_app_order_button_opens_prompt(app):
+    tk = app.market.companies[0]["ticker"]
+    ta = TradingApp(app)
+    ta.on_open()
+    ta.qty_text = "5"
+    ta._do_buy(tk)
+    rect = pygame.Rect(0, 0, 840, 520)
+    ta.draw(app.screen, rect)
+    r = ta._order_rects[tk]
+    ta.handle_event(_click(r.centerx, r.centery), rect)
+    assert ta._order_prompt == {"ticker": tk}
+    assert ta._order_kind == "stop"
+    assert ta._order_price_str          # pré-rempli au cours courant
+
+
+def test_trading_app_place_stop_loss_via_prompt(app):
+    tk = app.market.companies[0]["ticker"]
+    ta = TradingApp(app)
+    ta.on_open()
+    ta.qty_text = "5"
+    ta._do_buy(tk)
+    ta._open_order_prompt(tk)
+    ta._order_kind = "stop"
+    ta._order_price_str = "1.00"
+    ta._confirm_order()
+    assert ta._order_prompt is None
+    assert len(app.gs.player.conditional_orders) == 1
+    order = app.gs.player.conditional_orders[0]
+    assert order["ticker"] == tk and order["kind"] == "stop" and order["trigger"] == 1.0
+
+
+def test_trading_app_place_take_profit_switch_kind(app):
+    tk = app.market.companies[0]["ticker"]
+    ta = TradingApp(app)
+    ta.on_open()
+    ta.qty_text = "5"
+    ta._do_buy(tk)
+    rect = pygame.Rect(0, 0, 840, 520)
+    ta._open_order_prompt(tk)
+    ta.draw(app.screen, rect)          # peuple _order_kind_rects
+    target_r = ta._order_kind_rects["target"]
+    ta.handle_event(_click(target_r.centerx, target_r.centery), rect)
+    assert ta._order_kind == "target"
+    ta._order_price_str = "999999.00"
+    ta._confirm_order()
+    order = app.gs.player.conditional_orders[0]
+    assert order["kind"] == "target"
+
+
+def test_trading_app_order_prompt_invalid_price_keeps_prompt_open(app):
+    tk = app.market.companies[0]["ticker"]
+    ta = TradingApp(app)
+    ta.on_open()
+    ta.qty_text = "5"
+    ta._do_buy(tk)
+    ta._open_order_prompt(tk)
+    ta._order_price_str = "not a number"
+    ta._confirm_order()
+    assert ta._order_prompt is not None
+    assert app.gs.player.conditional_orders == []
+
+
+def test_trading_app_order_prompt_escape_cancels(app):
+    tk = app.market.companies[0]["ticker"]
+    ta = TradingApp(app)
+    ta.on_open()
+    ta.qty_text = "5"
+    ta._do_buy(tk)
+    ta._open_order_prompt(tk)
+    rect = pygame.Rect(0, 0, 840, 520)
+    ta.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=0, unicode=""), rect)
+    assert ta._order_prompt is None
+    assert app.gs.player.conditional_orders == []
+
+
+def test_trading_app_cancel_conditional_order_via_list(app):
+    from core import conditional_orders as CO
+    tk = app.market.companies[0]["ticker"]
+    ta = TradingApp(app)
+    ta.on_open()
+    ta.qty_text = "5"
+    ta._do_buy(tk)
+    r = CO.place(app.gs.player, app.market, tk, "stop", 1.0)
+    oid = r["order"]["id"]
+    rect = pygame.Rect(0, 0, 840, 520)
+    ta.draw(app.screen, rect)          # peuple _cond_cancel_rects
+    cr = ta._cond_cancel_rects[oid]
+    ta.handle_event(_click(cr.centerx, cr.centery), rect)
+    assert app.gs.player.conditional_orders == []
+
+
+def test_conditional_order_executes_on_market_step_via_desktop(app):
+    """Bout en bout : un stop-loss posé depuis l'app se déclenche au pas de
+    marché suivant (via GameState.advance_step, câblé dans le terminal)."""
+    from core import conditional_orders as CO
+    tk = app.market.companies[0]["ticker"]
+    ta = TradingApp(app)
+    ta.on_open()
+    ta.qty_text = "5"
+    ta._do_buy(tk)
+    price = app.market.price_of(tk)
+    CO.place(app.gs.player, app.market, tk, "stop", price * 10)   # seuil très haut -> déclenche à coup sûr
+    summary = app.gs.advance_step(app.market)
+    assert summary["conditional_orders_executed"]
+    assert tk not in app.gs.player.portfolio

@@ -34,6 +34,8 @@ class PlayerState:
     event_log: list = field(default_factory=list)     # historique d'événements récents
     cash_history: list = field(default_factory=list)  # net worth au fil du temps
     next_deal_id: int = 1                              # compteur d'identifiants de deals
+    conditional_orders: list = field(default_factory=list)  # stop-loss/take-profit en attente
+    next_conditional_order_id: int = 1                  # compteur d'identifiants d'ordres conditionnels
     market_seed: int = 0                               # graine du moteur de marché (0 = non initialisé)
     market_step: int = 0                               # nb de pas de marché écoulés (resync au chargement)
     portfolio: dict = field(default_factory=dict)      # holdings : ticker -> {"shares","avg"}
@@ -445,6 +447,7 @@ class GameState:
         fx_due = None
         macro_resolved = None
         swaps_expired = []
+        conditional_orders_executed = None
         if market is not None:
             from core import portfolio
             dividends = portfolio.dividends(p, market, config.DAYS_PER_STEP)
@@ -471,6 +474,12 @@ class GameState:
                 if cbi:
                     p.adjust_cash(cbi, category="revenus")
                     dividends += cbi
+            # ordres conditionnels (stop-loss/take-profit) : exécutés AVANT le
+            # contrôle de marge, comme un vrai ordre du joueur (voulu) passerait
+            # avant une liquidation forcée (subie) sur la position réduite.
+            if getattr(p, "conditional_orders", None):
+                from core import conditional_orders as _condord
+                conditional_orders_executed = _condord.execute_due(p, market)
             financing = portfolio.accrue_financing(p, market, config.DAYS_PER_STEP)
             margin_call = portfolio.check_margin_call(p, market)
             # échantillonnage du levier (style de jeu, indépendant de la progression de
@@ -595,6 +604,7 @@ class GameState:
             "fx_due": fx_due,
             "macro_resolved": macro_resolved,
             "swaps_expired": swaps_expired,
+            "conditional_orders_executed": conditional_orders_executed,
             "quarter_changed": p.quarter != prev_quarter,
             "quarter_report": quarter_report,
             "ma_events": ma_events,

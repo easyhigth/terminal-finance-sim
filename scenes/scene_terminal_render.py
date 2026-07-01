@@ -329,9 +329,10 @@ class TerminalRenderMixin:
             if visible:
                 hist = self.market.index_history(name, self.app.sim_clock, self.app.gs.player.day)
                 live_v = hist[-1] if hist else self.market.index_value(name)
-                # variation EN DIRECT : se dirige vers le prochain pas (déterministe),
-                # bouge chaque frame (cf. core/intraday.live_pct).
-                chg = intraday.live_pct(hist)
+                # variation « depuis la durée affichée » (~3 mois) : cumulée,
+                # ne repart pas de 0 % à chaque pas, glisse jour par jour au gré
+                # du dernier point animé (cf. core/intraday.window_pct).
+                chg = intraday.window_pct(hist)
                 col = config.COL_UP if chg >= 0 else config.COL_DOWN
                 flash_col = self._index_flash.tick(name, live_v, config.COL_UP, config.COL_DOWN,
                                                     config.COL_WHITE)

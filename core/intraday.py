@@ -39,6 +39,15 @@ def minutes_per_step():
     return config.DAYS_PER_STEP * MINUTES_PER_DAY
 
 
+def quantize_to_day(minutes):
+    """Ramène une progression en minutes de jeu à la borne du JOUR de jeu
+    inférieur (0, 1440, 2880…). L'animation « en direct » ne se met alors à
+    jour qu'une fois par jour de jeu écoulé (au lieu de chaque frame) : les
+    chiffres avancent par paliers d'un jour vers la destination du prochain
+    pas, ce qui est bien plus lisible qu'un glissement continu trop rapide."""
+    return (int(minutes) // MINUTES_PER_DAY) * MINUTES_PER_DAY
+
+
 def vol_mult_for_sigma(sigma, scale=1.0):
     """Multiplicateur de bruit affiché à partir de la volatilité idiosyncratique
     `sigma` d'une société (cf. `core/market.py::self.sigma`), borné pour rester
@@ -154,7 +163,7 @@ def live_point(market, sim_clock, day, key, history, region=None, vol_mult=1.0, 
         start, end = cur, float(target)
     else:
         start, end = (history[-2] if len(history) >= 2 else cur), cur
-    progress = sim_clock.game_minutes_acc
+    progress = quantize_to_day(sim_clock.game_minutes_acc)
     damp = region_open_factor(region, market.step_count) if region else 1.0
     return wiggle(market.seed, market.step_count, key, start, end, progress, damp=damp,
                   vol_mult=vol_mult * speed_factor(sim_clock))
@@ -164,10 +173,31 @@ def live_pct(series):
     """Variation « en direct » d'une série animée par `append_live` : valeur
     animée (`series[-1]`) vs la clôture du pas COURANT (`series[-2]`). Part de
     ~0 % au début du pas et se dirige vers la variation du prochain pas — bouge
-    donc à chaque frame, de façon directionnelle."""
+    donc par palier chaque jour de jeu, de façon directionnelle."""
     if len(series) < 2 or not series[-2]:
         return 0.0
     return (series[-1] / series[-2] - 1.0) * 100.0
+
+
+# Fenêtre par défaut (en PAS de marché) pour la variation « depuis la durée
+# affichée » des bandeaux d'indices — alignée sur la période 3M par défaut des
+# graphes (cf. scenes/scene_graph.py::STEP_PERIODS, 3M = 18 pas).
+WINDOW_PCT_LOOKBACK = 18
+
+
+def window_pct(series, lookback=WINDOW_PCT_LOOKBACK):
+    """Variation CUMULÉE de la valeur animée courante (`series[-1]`) depuis
+    `lookback` pas plus tôt (borné à la longueur de la série). Contrairement à
+    `live_pct` (qui repart de ~0 % à chaque pas), ce pourcentage reflète le
+    gain/la perte « depuis la durée affichée » et ne se remet donc pas à zéro à
+    chaque pas — il glisse jour par jour au gré du dernier point animé."""
+    if len(series) < 2:
+        return 0.0
+    n = min(int(lookback), len(series) - 1)
+    base = series[-1 - n]
+    if not base:
+        return 0.0
+    return (series[-1] / base - 1.0) * 100.0
 
 
 def append_live(market, sim_clock, day, key, history, region=None, vol_mult=1.0, target=None):
@@ -191,7 +221,7 @@ def intraday_series(market, sim_clock, day, key, history, window_minutes, n_poin
     if not history or n_points < 2:
         return []
     total_minutes = minutes_per_step()
-    progress = sim_clock.game_minutes_acc
+    progress = quantize_to_day(sim_clock.game_minutes_acc)
     out = []
     for k in range(n_points):
         ago = window_minutes * (n_points - 1 - k) / (n_points - 1)

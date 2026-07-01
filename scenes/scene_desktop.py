@@ -214,22 +214,44 @@ class DesktopScene(Scene):
 
     def _launch(self, key):
         if key == "terminal":
-            self._open_terminal_window()
-            return
+            return self._open_terminal_window()
         if key == "track":
             if self._track_scene:
-                self._open_scene_window(self._track_scene)
-            return
+                return self._open_scene_window(self._track_scene)
+            return None
         if key == "save":
             self._quick_save()
-            return
+            return None
         quick = next((scene for k, _l, _kind, scene in QUICK_APPS if k == key), None)
         if quick is not None:
-            self._open_scene_window(quick)
-            return
+            return self._open_scene_window(quick)
         factory = next((cls for k, _, _, cls in APPS if k == key), None)
         if factory is not None:
-            self.wm.open(key, lambda: factory(self.app))
+            w = self.wm.open(key, lambda: factory(self.app))
+            w.app_obj.desktop = self   # back-ref pour les liens inter-apps
+            return w
+        return None
+
+    # ------------------------------------------------- liens entre apps (PR2)
+    def open_trading(self, ticker=None):
+        """Ouvre/focalise l'app Trading, optionnellement pré-filtrée sur un
+        ticker (clic « Trader » depuis Recherche)."""
+        w = self._launch("trading")
+        if w is not None and ticker:
+            w.app_obj.focus_ticker(ticker)
+            self.wm.focus(w)
+        return w
+
+    def add_quote_to_sheet(self, ticker):
+        """Ouvre le Tableur et y ajoute une ligne « ticker · =PRICE(ticker) »
+        (cours EN DIRECT) — clic « → Tableur » depuis Recherche."""
+        w = self._open_sheet_app()
+        if w is not None:
+            w.app_obj.add_quote(ticker)
+            self.wm.focus(w)
+            self.app.notify(_L(f"{ticker} ajouté au tableur (cours en direct).",
+                               f"{ticker} added to the sheet (live price)."), "good")
+        return w
 
     def _quick_save(self):
         """Sauvegarde rapide (slot 1) — reprend le comportement de l'ancienne
@@ -305,6 +327,7 @@ class DesktopScene(Scene):
         données — feuille active si vierge, sinon une NOUVELLE feuille
         (cf. core/workbook.Workbook.import_financial)."""
         w = self.wm.open("sheet", lambda: SheetApp(self.app))
+        w.app_obj.desktop = self
         if import_data:
             w.app_obj.import_data(import_data)
         self.start_open = False

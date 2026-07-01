@@ -17,6 +17,8 @@ class DesktopApp:
 
     def __init__(self, app):
         self.app = app          # référence à l'App globale (marché, gs, horloge…)
+        self.desktop = None     # back-ref vers DesktopScene (liens inter-apps),
+        #                         posée par DesktopScene lors du lancement.
 
     def on_open(self):
         """Appelé une fois, à l'ouverture de la fenêtre."""

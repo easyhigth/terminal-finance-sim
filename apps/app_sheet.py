@@ -169,6 +169,23 @@ class SheetApp(DesktopApp):
             self._last_market_step = step
             self.sheet.invalidate()
 
+    def add_quote(self, ticker):
+        """Ajoute une ligne « ticker · =PRICE(ticker) » à la 1re ligne libre de
+        la colonne A (lien « → Tableur » de l'app Recherche). La formule est
+        VIVANTE : elle suit le cours au fil du temps."""
+        ticker = str(ticker).upper()
+        sheet = self.sheet
+        row = 1
+        while row <= N_ROWS and sheet.get_raw(f"A{row}") != "":
+            row += 1
+        if row > N_ROWS:
+            self.msg = "Feuille pleine : ajoutez une nouvelle feuille (+)."
+            return
+        sheet.set(f"A{row}", ticker)
+        sheet.set(f"B{row}", f'=PRICE("{ticker}")')
+        self.sel = f"B{row}"
+        self._ensure_visible()
+
     # --------------------------------------------------------------- import
     def import_data(self, data):
         """Reçoit un export (état financier, fiche M&A…) : remplit la feuille

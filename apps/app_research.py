@@ -32,6 +32,7 @@ class ResearchApp(DesktopApp):
         self._row_rects = {}       # ticker -> Rect
         self._list_rect = None
         self._search_rect = None
+        self._action_rects = {}    # "trade"|"sheet"|"analyse" -> Rect (liens inter-apps)
         # sélection initiale : plus grosse capi
         top = self.market.top_companies(n=1)
         if top:
@@ -56,6 +57,10 @@ class ResearchApp(DesktopApp):
                                          self.scroll + (-48 if event.button == 4 else 48)))
                 return True
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for kind, r in self._action_rects.items():
+                if r.collidepoint(event.pos):
+                    self._do_action(kind)
+                    return True
             for tk, r in self._row_rects.items():
                 if r.collidepoint(event.pos):
                     self.sel = tk
@@ -71,6 +76,18 @@ class ResearchApp(DesktopApp):
                 self.scroll = 0
                 return True
         return False
+
+    def _do_action(self, kind):
+        """Liens inter-apps (cf. DesktopScene) : ouvrir Trading pré-filtré,
+        pousser le cours dans le Tableur, ou ouvrir la fiche société complète."""
+        if not self.sel or self.desktop is None:
+            return
+        if kind == "trade":
+            self.desktop.open_trading(self.sel)
+        elif kind == "sheet":
+            self.desktop.add_quote_to_sheet(self.sel)
+        elif kind == "analyse":
+            self.desktop._open_scene_window("company", ticker=self.sel)
 
     # --------------------------------------------------------------- draw
     def draw(self, surf, rect):
@@ -138,6 +155,7 @@ class ResearchApp(DesktopApp):
     def _draw_detail(self, surf, rect):
         pygame.draw.rect(surf, config.COL_BG, rect)
         pygame.draw.rect(surf, config.COL_BORDER, rect, 1)
+        self._action_rects = {}
         if not self.sel:
             widgets.draw_text(surf, "Sélectionnez une société.", (rect.x + 12, rect.y + 12),
                               fonts.small(), config.COL_TEXT_DIM)
@@ -182,11 +200,35 @@ class ResearchApp(DesktopApp):
             ("BPA", f"{mt['eps']:.2f}"),
         ]
         col_w = (rect.w - 28) // 2
+        actions_top = rect.bottom - 34   # barre d'actions réservée en bas
         for k, (lbl, val) in enumerate(fields):
             fx = x + (k % 2) * col_w
             fyy = fy + (k // 2) * 24
-            if fyy + 20 > rect.bottom:
+            if fyy + 20 > actions_top:
                 break
             widgets.draw_text(surf, lbl, (fx, fyy), fonts.tiny(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, val, (fx + col_w - 12, fyy), fonts.small(bold=True),
                               config.COL_TEXT, align="right")
+        # barre d'actions (liens inter-apps) — seulement si hébergée sur le bureau
+        if self.desktop is not None:
+            self._draw_actions(surf, rect)
+
+    def _draw_actions(self, surf, rect):
+        actions = [("trade", "▸ Trader", config.COL_UP),
+                   ("sheet", "→ Tableur", config.COL_CYAN),
+                   ("analyse", "Analyse", config.COL_AMBER)]
+        mp = pygame.mouse.get_pos()
+        n = len(actions)
+        gap = 6
+        bw = (rect.w - 20 - gap * (n - 1)) // n
+        bx = rect.x + 10
+        by = rect.bottom - 30
+        self._action_rects = {}
+        for kind, label, acc in actions:
+            r = pygame.Rect(bx, by, bw, 22)
+            self._action_rects[kind] = r
+            hov = r.collidepoint(mp)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL, r, border_radius=4)
+            pygame.draw.rect(surf, acc, r, 1, border_radius=4)
+            widgets.draw_text(surf, label, r.center, fonts.tiny(bold=True), acc, align="center")
+            bx += bw + gap

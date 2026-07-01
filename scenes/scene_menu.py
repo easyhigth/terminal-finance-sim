@@ -55,7 +55,7 @@ class MenuScene(Scene):
             return
         self.app.gs = gs
         self.app.market = None
-        self.app.scenes.go("gameover" if gs.player.game_over else "terminal")
+        self.app.scenes.go("gameover" if gs.player.game_over else "desktop")
 
     def handle_event(self, event):
         if self.lang_btn.handle(event):

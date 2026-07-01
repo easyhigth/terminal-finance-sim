@@ -315,3 +315,63 @@ def test_route_scene_falls_back_to_classic_switch_outside_desktop():
     a.scenes.go("terminal")
     a.route_scene("dilemma", return_to="terminal")
     assert a.scenes.current_name == "dilemma"
+
+
+# ------------------------------------------- rail retiré -> icônes du bureau
+def test_terminal_rail_is_gone(app):
+    """Le rail latéral de commandes rapides a été retiré du terminal : plus
+    d'attribut `rail`, plus de zone clavier "rail", plus de rects cliquables."""
+    app.scenes.go("terminal")
+    term = app.scenes.current
+    term.update(0.016)
+    term.draw(app.screen)
+    assert not hasattr(term, "rail")
+    assert not hasattr(term, "rail_w")
+    assert "rail" not in term.zones.zone_order
+    assert not hasattr(term, "_rail_rects")
+
+
+def test_quick_apps_open_matching_scene_windows(app):
+    from scenes.scene_desktop import QUICK_APPS
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)
+    for key, _label, _kind, scene in QUICK_APPS:
+        if scene is None:      # "save" : action instantanée, pas une fenêtre
+            continue
+        desk._launch(key)
+        assert any(w.key == f"scene:{scene}" for w in desk.wm.windows), key
+
+
+def test_quick_save_action_saves_without_opening_window(app):
+    from core import config as cfg
+    from core.game_state import GameState
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    n_before = len(desk.wm.windows)
+    desk._launch("save")
+    assert len(desk.wm.windows) == n_before   # pas de fenêtre ouverte
+    assert GameState.load(cfg.SAVE_SLOTS[0]) is not None
+
+
+# --------------------------------------------- atterrissage bureau partout
+def test_continue_from_menu_lands_on_desktop():
+    """Le bouton CONTINUER du menu (reprise de l'autosave) atterrit sur le
+    bureau, pas sur le terminal plein écran."""
+    from core import config as cfg
+    a = main.App()
+    a.ensure_market()
+    a.gs.player.grade_index = 5
+    a.gs.save(cfg.AUTOSAVE_SLOT)
+    a.scenes.go("menu")
+    a.scenes.current._continue()
+    assert a.scenes.current_name == "desktop"
+
+
+def test_new_tab_opens_on_desktop():
+    a = main.App()
+    a.ensure_market()
+    n_before = len(a.pages.pages)
+    a.pages.open_new_tab()
+    assert len(a.pages.pages) == n_before + 1
+    assert a.pages.current_page.manager.current_name == "desktop"

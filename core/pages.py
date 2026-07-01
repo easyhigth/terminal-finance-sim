@@ -81,7 +81,7 @@ class Page:
 class PageManager:
     """Gère la liste (illimitée) des pages ouvertes et l'onglet actif."""
 
-    def __init__(self, app, main_manager, main_scene_name="terminal"):
+    def __init__(self, app, main_manager, main_scene_name="desktop"):
         self.app = app
         self.pages = [Page(main_manager, main_scene_name, {})]
         self.active = 0
@@ -152,9 +152,12 @@ class PageManager:
         self.pages = [keep]
         self.active = 0
 
-    def duplicate_current(self):
-        cur = self.current_page
-        return self.open_page(cur.manager.current_name or "terminal", **cur.kwargs)
+    def open_new_tab(self):
+        """Nouvel onglet (bouton « + » / Ctrl+T) : ouvre TOUJOURS sur le
+        BUREAU — écran maître du jeu (refonte UI « Jeu PC ») — plutôt que de
+        dupliquer l'onglet courant, comme un nouvel onglet de navigateur qui
+        repart sur l'accueil."""
+        return self.open_page("desktop")
 
     def close_page(self, index=None):
         if index is None:
@@ -274,7 +277,7 @@ class PageManager:
             tab_rects, new_rect = self._tab_rects()
             if new_rect.collidepoint(raw_pos):
                 if self.can_switch():
-                    self.duplicate_current()
+                    self.open_new_tab()
                 return
             for i, rect in enumerate(tab_rects):
                 close_rect = pygame.Rect(rect.right - 18, rect.y + 4, 14, 14)
@@ -293,7 +296,7 @@ class PageManager:
         if event.type == pygame.KEYDOWN and (event.mod & pygame.KMOD_CTRL):
             if event.key == pygame.K_t:
                 if self.can_switch():
-                    self.duplicate_current()
+                    self.open_new_tab()
                 return
             if event.key == pygame.K_w:
                 self.close_page()

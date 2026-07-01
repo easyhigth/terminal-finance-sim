@@ -67,6 +67,31 @@ TRACK_APP = {
     "Advisory": ("mandates", "Mandats", "advisory"),
 }
 
+# Anciens boutons du rail latéral du terminal (retiré, refonte UI « Jeu PC ») :
+# désormais des icônes du bureau, ouvertes en fenêtre comme n'importe quelle
+# autre app — plus rien n'est caché dans un panneau à part. (clé, libellé,
+# icon_kind, scène) — "save" (clé "save") est une action instantanée (pas une
+# fenêtre), cf. `_quick_save`.
+QUICK_APPS = [
+    ("qmarket", "Marché", "market", "markethub"),
+    ("qbook", "Portef.", "book", "book"),
+    ("qalerts", "Alertes", "alert", "alerts"),
+    ("qinbox", "Inbox", "inbox", "inbox"),
+    ("qnews", "News", "news", "news"),
+    ("qmission", "Mission", "mission", "mission"),
+    ("qmandates", "Mandats", "advisory", "mandates"),
+    ("qdeals", "Deals", "deals", "deals"),
+    ("qdecide", "Décide", "decide", "dilemma"),
+    ("qexamcert", "Exam/Certif", "examcert", "examcert"),
+    ("qwall", "Mur", "wall", "wall"),
+    ("qshop", "Shop", "shop", "shop"),
+    ("qexplorer", "Explorateur", "explorer", "explorer"),
+    ("qgraph", "Graphes", "graph", "graph"),
+    ("qmore", "Plus", "apps", "more"),
+    ("save", "Sauver", "save", None),
+    ("qcommands", "Aide", "help", "commands"),
+]
+
 # Scènes hébergées (menu Démarrer) nécessitant un actif par défaut si non fourni.
 _NEEDS_TICKER = {"company", "financials", "ma_target"}
 _NEEDS_TICKERS = {"compare", "graph"}
@@ -76,6 +101,11 @@ _SCENE_LABEL = {scene: label for _title, items in SECTIONS for label, scene, _kw
 
 ICON_W, ICON_H = 88, 78
 ICON_GAP = 6
+
+
+def _L(fr, en):
+    from core.i18n import get_lang
+    return en if get_lang() == "en" else fr
 
 
 def _scene_label(name):
@@ -184,9 +214,28 @@ class DesktopScene(Scene):
             if self._track_scene:
                 self._open_scene_window(self._track_scene)
             return
+        if key == "save":
+            self._quick_save()
+            return
+        quick = next((scene for k, _l, _kind, scene in QUICK_APPS if k == key), None)
+        if quick is not None:
+            self._open_scene_window(quick)
+            return
         factory = next((cls for k, _, _, cls in APPS if k == key), None)
         if factory is not None:
             self.wm.open(key, lambda: factory(self.app))
+
+    def _quick_save(self):
+        """Sauvegarde rapide (slot 1) — reprend le comportement de l'ancienne
+        commande SAVE du rail latéral, désormais une icône du bureau."""
+        p = self.app.gs.player
+        if p.hardcore:
+            self.app.notify(_L("Mode hardcore : sauvegarde manuelle désactivée.",
+                               "Hardcore mode: manual save disabled."), "warn")
+            return
+        self.app.gs.save(config.SAVE_SLOTS[0])
+        self.app.notify(_L(f"Partie sauvegardée (slot {config.SAVE_SLOTS[0]}).",
+                           f"Game saved (slot {config.SAVE_SLOTS[0]})."), "good")
 
     # --------------------------------------------------------- navigation
     def _open_terminal_window(self):
@@ -297,6 +346,8 @@ class DesktopScene(Scene):
         if info:
             _scene_name, label, kind = info
             items.append(("track", label, kind, config.COL_PRESTIGE))
+        # anciens boutons du rail latéral du terminal : icônes du bureau
+        items += [(k, lbl, kind, config.COL_CYAN) for k, lbl, kind, _scene in QUICK_APPS]
         return items
 
     def _draw_desktop_icons(self, surf):

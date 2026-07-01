@@ -2,7 +2,9 @@
 (Round 11 Phase 2) : horloge de jeu temps réel et calendrier des sessions
 de cotation par région."""
 from core import market_hours as mh
-from core.sim_clock import GAME_MINUTES_PER_REAL_SECOND_AT_X1 as _GMS, SimClock
+from core.sim_clock import GAME_MINUTES_PER_REAL_SECOND_AT_X1 as _GMS
+from core.sim_clock import SimClock
+
 
 # secondes réelles équivalentes à `m` minutes de jeu à x1 (indépendant de la
 # cadence exacte choisie : les tests valident la LOGIQUE de bancarisation).

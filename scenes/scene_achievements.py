@@ -70,7 +70,6 @@ class AchievementsScene(Scene):
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        p = self.app.gs.player
         n_obtained = sum(1 for r in self.rows if r["obtained"])
         widgets.draw_text(surf, _L("SUCCÈS", "ACHIEVEMENTS"), (40, 28),
                           fonts.title(bold=True), config.COL_PRESTIGE)

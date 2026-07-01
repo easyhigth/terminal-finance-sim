@@ -21,11 +21,10 @@ Ouvrable depuis la console (GP/GPC/COMP/...), ou via le bouton GRAPHE des fiches
 import pygame
 
 from core import bonds as BND
-from core import charts, config, indicators
+from core import charts, config, indicators, intraday
 from core import commodities as CMD
 from core import crypto as CRY
 from core import etfs as ETF
-from core import intraday
 from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.popups import ChartPopup, PopupMixin

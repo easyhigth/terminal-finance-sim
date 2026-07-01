@@ -5,8 +5,7 @@ Extrait de scene_terminal_commands.py pour limiter sa taille ; mixé dans
 TerminalScene avec les autres mixins de commandes.
 """
 
-from core import audio
-from core import config
+from core import audio, config
 from core import etfs as etfs_mod
 from core import inbox as inbox_mod
 from core import market_hours as mh_mod

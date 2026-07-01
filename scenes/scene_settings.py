@@ -20,6 +20,7 @@ from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.shortcutspanel import ShortcutsPanel
 
+
 # Libellés bilingues locaux (le contenu fin du jeu reste FR, mais le chrome
 # des réglages mérite l'anglais comme le reste du menu).
 def _L(fr, en):

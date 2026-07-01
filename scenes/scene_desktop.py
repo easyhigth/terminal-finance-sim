@@ -33,7 +33,9 @@ from apps.app_sheet import SheetApp
 from apps.app_trading import TradingApp
 from apps.app_watchlist import WatchlistApp
 from apps.scene_host import SceneHostApp
-from core import config, desktop_onboarding, portfolio as pf_mod, portfolio_margin as pm_mod
+from core import config, desktop_onboarding
+from core import portfolio as pf_mod
+from core import portfolio_margin as pm_mod
 from core.scene_manager import Scene
 from core.sim_clock import SPEEDS
 from scenes.scene_more import SECTIONS

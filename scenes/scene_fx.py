@@ -9,9 +9,8 @@ cotation/dénouement dans core/fx.py. Calqué sur scenes/scene_options.py.
 """
 import pygame
 
-from core import config, unlocks
+from core import config, intraday, unlocks
 from core import fx as FX
-from core import intraday
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
 

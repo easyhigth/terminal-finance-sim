@@ -17,6 +17,7 @@ from core.pages import PageManager
 from core.scene_manager import SceneManager
 from core.sim_clock import SimClock
 from scenes.scene_academy import AcademyScene
+from scenes.scene_achievements import AchievementsScene
 from scenes.scene_alerts import AlertsScene
 from scenes.scene_alm import AlmScene
 from scenes.scene_analytics import AnalyticsScene
@@ -164,6 +165,7 @@ def build_scene_manager(app):
     m.register("stresstest", StressTestScene(app))
     m.register("history", HistoryScene(app))
     m.register("team", TeamScene(app))
+    m.register("achievements", AchievementsScene(app))
     return m
 
 

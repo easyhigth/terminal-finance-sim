@@ -109,7 +109,7 @@ CMD_NAMES = [
     "TEAM", "EQUIPE", "STRESS", "TIMELINE",
     "GP", "GPC", "GPO", "GPCH", "COMP", "HS", "HVOL", "BETA", "CORR",
     "GEG", "GC", "RV", "ECO", "DEFINE", "PA", "ATTR",
-    "TRADES", "NOTE", "IDEAS", "CRITERIA", "JSTATS",
+    "TRADES", "NOTE", "IDEAS", "CRITERIA", "JSTATS", "ACHIEVEMENTS", "SUCCES", "BADGES",
 ]
 
 SAMPLE_NEWS = {
@@ -914,6 +914,8 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             self.app.scenes.go("saves", return_to="terminal")
         elif cmd in ("CAREER", "CARRIERE", "ROADMAP", "OBJECTIVES", "OBJ", "HISTORY", "JOURNAL"):
             self.app.scenes.go("career", return_to="terminal")
+        elif cmd in ("ACHIEVEMENTS", "SUCCES", "SUCCESS", "BADGES"):
+            self.app.scenes.go("achievements", return_to="terminal")
         elif cmd in ("INBOX", "MAIL", "MESSAGES"):
             self.app.scenes.go("inbox", return_to="terminal")
         elif cmd in ("DECIDE", "DECISION", "DILEMMA"):

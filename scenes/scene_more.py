@@ -80,6 +80,7 @@ SECTIONS = [
         ("Historique complet", "history", {}),
         ("Stress test régulateur", "stresstest", {}),
         ("Équipe / analystes", "team", {}),
+        ("Succès (badges)", "achievements", {}),
     ]),
     ("Apprendre", [
         ("Académie", "academy", {}),

@@ -83,7 +83,7 @@ _KNOWN_SCENES = [
     "analytics", "performance", "explorer", "tutorials", "splash", "markethub", "wall",
     "settings", "shop",
     "examcert", "stresstest", "history", "team", "alerts", "frontier_lab",
-    "dashboard", "compare",
+    "dashboard", "compare", "achievements",
 ]
 
 

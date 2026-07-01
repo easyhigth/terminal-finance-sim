@@ -84,6 +84,39 @@ def test_history_of_length_bounded_by_n(m):
     assert len(bounded) == 10
     assert bounded == full[-10:]
 
+
+def test_graph_step_periods_map_to_expected_horizons():
+    """Verrou V0 : les périodes du graphe (1M/3M/1A/3A/5A) doivent correspondre
+    au bon nombre de jours, sachant qu'un pas de marché = config.DAYS_PER_STEP
+    jours. Un décalage ici afficherait un graphe « 1 an » qui ne couvre pas un
+    an, etc. (cf. scenes/scene_graph.py::STEP_PERIODS)."""
+    from core import config
+    from scenes.scene_graph import STEP_PERIODS
+    per = dict(STEP_PERIODS)
+    d = config.DAYS_PER_STEP
+    # tolérance de quelques jours (arrondi des pas), horizon nominal en jours
+    assert abs(per["1M"] * d - 30) <= 5
+    assert abs(per["3M"] * d - 90) <= 5
+    assert abs(per["1A"] * d - 365) <= 5
+    assert abs(per["3A"] * d - 3 * 365) <= 20
+    assert abs(per["5A"] * d - 5 * 365) <= 20
+    assert per["MAX"] is None
+
+
+def test_history_available_from_career_start_for_all_graph_periods():
+    """Verrou V0 : dès le démarrage de carrière (market_step = WARMUP_STEPS), les
+    graphes doivent avoir assez d'historique pour TOUTES les périodes par pas —
+    sinon une courbe « 5 ans » serait vide/tronquée au jour 1."""
+    from core import market_constants as MC
+    from scenes.scene_graph import STEP_PERIODS
+    mk = Market(seed=7)
+    mk.sync_to(MC.WARMUP_STEPS)
+    tk = mk.companies[0]["ticker"]
+    for label, n in STEP_PERIODS:
+        if n is None:
+            continue
+        assert len(mk.history_of(tk, n)) == n, f"période {label} tronquée au départ"
+
 def test_track_company_prefills_history(m):
     tk = m.companies[1]["ticker"]
     hist = m.track_company(tk)

@@ -297,6 +297,19 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   taille de la fenêtre ; une fenêtre par défaut plus proche de cette résolution réduit
   nettement le facteur de réduction (donc le flou) sans toucher à la résolution logique
   elle-même (jugé trop risqué à changer globalement, cf. décision précédente).
+  **Étape 17 (polish V0) : un seul jeu de contrôles temps/pause.** La topbar du bureau
+  (`DesktopScene._draw_topbar`) redessinait pause/vitesse/⚙ (`_pause_rect`/`_speed_rects`/
+  `_gear_rect`) JUSTE en dessous du widget d'horloge de la bande d'onglets
+  (`ui/simclock_widget.py`, dessiné par `core/pages.py`) — doublon visuel. Retiré : la topbar du
+  bureau ne garde que Menu + horloge texte (Jour/heure/trimestre) + cash/patrimoine ; les
+  contrôles pause/vitesse/⚙ vivent une seule fois dans la bande d'onglets, TOUJOURS visible
+  au-dessus de toute scène pendant une partie (`PageManager._clock_visible()`). Par ailleurs, les
+  périodes du graphe (`scenes/scene_graph.py::STEP_PERIODS` — 1M=6, 3M=18, 1A=73, 3A=219, 5A=365
+  pas, MAX=None) ont été re-vérifiées : 1 pas de marché = `config.DAYS_PER_STEP` (5) jours, la
+  préhistoire de carrière (`market_step = WARMUP_STEPS` = 365 pas au démarrage,
+  `scenes/scene_runsetup.py`) garantit que toutes les périodes ont assez d'historique dès le jour 1
+  (verrous : `tests/test_market_query.py::test_graph_step_periods_map_to_expected_horizons` et
+  `test_history_available_from_career_start_for_all_graph_periods`).
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, un jour de jeu dure ~16 s réelles
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 90`), soit un nouveau pas de marché (5 jours) toutes

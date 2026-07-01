@@ -37,10 +37,8 @@ from core import config, desktop_onboarding
 from core import portfolio as pf_mod
 from core import portfolio_margin as pm_mod
 from core.scene_manager import Scene
-from core.sim_clock import SPEEDS
 from scenes.scene_more import SECTIONS
 from ui import desktop_icons, fonts, widgets
-from ui.simclock_widget import _draw_gear, _draw_pause, _draw_speed
 from ui.window_manager import WindowManager
 
 TOPBAR_H = 36
@@ -131,12 +129,9 @@ class DesktopScene(Scene):
         self._icon_rects = {}       # clé -> (Rect, icon_kind, label) — icônes du bureau
         self._launch_rects = {}     # clé app -> Rect (barre des tâches quick-launch)
         self._task_rects = {}       # Window -> Rect (barre des tâches)
-        self._speed_rects = {}      # valeur -> Rect (contrôles de vitesse)
         self._start_rect = None     # bouton menu Démarrer
         self._launcher_rects = []   # [(Rect, scene, kwargs)] items du menu Démarrer
-        self._pause_rect = None
         self._menu_rect = None
-        self._gear_rect = None
         self._ambient_rect = None    # widget patrimoine (clic → portefeuille)
         self._ctx_menu = None        # menu contextuel (clic droit) : dict ou None
         self._onboard_card = None    # carte d'accueil (rect) — 1re visite
@@ -257,16 +252,8 @@ class DesktopScene(Scene):
         if self._menu_rect and self._menu_rect.collidepoint(pos):
             self.app.scenes.go("menu")
             return
-        if self._gear_rect and self._gear_rect.collidepoint(pos):
-            self.app.scenes.go("settings", return_to="desktop")
-            return
-        if self._pause_rect and self._pause_rect.collidepoint(pos):
-            self.app.sim_clock.toggle_pause()
-            return
-        for val, r in self._speed_rects.items():
-            if r.collidepoint(pos):
-                self.app.sim_clock.set_speed(val)
-                return
+        # pause/vitesse/⚙ : gérés par la bande d'onglets (simclock_widget), plus
+        # de doublon dans la topbar du bureau.
 
     def _launch(self, key):
         if key == "terminal":
@@ -807,29 +794,10 @@ class DesktopScene(Scene):
                                 f"Patrimoine {widgets.format_money(nw, cur)}",
                           (300, 9), fonts.small(bold=True), config.COL_AMBER)
 
-        # contrôles de vitesse (à droite) + réglages — dessin vectoriel partagé
-        # avec la bande d'onglets classique (cf. ui/simclock_widget.py) : mêmes
-        # icônes (barres de pause, triangles de vitesse, roue dentée) partout.
-        x = config.SCREEN_WIDTH - 8
-        self._gear_rect = pygame.Rect(x - 30, 5, 26, TOPBAR_H - 10)
-        gh = self._gear_rect.collidepoint(pygame.mouse.get_pos())
-        pygame.draw.rect(surf, config.COL_PANEL if gh else config.COL_PANEL_HEAD, self._gear_rect, border_radius=4)
-        _draw_gear(surf, self._gear_rect, config.COL_AMBER if gh else config.COL_TEXT_DIM)
-        x = self._gear_rect.x - 8
-        self._speed_rects = {}
-        for val in reversed(SPEEDS):
-            r = pygame.Rect(x - 30, 5, 30, TOPBAR_H - 10)
-            self._speed_rects[val] = r
-            active = (self.app.sim_clock.speed == val and self.app.sim_clock.is_running())
-            pygame.draw.rect(surf, config.COL_PANEL if active else config.COL_PANEL_HEAD, r, border_radius=4)
-            pygame.draw.rect(surf, config.COL_AMBER if active else config.COL_BORDER, r, 1, border_radius=4)
-            _draw_speed(surf, r, val, config.COL_AMBER if active else config.COL_TEXT_DIM)
-            x = r.x - 4
-        self._pause_rect = pygame.Rect(x - 30, 5, 30, TOPBAR_H - 10)
-        paused = not self.app.sim_clock.is_running()
-        pygame.draw.rect(surf, config.COL_DOWN if paused else config.COL_PANEL_HEAD, self._pause_rect, border_radius=4)
-        pygame.draw.rect(surf, config.COL_BORDER, self._pause_rect, 1, border_radius=4)
-        _draw_pause(surf, self._pause_rect, config.COL_WHITE if paused else config.COL_TEXT_DIM)
+        # NB : les contrôles pause/vitesse/⚙ NE sont PAS redessinés ici — ils
+        # vivent une seule fois dans la bande d'onglets (ui/simclock_widget.py,
+        # dessinée par core/pages.py), toujours visibles au-dessus du bureau.
+        # Les redessiner dans cette topbar faisait doublon juste en dessous.
 
     def _draw_taskbar(self, surf):
         bar = pygame.Rect(0, config.SCREEN_HEIGHT - TASKBAR_H, config.SCREEN_WIDTH, TASKBAR_H)

@@ -292,6 +292,83 @@ def test_alt_tab_cycles_focused_window(app):
     assert desk.wm.focused is not focused_mid
 
 
+# ------------------------------------------------- ancrage / maximisation (PR3)
+def _down(x, y):
+    return pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(x, y))
+
+
+def _motion(x, y):
+    return pygame.event.Event(pygame.MOUSEMOTION, pos=(x, y), buttons=(1, 0, 0))
+
+
+def _up(x, y):
+    return pygame.event.Event(pygame.MOUSEBUTTONUP, button=1, pos=(x, y))
+
+
+def test_window_snaps_to_left_half_on_drag_to_edge(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("research")
+    wm = desk.wm
+    tr = w.title_rect
+    wm.handle_event(_down(tr.centerx, tr.centery))
+    # glisse vers le bord gauche -> aperçu d'ancrage
+    wm.handle_event(_motion(2, wm.work_area.centery))
+    assert wm._snap_preview is not None
+    wm.handle_event(_up(2, wm.work_area.centery))
+    assert w.rect.x == wm.work_area.x
+    assert w.rect.w == wm.work_area.w // 2
+    assert w.rect.h == wm.work_area.h
+    assert wm._snap_preview is None
+
+
+def test_double_click_title_maximizes_and_restores(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("trading")
+    wm = desk.wm
+    before = w.rect.copy()
+    tr = w.title_rect
+    wm.handle_event(_down(tr.centerx, tr.centery))
+    wm.handle_event(_up(tr.centerx, tr.centery))
+    wm.handle_event(_down(tr.centerx, tr.centery))   # 2e clic rapproché
+    assert w.rect == wm.work_area                    # maximisé
+    tr2 = w.title_rect
+    wm.handle_event(_up(tr2.centerx, tr2.centery))
+    wm.handle_event(_down(tr2.centerx, tr2.centery))
+    wm.handle_event(_up(tr2.centerx, tr2.centery))
+    wm.handle_event(_down(tr2.centerx, tr2.centery))  # re-double-clic -> restaure
+    assert w.rect == before
+
+
+def test_desktop_work_area_excludes_taskbar(app):
+    from core import config as cfg
+    from scenes.scene_desktop import TASKBAR_H, TOPBAR_H
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    wa = desk.wm.work_area
+    assert wa.y == TOPBAR_H
+    assert wa.bottom == cfg.SCREEN_HEIGHT - TASKBAR_H
+
+
+# --------------------------------------------- palette Ctrl+K -> fenêtre (PR3)
+def test_palette_navigate_opens_window_on_desktop(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    mgr = app.scenes
+    mgr._palette_navigate("markethub", {})
+    assert app.scenes.current_name == "desktop"      # pas de bascule plein écran
+    assert any(w.key == "scene:markethub" for w in desk.wm.windows)
+
+
+def test_palette_navigate_fullscreen_outside_desktop():
+    a = main.App()
+    a.ensure_market()
+    a.scenes.go("terminal")
+    a.scenes._palette_navigate("markethub", {})
+    assert a.scenes.current_name == "markethub"
+
+
 # ------------------------------------------------------------ calculatrice
 def test_calculator_app_computes_expression(app):
     from apps.app_calculator import CalculatorApp

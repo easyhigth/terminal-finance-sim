@@ -1336,3 +1336,93 @@ def test_conditional_order_executes_on_market_step_via_desktop(app):
     summary = app.gs.advance_step(app.market)
     assert summary["conditional_orders_executed"]
     assert tk not in app.gs.player.portfolio
+
+
+# ====================================== Recherche globale (Ctrl+/) ===============
+def _ctrl_slash():
+    return pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SLASH, mod=pygame.KMOD_CTRL, unicode="")
+
+
+def test_ctrl_slash_opens_global_search(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.handle_event(_ctrl_slash())
+    assert desk._search_open is True
+    assert desk._search_query == ""
+
+
+def test_search_escape_closes(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk._open_search()
+    desk.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=0, unicode=""))
+    assert desk._search_open is False
+
+
+def test_search_finds_held_position_and_opens_trading(app):
+    tk = app.market.top_companies(n=1)[0]["ticker"]
+    app.gs.player.portfolio[tk] = {"shares": 10.0, "avg": 100.0}
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk._open_search()
+    desk._search_query = tk
+    results = desk._search_results()
+    assert len(results) == 1
+    desk._search_navigate(results[0])
+    assert desk._search_open is False
+    tw = next((win for win in desk.wm.windows if win.key == "trading"), None)
+    assert tw is not None
+    assert tw.app_obj.search == tk.upper()
+
+
+def test_search_finds_inbox_message_and_opens_inbox(app):
+    app.gs.player.inbox = [{"id": 1, "subject": "Alerte importante", "sender": "Manager",
+                            "body": "", "read": False}]
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk._open_search()
+    desk._search_query = "importante"
+    results = desk._search_results()
+    assert len(results) == 1
+    desk._search_navigate(results[0])
+    assert any(w.key == "scene:inbox" for w in desk.wm.windows)
+
+
+def test_search_typing_and_backspace(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk._open_search()
+    desk.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=0, unicode="a"))
+    desk.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_b, mod=0, unicode="b"))
+    assert desk._search_query == "ab"
+    desk.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_BACKSPACE, mod=0, unicode=""))
+    assert desk._search_query == "a"
+
+
+def test_search_enter_navigates_to_selected_result(app):
+    tk = app.market.top_companies(n=1)[0]["ticker"]
+    app.gs.player.watchlist = [tk]
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk._open_search()
+    desk._search_query = tk
+    desk.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, mod=0, unicode=""))
+    assert desk._search_open is False
+    assert any(w.key == "trading" for w in desk.wm.windows)
+
+
+def test_search_click_outside_box_closes(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk._open_search()
+    desk.draw(app.screen)
+    desk.handle_event(_click(5, 5))
+    assert desk._search_open is False
+
+
+def test_search_draw_does_not_raise_with_no_results(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk._open_search()
+    desk._search_query = "zzz_no_match_zzz"
+    desk.draw(app.screen)   # ne doit pas lever

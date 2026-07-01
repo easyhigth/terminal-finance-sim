@@ -265,6 +265,17 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   cours de la partie (tous titres confondus, pas seulement celui affiché), avec annulation (×)
   individuelle — rétrécit dynamiquement la liste de valeurs pour rester visible sans la
   recouvrir.
+  **Étape 15 : recherche globale sur les données de partie (Ctrl+/).** `core/global_search.py`
+  (logique pure) cherche dans ce que le joueur POSSÈDE/REÇOIT déjà dans sa partie — positions,
+  watchlist, inbox, mandats actifs, deals actifs — par opposition à la palette de navigation
+  (Ctrl+K, `core/scene_manager.py`) qui cherche du contenu de RÉFÉRENCE (tickers du marché,
+  glossaire, leçons, scènes). Raccourci **Ctrl+/** (pas Ctrl+F : déjà pris par le rail du
+  terminal pour M&A, cf. `RAIL_SHORTCUTS` dans `scenes/scene_terminal.py`), câblé dans
+  `DesktopScene.handle_event` (prioritaire, avant même le menu contextuel). Chaque résultat
+  ({"label", "kind", "action"}) navigue selon son type : position/watchlist → Trading pré-filtré
+  (`DesktopScene.open_trading`), inbox/mandats/deals → la scène hébergée correspondante. Réutilise
+  `core/fuzzy.filter_sorted` (même moteur de correspondance floue que Ctrl+K) sur un haystack
+  concaténé par entrée (ticker+nom, sujet+expéditeur+corps, nom client, titre de deal).
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, un jour de jeu dure ~16 s réelles
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 90`), soit un nouveau pas de marché (5 jours) toutes

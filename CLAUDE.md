@@ -208,6 +208,21 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   popups FORCÉS par le jeu — dilemmes) fait clignoter l'entrée de la fenêtre dans la barre des
   tâches (`_draw_taskbar`) jusqu'au premier `WindowManager.focus` (un coup d'œil éteint le
   clignotement).
+  **Étape 12 : découvrabilité (accueil + menus contextuels).** (1) **Carte d'accueil** du bureau
+  à la 1re visite (`DesktopScene._draw_onboarding`) : mode d'emploi rapide (icônes = apps en
+  fenêtres, ancrage/maximisation, Alt+Tab, le terminal reste le moteur, clic droit, widget
+  patrimoine). NON modale — un clic sur « Commencer » (ou ailleurs) la referme ; l'état « vue »
+  est persisté à part (`core/desktop_onboarding.py`, JSON dédié — distinct de `core/onboarding.py`
+  qui est le parcours guidé du TERMINAL). L'action « Revoir l'accueil » du menu contextuel du
+  fond appelle `desktop_onboarding.reset()`. (2) **Menus contextuels (clic droit)**
+  (`_open_context_menu`/`_handle_ctx_event`/`_draw_context_menu`, état `self._ctx_menu`) selon la
+  cible sous le curseur : icône du bureau (Ouvrir / Ouvrir puis ancrer à gauche·droite), barre de
+  titre OU entrée de barre des tâches d'une fenêtre (Réduire/Restaurer, Agrandir/Restaurer,
+  Ancrer gauche·droite, Fermer), fond du bureau (Menu Applications, Réglages, Fermer toutes les
+  fenêtres, Revoir l'accueil). L'ancrage réutilise la logique de l'étape 10 (`_snap_window` pose
+  `_restore_rect`) ; « Fermer toutes les fenêtres » ne fait que MINIMISER le terminal (jamais
+  arrêter le moteur). Le menu se referme au clic sur un item (exécute son action), à tout clic
+  hors menu, ou sur Échap ; un clic droit sur le CONTENU d'une fenêtre reste routé vers l'app.
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, **1 minute réelle = 1 pas de marché**
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 120`), soit un nouveau pas toutes les ~60 s (x1) /

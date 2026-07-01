@@ -19,6 +19,8 @@ from ui.window_manager import TITLE_H, WindowManager
 
 @pytest.fixture()
 def app():
+    from core import desktop_onboarding
+    desktop_onboarding.mark_seen()   # neutralise la carte d'accueil (1re visite)
     a = main.App()
     a.ensure_market()
     p = a.gs.player
@@ -858,3 +860,119 @@ def test_ambient_widget_opens_portfolio(app):
     r = desk._ambient_rect
     desk.handle_event(_click(r.centerx, r.centery))
     assert any(win.key == "scene:book" for win in desk.wm.windows)
+
+
+# ============================================= PR5 : onboarding + clic droit =====
+def _rclick(x, y):
+    return pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=3, pos=(x, y))
+
+
+# ----------------------------------------------------------- carte d'accueil
+def test_onboarding_seen_flag_roundtrip():
+    from core import desktop_onboarding
+    desktop_onboarding.reset()
+    assert desktop_onboarding.seen() is False
+    desktop_onboarding.mark_seen()
+    assert desktop_onboarding.seen() is True
+
+
+def test_desktop_shows_onboarding_until_dismissed():
+    from core import desktop_onboarding
+    desktop_onboarding.reset()
+    a = main.App()
+    a.ensure_market()
+    a.scenes.go("desktop")
+    desk = a.scenes.current
+    desk.draw(a.screen)
+    assert desk._onboard_btn is not None            # carte affichée (1re visite)
+    # clic sur « Commencer » : marque vu, la carte disparaît
+    desk.handle_event(_click(desk._onboard_btn.centerx, desk._onboard_btn.centery))
+    assert desktop_onboarding.seen() is True
+    desktop_onboarding.mark_seen()                  # laisse l'état propre pour la suite
+
+
+def test_onboarding_click_outside_card_dismisses_and_passes_through():
+    from core import desktop_onboarding
+    desktop_onboarding.reset()
+    a = main.App()
+    a.ensure_market()
+    a.gs.player.grade_index = 9
+    a.scenes.go("desktop")
+    desk = a.scenes.current
+    desk.draw(a.screen)
+    # clic sur une icône du bureau (hors carte) : referme l'accueil ET ouvre l'app
+    r, _kind, _label = desk._icon_rects["research"]
+    desk.handle_event(_click(r.centerx, r.centery))
+    assert desktop_onboarding.seen() is True
+    assert any(w.key == "research" for w in desk.wm.windows)
+    desktop_onboarding.mark_seen()
+
+
+# --------------------------------------------------------- menus contextuels
+def test_right_click_icon_opens_context_menu(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)
+    r, _kind, _label = desk._icon_rects["research"]
+    desk.handle_event(_rclick(r.centerx, r.centery))
+    assert desk._ctx_menu is not None
+    assert len(desk._ctx_menu["items"]) >= 1
+    # dessiner peuple les rects cliquables ; cliquer « Ouvrir » lance l'app
+    desk.draw(app.screen)
+    item_r, _cb = desk._ctx_menu["rects"][0]
+    desk.handle_event(_click(item_r.centerx, item_r.centery))
+    assert desk._ctx_menu is None
+    assert any(w.key == "research" for w in desk.wm.windows)
+
+
+def test_right_click_window_title_menu_closes_window(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("research")
+    desk.draw(app.screen)
+    desk.handle_event(_rclick(w.title_rect.centerx, w.title_rect.centery))
+    assert desk._ctx_menu is not None
+    desk.draw(app.screen)
+    # « Fermer » est le dernier item du menu fenêtre
+    close_r, _cb = desk._ctx_menu["rects"][-1]
+    desk.handle_event(_click(close_r.centerx, close_r.centery))
+    assert w not in desk.wm.windows
+
+
+def test_right_click_desktop_background_menu(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)
+    # un point du fond, loin des icônes (côté droit, sous la barre supérieure)
+    from core import config as cfg
+    px = cfg.SCREEN_WIDTH - 40
+    py = TITLE_H + 120
+    desk.handle_event(_rclick(px, py))
+    assert desk._ctx_menu is not None
+    labels = [lbl for lbl, _cb in desk._ctx_menu["items"]]
+    assert any("Applications" in l or "menu" in l.lower() for l in labels)
+
+
+def test_context_menu_dismissed_by_outside_click(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)
+    r, _kind, _label = desk._icon_rects["trading"]
+    desk.handle_event(_rclick(r.centerx, r.centery))
+    assert desk._ctx_menu is not None
+    desk.draw(app.screen)
+    # clic loin du menu : le referme sans lancer d'action
+    n_before = len(desk.wm.windows)
+    desk.handle_event(_click(5, 5))
+    assert desk._ctx_menu is None
+    assert len(desk.wm.windows) == n_before
+
+
+def test_context_menu_snap_left_positions_window(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("sheet")
+    desk._snap_window(w, "left")
+    wa = desk.wm.work_area
+    assert w.rect.x == wa.x and w.rect.w == wa.w // 2
+    assert w._restore_rect is not None              # peut revenir à la taille d'avant

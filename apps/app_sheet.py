@@ -100,6 +100,8 @@ class SheetApp(DesktopApp):
         self._chart_close_rects = {}
         self._chart_drag = None
         self._chart_drag_off = (0, 0)
+        self._chart_resize = None
+        self._chart_resize_rects = {}
 
     @property
     def sheet(self):
@@ -224,6 +226,10 @@ class SheetApp(DesktopApp):
                 if r.collidepoint(event.pos):
                     self.workbook.active.charts = [c for c in self.workbook.active.charts if c.id != cid]
                     return True
+            for cid, r in self._chart_resize_rects.items():
+                if r.collidepoint(event.pos):
+                    self._chart_resize = next(c for c in self.workbook.active.charts if c.id == cid)
+                    return True
             for cid, r in self._chart_title_rects.items():
                 if r.collidepoint(event.pos):
                     chart = next(c for c in self.workbook.active.charts if c.id == cid)
@@ -254,6 +260,13 @@ class SheetApp(DesktopApp):
                     return True
             return False
         if event.type == pygame.MOUSEMOTION:
+            if self._chart_resize is not None:
+                chart = self._chart_resize
+                chart.w = max(160, event.pos[0] - (rect.x + chart.x))
+                chart.h = max(110, event.pos[1] - (rect.y + chart.y))
+                chart.w = min(chart.w, rect.w - chart.x)
+                chart.h = min(chart.h, rect.h - chart.y)
+                return True
             if self._chart_drag is not None:
                 chart = self._chart_drag
                 chart.x = event.pos[0] - rect.x - self._chart_drag_off[0]
@@ -267,6 +280,9 @@ class SheetApp(DesktopApp):
                         self.range_end = ref
                         return True
         if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if self._chart_resize is not None:
+                self._chart_resize = None
+                return True
             if self._chart_drag is not None:
                 self._chart_drag = None
                 return True
@@ -410,7 +426,8 @@ class SheetApp(DesktopApp):
                                       (cell.x + 4, cell.y + 3), fonts.tiny(), col)
 
         # graphiques posés sur cette feuille (par-dessus la grille)
-        self._chart_rects, self._chart_title_rects, self._chart_close_rects = {}, {}, {}
+        self._chart_rects, self._chart_title_rects = {}, {}
+        self._chart_close_rects, self._chart_resize_rects = {}, {}
         for chart in self.workbook.active.charts:
             self._draw_chart(surf, rect, chart)
 
@@ -501,6 +518,12 @@ class SheetApp(DesktopApp):
 
     # --------------------------------------------------------- graphiques
     def _draw_chart(self, surf, rect, chart):
+        # bornes vivantes : reste dans la fenêtre même si elle a été
+        # redimensionnée/rétrécie depuis le placement du graphique.
+        chart.w = max(160, min(chart.w, rect.w - 8))
+        chart.h = max(110, min(chart.h, rect.h - 8))
+        chart.x = max(0, min(chart.x, rect.w - chart.w))
+        chart.y = max(0, min(chart.y, rect.h - chart.h))
         r = pygame.Rect(rect.x + chart.x, rect.y + chart.y, chart.w, chart.h)
         pygame.draw.rect(surf, config.COL_BG, r)
         pygame.draw.rect(surf, config.COL_AMBER, r, 2)
@@ -524,20 +547,40 @@ class SheetApp(DesktopApp):
         data = self._chart_data(chart)
         if not data:
             widgets.draw_text(surf, "Plage invalide", body.center, fonts.tiny(), config.COL_DOWN, align="center")
-            return
-        if chart.kind == "scatter":
+        elif chart.kind == "scatter":
             self._draw_scatter(surf, body, data["x"], data["y"])
         elif chart.kind == "bar":
             self._draw_bar(surf, body, data["y"])
         else:
             self._draw_line(surf, body, data["y"])
+        # poignée de redimensionnement (coin bas-droit, comme les fenêtres)
+        grip = pygame.Rect(r.right - 12, r.bottom - 12, 12, 12)
+        self._chart_resize_rects[chart.id] = grip
+        for i in range(1, 4):
+            pygame.draw.line(surf, config.COL_AMBER, (grip.right - i * 3, grip.bottom - 1),
+                             (grip.right - 1, grip.bottom - i * 3), 1)
 
-    def _draw_line(self, surf, rect, y):
+    def _axis_frame(self, surf, body, lo, hi):
+        """Cadre + étiquettes min/médiane/max sur l'axe Y — lisibilité façon
+        Excel plutôt qu'un graphe nu. Retourne le rect de tracé (réduit pour
+        laisser la place aux étiquettes)."""
+        label_w = 34
+        plot = pygame.Rect(body.x + label_w, body.y + 2, max(10, body.w - label_w - 2), max(10, body.h - 12))
+        pygame.draw.rect(surf, config.COL_GRID, plot, 1)
+        mid = (lo + hi) / 2
+        pygame.draw.line(surf, config.COL_GRID, (plot.x, plot.centery), (plot.right, plot.centery), 1)
+        for val, y in ((hi, plot.y), (mid, plot.centery), (lo, plot.bottom)):
+            widgets.draw_text(surf, widgets.fit_text(f"{val:,.2f}", fonts.tiny(), label_w - 2),
+                              (body.x, max(body.y, min(y - 5, body.bottom - 10))), fonts.tiny(), config.COL_TEXT_DIM)
+        return plot
+
+    def _draw_line(self, surf, body, y):
         if not y:
             return
         lo, hi = min(y), max(y)
         if hi == lo:
             hi = lo + 1
+        rect = self._axis_frame(surf, body, lo, hi)
         n = len(y)
         pts = [(rect.x + (i / max(1, n - 1)) * rect.w,
                 rect.bottom - (v - lo) / (hi - lo) * rect.h) for i, v in enumerate(y)]
@@ -546,11 +589,12 @@ class SheetApp(DesktopApp):
         for p in pts:
             pygame.draw.circle(surf, config.COL_CYAN, (int(p[0]), int(p[1])), 2)
 
-    def _draw_bar(self, surf, rect, y):
+    def _draw_bar(self, surf, body, y):
         if not y:
             return
         lo = min(0.0, min(y))
         hi = max(y) if max(y) > 0 else 1.0
+        rect = self._axis_frame(surf, body, lo, hi)
         span = (hi - lo) or 1.0
         n = len(y)
         zero_y = rect.bottom - (0 - lo) / span * rect.h
@@ -562,16 +606,21 @@ class SheetApp(DesktopApp):
             pygame.draw.rect(surf, config.COL_UP if v >= 0 else config.COL_DOWN,
                              (int(bx), int(top), bw, max(1, int(h))))
 
-    def _draw_scatter(self, surf, rect, xs, ys):
+    def _draw_scatter(self, surf, body, xs, ys):
         if not xs or not ys:
             return
-        lox, hix = min(xs), max(xs)
         loy, hiy = min(ys), max(ys)
-        if hix == lox:
-            hix = lox + 1
         if hiy == loy:
             hiy = loy + 1
+        lox, hix = min(xs), max(xs)
+        if hix == lox:
+            hix = lox + 1
+        rect = self._axis_frame(surf, body, loy, hiy)
         for x, v in zip(xs, ys):
             px = rect.x + (x - lox) / (hix - lox) * rect.w
             py = rect.bottom - (v - loy) / (hiy - loy) * rect.h
             pygame.draw.circle(surf, config.COL_PRESTIGE, (int(px), int(py)), 3)
+        widgets.draw_text(surf, widgets.fit_text(f"{lox:,.2g}", fonts.tiny(), 40),
+                          (rect.x, rect.bottom + 1), fonts.tiny(), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, widgets.fit_text(f"{hix:,.2g}", fonts.tiny(), 40),
+                          (rect.right, rect.bottom + 1), fonts.tiny(), config.COL_TEXT_DIM, align="right")

@@ -154,6 +154,16 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
     dépendance à `widgets.draw_series` (pensé pour les séries de prix, pas les données tableur
     génériques). Pas de VBA/macros — uniquement formules + graphiques, l'usage courant d'Excel
     en finance.
+  **Étape 7 (polish navigation/lisibilité)** : les graphiques du tableur ont désormais un
+  **cadre d'axes avec étiquettes** (min/médiane/max, `SheetApp._axis_frame`) — lisibilité
+  chiffrée façon Excel plutôt qu'un tracé nu — et une **poignée de redimensionnement** (coin
+  bas-droit, comme les fenêtres du bureau, `_chart_resize_rects`) ; leur position/taille sont
+  **bornées à chaque frame** à la zone de contenu courante (`_draw_chart`), donc jamais perdus
+  hors champ si la fenêtre est rétrécie après coup. `ui/window_manager.py::WindowManager
+  .cycle_focus(reverse=False)` ajoute la navigation **Alt+Tab** entre les fenêtres ouvertes du
+  bureau (round-robin déterministe trié par clé, pas par ordre de focus récent — cycle complet
+  prévisible même avec beaucoup de fenêtres) ; câblé en tout premier dans
+  `DesktopScene.handle_event` (Alt+Maj+Tab = sens inverse).
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, **1 minute réelle = 1 pas de marché**
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 120`), soit un nouveau pas toutes les ~60 s (x1) /

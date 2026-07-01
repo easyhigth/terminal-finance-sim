@@ -159,6 +159,10 @@ class DesktopScene(Scene):
 
     # ------------------------------------------------------------- events
     def handle_event(self, event):
+        # Alt+Tab : passe à la fenêtre suivante (façon OS), prioritaire sur tout
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_TAB and (event.mod & pygame.KMOD_ALT):
+            self.wm.cycle_focus(reverse=bool(event.mod & pygame.KMOD_SHIFT))
+            return
         # menu Démarrer ouvert : priorité à ses items / fermeture au clic dehors
         if self.start_open and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for r, name, kw in self._launcher_rects:

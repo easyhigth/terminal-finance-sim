@@ -283,7 +283,6 @@ def test_alt_tab_cycles_focused_window(app):
     desk = app.scenes.current
     for key in ("research", "trading", "sheet"):
         desk._launch(key)
-    windows_by_key = {w.key: w for w in desk.wm.windows}
     focused_before = desk.wm.focused
     ev = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_TAB, mod=pygame.KMOD_ALT)
     desk.handle_event(ev)
@@ -1010,7 +1009,7 @@ def test_watchlist_price_flashes_on_change(app):
 def test_sheet_live_price_cell_flashes(app):
     """Une cellule =PRICE(...) clignote vert/rouge au mouvement (flash), pas
     juste blanc statique — cf. _LIVE_FN_NAMES."""
-    from apps.app_sheet import SheetApp, _LIVE_FN_NAMES
+    from apps.app_sheet import _LIVE_FN_NAMES, SheetApp
     assert "PRICE" in _LIVE_FN_NAMES
     tk = app.market.top_companies(n=1)[0]["ticker"]
     s = SheetApp(app)

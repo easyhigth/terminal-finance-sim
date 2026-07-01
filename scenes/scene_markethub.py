@@ -9,9 +9,8 @@ latéral « MARCHÉ ».
 """
 import pygame
 
-from core import config
+from core import config, intraday
 from core import fx as FX
-from core import intraday
 from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.popups import PopupMixin

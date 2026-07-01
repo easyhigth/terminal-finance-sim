@@ -17,9 +17,7 @@ import pygame
 if os.environ.get("SDL_VIDEODRIVER") != "dummy":
     os.environ.setdefault("PYGAME_FORCE_SCALE", "photo")
 
-from core import audio
-from core import config
-from core import display_settings
+from core import config, display_settings
 from core.game_state import GameState
 from core.market import Market
 from core.pages import PageManager
@@ -44,8 +42,8 @@ from scenes.scene_credit import CreditScene
 from scenes.scene_crypto import CryptoScene
 from scenes.scene_dashboard import DashboardScene
 from scenes.scene_deal import DealScene
-from scenes.scene_desktop import DesktopScene
 from scenes.scene_deals import DealsScene
+from scenes.scene_desktop import DesktopScene
 from scenes.scene_dilemma import DilemmaScene
 from scenes.scene_etfs import ETFScene
 from scenes.scene_evaluation import EvaluationScene

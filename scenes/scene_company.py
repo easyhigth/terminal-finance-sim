@@ -10,10 +10,8 @@ Ouverte via la commande COMPANY <ticker> ou en cliquant un ticker.
 import pygame
 
 from core import charts as charts
-from core import config
+from core import config, intraday, liquidity
 from core import financials as F
-from core import intraday
-from core import liquidity
 from core import market_hours as mh_mod
 from core import news as N
 from core.scene_manager import Scene

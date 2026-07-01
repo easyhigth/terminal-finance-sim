@@ -5,10 +5,9 @@ Extrait de scene_terminal.py pour limiter sa taille ; mixé dans TerminalScene.
 import pygame
 
 from core import career as career_mod
-from core import config
+from core import config, intraday
 from core import fx as fx_mod
 from core import inbox as inbox_mod
-from core import intraday
 from core import liquidity as liq_mod
 from core import market_hours as mh_mod
 from core import onboarding as onboarding_mod

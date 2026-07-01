@@ -12,9 +12,8 @@ Tout se pilote au clavier. COMMANDS affiche le catalogue complet.
 """
 import pygame
 
-from core import audio
+from core import audio, config
 from core import career as career_mod
-from core import config
 from core import market_hours as mh_mod
 from core import news as news_mod
 from core import onboarding as onboarding_mod

@@ -93,8 +93,41 @@ def test_sheet_app_shares_workbook_and_computes(app):
     sa.sheet.set("A2", "3")
     sa.sheet.set("A3", "=A1+A2")
     assert sa.sheet.get_value("A3") == 5
-    # partage le classeur avec app.sheet
-    assert app.sheet is sa.sheet
+    # partage le classeur avec app.workbook
+    assert app.workbook is sa.workbook
+
+
+def test_sheet_app_import_fills_blank_then_new_tab(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    assert len(sa.workbook.tabs) == 1
+    data = {"title": "ACME — Compte de résultat", "years": [2024, 2023],
+            "rows": [("Chiffre d'affaires", [100.0, 90.0])]}
+    sa.import_data(data)
+    assert len(sa.workbook.tabs) == 1          # feuille vierge -> remplie sur place
+    assert sa.sheet.get_raw("A3") == "Chiffre d'affaires"
+    # un second export (feuille désormais non vierge) ouvre une NOUVELLE feuille
+    data2 = {"title": "BETA — Bilan", "years": [2024],
+             "rows": [("Trésorerie", [50.0])]}
+    sa.import_data(data2)
+    assert len(sa.workbook.tabs) == 2
+    assert sa.workbook.active_index == 1
+    assert sa.sheet.get_raw("A3") == "Trésorerie"
+    # la première feuille reste intacte
+    assert sa.workbook.tabs[0].sheet.get_raw("A3") == "Chiffre d'affaires"
+
+
+def test_desktop_export_routes_to_native_sheet_app(app):
+    """Le bouton « → TABLEUR » d'un écran hébergé (financials, ma_target…)
+    doit atterrir dans l'app Tableur native (classeur multi-feuilles), pas
+    dans l'ancienne scène plein écran."""
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    data = {"title": "ACME — Bilan", "years": [2024], "rows": [("Actif", [10.0])]}
+    w = desk._open_scene_window("spreadsheet", import_data=data)
+    assert w.key == "sheet"
+    assert not any(win.key == "scene:spreadsheet" for win in desk.wm.windows)
+    assert w.app_obj.sheet.get_raw("A3") == "Actif"
 
 
 def test_research_app_selects_and_draws(app):
@@ -199,3 +232,41 @@ def test_ticker_scenes_get_default_asset(app):
     w = desk._open_scene_window("company")   # sans ticker -> défaut fourni
     assert w is not None
     assert "ticker" in w.app_obj._kwargs
+
+
+# --------------------------------------------------------- app liée à la voie
+def test_track_icon_appears_after_choosing_a_track_and_opens_scene(app):
+    from scenes.scene_desktop import TRACK_APP
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)
+    assert desk._track_rect is None            # "General" -> pas d'icône dédiée
+    app.gs.player.track = "M&A"
+    desk.draw(app.screen)
+    assert desk._track_rect is not None
+    scene_name, rect = desk._track_rect
+    assert scene_name == TRACK_APP["M&A"][0] == "ma"
+    desk.handle_event(_click(rect.centerx, rect.centery))
+    assert any(w.key == "scene:ma" for w in desk.wm.windows)
+
+
+# ----------------------------------------------------- popups de choix -> fenêtre
+def test_dilemma_routes_to_window_when_on_desktop():
+    a = main.App()
+    a.ensure_market()
+    a.gs.player.grade_index = 9
+    a.gs.player.cash = 5_000_000.0
+    a.scenes.go("desktop")
+    assert a.scenes.current_name == "desktop"
+    a.route_scene("dilemma", return_to="terminal")
+    desk = a.scenes.current
+    assert a.scenes.current_name == "desktop"   # le bureau reste la scène courante
+    assert any(w.key == "scene:dilemma" for w in desk.wm.windows)
+
+
+def test_route_scene_falls_back_to_classic_switch_outside_desktop():
+    a = main.App()
+    a.ensure_market()
+    a.scenes.go("terminal")
+    a.route_scene("dilemma", return_to="terminal")
+    assert a.scenes.current_name == "dilemma"

@@ -183,7 +183,8 @@ class App:
 
         # état de jeu courant (créé à la sélection du continent)
         self.gs = GameState()
-        self.sheet = None   # tableur partagé (créé à la 1re ouverture)
+        self.sheet = None       # tableur plein écran historique (créé à la 1re ouverture)
+        self.workbook = None    # classeur multi-feuilles de l'app Tableur du bureau
         self.market = None  # moteur de marché (créé/synchronisé à l'entrée du terminal)
         self.notes = NotificationCenter()   # centre de notifications (toasts)
 
@@ -201,6 +202,17 @@ class App:
     def notify(self, text, kind="info"):
         """Pousse une notification (toast) affichée en overlay."""
         self.notes.push(text, kind)
+
+    def route_scene(self, name, **kwargs):
+        """Navigation FORCÉE par le jeu (pas un clic joueur) — ex. un dilemme
+        qui se déclenche pendant que le temps passe. Si le bureau est la scène
+        courante, ouvre `name` en fenêtre (comme un popup de choix parmi
+        d'autres fenêtres) au lieu de basculer tout l'écran ; sinon,
+        comportement classique (bascule plein écran)."""
+        if self.scenes.current_name == "desktop":
+            self.scenes.current._open_scene_window(name, **kwargs)
+        else:
+            self.scenes.go(name, **kwargs)
 
     def _apply_window_mode(self):
         """(Ré)applique le mode d'affichage courant. La résolution LOGIQUE reste

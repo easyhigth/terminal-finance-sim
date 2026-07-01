@@ -1,19 +1,22 @@
 """
-scene_desktop.py — BUREAU façon « poste de travail » (refonte UI « Jeu PC »,
-étape 1).
+scene_desktop.py — BUREAU façon « poste de travail » (refonte UI « Jeu PC »).
 
 Écran principal type ordinateur : un fond de bureau, des icônes d'applications,
 une barre supérieure (horloge de jeu, trésorerie, vitesse) et une barre des
-tâches en bas. Les applications (Recherche, Trading, Tableur) s'ouvrent dans des
-FENÊTRES déplaçables cohabitant à l'écran (`ui/window_manager.py`), comme un
-vrai bureau où plusieurs outils sont ouverts en même temps.
+tâches en bas. Les applications (Recherche, Trading, Tableur, + l'app propre à
+la voie choisie) s'ouvrent dans des FENÊTRES déplaçables cohabitant à l'écran
+(`ui/window_manager.py`), comme un vrai bureau où plusieurs outils sont
+ouverts en même temps (ex. suivre le FX pendant que le desk M&A tourne à côté).
+N'IMPORTE QUELLE scène existante peut aussi s'ouvrir en fenêtre via le menu
+Démarrer (`apps/scene_host.py`).
 
 Le temps continue d'avancer ici (le bureau est une scène « live », cf.
 `core/sim_clock.LIVE_SCENE_NAMES`) : les pas de marché bancarisés par l'horloge
 sont joués via le terminal historique (`TerminalScene._drain_pending_steps`),
-qui reste le moteur de la boucle de jeu (deals, crises, carrière…). Le terminal
-classique reste accessible depuis une icône, le temps de migrer toutes les
-scènes en fenêtres (étapes suivantes).
+qui reste le moteur de la boucle de jeu (deals, crises, carrière…). Les popups
+de choix déclenchés par le jeu (pas un clic joueur — ex. un dilemme) passent
+par `App.route_scene()` : ouverture en fenêtre plutôt que bascule plein écran.
+Le terminal classique reste accessible depuis une icône.
 """
 import pygame
 
@@ -37,6 +40,19 @@ APPS = [
     ("trading", "Trading", "💹", TradingApp),
     ("sheet", "Tableur", "▦", SheetApp),
 ]
+
+# Application supplémentaire propre à la VOIE (track) choisie par le joueur
+# (cf. core/tracks.py) : une fois la voie choisie, une icône dédiée apparaît
+# sur le bureau et ouvre l'écran correspondant EN FENÊTRE — au même titre que
+# les autres apps, ouvrable en même temps (ex. suivre le FX pendant que le
+# desk M&A tourne dans une autre fenêtre).
+TRACK_APP = {
+    "Portfolio": ("portfolio_unified", "Portefeuille", "📊"),
+    "M&A": ("ma", "M&A", "🤝"),
+    "Risk": ("risk", "Risque", "⚠"),
+    "Quant": ("quant", "Quant", "∑"),
+    "Advisory": ("mandates", "Mandats", "🧾"),
+}
 
 # Scènes hébergées (menu Démarrer) nécessitant un actif par défaut si non fourni.
 _NEEDS_TICKER = {"company", "financials", "ma_target"}
@@ -64,6 +80,7 @@ class DesktopScene(Scene):
         self._launcher_rects = []   # [(Rect, scene, kwargs)] items du menu Démarrer
         self._pause_rect = None
         self._terminal_rect = None  # icône « Terminal classique »
+        self._track_rect = None     # (scene_name, Rect) icône propre à la voie choisie
         self._menu_rect = None
         self._gear_rect = None
         # le terminal reste le MOTEUR de la boucle de jeu : on l'initialise si on
@@ -124,6 +141,9 @@ class DesktopScene(Scene):
         if self._terminal_rect and self._terminal_rect.collidepoint(pos):
             self.app.scenes.go("terminal")
             return
+        if self._track_rect and self._track_rect[1].collidepoint(pos):
+            self._open_scene_window(self._track_rect[0])
+            return
         if self._menu_rect and self._menu_rect.collidepoint(pos):
             self.app.scenes.go("menu")
             return
@@ -147,6 +167,13 @@ class DesktopScene(Scene):
         """Ouvre (ou ramène au premier plan) une fenêtre hébergeant la scène
         `name`. C'est aussi le point d'entrée du routeur de navigation des
         scènes hébergées (cf. apps/scene_host.py)."""
+        if name == "spreadsheet":
+            # le Tableur du bureau est une app NATIVE unique (classeur multi-
+            # feuilles, cf. apps/app_sheet.py) : toute navigation vers l'ancien
+            # écran plein écran (export d'état financier, bouton PLUS…) est
+            # redirigée vers cette app plutôt que d'héberger l'écran
+            # historique — un seul tableur sur le bureau, jamais deux.
+            return self._open_sheet_app(kwargs.get("import_data"))
         if name not in self.app.scenes.scenes or name in ("desktop", "gameover"):
             # gameover / sorties de flux : bascule plein écran (hors fenêtres)
             if name in self.app.scenes.scenes:
@@ -172,6 +199,17 @@ class DesktopScene(Scene):
         w = self.wm.open(key, factory)
         if existing is not None and kw:
             w.app_obj.reenter(**kw)   # met à jour le contexte (ticker…) si déjà ouverte
+        self.start_open = False
+        return w
+
+    def _open_sheet_app(self, import_data=None):
+        """Ouvre/ramène l'app Tableur ; si `import_data` est fourni (export
+        depuis un état financier/une fiche M&A…), le classeur reçoit les
+        données — feuille active si vierge, sinon une NOUVELLE feuille
+        (cf. core/workbook.Workbook.import_financial)."""
+        w = self.wm.open("sheet", lambda: SheetApp(self.app))
+        if import_data:
+            w.app_obj.import_data(import_data)
         self.start_open = False
         return w
 
@@ -223,6 +261,22 @@ class DesktopScene(Scene):
         widgets.draw_text(surf, "▣", (r.centerx, r.y + 26), fonts.title(), config.COL_CYAN, align="center")
         widgets.draw_text(surf, "Terminal", (r.centerx, r.bottom - 18), fonts.small(bold=True),
                           config.COL_TEXT, align="center")
+        # icône propre à la voie choisie (une fois choisie, cf. TRACK_APP)
+        y += 96
+        self._track_rect = None
+        track = getattr(self.app.gs.player, "track", "General")
+        if track in TRACK_APP:
+            scene_name, label, icon = TRACK_APP[track]
+            r = pygame.Rect(x, y, 92, 78)
+            self._track_rect = (scene_name, r)
+            hov = r.collidepoint(pygame.mouse.get_pos())
+            if hov:
+                pygame.draw.rect(surf, config.COL_PANEL, r, border_radius=8)
+                pygame.draw.rect(surf, config.COL_PRESTIGE, r, 1, border_radius=8)
+            widgets.draw_text(surf, icon, (r.centerx, r.y + 26), fonts.title(),
+                              config.COL_PRESTIGE, align="center")
+            widgets.draw_text(surf, label, (r.centerx, r.bottom - 18), fonts.small(bold=True),
+                              config.COL_TEXT, align="center")
 
     def _draw_topbar(self, surf):
         bar = pygame.Rect(0, 0, config.SCREEN_WIDTH, TOPBAR_H)

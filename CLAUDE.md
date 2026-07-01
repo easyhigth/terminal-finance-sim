@@ -68,6 +68,24 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   l'**écran d'atterrissage** d'une nouvelle partie (`scene_intro` → `desktop` ; le terminal
   est initialisé au 1er `on_enter` du bureau pour piloter le temps). Le terminal classique
   reste accessible (icône « Terminal »).
+  **Étape 3** : app dédiée à la VOIE choisie (`TRACK_APP` dans `scene_desktop.py` — M&A→`ma`,
+  Risk→`risk`, Quant→`quant`, Portfolio→`portfolio_unified`, Advisory→`mandates`) : une fois
+  `player.track` fixé (hors `"General"`), une icône supplémentaire apparaît sur le bureau et
+  ouvre l'écran de la voie en fenêtre, comme les autres apps (ouvrable en même temps —
+  ex. suivre le FX pendant que la fenêtre M&A tourne à côté). Les navigations FORCÉES par le
+  jeu (pas un clic joueur — ex. un dilemme qui se déclenche pendant que le temps passe) 
+  utilisent `App.route_scene(name, **kwargs)` : sur le bureau, ouvre une fenêtre (popup de
+  choix parmi les autres) au lieu de basculer tout l'écran ; sinon comportement classique
+  (`scenes/scene_terminal_time.py` l'utilise pour le déclenchement d'un dilemme). Le Tableur
+  est passé à un **classeur multi-feuilles** (`core/workbook.py::Workbook`, onglets façon
+  Excel) partagé par l'app native (`apps/app_sheet.py`, `app.workbook`) : un export (état
+  financier, fiche M&A…) remplit la feuille ACTIVE si elle est vierge, sinon ouvre une
+  NOUVELLE feuille (`Workbook.import_financial`) — jamais d'écrasement silencieux d'un modèle
+  en cours. Toute navigation vers l'ancienne scène plein écran `"spreadsheet"` (bouton
+  « → TABLEUR », entrée PLUS) est interceptée par `DesktopScene._open_scene_window` et
+  redirigée vers cette app native (`_open_sheet_app`) — un seul tableur sur le bureau. La
+  scène `scene_spreadsheet.py` (avec son propre `app.sheet`, distinct de `app.workbook`) reste
+  inchangée et n'est plus utilisée QUE hors bureau (terminal classique).
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, **1 minute réelle = 1 pas de marché**
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 120`), soit un nouveau pas toutes les ~60 s (x1) /

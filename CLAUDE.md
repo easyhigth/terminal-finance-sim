@@ -86,6 +86,31 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   redirigée vers cette app native (`_open_sheet_app`) — un seul tableur sur le bureau. La
   scène `scene_spreadsheet.py` (avec son propre `app.sheet`, distinct de `app.workbook`) reste
   inchangée et n'est plus utilisée QUE hors bureau (terminal classique).
+  **Étape 4 : le bureau devient l'ÉCRAN MAÎTRE**, et le TERMINAL lui-même devient une fenêtre
+  comme les autres (plus de scène plein écran séparée pour jouer). `DesktopScene` crée à
+  l'arrivée une instance TERMINAL persistante (`self._terminal_host`, un `SceneHostApp`) qui
+  reste le MOTEUR de la boucle de jeu tant que la partie tourne — `_tick_market()` l'utilise
+  directement, que sa fenêtre soit ouverte, minimisée (état par défaut au démarrage, bureau
+  propre) ou fermée (fermer la fenêtre ne tue pas le moteur : le temps continue de s'écouler ;
+  ré-ouvrir via l'icône Terminal retrouve la MÊME instance, jamais de doublon). Comme toute
+  navigation interne du terminal (`self.app.scenes.go(...)`, ex. taper SHOP) passe par SA
+  PROPRE proxy (le terminal est hébergé comme les autres scènes), taper une commande dans le
+  terminal ouvre désormais une FENÊTRE sur le bureau plutôt que de basculer plein écran — le
+  terminal se comporte comme n'importe quelle autre app. Les points d'entrée qui atterrissaient
+  auparavant sur `"terminal"` (nouvelle partie via `scene_intro`, sandbox, chargement de
+  sauvegarde `scene_saves.py`/`SceneManager._quickslot_load`) atterrissent désormais tous sur
+  `"desktop"` — `"desktop"` est dans `BREADCRUMB_SKIP` (`core/scene_manager.py`, pas de fil
+  d'Ariane à afficher par-dessus, toute la navigation y étant interne aux fenêtres). Seules les
+  scènes de flux pré/post-partie (`_FULLSCREEN_EXIT` dans `scene_desktop.py` : menu, gameover,
+  intro, continent, runsetup, sandbox, splash) restent une VRAIE bascule plein écran — quitter
+  le bureau pour de bon. Icônes du bureau en GRILLE (pas une colonne, `_icon_list`/
+  `_draw_desktop_icons`), dessinées en VECTORIEL (`ui/desktop_icons.py`) : les emoji
+  (🔍💹▦🖥🤝⚠∑…) ne s'affichent pas de façon fiable dans la police embarquée JetBrains Mono
+  (pas de couverture emoji), même défaut déjà rencontré et corrigé pour le bouton pause
+  (`ui/simclock_widget.py`, dont le bureau réutilise directement les fonctions de dessin
+  `_draw_pause`/`_draw_speed`/`_draw_gear` pour des contrôles identiques). Chrome de fenêtre
+  (`ui/window_manager.py`) et titres de fenêtres hébergées (`DesktopApp.icon_kind`,
+  `apps/base.py`) migrés au même système d'icônes vectorielles.
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, **1 minute réelle = 1 pas de marché**
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 120`), soit un nouveau pas toutes les ~60 s (x1) /

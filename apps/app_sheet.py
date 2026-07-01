@@ -30,7 +30,7 @@ TAB_W = 108
 
 class SheetApp(DesktopApp):
     title = "Tableur"
-    icon = "▦"
+    icon_kind = "sheet"
     default_size = (720, 480)
     min_size = (420, 280)
 

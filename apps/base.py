@@ -11,7 +11,7 @@ testés dans `handle_event()` (même pattern que les scènes existantes).
 
 class DesktopApp:
     title = "Application"
-    icon = "▣"
+    icon_kind = "generic"   # clé d'icône vectorielle (cf. ui/desktop_icons.py)
     default_size = (760, 480)
     min_size = (340, 240)
 

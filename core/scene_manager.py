@@ -17,8 +17,11 @@ PALETTE_ROW_H = 30
 
 # Scènes de flux pré-partie (menu, création de run...) : jamais de fil
 # d'Ariane pendant cette phase, et la pile est purgée pour repartir propre
-# une fois "terminal" atteint.
-BREADCRUMB_SKIP = {"menu", "continent", "runsetup", "sandbox", "splash", "intro", "gameover"}
+# une fois "terminal" atteint. "desktop" : écran MAÎTRE du jeu (refonte UI) —
+# toute la navigation qui s'y passe est interne (fenêtres), jamais un vrai
+# SceneManager.go(), donc pas de fil d'Ariane à afficher par-dessus.
+BREADCRUMB_SKIP = {"menu", "continent", "runsetup", "sandbox", "splash", "intro", "gameover",
+                   "desktop"}
 BREADCRUMB_Y = 4
 
 
@@ -326,7 +329,7 @@ class SceneManager:
         self.app.gs = gs
         self.app.ensure_market()
         self.close_palette()
-        self.go("gameover" if gs.player.game_over else "terminal")
+        self.go("gameover" if gs.player.game_over else "desktop")
         self.app.notify(_L(f"Chargé depuis {slot.upper()}.", f"Loaded from {slot.upper()}."), "good")
 
     def handle_event(self, event):

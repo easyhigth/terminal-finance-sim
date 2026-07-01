@@ -73,7 +73,7 @@ class _ProxyApp:
 class SceneHostApp(DesktopApp):
     default_size = (940, 560)
     min_size = (420, 300)
-    icon = "▣"
+    icon_kind = "generic"
 
     def __init__(self, app, scene_name, title, kwargs=None):
         super().__init__(app)

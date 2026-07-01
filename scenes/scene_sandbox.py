@@ -98,7 +98,7 @@ class SandboxScene(Scene):
             market.regime_since = market.step_count
 
         # ne JAMAIS appeler gs.save() ici : run jetable, voir docstring du module.
-        self.app.scenes.go("terminal")
+        self.app.scenes.go("desktop")
 
     def update(self, dt):
         mp = pygame.mouse.get_pos()

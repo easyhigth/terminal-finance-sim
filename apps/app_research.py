@@ -19,7 +19,7 @@ ROW_H = 22
 
 class ResearchApp(DesktopApp):
     title = "Recherche — Marchés"
-    icon = "🔍"
+    icon_kind = "research"
     default_size = (820, 520)
     min_size = (520, 320)
 

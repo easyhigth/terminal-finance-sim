@@ -17,7 +17,7 @@ surface, pour rester compatible avec les widgets existants (`ui/widgets.py`).
 import pygame
 
 from core import config
-from ui import fonts, widgets
+from ui import desktop_icons, fonts, widgets
 
 TITLE_H = 26          # hauteur de la barre de titre
 BORDER = 2            # épaisseur du liseré de fenêtre
@@ -74,19 +74,23 @@ class Window:
         tr = self.title_rect
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if focused else config.COL_PANEL, tr)
         pygame.draw.line(surf, accent, (tr.x, tr.bottom - 1), (tr.right, tr.bottom - 1), 1)
-        icon = getattr(self.app_obj, "icon", "▣")
-        widgets.draw_text(surf, f"{icon}  {self.app_obj.title}", (tr.x + 10, tr.y + 5),
-                          fonts.small(bold=True), config.COL_AMBER if focused else config.COL_TEXT_DIM)
-        # boutons réduire / fermer
+        icon_kind = getattr(self.app_obj, "icon_kind", "generic")
+        icon_col = config.COL_AMBER if focused else config.COL_TEXT_DIM
+        desktop_icons.draw(surf, (tr.x + 18, tr.centery), icon_kind, icon_col)
+        widgets.draw_text(surf, self.app_obj.title, (tr.x + 32, tr.y + 5),
+                          fonts.small(bold=True), icon_col)
+        # boutons réduire / fermer (dessin vectoriel, cf. ui/desktop_icons.py —
+        # les glyphes Unicode « – »/« ✕ » ne s'affichent pas de façon fiable)
         mr, cr = self.min_rect, self.close_rect
         mp = pygame.mouse.get_pos()
         if mr.collidepoint(mp):
             pygame.draw.rect(surf, config.COL_PANEL, mr)
-        widgets.draw_text(surf, "–", mr.center, fonts.small(bold=True), config.COL_TEXT, align="center")
+        pygame.draw.line(surf, config.COL_TEXT, (mr.centerx - 5, mr.centery), (mr.centerx + 5, mr.centery), 2)
         if cr.collidepoint(mp):
             pygame.draw.rect(surf, config.COL_DOWN, cr)
-        widgets.draw_text(surf, "✕", cr.center, fonts.small(bold=True),
-                          config.COL_WHITE if cr.collidepoint(mp) else config.COL_TEXT, align="center")
+        xcol = config.COL_WHITE if cr.collidepoint(mp) else config.COL_TEXT
+        pygame.draw.line(surf, xcol, (cr.centerx - 5, cr.centery - 5), (cr.centerx + 5, cr.centery + 5), 2)
+        pygame.draw.line(surf, xcol, (cr.centerx - 5, cr.centery + 5), (cr.centerx + 5, cr.centery - 5), 2)
         # contenu de l'application (clippé à sa zone)
         cont = self.content_rect
         prev_clip = surf.get_clip()

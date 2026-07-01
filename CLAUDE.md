@@ -175,6 +175,14 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   les graphiques qui en dépendent se recalculent en direct au fil du temps qui passe (un
   modèle « attend le bon moment » tout seul). Un ticker inconnu renvoie `"#N/A"` (pas de
   crash). Catégorie « Marché (en direct) » ajoutée au catalogue `fx ▾`.
+  **Étape 9 : liens cliquables entre apps.** Les apps natives reçoivent une back-ref
+  `desktop` (posée par `DesktopScene._launch`/`_open_sheet_app`, cf. `apps/base.DesktopApp`).
+  L'app Recherche (`apps/app_research.py`) affiche une barre d'actions dans le panneau détail —
+  **Trader** (`DesktopScene.open_trading(ticker)` → ouvre/focalise Trading pré-filtré via
+  `TradingApp.focus_ticker`), **→ Tableur** (`DesktopScene.add_quote_to_sheet` → `SheetApp
+  .add_quote` insère `ticker`/`=PRICE("ticker")` en 1re ligne libre, cours vivant), **Analyse**
+  (`_open_scene_window("company", ticker=…)` → fiche Refinitiv en fenêtre). Transforme les
+  fenêtres juxtaposées en vrai flux de travail (repérer → trader/modéliser sans re-saisir).
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, **1 minute réelle = 1 pas de marché**
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 120`), soit un nouveau pas toutes les ~60 s (x1) /

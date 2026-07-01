@@ -369,6 +369,59 @@ def test_sheet_live_formula_feeds_a_chart(app):
     assert data["y"] == [pytest.approx(app.market.price_of(t)) for t in tks]
 
 
+# --------------------------------------------- liens cliquables entre apps (PR2)
+def test_research_trade_link_opens_and_prefills_trading(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("research")
+    ra = w.app_obj
+    assert ra.desktop is desk               # back-ref posée au lancement
+    tk = app.market.companies[0]["ticker"]
+    ra.sel = tk
+    ra._do_action("trade")
+    tw = next((win for win in desk.wm.windows if win.key == "trading"), None)
+    assert tw is not None
+    assert tw.app_obj.search == tk          # trading pré-filtré sur le ticker
+    assert desk.wm.focused is tw            # ramené au premier plan
+
+
+def test_research_sheet_link_pushes_live_quote(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    ra = desk._launch("research").app_obj
+    tk = app.market.companies[0]["ticker"]
+    ra.sel = tk
+    ra._do_action("sheet")
+    sw = next(win for win in desk.wm.windows if win.key == "sheet")
+    sheet = sw.app_obj.sheet
+    assert sheet.get_raw("A1") == tk
+    assert sheet.get_raw("B1") == f'=PRICE("{tk}")'
+    assert sheet.get_value("B1") == pytest.approx(app.market.price_of(tk))
+
+
+def test_research_analyse_link_opens_company_window(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    ra = desk._launch("research").app_obj
+    ra.sel = app.market.companies[0]["ticker"]
+    ra._do_action("analyse")
+    assert any(win.key == "scene:company" for win in desk.wm.windows)
+
+
+def test_research_action_bar_click_via_draw(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("research")
+    ra = w.app_obj
+    ra.sel = app.market.companies[0]["ticker"]
+    rect = pygame.Rect(0, 0, 820, 520)
+    ra.draw(app.screen, rect)               # peuple _action_rects
+    assert "trade" in ra._action_rects
+    r = ra._action_rects["trade"]
+    ra.handle_event(_click(r.centerx, r.centery), rect)
+    assert any(win.key == "trading" for win in desk.wm.windows)
+
+
 def test_desktop_export_routes_to_native_sheet_app(app):
     """Le bouton « → TABLEUR » d'un écran hébergé (financials, ma_target…)
     doit atterrir dans l'app Tableur native (classeur multi-feuilles), pas

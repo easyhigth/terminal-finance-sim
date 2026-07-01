@@ -40,6 +40,13 @@ class TradingApp(DesktopApp):
         self._qty_minus = self._qty_plus = None
         self._list_rect = None
 
+    def focus_ticker(self, ticker):
+        """Pré-filtre la liste sur `ticker` — appelé par le lien « Trader »
+        de l'app Recherche (cf. DesktopScene.open_trading)."""
+        self.search = str(ticker).upper()
+        self.scroll = 0
+        self.msg = f"Prêt à trader {self.search}."
+
     def _can_trade(self):
         return unlocks.unlocked(self.app.gs.player, "trade")
 

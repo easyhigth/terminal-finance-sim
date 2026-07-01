@@ -189,6 +189,15 @@ def _help(surf, cx, cy, col):
     pygame.draw.circle(surf, col, (cx, cy + 7), 1)
 
 
+def _calc(surf, cx, cy, col):
+    r = pygame.Rect(cx - 11, cy - 13, 22, 26)
+    pygame.draw.rect(surf, col, r, 2, border_radius=2)
+    pygame.draw.line(surf, col, (r.x + 3, r.y + 5), (r.right - 3, r.y + 5), 1)
+    for gy in range(r.y + 11, r.bottom - 3, 6):
+        for gx in range(r.x + 4, r.right - 3, 6):
+            pygame.draw.rect(surf, col, (gx, gy, 3, 3))
+
+
 _ICONS = {
     "research": _research, "trading": _trading, "sheet": _sheet,
     "terminal": _terminal, "ma": _ma, "risk": _risk, "quant": _quant,
@@ -197,6 +206,7 @@ _ICONS = {
     "inbox": _inbox, "news": _news, "mission": _mission, "deals": _deals,
     "decide": _decide, "examcert": _examcert, "wall": _wall, "shop": _shop,
     "explorer": _explorer, "graph": _graph, "save": _save, "help": _help,
+    "calc": _calc,
 }
 
 

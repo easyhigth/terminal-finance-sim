@@ -73,10 +73,54 @@ def _pmt(args):
     return -pv * rate * (1 + rate) ** nper / ((1 + rate) ** nper - 1)
 
 
+def _pv(args):
+    f = _nums(args)
+    rate, nper, pmt = f[0], f[1], f[2]
+    if rate == 0:
+        return -pmt * nper
+    return -pmt * (1 - (1 + rate) ** (-nper)) / rate
+
+
+def _fv(args):
+    f = _nums(args)
+    rate, nper, pmt = f[0], f[1], f[2]
+    if rate == 0:
+        return -pmt * nper
+    return -pmt * (((1 + rate) ** nper - 1) / rate)
+
+
+def _median(vals):
+    s = sorted(vals)
+    n = len(s)
+    if n == 0:
+        return 0.0
+    mid = n // 2
+    return s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2.0
+
+
+def _correl(args):
+    """CORREL(plageX, plageY) — corrélation de Pearson entre deux plages de
+    même longueur (usage classique finance : deux séries de rendements)."""
+    if len(args) < 2:
+        return 0.0
+    xs = _nums([args[0]])
+    ys = _nums([args[1]])
+    n = min(len(xs), len(ys))
+    if n < 2:
+        return 0.0
+    xs, ys = xs[:n], ys[:n]
+    mx, my = sum(xs) / n, sum(ys) / n
+    cov = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    sx = math.sqrt(sum((x - mx) ** 2 for x in xs))
+    sy = math.sqrt(sum((y - my) ** 2 for y in ys))
+    return cov / (sx * sy) if sx and sy else 0.0
+
+
 FUNCTIONS = {
     "SUM":     lambda a: sum(_nums(a)),
     "AVERAGE": lambda a: (sum(_nums(a)) / len(_nums(a))) if _nums(a) else 0.0,
     "MEAN":    lambda a: (sum(_nums(a)) / len(_nums(a))) if _nums(a) else 0.0,
+    "MEDIAN":  lambda a: _median(_nums(a)),
     "MIN":     lambda a: min(_nums(a)) if _nums(a) else 0.0,
     "MAX":     lambda a: max(_nums(a)) if _nums(a) else 0.0,
     "COUNT":   lambda a: float(len(_nums(a))),
@@ -89,9 +133,12 @@ FUNCTIONS = {
     "ROUND":   lambda a: round(_nums(a)[0], int(_nums(a)[1]) if len(_nums(a)) > 1 else 0),
     "STDEV":   lambda a: _stdev(_nums(a)),
     "VAR":     lambda a: _stdev(_nums(a)) ** 2,
+    "CORREL":  _correl,
     "NPV":     _npv,
     "IRR":     _irr,
     "PMT":     _pmt,
+    "PV":      _pv,
+    "FV":      _fv,
     "IF":      lambda a: a[1] if a[0] else (a[2] if len(a) > 2 else 0.0),
 }
 

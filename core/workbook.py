@@ -15,10 +15,27 @@ Logique pure (pas de pygame) : testable seule.
 from core.spreadsheet_engine import Spreadsheet, idx_to_col
 
 
+class SheetChart:
+    """Un graphe inséré sur une feuille (comme un objet graphique Excel) :
+    type + plage source + position/taille (en pixels, dans le canvas de la
+    grille). Logique pure — l'app (`apps/app_sheet.py`) l'affiche et gère le
+    glisser/redimensionner ; ce module ne connaît que l'état."""
+
+    _next_id = 1
+
+    def __init__(self, kind, range_str, x, y, w=280, h=180):
+        self.id = SheetChart._next_id
+        SheetChart._next_id += 1
+        self.kind = kind            # "line" | "bar" | "scatter"
+        self.range_str = range_str
+        self.x, self.y, self.w, self.h = x, y, w, h
+
+
 class WorkbookTab:
     def __init__(self, name, sheet):
         self.name = name
         self.sheet = sheet
+        self.charts = []   # [SheetChart]
 
 
 class Workbook:

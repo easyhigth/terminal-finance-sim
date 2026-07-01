@@ -129,6 +129,31 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   d'onglets, `core/pages.py` — a son `main_scene_name` par défaut à `"desktop"`, et un
   **nouvel onglet** (bouton « + » / Ctrl+T, `PageManager.open_new_tab()`, ex-`duplicate_current`)
   ouvre TOUJOURS sur le bureau plutôt que de dupliquer l'onglet courant.
+  **Étape 6** : la **calculatrice** devient une app du bureau (`apps/app_calculator.py`,
+  `CalculatorApp`, icône « calc ») — jusqu'ici accessible uniquement en overlay flottant
+  depuis les missions/examens (`ui/calculator.py`, toujours utilisé tel quel à cet endroit) ;
+  l'app du bureau réutilise sa logique de calcul (`safe_eval`, touches scientifiques) sans le
+  cadre/titre du widget d'origine (chrome fourni par la fenêtre). Le **tableur** (`apps/app_sheet.py`)
+  devient nettement plus « façon Excel » :
+  - **Catalogue de formules** (bouton « fx ▾ » de la barre d'outils) : panneau catégorisé
+    (Maths/Statistiques/Finance/Logique) listant chaque fonction du moteur
+    (`core/spreadsheet_engine.FUNCTIONS`, complété par `MEDIAN`/`CORREL`/`PV`/`FV`) avec une
+    courte description ; cliquer insère `NOM(` dans la formule en cours (`_insert_function`).
+  - **Sélection de plage** : glisser la souris sur plusieurs cellules (`range_anchor`/
+    `range_end`, mis à jour par `handle_event` sur MOUSEMOTION tant que `_dragging_range`),
+    surlignée dans la grille (en-têtes + cellules).
+  - **Graphiques insérés sur la feuille** (`core/workbook.SheetChart` — type/plage/position,
+    stockés par `WorkbookTab.charts`, PAS persistés) : 3 types depuis la barre d'outils —
+    Ligne, Barres (une colonne de valeurs, éventuellement précédée d'une colonne d'étiquettes),
+    Nuage de points (exige EXACTEMENT 2 colonnes numériques X;Y, message d'erreur sinon). Les
+    données sont relues EN DIRECT depuis la feuille à chaque frame (`_chart_data`) — un
+    graphique reflète donc les recalculs de formules. Chaque graphique est une boîte flottante
+    par-dessus la grille (positionnée en coordonnées RELATIVES au contenu de la fenêtre, donc
+    stable si la fenêtre est déplacée) : titre déplaçable (glisser), bouton fermer (×). Dessin
+    par primitives `pygame.draw` directes (`_draw_line`/`_draw_bar`/`_draw_scatter`), pas de
+    dépendance à `widgets.draw_series` (pensé pour les séries de prix, pas les données tableur
+    génériques). Pas de VBA/macros — uniquement formules + graphiques, l'usage courant d'Excel
+    en finance.
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, **1 minute réelle = 1 pas de marché**
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 120`), soit un nouveau pas toutes les ~60 s (x1) /

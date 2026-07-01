@@ -27,6 +27,7 @@ s'affichent pas de façon fiable dans la police embarquée (cf. ce module).
 """
 import pygame
 
+from apps.app_calculator import CalculatorApp
 from apps.app_research import ResearchApp
 from apps.app_sheet import SheetApp
 from apps.app_trading import TradingApp
@@ -52,6 +53,7 @@ APPS = [
     ("research", "Recherche", "research", ResearchApp),
     ("trading", "Trading", "trading", TradingApp),
     ("sheet", "Tableur", "sheet", SheetApp),
+    ("calculator", "Calculatrice", "calc", CalculatorApp),
 ]
 
 # Application supplémentaire propre à la VOIE (track) choisie par le joueur

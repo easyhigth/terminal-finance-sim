@@ -386,3 +386,33 @@ def test_nested_function_and_reference_combo():
     sh.set("A3", "30")
     sh.set("B1", "=ROUND(AVERAGE(A1:A3)/3,2)")
     assert sh.get_value("B1") == pytest.approx(round((10 + 20 + 30) / 3 / 3, 2))
+
+
+# ------------------------------------------------ nouvelles fonctions finance
+def test_median_odd_and_even():
+    sh = Spreadsheet()
+    sh.set("A1", "1"); sh.set("A2", "3"); sh.set("A3", "2")
+    sh.set("B1", "=MEDIAN(A1:A3)")
+    assert sh.get_value("B1") == 2.0
+    sh.set("A4", "10")
+    sh.set("B2", "=MEDIAN(A1:A4)")
+    assert sh.get_value("B2") == pytest.approx((2 + 3) / 2)
+
+
+def test_correl_perfect_positive():
+    sh = Spreadsheet()
+    for i, (x, y) in enumerate([(1, 2), (2, 4), (3, 6), (4, 8)], start=1):
+        sh.set(f"A{i}", str(x))
+        sh.set(f"B{i}", str(y))
+    sh.set("C1", "=CORREL(A1:A4,B1:B4)")
+    assert sh.get_value("C1") == pytest.approx(1.0)
+
+
+def test_pv_and_fv_roundtrip():
+    sh = Spreadsheet()
+    sh.set("A1", "=PV(0.05,10,-100)")
+    pv = sh.get_value("A1")
+    assert pv > 0
+    sh.set("A2", "=FV(0.05,10,-100)")
+    fv = sh.get_value("A2")
+    assert fv > 0

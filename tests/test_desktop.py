@@ -117,6 +117,140 @@ def test_sheet_app_import_fills_blank_then_new_tab(app):
     assert sa.workbook.tabs[0].sheet.get_raw("A3") == "Chiffre d'affaires"
 
 
+# ----------------------------------------------- tableur "façon Excel" (fx, plages, graphes)
+def test_sheet_app_fx_picker_inserts_function(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    sa._insert_function("NPV")
+    assert sa.editing is True
+    assert sa.edit_buf == "=NPV("
+    assert sa.fx_open is False
+
+
+def test_sheet_app_fx_picker_appends_to_existing_formula(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    sa.editing = True
+    sa.edit_buf = "=ROUND("
+    sa._insert_function("AVERAGE")
+    assert sa.edit_buf == "=ROUND(AVERAGE("
+
+
+def test_sheet_app_range_drag_selection(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    rect = pygame.Rect(0, 0, 900, 600)
+    sa.draw(app.screen, rect)   # peuple _cell_rects
+    a1 = sa._cell_rects["A1"].center
+    b3 = sa._cell_rects["B3"].center
+    sa.handle_event(_click(*a1), rect)
+    assert sa._dragging_range is True
+    sa.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=b3, buttons=(1, 0, 0)), rect)
+    sa.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, button=1, pos=b3), rect)
+    assert sa._dragging_range is False
+    c1, c2, r1, r2 = sa._range_bounds()
+    assert (c1, c2, r1, r2) == (0, 1, 1, 3)   # A1:B3
+
+
+def test_sheet_app_add_line_chart_from_range(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    for i, v in enumerate((10, 20, 15, 30), start=1):
+        sa.sheet.set(f"A{i}", str(v))
+    sa.range_anchor, sa.range_end = "A1", "A4"
+    sa._add_chart("line")
+    assert len(sa.workbook.active.charts) == 1
+    chart = sa.workbook.active.charts[0]
+    assert chart.kind == "line" and chart.range_str == "A1:A4"
+    data = sa._chart_data(chart)
+    assert data["y"] == [10.0, 20.0, 15.0, 30.0]
+
+
+def test_sheet_app_add_scatter_requires_two_columns(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    for i, (x, y) in enumerate([(1, 2), (2, 4), (3, 6)], start=1):
+        sa.sheet.set(f"A{i}", str(x))
+        sa.sheet.set(f"B{i}", str(y))
+    sa.range_anchor, sa.range_end = "A1", "A3"   # une seule colonne -> refusé
+    sa._add_chart("scatter")
+    assert len(sa.workbook.active.charts) == 0
+    assert "2 colonnes" in sa.msg
+    sa.range_anchor, sa.range_end = "A1", "B3"
+    sa._add_chart("scatter")
+    assert len(sa.workbook.active.charts) == 1
+    data = sa._chart_data(sa.workbook.active.charts[0])
+    assert data["x"] == [1.0, 2.0, 3.0]
+    assert data["y"] == [2.0, 4.0, 6.0]
+
+
+def test_sheet_app_add_bar_chart_with_labels_column(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    labels = ["Q1", "Q2", "Q3"]
+    vals = [100, 150, 90]
+    for i, (lab, v) in enumerate(zip(labels, vals), start=1):
+        sa.sheet.set(f"A{i}", lab)
+        sa.sheet.set(f"B{i}", str(v))
+    sa.range_anchor, sa.range_end = "A1", "B3"
+    sa._add_chart("bar")
+    chart = sa.workbook.active.charts[0]
+    data = sa._chart_data(chart)
+    assert data["labels"] == labels
+    assert data["y"] == [100.0, 150.0, 90.0]
+
+
+def test_sheet_app_close_chart_removes_it(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    for i, v in enumerate((1, 2, 3), start=1):
+        sa.sheet.set(f"A{i}", str(v))
+    sa.range_anchor, sa.range_end = "A1", "A3"
+    sa._add_chart("line")
+    rect = pygame.Rect(0, 0, 900, 600)
+    sa.draw(app.screen, rect)   # peuple _chart_close_rects
+    cid = sa.workbook.active.charts[0].id
+    close_r = sa._chart_close_rects[cid]
+    sa.handle_event(_click(close_r.centerx, close_r.centery), rect)
+    assert sa.workbook.active.charts == []
+
+
+def test_sheet_app_drag_chart_moves_it(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    for i, v in enumerate((1, 2, 3), start=1):
+        sa.sheet.set(f"A{i}", str(v))
+    sa.range_anchor, sa.range_end = "A1", "A3"
+    sa._add_chart("line")
+    rect = pygame.Rect(50, 50, 900, 600)
+    sa.draw(app.screen, rect)
+    chart = sa.workbook.active.charts[0]
+    title_r = sa._chart_title_rects[chart.id]
+    x0, y0 = chart.x, chart.y
+    sa.handle_event(_click(title_r.centerx, title_r.centery), rect)
+    new_pos = (title_r.centerx + 40, title_r.centery + 30)
+    sa.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=new_pos, buttons=(1, 0, 0)), rect)
+    sa.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, button=1, pos=new_pos), rect)
+    assert (chart.x, chart.y) != (x0, y0)
+
+
+# ------------------------------------------------------------ calculatrice
+def test_calculator_app_computes_expression(app):
+    from apps.app_calculator import CalculatorApp
+    ca = CalculatorApp(app)
+    ca.on_open()
+    ca.expr = "2+3*4"
+    ca._press("=")
+    assert ca.result == "14"
+
+
+def test_calculator_desktop_icon_opens_window(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk._launch("calculator")
+    assert any(w.key == "calculator" for w in desk.wm.windows)
+
+
 def test_desktop_export_routes_to_native_sheet_app(app):
     """Le bouton « → TABLEUR » d'un écran hébergé (financials, ma_target…)
     doit atterrir dans l'app Tableur native (classeur multi-feuilles), pas

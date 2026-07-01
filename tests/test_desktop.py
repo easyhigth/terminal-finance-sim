@@ -1032,3 +1032,186 @@ def test_sim_clock_pace_leaves_a_day_slower_than_before():
 def test_intraday_refreshes_more_than_once_per_day():
     from core import intraday
     assert intraday.MINUTES_PER_DAY // intraday.QUANTIZE_MINUTES >= 2
+
+
+# ==================================== Tableur avancé (VLOOKUP UI, CF, CSV, ====
+# ==================================== copier/coller, annuler/rétablir) =======
+def test_sheet_app_vlookup_catalog_entry_present(app):
+    from apps.app_sheet import FUNCTION_CATALOG
+    names = {name for _cat, funcs in FUNCTION_CATALOG for name, _hint in funcs}
+    assert "VLOOKUP" in names
+
+
+def test_sheet_app_vlookup_formula_resolves(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    sa.sheet.set("A1", "MVC"); sa.sheet.set("B1", "42")
+    sa.sheet.set("C1", '=VLOOKUP("MVC",A1:B1,2)')
+    assert sa.sheet.get_value("C1") == 42.0
+
+
+# ------------------------------------------------------- copier/coller (Ctrl+C/V)
+def _ctrl_key(key):
+    return pygame.event.Event(pygame.KEYDOWN, key=key, mod=pygame.KMOD_CTRL, unicode="")
+
+
+def test_sheet_app_copy_paste_range(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    sa.sheet.set("A1", "10"); sa.sheet.set("A2", "20")
+    sa.range_anchor, sa.range_end = "A1", "A2"
+    rect = pygame.Rect(0, 0, 900, 600)
+    sa.handle_event(_ctrl_key(pygame.K_c), rect)
+    assert sa._clipboard == [["10"], ["20"]]
+    sa.sel = "C1"
+    sa.handle_event(_ctrl_key(pygame.K_v), rect)
+    assert sa.sheet.get_raw("C1") == "10"
+    assert sa.sheet.get_raw("C2") == "20"
+
+
+def test_sheet_app_paste_without_copy_shows_message(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    rect = pygame.Rect(0, 0, 900, 600)
+    sa.handle_event(_ctrl_key(pygame.K_v), rect)
+    assert "presse-papiers" in sa.msg.lower() or "vide" in sa.msg.lower()
+
+
+def test_sheet_app_paste_clipped_to_sheet_bounds(app):
+    """Coller près du bord de la feuille ne doit pas planter : les cellules
+    hors bornes sont silencieusement ignorées."""
+    from apps.app_sheet import N_COLS, N_ROWS
+    sa = SheetApp(app)
+    sa.on_open()
+    sa.sheet.set("A1", "x"); sa.sheet.set("B1", "y")
+    sa.range_anchor, sa.range_end = "A1", "B1"
+    sa._copy_range()
+    sa.sel = f"{chr(ord('A') + N_COLS - 1)}{N_ROWS}"   # coin bas-droit de la feuille
+    sa._paste_range()   # ne doit pas lever malgré le débordement
+
+
+# ------------------------------------------------------------ annuler/rétablir
+def test_sheet_app_undo_redo_single_edit(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    sa.sel = "A1"
+    sa.editing = True
+    sa.edit_buf = "=1+1"
+    sa._commit()
+    assert sa.sheet.get_raw("A1") == "=1+1"
+    sa._undo_action()
+    assert sa.sheet.get_raw("A1") == ""
+    sa._redo_action()
+    assert sa.sheet.get_raw("A1") == "=1+1"
+
+
+def test_sheet_app_undo_empty_stack_shows_message(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    sa._undo_action()
+    assert "annuler" in sa.msg.lower()
+
+
+def test_sheet_app_new_edit_clears_redo_stack(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    sa.sel = "A1"
+    sa.editing = True
+    sa.edit_buf = "1"
+    sa._commit()
+    sa._undo_action()
+    assert sa._redo    # un rétablissement est possible
+    sa.sel = "B1"
+    sa.editing = True
+    sa.edit_buf = "2"
+    sa._commit()
+    assert sa._redo == []   # une nouvelle action a invalidé le rétablissement
+
+
+def test_sheet_app_undo_covers_paste_as_one_action(app):
+    """Un collage multi-cellules s'annule en UN SEUL Ctrl+Z (comme un vrai
+    tableur), pas cellule par cellule."""
+    sa = SheetApp(app)
+    sa.on_open()
+    sa.sheet.set("A1", "1"); sa.sheet.set("A2", "2")
+    sa.range_anchor, sa.range_end = "A1", "A2"
+    sa._copy_range()
+    sa.sel = "C1"
+    sa._paste_range()
+    assert sa.sheet.get_raw("C1") == "1" and sa.sheet.get_raw("C2") == "2"
+    sa._undo_action()
+    assert sa.sheet.get_raw("C1") == "" and sa.sheet.get_raw("C2") == ""
+
+
+def test_sheet_app_backspace_delete_is_undoable(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    sa.sheet.set("A1", "hello")
+    sa.sel = "A1"
+    rect = pygame.Rect(0, 0, 900, 600)
+    sa.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_BACKSPACE, mod=0, unicode=""), rect)
+    assert sa.sheet.get_raw("A1") == ""
+    sa._undo_action()
+    assert sa.sheet.get_raw("A1") == "hello"
+
+
+# ------------------------------------------------------- mise en forme conditionnelle
+def test_sheet_app_cf_rule_applies_to_selected_range(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    sa.sheet.set("A1", "150")
+    sa.range_anchor, sa.range_end = "A1", "A1"
+    sa._cf_op, sa._cf_value_str, sa._cf_color = ">", "100", "up"
+    sa._apply_cf_rule()
+    assert len(sa.workbook.active.cf_rules) == 1
+    rule = sa.workbook.active.cf_rules[0]
+    assert rule.range_str == "A1:A1"
+    assert sa.workbook.active.cf_color_for("A1", 150.0) == "up"
+
+
+def test_sheet_app_cf_invalid_threshold_shows_message(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    sa._cf_value_str = "not a number"
+    sa._apply_cf_rule()
+    assert sa.workbook.active.cf_rules == []
+    assert "seuil" in sa.msg.lower() or "invalide" in sa.msg.lower()
+
+
+def test_sheet_app_cf_panel_toggle_and_remove_rule(app):
+    from core.workbook import ConditionalFormat
+    sa = SheetApp(app)
+    sa.on_open()
+    rect = pygame.Rect(0, 0, 900, 600)
+    sa.draw(app.screen, rect)          # peuple self._cf_rect
+    sa.handle_event(_click(sa._cf_rect.centerx, sa._cf_rect.centery), rect)
+    assert sa.cf_open is True
+    sa.workbook.active.cf_rules.append(ConditionalFormat("A1:A1", ">", 0.0, "up"))
+    sa.draw(app.screen, rect)          # peuple self._cf_remove_rects
+    rid = sa.workbook.active.cf_rules[0].id
+    rm_rect = sa._cf_remove_rects[rid]
+    sa.handle_event(_click(rm_rect.centerx, rm_rect.centery), rect)
+    assert sa.workbook.active.cf_rules == []
+
+
+# ------------------------------------------------------------------- export CSV
+def test_sheet_app_export_csv_writes_file(app, tmp_path, monkeypatch):
+    monkeypatch.setattr(os.path, "expanduser", lambda p: str(tmp_path))
+    sa = SheetApp(app)
+    sa.on_open()
+    sa.sheet.set("A1", "10")
+    sa.sheet.set("B1", "20")
+    sa.sheet.set("A2", "=A1+B1")
+    sa._export_csv()
+    files = list(tmp_path.glob("*.csv"))
+    assert len(files) == 1
+    content = files[0].read_text(encoding="utf-8")
+    assert "10" in content and "20" in content and "30" in content
+    assert "Exporté" in sa.msg
+
+
+def test_sheet_app_export_csv_empty_sheet_shows_message(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    sa._export_csv()
+    assert "vide" in sa.msg.lower()

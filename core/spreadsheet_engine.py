@@ -356,6 +356,8 @@ class Parser:
             return self._num(self.sheet.get_value(t.val))
         if t.kind == Tok.FUNC:
             self.expect(Tok.LP)
+            if t.val == "VLOOKUP":
+                return self._vlookup()
             args = self.arglist()
             self.expect(Tok.RP)
             fn = FUNCTIONS.get(t.val)
@@ -393,6 +395,55 @@ class Parser:
     def _range_values(self, c1, c2):
         return [self._num(self.sheet.get_value(r))
                 for r in self.sheet.expand_range(c1, c2)]
+
+    def _range_grid(self, c1, c2):
+        """Comme `_range_values` mais préserve la forme (liste de LIGNES, chaque
+        ligne étant la liste des valeurs de ses colonnes) — nécessaire pour
+        VLOOKUP (recherche sur la 1re colonne, retourne une autre colonne de la
+        MÊME ligne), impossible à partir d'une liste aplatie."""
+        def split(ref):
+            i = 0
+            while i < len(ref) and ref[i].isalpha():
+                i += 1
+            return col_to_idx(ref[:i]), int(ref[i:])
+        col1, row1 = split(c1)
+        col2, row2 = split(c2)
+        cmin, cmax = min(col1, col2), max(col1, col2)
+        rmin, rmax = min(row1, row2), max(row1, row2)
+        grid = []
+        for r in range(rmin, rmax + 1):
+            grid.append([self._num(self.sheet.get_value(f"{idx_to_col(c)}{r}"))
+                        for c in range(cmin, cmax + 1)])
+        return grid
+
+    def _vlookup(self):
+        """VLOOKUP(valeur_recherchée, plage, index_colonne) — cherche
+        `valeur_recherchée` dans la 1re colonne de `plage` (correspondance
+        EXACTE) et renvoie la valeur de la colonne `index_colonne` (1 = la
+        1re colonne elle-même) de la ligne trouvée. `#N/A` si non trouvée."""
+        search = self.compare()
+        self.expect(Tok.COMMA)
+        start = self.expect(Tok.REF)
+        self.expect(Tok.COLON)
+        end = self.expect(Tok.REF)
+        self.expect(Tok.COMMA)
+        col_idx = int(self.compare())
+        # 4e argument optionnel (correspondance approx. façon Excel) accepté
+        # mais ignoré : seule la correspondance EXACTE est supportée ici,
+        # suffisante pour l'usage courant (recherche de ticker/étiquette).
+        if self.peek() and self.peek().kind == Tok.COMMA:
+            self.next()
+            self.compare()
+        self.expect(Tok.RP)
+        grid = self._range_grid(start.val, end.val)
+        for row in grid:
+            if not row:
+                continue
+            if row[0] == search:
+                if 1 <= col_idx <= len(row):
+                    return row[col_idx - 1]
+                return "#REF"
+        return "#N/A"
 
 
 # ---------------------------------------------------------------------------

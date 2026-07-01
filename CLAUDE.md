@@ -223,6 +223,30 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   `_restore_rect`) ; « Fermer toutes les fenêtres » ne fait que MINIMISER le terminal (jamais
   arrêter le moteur). Le menu se referme au clic sur un item (exécute son action), à tout clic
   hors menu, ou sur Échap ; un clic droit sur le CONTENU d'une fenêtre reste routé vers l'app.
+  **Étape 13 : tableur avancé (recherche, mise en forme conditionnelle, CSV, copier/coller,
+  annuler/rétablir).** `core/spreadsheet_engine.py` gagne **VLOOKUP** (`Parser._vlookup`,
+  correspondance EXACTE uniquement — le 4e argument optionnel façon Excel est accepté mais
+  ignoré) : contrairement aux autres fonctions (args déjà aplatis en liste scalaire via
+  `_range_values`), VLOOKUP a besoin de la FORME de la plage (colonne de recherche vs colonne de
+  retour, même ligne) — `Parser._range_grid` construit une grille `[ligne][colonne]` dédiée, sans
+  changer le comportement des agrégats existants (SUM/AVERAGE/NPV… restent order-sensitive là où
+  il le faut, cf. tests). `core/workbook.py::ConditionalFormat` (liste `WorkbookTab.cf_rules`) :
+  mise en forme conditionnelle simplifiée — un seuil numérique (opérateur `>`, `<`, `>=` ou `<=`) sur une
+  plage, résolu en couleur logique (`up`/`down`/`amber`) via `WorkbookTab.cf_color_for` (la
+  DERNIÈRE règle qui correspond gagne, comme Excel) ; l'app (`apps/app_sheet.py`, panneau « CF »
+  de la barre d'outils) peint la cellule d'un survol translucide (`pygame.SRCALPHA`) sans
+  toucher au texte. **Export CSV** (bouton « CSV ») : écrit les VALEURS calculées (pas les
+  formules) de la feuille active vers le dossier personnel de l'utilisateur — pas de sélecteur de
+  fichier natif (comme la sauvegarde rapide du bureau), le message affiche le chemin écrit.
+  **Copier/coller de plage** (Ctrl+C/Ctrl+V, `_copy_range`/`_paste_range`) : copie les FORMULES
+  brutes (pas les valeurs), collées telles quelles à partir de la cellule sélectionnée (pas de
+  décalage relatif des références) et bornées aux limites de la feuille. **Annuler/rétablir**
+  (Ctrl+Z/Ctrl+Y, `_undo`/`_redo`, pile en mémoire non persistée) : chaque édition/effacement/
+  collage empile l'état AVANT modification (`_record_undo`) ; un collage multi-cellules s'annule
+  en un seul Ctrl+Z (toute la plage), pas cellule par cellule ; toute NOUVELLE action vide la
+  pile de rétablissement. Les raccourcis Ctrl+C/V/Z/Y ne s'activent que HORS édition d'une
+  cellule (`not self.editing`) pour ne jamais intercepter la frappe normale dans la barre de
+  formule.
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, un jour de jeu dure ~16 s réelles
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 90`), soit un nouveau pas de marché (5 jours) toutes

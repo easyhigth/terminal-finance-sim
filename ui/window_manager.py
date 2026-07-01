@@ -36,6 +36,7 @@ class Window:
         self._drag_off = None     # (dx, dy) pendant un déplacement
         self._resizing = False    # redimensionnement en cours
         self._restore_rect = None # taille/pos avant ancrage/maximisation (toggle)
+        self.attention = False    # réclame l'attention (clignote dans la barre des tâches)
 
     # --- sous-rectangles du chrome (recalculés à la volée depuis self.rect) ---
     @property
@@ -149,9 +150,11 @@ class WindowManager:
             self.windows.remove(w)
 
     def focus(self, w):
-        if w in self.windows and self.windows[-1] is not w:
-            self.windows.remove(w)
-            self.windows.append(w)
+        if w in self.windows:
+            w.attention = False   # prendre le focus éteint le clignotement
+            if self.windows[-1] is not w:
+                self.windows.remove(w)
+                self.windows.append(w)
 
     def toggle_minimize(self, w):
         w.minimized = not w.minimized

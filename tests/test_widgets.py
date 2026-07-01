@@ -89,3 +89,55 @@ def test_scroll_state_handle_wheel_only_inside_rect():
     assert st.scroll == 0
     assert st.handle_wheel(inside) is True
     assert st.scroll == 48                       # molette bas = +48px
+
+
+# ------------------------------------------------------------- TickFlash
+def _fake_clock(monkeypatch, start=0):
+    """Remplace pygame.time.get_ticks() par une horloge contrôlable (liste
+    mutable [ms]) pour tester la décroissance du flash sans vrai sleep()."""
+    import pygame
+    now = [start]
+    monkeypatch.setattr(pygame.time, "get_ticks", lambda: now[0])
+    return now
+
+
+def test_tick_flash_first_seen_is_base_color(monkeypatch):
+    _fake_clock(monkeypatch)
+    flash = widgets.TickFlash()
+    base = (10, 10, 10)
+    assert flash.tick("MVC", 100.0, (0, 255, 0), (255, 0, 0), base) == base
+
+
+def test_tick_flash_up_is_full_saturation_during_hold(monkeypatch):
+    now = _fake_clock(monkeypatch)
+    flash = widgets.TickFlash()
+    up, down, base = (0, 255, 0), (255, 0, 0), (10, 10, 10)
+    flash.tick("MVC", 100.0, up, down, base)         # 1er point : référence
+    now[0] += 10
+    col = flash.tick("MVC", 101.0, up, down, base)    # hausse -> plein vert
+    assert col == up
+    now[0] += widgets.TickFlash.HOLD_MS - 1           # toujours dans le plateau
+    col = flash.tick("MVC", 101.0, up, down, base)
+    assert col == up
+
+
+def test_tick_flash_down_decays_back_to_base(monkeypatch):
+    now = _fake_clock(monkeypatch)
+    flash = widgets.TickFlash()
+    up, down, base = (0, 255, 0), (255, 0, 0), (10, 10, 10)
+    flash.tick("MVC", 100.0, up, down, base)
+    now[0] += 10
+    col = flash.tick("MVC", 99.0, up, down, base)     # baisse -> plein rouge
+    assert col == down
+    now[0] += widgets.TickFlash.HOLD_MS + widgets.TickFlash.DECAY_MS + 50
+    col = flash.tick("MVC", 99.0, up, down, base)     # largement décru -> couleur de base
+    assert col == base
+
+
+def test_tick_flash_no_change_keeps_previous_direction():
+    flash = widgets.TickFlash()
+    up, down, base = (0, 255, 0), (255, 0, 0), (10, 10, 10)
+    flash.tick("MVC", 100.0, up, down, base)
+    flash.tick("MVC", 105.0, up, down, base)
+    col = flash.tick("MVC", 105.0, up, down, base)    # valeur inchangée : reste en vert (dans le plateau)
+    assert col == up

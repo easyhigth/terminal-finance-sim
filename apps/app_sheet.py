@@ -59,6 +59,11 @@ FUNCTION_CATALOG = [
 
 CHART_TYPES = [("line", "Ligne"), ("bar", "Barres"), ("scatter", "Nuage")]
 
+# Fonctions de marché EN DIRECT (cf. _market_fn) : une cellule dont la formule
+# en appelle une clignote vert/rouge au mouvement (cf. TickFlash), comme un
+# vrai terminal — repère visuel qu'elle est vivante, pas figée.
+_LIVE_FN_NAMES = ("PRICE", "INDEX", "FX", "NETWORTH", "CASH")
+
 
 def _split_ref(ref):
     i = 0
@@ -109,6 +114,7 @@ class SheetApp(DesktopApp):
         self._chart_resize = None
         self._chart_resize_rects = {}
         self._last_market_step = None
+        self._flash = widgets.TickFlash()   # flash vert/rouge des cellules de marché en direct
         self.sheet.external = self._market_fn   # dès l'ouverture (avant 1er draw)
 
     @property
@@ -498,6 +504,8 @@ class SheetApp(DesktopApp):
                 col = config.COL_WHITE if is_num else config.COL_TEXT
                 if isinstance(v, str) and v.startswith("#"):
                     col = config.COL_DOWN
+                elif is_num and raw.startswith("=") and any(fn in raw.upper() for fn in _LIVE_FN_NAMES):
+                    col = self._flash.tick(ref, v, config.COL_UP, config.COL_DOWN, config.COL_WHITE)
                 if is_num:
                     widgets.draw_text(surf, widgets.fit_text(text, fonts.tiny(), CELL_W - 8),
                                       (cell.right - 4, cell.y + 3), fonts.tiny(), col, align="right")

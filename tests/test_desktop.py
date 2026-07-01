@@ -976,3 +976,59 @@ def test_context_menu_snap_left_positions_window(app):
     wa = desk.wm.work_area
     assert w.rect.x == wa.x and w.rect.w == wa.w // 2
     assert w._restore_rect is not None              # peut revenir à la taille d'avant
+
+
+# ============================== réactivité des graphes + flash vert/rouge ======
+def test_watchlist_uses_animated_live_price(app):
+    """La Watchlist affiche le prix ANIMÉ (core/intraday.py), pas juste la
+    clôture figée du dernier pas — cohérent avec le reste du bureau (research,
+    graphe)."""
+    from apps.app_watchlist import WatchlistApp
+    tk = app.market.top_companies(n=1)[0]["ticker"]
+    w = WatchlistApp(app)
+    w.on_open()
+    hist = w._live_hist(tk)
+    assert hist and hist[-1] == pytest.approx(app.market.price_of(tk), rel=0.05)
+
+
+def test_watchlist_price_flashes_on_change(app):
+    from apps.app_watchlist import WatchlistApp
+    tk = app.market.top_companies(n=1)[0]["ticker"]
+    app.gs.player.watchlist = [tk]
+    w = WatchlistApp(app)
+    w.desktop = None
+    w.on_open()
+    rect = pygame.Rect(40, 40, 420, 460)
+    w.draw(app.screen, rect)          # 1er point : pas encore de flash (référence)
+    app.pending_market_steps = 1
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.update(0.016)                # avance le marché d'un pas -> le prix bouge
+    w.draw(app.screen, rect)          # doit pouvoir flasher sans lever d'erreur
+
+
+def test_sheet_live_price_cell_flashes(app):
+    """Une cellule =PRICE(...) clignote vert/rouge au mouvement (flash), pas
+    juste blanc statique — cf. _LIVE_FN_NAMES."""
+    from apps.app_sheet import SheetApp, _LIVE_FN_NAMES
+    assert "PRICE" in _LIVE_FN_NAMES
+    tk = app.market.top_companies(n=1)[0]["ticker"]
+    s = SheetApp(app)
+    s.on_open()
+    s.sheet.set("A1", f'=PRICE("{tk}")')
+    rect = pygame.Rect(40, 40, 760, 520)
+    s.draw(app.screen, rect)          # ne doit pas lever ; alimente le flash
+    assert "A1" in s._flash._last
+
+
+def test_sim_clock_pace_leaves_a_day_slower_than_before():
+    """Régression de rythme : un jour de jeu à x1 doit durer plus longtemps
+    qu'avec l'ancienne cadence (120 min de jeu/s réelle -> 12s/jour)."""
+    from core.sim_clock import GAME_MINUTES_PER_REAL_SECOND_AT_X1, MINUTES_PER_DAY
+    seconds_per_day = MINUTES_PER_DAY / GAME_MINUTES_PER_REAL_SECOND_AT_X1
+    assert seconds_per_day > 12.0
+
+
+def test_intraday_refreshes_more_than_once_per_day():
+    from core import intraday
+    assert intraday.MINUTES_PER_DAY // intraday.QUANTIZE_MINUTES >= 2

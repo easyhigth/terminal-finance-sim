@@ -14,14 +14,15 @@ où il en était au retour — aucune minute de jeu n'est comptée pendant ce
 temps, donc aucun pas de marché ne s'accumule en arrière-plan.
 """
 
-# Cadence du temps de jeu (décision produit) : à x1, **1 minute réelle = 1 pas
-# de marché** (= config.DAYS_PER_STEP = 5 jours de jeu). Un pas vaut donc
-# 5 × 1440 = 7200 minutes de jeu joués en 60 s réelles → 120 minutes de jeu par
-# seconde réelle. Conséquence : à x1 un nouveau pas (vrai changement de prix)
-# toutes les ~60 s, à x3 toutes les ~20 s ; entre deux pas, l'animation intraday
-# fait glisser la courbe en continu. (Auparavant : 1.0 — soit 1 pas toutes les
-# ~2 h, d'où l'impression que rien ne bougeait.)
-GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 120.0
+# Cadence du temps de jeu (décision produit) : à x1, un jour de jeu dure ~16s
+# réelles (1440 / 90). Un pas de marché (vrai changement de prix, cf.
+# config.DAYS_PER_STEP = 5 jours) prend donc ~80 s à x1, ~27 s à x3 ; entre deux
+# pas, l'animation intraday (core/intraday.py) fait bouger la courbe par petits
+# paliers visibles plusieurs fois par jour de jeu (cf. QUANTIZE_MINUTES), pour
+# que le marché semble vivant même sans nouveau pas. (Valeur plus rapide,
+# 120, jugée trop expéditive : les jours passaient sans que rien ne semble
+# bouger à l'écran.)
+GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 90.0
 
 # Un pas de marché = config.DAYS_PER_STEP jours de jeu.
 MINUTES_PER_DAY = 24 * 60

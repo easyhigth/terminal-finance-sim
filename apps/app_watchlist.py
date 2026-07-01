@@ -28,9 +28,15 @@ class WatchlistApp(DesktopApp):
         self._row_rects = {}       # ticker -> Rect (ligne cliquable → Trading)
         self._del_rects = {}       # ticker -> Rect (× retirer)
         self._list_rect = None
+        self._flash = widgets.TickFlash()   # flash vert/rouge du cours en direct
 
-    def _last_change_pct(self, tk):
-        hist = self.market.history_of(tk, 2)
+    def _live_hist(self, tk):
+        """Historique + point animé en direct (cf. core/intraday.py) — bouge
+        par petits paliers même entre deux pas du moteur de marché."""
+        return self.market.history_of(tk, 18, sim_clock=self.app.sim_clock,
+                                      day=self.app.gs.player.day)
+
+    def _last_change_pct(self, hist):
         if len(hist) >= 2 and hist[-2]:
             return (hist[-1] / hist[-2] - 1.0) * 100.0
         return 0.0
@@ -79,15 +85,17 @@ class WatchlistApp(DesktopApp):
             self._row_rects[tk] = r
             if r.collidepoint(mp):
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, r)
-            price = self.market.price_of(tk)
-            chg = self._last_change_pct(tk)
+            hist = self._live_hist(tk)
+            price = hist[-1] if hist else self.market.price_of(tk)
+            chg = self._last_change_pct(hist)
             ccol = config.COL_UP if chg >= 0 else config.COL_DOWN
+            flash_col = self._flash.tick(tk, price, config.COL_UP, config.COL_DOWN, config.COL_WHITE)
             widgets.draw_text(surf, tk, (r.x + 6, r.y + 4), fonts.small(bold=True), config.COL_AMBER)
             name = self.market.companies[i]["name"]
             widgets.draw_text(surf, widgets.fit_text(name, fonts.tiny(), r.w - 210),
                               (r.x + 68, r.y + 5), fonts.tiny(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, f"{price:,.2f}", (r.right - 118, r.y + 4), fonts.small(),
-                              config.COL_WHITE, align="right")
+                              flash_col, align="right")
             widgets.draw_text(surf, f"{chg:+.2f}%", (r.right - 44, r.y + 4), fonts.small(bold=True),
                               ccol, align="right")
             dr = pygame.Rect(r.right - 20, r.y + 3, 16, ROW_H - 8)

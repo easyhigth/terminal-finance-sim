@@ -26,26 +26,39 @@ MINUTES_PER_DAY = 24 * 60
 # zoomée (« 5 dernières minutes »).
 _RESOLUTIONS = (720, 60, 5)
 _AMPLITUDES = (1.0, 0.45, 0.2)
-_NOISE_PCT = 0.0009  # amplitude relative max du bruit (~0.09%, "vraie vie")
+# Amplitude relative max du bruit affiché (~0.22%) : purement visuel (n'affecte
+# jamais market.price/index_value, donc jamais le prix d'exécution des ordres)
+# — poussé au-delà de la "vraie vie" (0.09% à l'origine) pour que le marché
+# semble vivant à l'écran même entre deux pas du moteur, sur retour joueur.
+_NOISE_PCT = 0.0022
 
 # Sigma "moyen" du roster (cf. data/companies.py, profils sectoriels ~0.018-0.055) ;
 # sert de référence pour que les sociétés volatiles (tech/semicon...) bougent
 # visiblement plus que les défensives (utilities...) à l'écran.
 _TYPICAL_SIGMA = 0.035
-_VOL_MULT_RANGE = (0.5, 2.2)
+_VOL_MULT_RANGE = (0.6, 2.8)
 
 
 def minutes_per_step():
     return config.DAYS_PER_STEP * MINUTES_PER_DAY
 
 
+# Pas de rafraîchissement de l'animation « en direct » (minutes de jeu) : plus
+# fin qu'un jour entier (360 min = 4 rafraîchissements/jour, ~toutes les 4s
+# réelles à x1) pour que le marché bouge visiblement plusieurs fois par jour
+# de jeu au lieu d'un unique saut quotidien — tout en restant assez espacé
+# pour rester lisible (pas un glissement continu à chaque frame).
+QUANTIZE_MINUTES = 360
+
+
 def quantize_to_day(minutes):
-    """Ramène une progression en minutes de jeu à la borne du JOUR de jeu
-    inférieur (0, 1440, 2880…). L'animation « en direct » ne se met alors à
-    jour qu'une fois par jour de jeu écoulé (au lieu de chaque frame) : les
-    chiffres avancent par paliers d'un jour vers la destination du prochain
-    pas, ce qui est bien plus lisible qu'un glissement continu trop rapide."""
-    return (int(minutes) // MINUTES_PER_DAY) * MINUTES_PER_DAY
+    """Ramène une progression en minutes de jeu à la borne de palier
+    (`QUANTIZE_MINUTES`) inférieure. L'animation « en direct » ne se met alors
+    à jour que par paliers (au lieu de chaque frame) : les chiffres avancent
+    par petits sauts vers la destination du prochain pas, plus lisible qu'un
+    glissement continu tout en restant nettement plus réactif qu'un seul
+    rafraîchissement par jour de jeu."""
+    return (int(minutes) // QUANTIZE_MINUTES) * QUANTIZE_MINUTES
 
 
 def vol_mult_for_sigma(sigma, scale=1.0):

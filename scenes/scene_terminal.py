@@ -94,7 +94,7 @@ ZONE_ORDER = ["console", "rail", "indices", "health", "topco", "career", "feed"]
 # Noms de commandes pour l'autocomplétion (Tab) et la suggestion fantôme
 CMD_NAMES = [
     "HELP", "COMMANDS", "MISSION", "EVAL", "EXAMCERT", "TRACK", "CAREER", "INBOX",
-    "RIVALS", "RECLAIM", "RECONVERT", "MANDATES", "MANDATE", "DECIDE", "MARKET", "MARKETHUB", "WALL", "HOURS", "TOP", "MOVERS",
+    "RIVALS", "RECLAIM", "RECONVERT", "MANDATES", "MANDATE", "DECIDE", "MARKET", "MARKETHUB", "WALL", "DESKTOP", "BUREAU", "HOURS", "TOP", "MOVERS",
     "COMPANY", "FA", "SEARCH", "ACCESS", "EXPLORE", "SHOP", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS", "LEGACY", "ARCHETYPE",
     "TENSION", "CRISIS",
@@ -237,6 +237,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             (None, "AGIR & PROGRESSER"),
             ("EXAM/CERTIF", "EXAMCERT"),
             (None, "OUTILS"),
+            ("🖥 BUREAU", "DESKTOP"),
             ("MUR", "WALL"), ("SHOP", "SHOP"), ("EXPLORATEUR", "EXPLORER"),
             ("GRAPHES", "GP"), ("PLUS", "MORE"),
             ("SAUVER", "SAVE"), ("AIDE", "COMMANDS"),
@@ -791,6 +792,8 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             self.app.scenes.go("markethub", return_to="terminal")
         elif cmd == "WALL":
             self.app.scenes.go("wall", return_to="terminal")
+        elif cmd in ("DESKTOP", "BUREAU", "PC"):
+            self.app.scenes.go("desktop")
         elif cmd in ("SETTINGS", "REGLAGES", "RÉGLAGES"):
             self.app.scenes.go("settings", return_to="terminal")
         elif cmd == "TOP":

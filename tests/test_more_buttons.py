@@ -20,7 +20,7 @@ from scenes.scene_more import SECTIONS
 #    a bien un bouton PLUS.
 _EXCLUDED = {
     "menu", "continent", "runsetup", "sandbox", "intro", "splash", "gameover",
-    "terminal", "more", "ma_target", "deal",
+    "terminal", "desktop", "more", "ma_target", "deal",
 }
 
 

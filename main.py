@@ -34,6 +34,7 @@ from scenes.scene_credit import CreditScene
 from scenes.scene_crypto import CryptoScene
 from scenes.scene_dashboard import DashboardScene
 from scenes.scene_deal import DealScene
+from scenes.scene_desktop import DesktopScene
 from scenes.scene_deals import DealsScene
 from scenes.scene_dilemma import DilemmaScene
 from scenes.scene_etfs import ETFScene
@@ -99,6 +100,7 @@ def build_scene_manager(app):
     m.register("runsetup", RunSetupScene(app))
     m.register("sandbox", SandboxScene(app))
     m.register("terminal", TerminalScene(app))
+    m.register("desktop", DesktopScene(app))
     m.register("glossary", GlossaryScene(app))
     m.register("evaluation", EvaluationScene(app))
     m.register("portfolio", PortfolioScene(app))

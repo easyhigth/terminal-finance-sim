@@ -134,3 +134,68 @@ def test_desktop_launch_opens_windows(app):
     assert len(desk.wm.windows) == 3
     desk.update(0.016)
     desk.draw(app.screen)
+
+
+# --------------------------------------------------- scènes hébergées (étape 2)
+def test_scene_host_wraps_and_draws(app):
+    from apps.scene_host import SceneHostApp
+    host = SceneHostApp(app, "risk", "Risque")
+    host.bind_opener(lambda name, **kw: None)
+    host.on_open()
+    rect = pygame.Rect(60, 60, 900, 540)
+    host.update(0.016)
+    host.draw(app.screen, rect)          # offscreen + smoothscale, ne doit pas lever
+    # un clic (coordonnées fenêtre) est transformé en espace logique
+    host.handle_event(_click(rect.centerx, rect.centery), rect)
+
+
+def test_scene_host_navigation_opens_window_not_switch(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)
+    # ouvre une scène hébergée via le menu Démarrer
+    w = desk._open_scene_window("markethub")
+    assert any(win.key == "scene:markethub" for win in desk.wm.windows)
+    # la navigation interne de la scène ouvre une AUTRE fenêtre (routeur)
+    w.app_obj.router.go("bonds")
+    assert any(win.key == "scene:bonds" for win in desk.wm.windows)
+    # le bureau reste la scène courante (pas de bascule plein écran)
+    assert app.scenes.current_name == "desktop"
+
+
+def test_desktop_launcher_lists_scenes(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.start_open = True
+    desk.draw(app.screen)
+    assert len(desk._launcher_rects) > 20      # toutes les scènes du hub PLUS
+    # ouvrir un item par clic
+    r, scene, kw = desk._launcher_rects[0]
+    desk.handle_event(_click(r.centerx, r.centery))
+    assert any(win.key == f"scene:{scene}" for win in desk.wm.windows)
+
+
+def test_every_launcher_scene_hosts_without_error(app):
+    """Chaque scène du menu Démarrer doit pouvoir être hébergée en fenêtre
+    (on_enter + update + draw + un clic) sans lever d'exception."""
+    from scenes.scene_more import SECTIONS
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    names = {scene for _t, items in SECTIONS for _l, scene, _kw in items}
+    for name in sorted(names):
+        w = desk._open_scene_window(name)
+        assert w is not None, name
+        w.app_obj.update(0.016)
+        rect = pygame.Rect(50, 50, 900, 540)
+        w.app_obj.draw(app.screen, rect)
+        w.app_obj.handle_event(_click(rect.centerx, rect.centery), rect)
+        w.app_obj.draw(app.screen, rect)
+        desk.wm.close(w)
+
+
+def test_ticker_scenes_get_default_asset(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._open_scene_window("company")   # sans ticker -> défaut fourni
+    assert w is not None
+    assert "ticker" in w.app_obj._kwargs

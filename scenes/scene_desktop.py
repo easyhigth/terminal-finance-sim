@@ -20,21 +20,34 @@ import pygame
 from apps.app_research import ResearchApp
 from apps.app_sheet import SheetApp
 from apps.app_trading import TradingApp
+from apps.scene_host import SceneHostApp
 from core import config, portfolio as pf_mod
 from core.scene_manager import Scene
 from core.sim_clock import SPEEDS
+from scenes.scene_more import SECTIONS
 from ui import fonts, widgets
 from ui.window_manager import WindowManager
 
 TOPBAR_H = 36
 TASKBAR_H = 30
 
-# Applications lançables (clé, libellé, icône, fabrique)
+# Applications NATIVES du bureau (dessinées en fenêtre, clé, libellé, icône, fabrique)
 APPS = [
     ("research", "Recherche", "🔍", ResearchApp),
     ("trading", "Trading", "💹", TradingApp),
     ("sheet", "Tableur", "▦", SheetApp),
 ]
+
+# Scènes hébergées (menu Démarrer) nécessitant un actif par défaut si non fourni.
+_NEEDS_TICKER = {"company", "financials", "ma_target"}
+_NEEDS_TICKERS = {"compare", "graph"}
+
+# Libellé lisible d'une scène (repris des sections du hub PLUS).
+_SCENE_LABEL = {scene: label for _title, items in SECTIONS for label, scene, _kw in items}
+
+
+def _scene_label(name):
+    return _SCENE_LABEL.get(name, name.capitalize())
 
 
 class DesktopScene(Scene):
@@ -42,14 +55,23 @@ class DesktopScene(Scene):
         self.app.ensure_market()
         if not hasattr(self, "wm"):
             self.wm = WindowManager(self.app)
+        self.start_open = False
         self._icon_rects = {}       # clé app -> Rect (icônes du bureau)
         self._launch_rects = {}     # clé app -> Rect (barre des tâches quick-launch)
         self._task_rects = {}       # Window -> Rect (barre des tâches)
         self._speed_rects = {}      # valeur -> Rect (contrôles de vitesse)
+        self._start_rect = None     # bouton menu Démarrer
+        self._launcher_rects = []   # [(Rect, scene, kwargs)] items du menu Démarrer
         self._pause_rect = None
         self._terminal_rect = None  # icône « Terminal classique »
         self._menu_rect = None
         self._gear_rect = None
+        # le terminal reste le MOTEUR de la boucle de jeu : on l'initialise si on
+        # atterrit directement sur le bureau (nouvelle partie), pour que le temps
+        # s'écoule dès l'arrivée (cf. _tick_market).
+        term = self.app.scenes.scenes.get("terminal")
+        if term is not None and not hasattr(term, "worldmap"):
+            term.on_enter()
 
     # ------------------------------------------------------ temps (marché)
     def _tick_market(self):
@@ -68,11 +90,25 @@ class DesktopScene(Scene):
 
     # ------------------------------------------------------------- events
     def handle_event(self, event):
+        # menu Démarrer ouvert : priorité à ses items / fermeture au clic dehors
+        if self.start_open and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for r, name, kw in self._launcher_rects:
+                if r.collidepoint(event.pos):
+                    self._open_scene_window(name, **kw)
+                    return
+            if not (self._start_rect and self._start_rect.collidepoint(event.pos)):
+                self.start_open = False
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and self.start_open:
+            self.start_open = False
+            return
         if self.wm.handle_event(event):
             return
         if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
             return
         pos = event.pos
+        if self._start_rect and self._start_rect.collidepoint(pos):
+            self.start_open = not self.start_open
+            return
         # icônes du bureau + quick-launch : ouvrir/ramener l'app
         for key, r in list(self._icon_rects.items()) + list(self._launch_rects.items()):
             if r.collidepoint(pos):
@@ -107,6 +143,38 @@ class DesktopScene(Scene):
         if factory is not None:
             self.wm.open(key, lambda: factory(self.app))
 
+    def _open_scene_window(self, name, **kwargs):
+        """Ouvre (ou ramène au premier plan) une fenêtre hébergeant la scène
+        `name`. C'est aussi le point d'entrée du routeur de navigation des
+        scènes hébergées (cf. apps/scene_host.py)."""
+        if name not in self.app.scenes.scenes or name in ("desktop", "gameover"):
+            # gameover / sorties de flux : bascule plein écran (hors fenêtres)
+            if name in self.app.scenes.scenes:
+                self.app.scenes.go(name, **kwargs)
+            return
+        kw = dict(kwargs)
+        m = self.app.ensure_market()
+        if name in _NEEDS_TICKER and "ticker" not in kw:
+            top = m.top_companies(n=1)
+            if top:
+                kw["ticker"] = top[0]["ticker"]
+        if name in _NEEDS_TICKERS and "tickers" not in kw:
+            kw["tickers"] = [c["ticker"] for c in m.top_companies(n=2)]
+        key = f"scene:{name}"
+        existing = next((w for w in self.wm.windows if w.key == key), None)
+
+        def factory():
+            host = SceneHostApp(self.app, name, _scene_label(name), kw)
+            host.icon = "▣"
+            host.bind_opener(self._open_scene_window)
+            return host
+
+        w = self.wm.open(key, factory)
+        if existing is not None and kw:
+            w.app_obj.reenter(**kw)   # met à jour le contexte (ticker…) si déjà ouverte
+        self.start_open = False
+        return w
+
     # -------------------------------------------------------------- draw
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -115,6 +183,8 @@ class DesktopScene(Scene):
         self.wm.draw(surf)
         self._draw_topbar(surf)
         self._draw_taskbar(surf)
+        if self.start_open:
+            self._draw_launcher(surf)
 
     def _draw_wallpaper(self, surf):
         # léger quadrillage « poste de travail »
@@ -206,9 +276,17 @@ class DesktopScene(Scene):
         bar = pygame.Rect(0, config.SCREEN_HEIGHT - TASKBAR_H, config.SCREEN_WIDTH, TASKBAR_H)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, bar)
         pygame.draw.line(surf, config.COL_BORDER, (0, bar.y), (bar.right, bar.y), 1)
+        # bouton menu Démarrer (à gauche)
+        self._start_rect = pygame.Rect(6, bar.y + 4, 84, TASKBAR_H - 8)
+        active = self.start_open
+        pygame.draw.rect(surf, config.COL_AMBER if active else config.COL_PANEL, self._start_rect, border_radius=4)
+        widgets.draw_text(surf, "⊞ Apps", self._start_rect.center, fonts.small(bold=True),
+                          config.COL_BG if active else config.COL_AMBER, align="center")
+        pygame.draw.line(surf, config.COL_BORDER, (self._start_rect.right + 4, bar.y + 4),
+                         (self._start_rect.right + 4, bar.bottom - 4), 1)
         # quick-launch (à gauche)
         self._launch_rects = {}
-        x = 8
+        x = self._start_rect.right + 10
         for key, label, icon, _cls in APPS:
             r = pygame.Rect(x, bar.y + 4, 26, TASKBAR_H - 8)
             self._launch_rects[key] = r
@@ -232,3 +310,49 @@ class DesktopScene(Scene):
             widgets.draw_text(surf, widgets.fit_text(f"{w.app_obj.icon} {w.app_obj.title}", fonts.tiny(), r.w - 12),
                               (r.x + 6, r.y + 5), fonts.tiny(bold=True), col)
             x += 156
+
+    def _draw_launcher(self, surf):
+        """Menu Démarrer : toutes les scènes du jeu, ouvrables en fenêtre."""
+        shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
+        shade.fill((0, 0, 0, 120))
+        surf.blit(shade, (0, 0))
+        panel = pygame.Rect(30, TOPBAR_H + 20, config.SCREEN_WIDTH - 60,
+                           config.SCREEN_HEIGHT - TOPBAR_H - TASKBAR_H - 40)
+        pygame.draw.rect(surf, config.COL_PANEL, panel)
+        pygame.draw.rect(surf, config.COL_AMBER, panel, 2)
+        widgets.draw_text(surf, "APPLICATIONS — ouvrir en fenêtre", (panel.x + 16, panel.y + 10),
+                          fonts.head(bold=True), config.COL_AMBER)
+        self._launcher_rects = []
+        col_w = 236
+        item_h = 22
+        x0 = panel.x + 16
+        y0 = panel.y + 44
+        x, y = x0, y0
+        max_y = panel.bottom - 16
+        prev_clip = surf.get_clip()
+        surf.set_clip(panel)
+        for title, items in SECTIONS:
+            # en-tête de section : force une nouvelle colonne si trop bas
+            if y + 18 + item_h > max_y:
+                x += col_w
+                y = y0
+            widgets.draw_text(surf, title.upper(), (x, y), fonts.tiny(bold=True), config.COL_CYAN)
+            y += 18
+            for label, scene, kw in items:
+                if y + item_h > max_y:
+                    x += col_w
+                    y = y0
+                    widgets.draw_text(surf, title.upper() + " (suite)", (x, y), fonts.tiny(bold=True), config.COL_CYAN)
+                    y += 18
+                r = pygame.Rect(x, y, col_w - 12, item_h - 2)
+                self._launcher_rects.append((r, scene, kw))
+                hov = r.collidepoint(pygame.mouse.get_pos())
+                if hov:
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, r, border_radius=3)
+                    pygame.draw.rect(surf, config.COL_AMBER, r, 1, border_radius=3)
+                widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), col_w - 24),
+                                  (r.x + 8, r.y + 3), fonts.small(),
+                                  config.COL_TEXT if hov else config.COL_TEXT_DIM)
+                y += item_h
+            y += 8
+        surf.set_clip(prev_clip)

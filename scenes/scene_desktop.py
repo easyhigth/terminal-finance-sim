@@ -139,6 +139,14 @@ class DesktopScene(Scene):
         self._ctx_menu = None        # menu contextuel (clic droit) : dict ou None
         self._onboard_card = None    # carte d'accueil (rect) — 1re visite
         self._onboard_btn = None
+        # recherche globale (Ctrl+/ — Ctrl+F est déjà pris par le rail du
+        # terminal pour M&A, cf. RAIL_SHORTCUTS) : cherche dans les DONNÉES DE
+        # PARTIE (positions, watchlist, inbox, mandats, deals), pas le contenu
+        # de référence déjà couvert par la palette Ctrl+K.
+        self._search_open = False
+        self._search_query = ""
+        self._search_sel = 0
+        self._search_rects = []
         # le terminal reste le MOTEUR de la boucle de jeu : instance persistante,
         # créée une seule fois par partie, hébergée dans SA PROPRE fenêtre (comme
         # les autres apps) — le temps s'écoule qu'elle soit ouverte ou non.
@@ -169,6 +177,16 @@ class DesktopScene(Scene):
 
     # ------------------------------------------------------------- events
     def handle_event(self, event):
+        # recherche globale ouverte : capture tout en priorité
+        if self._search_open:
+            self._handle_search_event(event)
+            return
+        # Ctrl+/ : ouvre la recherche globale (positions/watchlist/inbox/
+        # mandats/deals) — prioritaire sur tout le reste.
+        if (event.type == pygame.KEYDOWN and event.key == pygame.K_SLASH
+                and (event.mod & pygame.KMOD_CTRL)):
+            self._open_search()
+            return
         # menu contextuel ouvert : il capture les clics/échap en priorité
         if self._ctx_menu is not None and self._handle_ctx_event(event):
             return
@@ -374,6 +392,102 @@ class DesktopScene(Scene):
         self.start_open = False
         return w
 
+    # ------------------------------------------------- recherche globale (Ctrl+/)
+    def _open_search(self):
+        self._search_open = True
+        self._search_query = ""
+        self._search_sel = 0
+        self.start_open = False
+
+    def _close_search(self):
+        self._search_open = False
+
+    def _search_results(self):
+        from core import global_search
+        m = getattr(self.app, "market", None)
+        return global_search.search(self.app.gs.player, m, self._search_query)
+
+    def _search_navigate(self, entry):
+        action = entry["action"]
+        if action["open"] == "trading":
+            self.open_trading(action["ticker"])
+        elif action["open"] == "scene":
+            self._open_scene_window(action["name"])
+        self._close_search()
+
+    def _handle_search_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self._close_search()
+                return
+            results = self._search_results()
+            if event.key == pygame.K_BACKSPACE:
+                self._search_query = self._search_query[:-1]
+                self._search_sel = 0
+                return
+            if event.key == pygame.K_DOWN:
+                if results:
+                    self._search_sel = (self._search_sel + 1) % len(results)
+                return
+            if event.key == pygame.K_UP:
+                if results:
+                    self._search_sel = (self._search_sel - 1) % len(results)
+                return
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                if results:
+                    self._search_navigate(results[self._search_sel % len(results)])
+                return
+            if event.unicode and event.unicode.isprintable():
+                self._search_query += event.unicode
+                self._search_sel = 0
+                return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for r, entry in self._search_rects:
+                if r.collidepoint(event.pos):
+                    self._search_navigate(entry)
+                    return
+            box = pygame.Rect((config.SCREEN_WIDTH - 560) // 2, (config.SCREEN_HEIGHT - 360) // 2, 560, 360)
+            if not box.collidepoint(event.pos):
+                self._close_search()
+
+    def _draw_search(self, surf):
+        box = pygame.Rect((config.SCREEN_WIDTH - 560) // 2, (config.SCREEN_HEIGHT - 360) // 2, 560, 360)
+        shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
+        shade.fill((0, 0, 0, 160))
+        surf.blit(shade, (0, 0))
+        pygame.draw.rect(surf, config.COL_PANEL, box)
+        pygame.draw.rect(surf, config.COL_AMBER, box, 2)
+        widgets.draw_text(surf, _L("RECHERCHE (Ctrl+/) — positions, watchlist, inbox, mandats, deals",
+                                   "SEARCH (Ctrl+/) — positions, watchlist, inbox, mandates, deals"),
+                          (box.x + 14, box.y + 12), fonts.small(bold=True), config.COL_AMBER)
+        search_box = pygame.Rect(box.x + 14, box.y + 38, box.w - 28, 26)
+        pygame.draw.rect(surf, config.COL_BG, search_box)
+        pygame.draw.rect(surf, config.COL_BORDER, search_box, 1)
+        cur = "_" if pygame.time.get_ticks() % 1000 < 500 else ""
+        widgets.draw_text(surf, (self._search_query + cur) or _L("tapez pour chercher…", "type to search…"),
+                          (search_box.x + 8, search_box.y + 5), fonts.small(),
+                          config.COL_WHITE if self._search_query else config.COL_TEXT_DIM)
+        results = self._search_results()
+        self._search_sel = min(self._search_sel, max(0, len(results) - 1))
+        list_y = box.y + 72
+        row_h = 28
+        max_rows = (box.bottom - 10 - list_y) // row_h
+        self._search_rects = []
+        if not results:
+            widgets.draw_text(surf, _L("Aucun résultat.", "No results."), (box.x + 14, list_y + 6),
+                              fonts.small(), config.COL_TEXT_DIM)
+        for i, entry in enumerate(results[:max_rows]):
+            row = pygame.Rect(box.x + 10, list_y + i * row_h, box.w - 20, row_h)
+            self._search_rects.append((row, entry))
+            if i == self._search_sel:
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row)
+                pygame.draw.rect(surf, config.COL_AMBER, row, 1)
+            widgets.draw_text(surf, widgets.fit_text(entry["label"], fonts.small(), row.w - 16),
+                              (row.x + 8, row.y + 6), fonts.small(), config.COL_TEXT)
+        if len(results) > max_rows:
+            widgets.draw_text(surf, f"… {_L('et', 'and')} {len(results) - max_rows} {_L('autre(s)', 'more')}",
+                              (box.x + 14, box.bottom - 22), fonts.tiny(), config.COL_TEXT_DIM)
+
     # ------------------------------------------------- menus contextuels (clic droit)
     def _snap_window(self, w, side):
         """Ancre une fenêtre sur une moitié de la zone de travail (comme le
@@ -512,7 +626,7 @@ class DesktopScene(Scene):
         shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
         shade.fill((0, 0, 0, 150))
         surf.blit(shade, (0, 0))
-        W, H = 560, 300
+        W, H = 560, 320
         x = (config.SCREEN_WIDTH - W) // 2
         y = (config.SCREEN_HEIGHT - H) // 2
         card = pygame.Rect(x, y, W, H)
@@ -537,6 +651,8 @@ class DesktopScene(Scene):
                "• RIGHT-click an icon, a window or the background: action menu."),
             _L("• Le widget en bas à droite suit votre patrimoine en direct.",
                "• The bottom-right widget tracks your net worth live."),
+            _L("• Ctrl+/ cherche dans vos positions, watchlist, inbox, mandats et deals.",
+               "• Ctrl+/ searches your positions, watchlist, inbox, mandates and deals."),
         ]
         ly = y + 58
         for ln in lines:
@@ -570,6 +686,8 @@ class DesktopScene(Scene):
             self._draw_launcher(surf)
         if self._ctx_menu is not None:
             self._draw_context_menu(surf)
+        if self._search_open:
+            self._draw_search(surf)
         if not desktop_onboarding.seen():
             self._draw_onboarding(surf)
 

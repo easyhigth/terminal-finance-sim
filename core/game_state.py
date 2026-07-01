@@ -288,6 +288,44 @@ class GameState:
         logger.info("load: succès (slot=%s, path=%s)", slot, path)
         return gs
 
+    def export_to(self, path):
+        """Écrit la partie dans un fichier JSON autonome à un chemin ARBITRAIRE
+        (hors `config.SAVE_DIR`) — permet de transporter une sauvegarde d'une
+        machine à l'autre (clé USB, cloud perso…) sans dépendre d'un service
+        tiers. Même format que `save()` (compatible avec `import_from`/`load`).
+        Fonctionne aussi en mode sandbox (contrairement à `save()`) : c'est une
+        action explicite du joueur, pas un point de sauvegarde automatique."""
+        logger.info("export_to: début (path=%s)", path)
+        d = os.path.dirname(path)
+        if d:
+            os.makedirs(d, exist_ok=True)
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(self.to_dict(), f, indent=2)
+        except Exception:
+            logger.warning("export_to: échec (path=%s)", path, exc_info=True)
+            raise
+        logger.info("export_to: succès (path=%s)", path)
+        return path
+
+    @classmethod
+    def import_from(cls, path):
+        """Charge une partie depuis un fichier JSON autonome à un chemin
+        ARBITRAIRE (cf. `export_to`). Retourne None (jamais d'exception) si le
+        fichier est absent, illisible ou corrompu — même contrat que `load()`."""
+        logger.info("import_from: début (path=%s)", path)
+        if not path or not os.path.exists(path):
+            logger.info("import_from: fichier introuvable (path=%s)", path)
+            return None
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                gs = cls.from_dict(json.load(f))
+        except Exception:
+            logger.warning("import_from: échec (path=%s)", path, exc_info=True)
+            return None
+        logger.info("import_from: succès (path=%s)", path)
+        return gs
+
     @staticmethod
     def delete(slot):
         """Supprime un slot de sauvegarde. Retourne True si supprimé."""

@@ -304,6 +304,18 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   Le panneau des raccourcis clavier (`ui/shortcutspanel.py`) a migré ici (bouton dédié dans
   les réglages) ; il n'y a plus de bouton ⌨ dans la barre du terminal. Espace = pause/reprise
   (ligne de commande vide).
+- **`scenes/scene_saves.py`** (scène `"saves"`, commande `SAVES`/`LOAD`) : gestion des slots de
+  sauvegarde (autosave + `config.SAVE_SLOTS`) — charger/enregistrer/supprimer, ET **exporter/
+  importer en fichier portable** (boutons EXPORTER par slot, IMPORTER en haut de l'écran) : un
+  chemin arbitraire (pas forcément `config.SAVE_DIR`), pour transporter une partie d'une machine
+  à l'autre à la main (clé USB, cloud perso…) sans dépendre d'un service tiers.
+  `GameState.export_to(path)`/`GameState.import_from(path)` (`core/game_state.py`) réutilisent le
+  même format JSON que `save()`/`load()`, mais à un chemin choisi par le joueur (saisi via une
+  boîte de dialogue texte, `self.path_prompt`/`self.path_buf`, même pattern que les champs de
+  saisie du reste du jeu) — `export_to` fonctionne même en mode sandbox (contrairement à `save()`,
+  no-op en sandbox) car c'est une action explicite du joueur, pas un point de sauvegarde
+  automatique. Un import réussi remplace `app.gs` et ramène au bureau, comme un chargement de
+  slot classique.
 - **`data/companies.py`** : roster fictif déterministe (320 sociétés, `ROSTER_SEED` fixe,
   noms déformés exprès : LVMH→LWNH, NVIDIA→MVC…).
 - **`core/`** : systèmes de jeu (career, portfolio, bonds, commodities, crypto, structured,

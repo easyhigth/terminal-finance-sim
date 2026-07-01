@@ -416,3 +416,62 @@ def test_pv_and_fv_roundtrip():
     sh.set("A2", "=FV(0.05,10,-100)")
     fv = sh.get_value("A2")
     assert fv > 0
+
+
+# --------------------------------------------------------------- VLOOKUP
+def _lookup_sheet():
+    sh = Spreadsheet()
+    sh.set("A1", "MVC"); sh.set("B1", "100"); sh.set("C1", "Tech")
+    sh.set("A2", "AAPL"); sh.set("B2", "200"); sh.set("C2", "Hardware")
+    sh.set("A3", "LWNH"); sh.set("B3", "300"); sh.set("C3", "Luxury")
+    return sh
+
+
+def test_vlookup_exact_match_returns_target_column():
+    sh = _lookup_sheet()
+    sh.set("D1", '=VLOOKUP("AAPL",A1:C3,2)')
+    assert sh.get_value("D1") == 200.0
+    sh.set("D2", '=VLOOKUP("AAPL",A1:C3,3)')
+    assert sh.get_value("D2") == "Hardware"
+
+
+def test_vlookup_first_column_returns_the_key_itself():
+    sh = _lookup_sheet()
+    sh.set("D1", '=VLOOKUP("LWNH",A1:C3,1)')
+    assert sh.get_value("D1") == "LWNH"
+
+
+def test_vlookup_not_found_returns_na():
+    sh = _lookup_sheet()
+    sh.set("D1", '=VLOOKUP("XXXX",A1:C3,2)')
+    assert sh.get_value("D1") == "#N/A"
+
+
+def test_vlookup_column_out_of_range_returns_ref_error():
+    sh = _lookup_sheet()
+    sh.set("D1", '=VLOOKUP("MVC",A1:C3,9)')
+    assert sh.get_value("D1") == "#REF"
+
+
+def test_vlookup_by_cell_reference_key():
+    sh = _lookup_sheet()
+    sh.set("E1", "AAPL")
+    sh.set("D1", "=VLOOKUP(E1,A1:C3,2)")
+    assert sh.get_value("D1") == 200.0
+
+
+def test_vlookup_ignores_optional_fourth_argument():
+    """Le moteur n'a pas de littéraux booléens nommés (pas de TRUE/FALSE) :
+    le 4e argument optionnel façon Excel se passe en 0/1, et reste ignoré
+    (seule la correspondance EXACTE est supportée)."""
+    sh = _lookup_sheet()
+    sh.set("D1", '=VLOOKUP("AAPL",A1:C3,2,0)')
+    assert sh.get_value("D1") == 200.0
+
+
+def test_range_aggregate_unaffected_by_grid_shape_refactor():
+    """SUM/AVERAGE sur une plage 2D doivent rester corrects après le passage
+    de _range_values (aplati) à une grille interne pour VLOOKUP."""
+    sh = _lookup_sheet()
+    sh.set("D1", "=SUM(B1:B3)")
+    assert sh.get_value("D1") == 600.0

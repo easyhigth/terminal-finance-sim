@@ -12,7 +12,7 @@ d'autres fenêtres du bureau tournent en même temps.
 
 Logique pure (pas de pygame) : testable seule.
 """
-from core.spreadsheet_engine import Spreadsheet, idx_to_col
+from core.spreadsheet_engine import Spreadsheet, col_to_idx, idx_to_col
 
 
 class SheetChart:
@@ -31,11 +31,73 @@ class SheetChart:
         self.x, self.y, self.w, self.h = x, y, w, h
 
 
+_CF_OPS = {
+    ">":  lambda v, t: v > t,
+    "<":  lambda v, t: v < t,
+    ">=": lambda v, t: v >= t,
+    "<=": lambda v, t: v <= t,
+}
+
+
+class ConditionalFormat:
+    """Une règle de mise en forme conditionnelle (façon Excel, simplifiée) :
+    si la valeur numérique d'une cellule de `range_str` vérifie `op value`,
+    la cellule est peinte avec `color` (nom logique : "up"/"down"/"amber",
+    résolu en couleur concrète par l'app — ce module reste sans pygame)."""
+
+    _next_id = 1
+
+    def __init__(self, range_str, op, value, color):
+        self.id = ConditionalFormat._next_id
+        ConditionalFormat._next_id += 1
+        self.range_str = range_str
+        self.op = op
+        self.value = value
+        self.color = color
+
+    def _cells(self):
+        try:
+            a, b = self.range_str.split(":")
+        except ValueError:
+            a = b = self.range_str
+
+        def split(ref):
+            i = 0
+            while i < len(ref) and ref[i].isalpha():
+                i += 1
+            return col_to_idx(ref[:i]), int(ref[i:])
+        c1, r1 = split(a)
+        c2, r2 = split(b)
+        cells = set()
+        for c in range(min(c1, c2), max(c1, c2) + 1):
+            for r in range(min(r1, r2), max(r1, r2) + 1):
+                cells.add(f"{idx_to_col(c)}{r}")
+        return cells
+
+    def matches(self, ref, value):
+        if ref not in self._cells():
+            return False
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            return False
+        test = _CF_OPS.get(self.op)
+        return bool(test and test(value, self.value))
+
+
 class WorkbookTab:
     def __init__(self, name, sheet):
         self.name = name
         self.sheet = sheet
-        self.charts = []   # [SheetChart]
+        self.charts = []          # [SheetChart]
+        self.cf_rules = []        # [ConditionalFormat] mise en forme conditionnelle
+
+    def cf_color_for(self, ref, value):
+        """Couleur logique (dernière règle qui correspond gagne, comme Excel
+        applique la dernière règle en cas de conflit) ou None si aucune."""
+        color = None
+        for rule in self.cf_rules:
+            if rule.matches(ref, value):
+                color = rule.color
+        return color
 
 
 class Workbook:

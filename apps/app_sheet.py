@@ -16,12 +16,15 @@ classeur : la feuille ACTIVE si elle est vierge, sinon une NOUVELLE feuille —
 jamais d'écrasement silencieux d'un modèle en cours (cf. `Workbook.import_financial`).
 Feuille vierge par défaut : un vrai bac à sable pour les calculs du joueur.
 """
+import csv
+import os
+
 import pygame
 
 from apps.base import DesktopApp
 from core import config
 from core.spreadsheet_engine import col_to_idx, idx_to_col
-from core.workbook import SheetChart, Workbook
+from core.workbook import ConditionalFormat, SheetChart, Workbook
 from ui import fonts, widgets
 
 N_ROWS = 24
@@ -49,6 +52,7 @@ FUNCTION_CATALOG = [
                  ("PMT", "Mensualité d'emprunt"), ("PV", "Valeur actuelle"),
                  ("FV", "Valeur future")]),
     ("Logique", [("IF", "Condition SI")]),
+    ("Recherche", [("VLOOKUP", "Recherche verticale (valeur;plage;colonne)")]),
     ("Marché (en direct)", [("PRICE", 'Cours d\'une action ("MVC")'),
                             ("INDEX", "Valeur d'un indice"),
                             ("FX", 'Taux de change ("USD/JPY")'),
@@ -58,6 +62,14 @@ FUNCTION_CATALOG = [
 ]
 
 CHART_TYPES = [("line", "Ligne"), ("bar", "Barres"), ("scatter", "Nuage")]
+
+# Mise en forme conditionnelle : opérateurs et couleurs proposés (façon Excel,
+# simplifié à un seuil numérique — le cas d'usage courant en finance : repérer
+# d'un coup d'œil les dépassements/manquements par rapport à un objectif).
+CF_OPS = [">", "<", ">=", "<="]
+CF_COLORS = [("up", "Vert"), ("down", "Rouge"), ("amber", "Ambre")]
+_CF_RGB = {"up": config.COL_UP, "down": config.COL_DOWN, "amber": config.COL_AMBER}
+UNDO_LIMIT = 50
 
 # Fonctions de marché EN DIRECT (cf. _market_fn) : une cellule dont la formule
 # en appelle une clignote vert/rouge au mouvement (cf. TickFlash), comme un
@@ -116,6 +128,30 @@ class SheetApp(DesktopApp):
         self._last_market_step = None
         self._flash = widgets.TickFlash()   # flash vert/rouge des cellules de marché en direct
         self.sheet.external = self._market_fn   # dès l'ouverture (avant 1er draw)
+        # annuler/rétablir (Ctrl+Z / Ctrl+Y) : pile d'états AVANT chaque
+        # modification (édition, effacement, collage) — pas persisté (repart
+        # à vide à chaque ouverture de fenêtre, comme un vrai Ctrl+Z de session).
+        self._undo = []
+        self._redo = []
+        # copier/coller de plage (Ctrl+C / Ctrl+V) : grille de formules BRUTES
+        # (pas de valeurs calculées), collée en conservant les formules telles
+        # quelles (pas de décalage relatif des références — usage courant du
+        # jeu : dupliquer des lignes de cours suivis, pas un modèle complexe).
+        self._clipboard = None
+        # mise en forme conditionnelle ("CF")
+        self.cf_open = False
+        self._cf_rect = None
+        self._cf_panel_rect = None
+        self._cf_op = ">"
+        self._cf_value_str = "0"
+        self._cf_value_focus = False
+        self._cf_color = "up"
+        self._cf_op_rects = {}
+        self._cf_color_rects = {}
+        self._cf_value_rect = None
+        self._cf_apply_rect = None
+        self._cf_remove_rects = {}
+        self._csv_rect = None
 
     @property
     def sheet(self):
@@ -209,6 +245,7 @@ class SheetApp(DesktopApp):
 
     def _commit(self):
         if self.editing:
+            self._record_undo([self.sel])
             self.sheet.set(self.sel, self.edit_buf)
             self.editing = False
 
@@ -236,6 +273,156 @@ class SheetApp(DesktopApp):
             self.edit_buf = "=" + self.edit_buf
         self.edit_buf += f"{name}("
         self.fx_open = False
+
+    # ------------------------------------------------------- annuler/rétablir
+    def _record_undo(self, refs):
+        """Empile l'état AVANT modification de `refs` sur la pile d'annulation
+        (Ctrl+Z) ; toute nouvelle action invalide la pile de rétablissement
+        (Ctrl+Y), comme dans un vrai tableur."""
+        entry = [(r, self.sheet.get_raw(r)) for r in refs]
+        self._undo.append(entry)
+        self._redo.clear()
+        if len(self._undo) > UNDO_LIMIT:
+            self._undo.pop(0)
+
+    def _undo_action(self):
+        if not self._undo:
+            self.msg = "Rien à annuler."
+            return
+        entry = self._undo.pop()
+        redo_entry = [(r, self.sheet.get_raw(r)) for r, _ in entry]
+        for r, old in entry:
+            self.sheet.set(r, old)
+        self._redo.append(redo_entry)
+        self.msg = "Annulé."
+
+    def _redo_action(self):
+        if not self._redo:
+            self.msg = "Rien à rétablir."
+            return
+        entry = self._redo.pop()
+        undo_entry = [(r, self.sheet.get_raw(r)) for r, _ in entry]
+        for r, old in entry:
+            self.sheet.set(r, old)
+        self._undo.append(undo_entry)
+        self.msg = "Rétabli."
+
+    # --------------------------------------------------- copier/coller de plage
+    def _copy_range(self):
+        c1, c2, r1, r2 = self._range_bounds()
+        self._clipboard = [[self.sheet.get_raw(f"{idx_to_col(c)}{r}") for c in range(c1, c2 + 1)]
+                           for r in range(r1, r2 + 1)]
+        n = (c2 - c1 + 1) * (r2 - r1 + 1)
+        self.msg = f"{n} cellule(s) copiée(s)."
+
+    def _paste_range(self):
+        if not self._clipboard:
+            self.msg = "Presse-papiers vide (Ctrl+C d'abord)."
+            return
+        c0, r0 = _split_ref(self.sel)
+        targets = []
+        for dr, row in enumerate(self._clipboard):
+            for dc, raw in enumerate(row):
+                c, r = c0 + dc, r0 + dr
+                if c < N_COLS and r <= N_ROWS:
+                    targets.append((f"{idx_to_col(c)}{r}", raw))
+        self._record_undo([ref for ref, _ in targets])
+        for ref, raw in targets:
+            self.sheet.set(ref, raw)
+        self.msg = f"{len(targets)} cellule(s) collée(s)."
+
+    # ------------------------------------------------------------- export CSV
+    def _export_csv(self):
+        """Exporte la feuille ACTIVE (valeurs calculées, pas les formules) en
+        CSV, vers le dossier personnel de l'utilisateur — même logique « pas de
+        sélecteur de fichier natif » que la sauvegarde rapide du bureau."""
+        tab = self.workbook.active
+        sheet = tab.sheet
+        max_r = max_c = 0
+        for ref in sheet.cells:
+            if sheet.get_raw(ref) == "":
+                continue
+            c, r = _split_ref(ref)
+            max_r, max_c = max(max_r, r), max(max_c, c)
+        if max_r == 0:
+            self.msg = "Feuille vide : rien à exporter."
+            return
+        fname = "".join(ch if ch.isalnum() else "_" for ch in tab.name) + ".csv"
+        path = os.path.join(os.path.expanduser("~"), fname)
+        try:
+            with open(path, "w", newline="", encoding="utf-8") as f:
+                w = csv.writer(f)
+                for r in range(1, max_r + 1):
+                    row = []
+                    for c in range(max_c + 1):
+                        v = sheet.get_value(f"{idx_to_col(c)}{r}")
+                        row.append("" if v == "" else self._fmt(v))
+                    w.writerow(row)
+            self.msg = f"Exporté vers « {path} »."
+        except OSError:
+            self.msg = "Échec de l'export CSV (chemin inaccessible)."
+
+    # ---------------------------------------------- mise en forme conditionnelle
+    def _cf_value(self):
+        try:
+            return float(self._cf_value_str)
+        except ValueError:
+            return None
+
+    def _apply_cf_rule(self):
+        val = self._cf_value()
+        if val is None:
+            self.msg = "Seuil invalide."
+            return
+        c1, c2, r1, r2 = self._range_bounds()
+        range_str = f"{idx_to_col(c1)}{r1}:{idx_to_col(c2)}{r2}"
+        self.workbook.active.cf_rules.append(
+            ConditionalFormat(range_str, self._cf_op, val, self._cf_color))
+        self.msg = f"Règle ajoutée sur {range_str}."
+
+    def _handle_cf_event(self, event):
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.cf_open = False
+            self._cf_value_focus = False
+            return True
+        if self._cf_value_focus and event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_BACKSPACE:
+                self._cf_value_str = self._cf_value_str[:-1]
+                return True
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_TAB):
+                self._cf_value_focus = False
+                return True
+            if event.unicode and (event.unicode.isdigit() or event.unicode in ".-"):
+                self._cf_value_str += event.unicode
+                return True
+            return True
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._cf_value_rect and self._cf_value_rect.collidepoint(event.pos):
+                self._cf_value_focus = True
+                return True
+            for op, r in self._cf_op_rects.items():
+                if r.collidepoint(event.pos):
+                    self._cf_op = op
+                    return True
+            for color, r in self._cf_color_rects.items():
+                if r.collidepoint(event.pos):
+                    self._cf_color = color
+                    return True
+            if self._cf_apply_rect and self._cf_apply_rect.collidepoint(event.pos):
+                self._apply_cf_rule()
+                return True
+            for rid, r in self._cf_remove_rects.items():
+                if r.collidepoint(event.pos):
+                    self.workbook.active.cf_rules = [
+                        rule for rule in self.workbook.active.cf_rules if rule.id != rid]
+                    return True
+            if self._cf_panel_rect and not self._cf_panel_rect.collidepoint(event.pos) \
+                    and not (self._cf_rect and self._cf_rect.collidepoint(event.pos)):
+                self.cf_open = False
+                self._cf_value_focus = False
+                return True
+            return True
+        return False
 
     # ----------------------------------------------------------- graphiques
     def _add_chart(self, kind):
@@ -299,9 +486,34 @@ class SheetApp(DesktopApp):
                 self.fx_open = False
                 return True
 
+        if self.cf_open and self._handle_cf_event(event):
+            return True
+
+        # raccourcis clavier façon tableur (Ctrl+C/V/Z/Y) — seulement hors
+        # édition d'une cellule (ne doit pas intercepter la frappe normale).
+        if event.type == pygame.KEYDOWN and not self.editing and (event.mod & pygame.KMOD_CTRL):
+            if event.key == pygame.K_c:
+                self._copy_range()
+                return True
+            if event.key == pygame.K_v:
+                self._paste_range()
+                return True
+            if event.key == pygame.K_z:
+                self._undo_action()
+                return True
+            if event.key == pygame.K_y:
+                self._redo_action()
+                return True
+
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._fx_rect and self._fx_rect.collidepoint(event.pos):
                 self.fx_open = not self.fx_open
+                return True
+            if self._cf_rect and self._cf_rect.collidepoint(event.pos):
+                self.cf_open = not self.cf_open
+                return True
+            if self._csv_rect and self._csv_rect.collidepoint(event.pos):
+                self._export_csv()
                 return True
             for kind, r in self._chart_btn_rects.items():
                 if r.collidepoint(event.pos):
@@ -394,6 +606,7 @@ class SheetApp(DesktopApp):
                     self.editing = True
                     self.edit_buf = self.sheet.get_raw(self.sel)
                 elif event.key == pygame.K_BACKSPACE:
+                    self._record_undo([self.sel])
                     self.sheet.set(self.sel, "")
                 elif event.key == pygame.K_UP:
                     self._move(0, -1)
@@ -490,12 +703,19 @@ class SheetApp(DesktopApp):
                 self._cell_rects[ref] = cell
                 sel = (ref == self.sel)
                 in_range = has_range and in_range_row and rc1 <= c <= rc2
+                raw = self.sheet.get_raw(ref)
                 bg = config.COL_PANEL_HEAD if sel else (
                     (18, 40, 46) if in_range else config.COL_BG)
                 pygame.draw.rect(surf, bg, cell)
+                if raw != "":
+                    cf_val = self.sheet.get_value(ref)
+                    cf_color = self.workbook.active.cf_color_for(ref, cf_val)
+                    if cf_color:
+                        tint = pygame.Surface(cell.size, pygame.SRCALPHA)
+                        tint.fill((*_CF_RGB[cf_color], 70))
+                        surf.blit(tint, cell.topleft)
                 pygame.draw.rect(surf, config.COL_CYAN if (sel or in_range) else config.COL_GRID,
                                  cell, 2 if sel else 1)
-                raw = self.sheet.get_raw(ref)
                 if raw == "":
                     continue
                 v = self.sheet.get_value(ref)
@@ -521,6 +741,8 @@ class SheetApp(DesktopApp):
 
         if self.fx_open:
             self._draw_fx_panel(surf, rect)
+        if self.cf_open:
+            self._draw_cf_panel(surf, rect)
 
     def _draw_tab_bar(self, surf, rect, pad):
         bar = pygame.Rect(rect.x + pad, rect.y + pad, rect.w - 2 * pad, TAB_BAR_H)
@@ -573,6 +795,22 @@ class SheetApp(DesktopApp):
             pygame.draw.rect(surf, config.COL_CYAN, r, 1, border_radius=3)
             widgets.draw_text(surf, label, r.center, fonts.tiny(bold=True), config.COL_CYAN, align="center")
             x += w + 6
+        pygame.draw.line(surf, config.COL_BORDER, (x - 2, bar.y + 3), (x - 2, bar.bottom - 3), 1)
+        x += 6
+        self._cf_rect = pygame.Rect(x, bar.y + 2, 34, TOOLBAR_H - 4)
+        hov = self._cf_rect.collidepoint(mp) or self.cf_open
+        pygame.draw.rect(surf, config.COL_PANEL if hov else config.COL_BG, self._cf_rect, border_radius=3)
+        pygame.draw.rect(surf, config.COL_PRESTIGE, self._cf_rect, 1, border_radius=3)
+        widgets.draw_text(surf, "CF", self._cf_rect.center, fonts.tiny(bold=True),
+                          config.COL_PRESTIGE, align="center")
+        x = self._cf_rect.right + 6
+        self._csv_rect = pygame.Rect(x, bar.y + 2, 42, TOOLBAR_H - 4)
+        hov = self._csv_rect.collidepoint(mp)
+        pygame.draw.rect(surf, config.COL_PANEL if hov else config.COL_BG, self._csv_rect, border_radius=3)
+        pygame.draw.rect(surf, config.COL_TEXT_DIM, self._csv_rect, 1, border_radius=3)
+        widgets.draw_text(surf, "CSV", self._csv_rect.center, fonts.tiny(bold=True),
+                          config.COL_TEXT_DIM, align="center")
+        x = self._csv_rect.right + 8
         if self.msg:
             widgets.draw_text(surf, widgets.fit_text(self.msg, fonts.tiny(), bar.right - x - 8),
                               (x + 8, bar.y + 6), fonts.tiny(), config.COL_TEXT_DIM)
@@ -603,6 +841,90 @@ class SheetApp(DesktopApp):
                 y += 16
             y += 6
         surf.set_clip(prev_clip)
+
+    def _draw_cf_panel(self, surf, rect):
+        """Panneau « mise en forme conditionnelle » : définit une règle
+        (opérateur + seuil + couleur) sur la plage actuellement sélectionnée,
+        et liste/retire les règles déjà posées sur la feuille active."""
+        c1, c2, r1, r2 = self._range_bounds()
+        range_str = f"{idx_to_col(c1)}{r1}:{idx_to_col(c2)}{r2}"
+        rules = self.workbook.active.cf_rules
+        panel_h = 132 + len(rules) * 18
+        panel = pygame.Rect(self._cf_rect.x, self._cf_rect.bottom + 2, 260, panel_h)
+        panel.right = min(panel.right, rect.right - 4)
+        panel.bottom = min(panel.bottom, rect.bottom - 4)
+        pygame.draw.rect(surf, config.COL_PANEL, panel)
+        pygame.draw.rect(surf, config.COL_PRESTIGE, panel, 2)
+        self._cf_panel_rect = panel
+        mp = pygame.mouse.get_pos()
+
+        widgets.draw_text(surf, "MISE EN FORME CONDITIONNELLE", (panel.x + 8, panel.y + 6),
+                          fonts.tiny(bold=True), config.COL_PRESTIGE)
+        widgets.draw_text(surf, f"Plage : {range_str}", (panel.x + 8, panel.y + 22),
+                          fonts.tiny(), config.COL_TEXT_DIM)
+
+        # opérateur
+        self._cf_op_rects = {}
+        x = panel.x + 8
+        for op in CF_OPS:
+            w = 30
+            r = pygame.Rect(x, panel.y + 40, w, 20)
+            self._cf_op_rects[op] = r
+            active = (op == self._cf_op)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if active else config.COL_BG, r, border_radius=3)
+            pygame.draw.rect(surf, config.COL_PRESTIGE if active else config.COL_BORDER, r, 1, border_radius=3)
+            widgets.draw_text(surf, op, r.center, fonts.tiny(bold=True),
+                              config.COL_PRESTIGE if active else config.COL_TEXT_DIM, align="center")
+            x += w + 4
+        # seuil
+        self._cf_value_rect = pygame.Rect(x + 4, panel.y + 40, 70, 20)
+        pygame.draw.rect(surf, config.COL_BG, self._cf_value_rect, border_radius=3)
+        pygame.draw.rect(surf, config.COL_CYAN if self._cf_value_focus else config.COL_BORDER,
+                         self._cf_value_rect, 1, border_radius=3)
+        cur = "_" if self._cf_value_focus and pygame.time.get_ticks() % 1000 < 500 else ""
+        widgets.draw_text(surf, (self._cf_value_str or "0") + cur,
+                          (self._cf_value_rect.x + 6, self._cf_value_rect.y + 3),
+                          fonts.tiny(), config.COL_TEXT)
+
+        # couleur
+        self._cf_color_rects = {}
+        x = panel.x + 8
+        for color, label in CF_COLORS:
+            w = 70
+            r = pygame.Rect(x, panel.y + 66, w, 20)
+            self._cf_color_rects[color] = r
+            active = (color == self._cf_color)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if active else config.COL_BG, r, border_radius=3)
+            pygame.draw.rect(surf, _CF_RGB[color], r, 2 if active else 1, border_radius=3)
+            widgets.draw_text(surf, label, r.center, fonts.tiny(bold=active), _CF_RGB[color], align="center")
+            x += w + 4
+
+        self._cf_apply_rect = pygame.Rect(panel.x + 8, panel.y + 92, panel.w - 16, 22)
+        hov = self._cf_apply_rect.collidepoint(mp)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_BG,
+                         self._cf_apply_rect, border_radius=3)
+        pygame.draw.rect(surf, config.COL_PRESTIGE, self._cf_apply_rect, 1, border_radius=3)
+        widgets.draw_text(surf, "APPLIQUER SUR LA PLAGE", self._cf_apply_rect.center,
+                          fonts.tiny(bold=True), config.COL_PRESTIGE, align="center")
+
+        # règles existantes
+        self._cf_remove_rects = {}
+        y = panel.y + 122
+        if rules:
+            widgets.draw_text(surf, f"RÈGLES ({len(rules)})", (panel.x + 8, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+            y += 16
+            for rule in rules:
+                label = f"{rule.range_str} {rule.op} {rule.value:g}"
+                widgets.draw_text(surf, widgets.fit_text(label, fonts.tiny(), panel.w - 40),
+                                  (panel.x + 8, y), fonts.tiny(), _CF_RGB[rule.color])
+                rm = pygame.Rect(panel.right - 24, y - 2, 16, 16)
+                self._cf_remove_rects[rule.id] = rm
+                hov = rm.collidepoint(mp)
+                pygame.draw.line(surf, config.COL_DOWN if hov else config.COL_TEXT_DIM,
+                                 (rm.x + 3, rm.y + 3), (rm.right - 3, rm.bottom - 3), 2)
+                pygame.draw.line(surf, config.COL_DOWN if hov else config.COL_TEXT_DIM,
+                                 (rm.x + 3, rm.bottom - 3), (rm.right - 3, rm.y + 3), 2)
+                y += 18
 
     # --------------------------------------------------------- graphiques
     def _draw_chart(self, surf, rect, chart):

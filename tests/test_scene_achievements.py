@@ -104,6 +104,49 @@ def test_escape_returns_to_return_to_scene(app):
     assert app.scenes.current_name == "terminal"
 
 
+def test_filter_defaults_to_all_categories(app):
+    app.scenes.go("achievements", return_to="terminal")
+    scene = app.scenes.current
+    assert scene._cat_filter is None
+    assert scene._visible_rows() == scene.rows
+
+
+def test_draw_builds_chip_rects_for_present_categories(app):
+    app.scenes.go("achievements", return_to="terminal")
+    scene = app.scenes.current
+    scene.draw(app.screen)
+    present = {r["cat"] for r in scene.rows if r["cat"]}
+    assert set(scene._chip_rects) == present | {None}
+
+
+def test_clicking_a_chip_filters_rows_by_category(app):
+    app.scenes.go("achievements", return_to="terminal")
+    scene = app.scenes.current
+    scene.draw(app.screen)
+    career_rect = scene._chip_rects["career"]
+    scene.handle_event(_click(career_rect.centerx, career_rect.centery))
+    assert scene._cat_filter == "career"
+    assert scene._visible_rows()
+    assert all(r["cat"] == "career" for r in scene._visible_rows())
+
+
+def test_clicking_all_chip_clears_filter(app):
+    app.scenes.go("achievements", return_to="terminal")
+    scene = app.scenes.current
+    scene.draw(app.screen)
+    scene._cat_filter = "career"
+    all_rect = scene._chip_rects[None]
+    scene.handle_event(_click(all_rect.centerx, all_rect.centery))
+    assert scene._cat_filter is None
+    assert scene._visible_rows() == scene.rows
+
+
+def test_every_badge_has_a_known_category():
+    valid = {cid for cid, _fr, _en in badges_mod.CATEGORIES}
+    for b in badges_mod.all_badges() + badges_mod.all_streak_badges():
+        assert b.get("cat") in valid, b["id"]
+
+
 def test_terminal_command_opens_achievements_scene(app):
     app.scenes.go("desktop")
     desk = app.scenes.current

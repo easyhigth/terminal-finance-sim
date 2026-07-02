@@ -77,6 +77,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self.start_open = False
         self._icon_rects = {}       # clé -> (Rect, icon_kind, label) — icônes du bureau
         self._icon_focus = None     # clé de l'icône ayant le focus clavier (ou None)
+        self._show_desktop_restore = []  # clés des fenêtres à restaurer (CTRL+MAJ+D)
         self._launch_rects = {}     # clé app -> Rect (barre des tâches quick-launch)
         self._task_rects = {}       # Window -> Rect (barre des tâches)
         self._start_rect = None     # bouton menu Démarrer
@@ -168,6 +169,14 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         # Alt+Tab : passe à la fenêtre suivante (façon OS), prioritaire sur tout
         if event.type == pygame.KEYDOWN and event.key == pygame.K_TAB and (event.mod & pygame.KMOD_ALT):
             self.wm.cycle_focus(reverse=bool(event.mod & pygame.KMOD_SHIFT))
+            return
+        # « Afficher le bureau » (façon Windows+D — CTRL+MAJ+D pour éviter tout
+        # conflit avec le raccourci OS Windows+D lui-même ET avec CTRL+D
+        # ci-dessus, réservé à l'icône Deals) : réduit toutes les fenêtres
+        # ouvertes ; un 2ᵉ appui restaure exactement celles qui l'étaient.
+        if (event.type == pygame.KEYDOWN and event.key == pygame.K_d
+                and (event.mod & pygame.KMOD_CTRL) and (event.mod & pygame.KMOD_SHIFT)):
+            self._toggle_show_desktop()
             return
         # clic droit : menu contextuel (icône, chrome de fenêtre, barre des
         # tâches ou fond du bureau) — avant le routage classique des fenêtres.
@@ -277,6 +286,23 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             return
         # pause/vitesse/⚙ : gérés par la bande d'onglets (simclock_widget), plus
         # de doublon dans la topbar du bureau.
+
+    def _toggle_show_desktop(self):
+        """CTRL+MAJ+D : réduit toutes les fenêtres ouvertes (bureau dégagé),
+        ou restaure exactement celles qui viennent d'être réduites par ce
+        raccourci si aucune fenêtre n'est ouverte — comme Afficher le bureau
+        sous Windows/macOS. Ne touche pas aux fenêtres déjà minimisées avant
+        l'appel (le terminal, minimisé par défaut, reste tel quel)."""
+        open_wins = [w for w in self.wm.windows if not w.minimized]
+        if open_wins:
+            self._show_desktop_restore = [w.key for w in open_wins]
+            for w in open_wins:
+                w.minimized = True
+        else:
+            for w in self.wm.windows:
+                if w.key in self._show_desktop_restore:
+                    w.minimized = False
+            self._show_desktop_restore = []
 
     def _launch(self, key):
         if key == "terminal":

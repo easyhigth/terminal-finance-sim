@@ -110,6 +110,8 @@ SECTIONS = [
             "(à ne pas confondre avec CTRL+K, la palette de navigation générale)"),
         ("ALT+TAB / ALT+MAJ+TAB", "Passe à la fenêtre suivante/précédente (façon "
             "système d'exploitation), quel que soit l'écran affiché au premier plan"),
+        ("CTRL+MAJ+D", "Afficher le bureau (façon Windows+D) : réduit toutes les "
+            "fenêtres ouvertes ; un 2ᵉ appui restaure exactement celles qui l'étaient"),
         ("Clic droit", "Ouvre un menu contextuel selon la cible : icône, barre de "
             "titre d'une fenêtre, entrée de la barre des tâches, ou fond du bureau"),
     ]),

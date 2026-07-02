@@ -100,6 +100,8 @@ SECTIONS_EN = [
             "(not to be confused with CTRL+K, the general navigation palette)"),
         ("ALT+TAB / ALT+SHIFT+TAB", "Switches to the next/previous window (OS-style), "
             "whatever screen is currently in front"),
+        ("CTRL+SHIFT+D", "Show desktop (Windows+D style): minimizes every open "
+            "window ; a 2nd press restores exactly the ones that were open"),
         ("Right click", "Opens a context menu depending on the target: icon, a "
             "window's title bar, taskbar entry, or the desktop background"),
     ]),

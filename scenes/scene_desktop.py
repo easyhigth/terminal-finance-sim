@@ -623,6 +623,8 @@ class DesktopScene(Scene):
             (_L("Fermer toutes les fenêtres", "Close all windows"), self._close_all_windows),
             (_L("Revoir l'accueil", "Show welcome again"), desktop_onboarding.reset),
             (_L("Revoir le tutoriel", "Replay the tutorial"), desktop_tutorial.reset),
+            (_L("Tutoriels (leçons guidées)", "Tutorials (guided lessons)"),
+             lambda: self._open_scene_window("tutorials")),
         ]
 
     def _launch_and_snap(self, key, side):

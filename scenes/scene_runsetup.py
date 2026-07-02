@@ -189,9 +189,14 @@ class RunSetupScene(Scene):
             self.prev_btn.draw(surf)
             self.confirm_btn.draw(surf)
 
-    @staticmethod
-    def _scen_meta(s):
-        return (f"Capital {widgets.format_money(s['cash'], '$')} · "
+    def _scen_meta(self, s):
+        """Méta d'un scénario de départ. Le capital affiché intègre le
+        multiplicateur du preset de difficulté SÉLECTIONNÉ — le joueur voit
+        le chiffre avec lequel il démarrera vraiment (cf. difficulty.apply)."""
+        p = diff_mod.PRESETS[self.diff_idx]
+        cash = s["cash"] * p["cash_mult"]
+        note = f" ({diff_mod.label(p)})" if p["cash_mult"] != 1.0 else ""
+        return (f"Capital {widgets.format_money(cash, '$')}{note} · "
                 f"grade {config.GRADES[s['grade_index']]} · réputation {s['reputation']}.  "
                 + s["desc"])
 

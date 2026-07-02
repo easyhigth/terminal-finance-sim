@@ -41,7 +41,6 @@ class TradingApp(DesktopApp):
         self.order_feed = []
         self.scroll = 0
         self._max_scroll = 0
-        self._row_rects = {}
         self._buy_rects = {}
         self._sell_rects = {}
         self._preset_rects = {}
@@ -306,7 +305,7 @@ class TradingApp(DesktopApp):
         widgets.draw_text(surf, "POSSÉDÉ", (list_area.x + int(list_area.w * 0.66), list_area.y + 4),
                           fonts.tiny(bold=True), config.COL_TEXT_DIM)
         rows = self._rows()
-        self._row_rects, self._buy_rects, self._sell_rects, self._order_rects = {}, {}, {}, {}
+        self._buy_rects, self._sell_rects, self._order_rects = {}, {}, {}
         body = pygame.Rect(list_area.x, list_area.y + 22, list_area.w, list_area.h - 24)
         prev_clip = surf.get_clip()
         surf.set_clip(body)

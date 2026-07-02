@@ -22,6 +22,7 @@ from core import politics as politics_mod
 from core import portfolio as pf_mod
 from core import rivals as rivals_mod
 from core import scenarios as scenarios_mod
+from core import story_arcs as story_mod
 from core import stresstest as stresstest_mod
 from core.i18n import get_lang
 from ui import widgets
@@ -434,6 +435,13 @@ class TerminalTimeMixin:
             self._log(_L(f"  ✶ Nouveau deal #{d['id']} : {d['title']} ({d['days_left']}j)", f"  ✶ New deal #{d['id']}: {d['title']} ({d['days_left']}d)"))
         # messages d'ambiance / conformité
         inbox_mod.on_step(p, m, summary, random)
+        # arcs narratifs : un même expéditeur revient au fil des semaines
+        # (mentor, journaliste, petit client…) — cf. core/story_arcs.py
+        for arc_msg in story_mod.on_step(p, m):
+            self._log(f"  @ {arc_msg['sender']} — {arc_msg['subject']} (INBOX).")
+            self.app.notify(_L(f"Message : {arc_msg['sender']}",
+                               f"Message: {arc_msg['sender']}"),
+                            "prestige" if arc_msg["finale"] else "info")
         # scrutin réglementaire : décroissance + risque d'enquête
         inv = dilemmas_mod.maybe_investigate(p, random)
         if inv:

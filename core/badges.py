@@ -100,6 +100,23 @@ BADGES = [
      "desc": ("Détenir une crypto du groupe corrélé pendant un depeg actif, sans stablecoin décroché en portefeuille.",
               "Hold a crypto from the correlated group during an active depeg, with no depegged stablecoin in your portfolio."),
      "test": lambda p, m: _traded_through_contagion(p, m)},
+    {"id": "alumnus", "name": ("Ancien élève", "Alumnus"),
+     "desc": ("Mener à son terme l'arc narratif du mentor (inbox).",
+              "See the mentor's inbox story arc through to the end."),
+     "test": lambda p, m: "mentor" in (p.flags.get("story_arcs_done") or [])},
+    {"id": "well_connected", "name": ("Bien entouré", "Well connected"),
+     "desc": ("Mener à leur terme tous les arcs narratifs de l'inbox.",
+              "See every inbox story arc through to the end."),
+     "test": lambda p, m: _all_story_arcs_done(p),
+     "progress": lambda p, m: _story_arcs_progress(p)},
+    {"id": "no_safety_net", "name": ("Sans filet", "No safety net"),
+     "desc": ("Atteindre le grade Associate ou plus en difficulté Exigeant.",
+              "Reach Associate grade or higher on Demanding difficulty."),
+     "test": lambda p, m: p.flags.get("difficulty") == "demanding" and p.grade_index >= 4},
+    {"id": "hof_legend", "name": ("Légende du panthéon", "Hall of Fame legend"),
+     "desc": ("Terminer une carrière dans le top 3 du panthéon local.",
+              "Finish a career in the local Hall of Fame top 3."),
+     "test": lambda p, m: bool(p.flags.get("hof_top3"))},
 ]
 
 
@@ -132,6 +149,18 @@ def _has_itm_hedge(player, market):
         return any(h.get("in_money") for h in hedging.holdings(player, market))
     except Exception:
         return False
+
+
+def _all_story_arcs_done(player):
+    from data.story_arcs import ARCS
+    done = set(player.flags.get("story_arcs_done") or [])
+    return bool(ARCS) and all(a["id"] in done for a in ARCS)
+
+
+def _story_arcs_progress(player):
+    from data.story_arcs import ARCS
+    done = set(player.flags.get("story_arcs_done") or [])
+    return (sum(1 for a in ARCS if a["id"] in done), len(ARCS))
 
 
 def _traded_through_contagion(player, market):

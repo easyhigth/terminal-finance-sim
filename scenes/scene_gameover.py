@@ -8,6 +8,7 @@ import math
 
 import pygame
 
+from core import badges as badges_mod
 from core import config
 from core import hall_of_fame as hof_mod
 from core import score as score_mod
@@ -57,6 +58,12 @@ class GameOverScene(Scene):
         if p.game_over and not p.flags.get("hof_recorded"):
             p.flags["hof_recorded"] = True
             self.hof_rank = hof_mod.record(p, self.score.total)
+            if self.hof_rank is not None and self.hof_rank <= 3:
+                p.flags["hof_top3"] = True
+            # badges dépendant de l'issue de la partie (panthéon...) : plus
+            # aucun pas de marché ne sera joué après cet écran, donc c'est
+            # ici — pas dans la boucle de jeu — qu'il faut les attribuer.
+            badges_mod.check_new(p, market)
         self.hof_top = hof_mod.top(5)
         self.menu_btn = widgets.Button(
             (config.SCREEN_WIDTH // 2 - 150, 660, 300, 26),

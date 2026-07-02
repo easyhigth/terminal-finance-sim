@@ -184,9 +184,11 @@ class PlayerState:
         return (d - 1) // config.DAYS_PER_QUARTER + 1
 
     def salary_per_step(self):
-        """Salaire net crédité par tour d'avancement, croissant avec le grade."""
+        """Salaire net crédité par tour d'avancement, croissant avec le grade,
+        modulé par la difficulté du run (core/difficulty.py)."""
+        from core import difficulty
         base = 4_000 + self.grade_index * 9_000
-        return base * (config.DAYS_PER_STEP / 30.0)
+        return base * (config.DAYS_PER_STEP / 30.0) * difficulty.salary_mult(self)
 
     def costs_per_step(self):
         """Coûts opérationnels par tour (plus élevés aux grades supérieurs)."""
@@ -554,6 +556,11 @@ class GameState:
             p.quarter_flows = {}
             p.quarter_nw_anchor = nw
             quarter_report = career.close_quarter(p)
+            # mémorisé pour la carte « Bilan du trimestre » du bureau
+            # (scenes/scene_desktop.py) — JSON-sérialisable, persiste au save.
+            p.flags["last_quarter_report"] = dict(quarter_report,
+                                                  quarter=prev_quarter,
+                                                  nw=round(nw, 2))
             career.ensure_objectives(p)
             from core import review as _review
             review_offer = _review.maybe_trigger(p, True)

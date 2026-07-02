@@ -33,9 +33,10 @@ from apps.app_sheet import SheetApp
 from apps.app_trading import TradingApp
 from apps.app_watchlist import WatchlistApp
 from apps.scene_host import SceneHostApp
-from core import config, desktop_onboarding
+from core import config, desktop_onboarding, desktop_tutorial
 from core import portfolio as pf_mod
 from core import portfolio_margin as pm_mod
+from core import unlocks as unlocks_mod
 from core.scene_manager import Scene
 from scenes.scene_more import SECTIONS
 from ui import desktop_icons, fonts, widgets
@@ -96,6 +97,16 @@ QUICK_APPS = [
     ("qcommands", "Aide", "help", "commands"),
 ]
 
+# Icônes du bureau soumises au déblocage progressif (core/unlocks.py) : la
+# complexité arrive par paliers de grade, comme les commandes du terminal —
+# une icône verrouillée n'apparaît tout simplement pas (et son apparition au
+# grade suivant fait office de récompense, cf. `_check_new_icons`).
+ICON_FEATURE = {
+    "trading": "trade",
+    "qmandates": "mandates",
+    "qdeals": "deals",
+}
+
 # Scènes hébergées (menu Démarrer) nécessitant un actif par défaut si non fourni.
 _NEEDS_TICKER = {"company", "financials", "ma_target"}
 _NEEDS_TICKERS = {"compare", "graph"}
@@ -133,9 +144,12 @@ class DesktopScene(Scene):
         self._launcher_rects = []   # [(Rect, scene, kwargs)] items du menu Démarrer
         self._menu_rect = None
         self._ambient_rect = None    # widget patrimoine (clic → portefeuille)
+        self._todo_rects = []        # lignes du widget « À faire » (clic → scène)
         self._ctx_menu = None        # menu contextuel (clic droit) : dict ou None
         self._onboard_card = None    # carte d'accueil (rect) — 1re visite
         self._onboard_btn = None
+        self._tuto_skip_rect = None  # bouton « Passer » du tutoriel guidé
+        self._qcard_rects = {}       # boutons de la carte « Bilan du trimestre »
         # recherche globale (Ctrl+/ — Ctrl+F est déjà pris par le rail du
         # terminal pour M&A, cf. RAIL_SHORTCUTS) : cherche dans les DONNÉES DE
         # PARTIE (positions, watchlist, inbox, mandats, deals), pas le contenu
@@ -171,6 +185,31 @@ class DesktopScene(Scene):
     def update(self, dt):
         self._tick_market()
         self.wm.update(dt)
+        self._check_new_icons()
+        self._check_tutorial()
+
+    # ------------------------------------------------------ tutoriel guidé
+    def _check_tutorial(self):
+        """Valide l'étape courante du tutoriel de prise en main dès que l'état
+        du bureau la satisfait (fenêtre ouverte, ancrage…) — détection sur
+        l'ÉTAT, pas sur le clic, comme le parcours du terminal."""
+        if not desktop_onboarding.seen() or desktop_tutorial.done():
+            return
+        cur = desktop_tutorial.active_step()
+        if cur is None:
+            return
+        _idx, step = cur
+        try:
+            ok = bool(step["check"](self))
+        except Exception:
+            ok = False
+        if not ok:
+            return
+        if desktop_tutorial.advance():
+            self.app.notify(_L("Tutoriel terminé — le poste de travail est à vous !",
+                               "Tutorial complete — the workstation is yours!"), "prestige")
+        else:
+            self.app.notify(_L("Étape validée ✓", "Step complete ✓"), "good")
 
     # ------------------------------------------------------------- events
     def handle_event(self, event):
@@ -221,6 +260,25 @@ class DesktopScene(Scene):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and self.start_open:
             self.start_open = False
             return
+        # carte « Bilan du trimestre » (au-dessus des fenêtres) : ses boutons
+        # sont prioritaires, un clic ailleurs sur la carte est absorbé.
+        if self._quarter_card_pending() is not None \
+                and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            card = self._qcard_rects.get("card")
+            for key, r in self._qcard_rects.items():
+                if key != "card" and r and r.collidepoint(event.pos):
+                    self._ack_quarter_card()
+                    if key == "career":
+                        self._open_scene_window("career")
+                    return
+            if card and card.collidepoint(event.pos):
+                return
+        # bouton « Passer » du tutoriel guidé (dessiné au-dessus des fenêtres)
+        if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                and self._tuto_skip_rect and self._tuto_skip_rect.collidepoint(event.pos)):
+            desktop_tutorial.skip()
+            self._tuto_skip_rect = None
+            return
         if self.wm.handle_event(event):
             return
         if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
@@ -249,6 +307,11 @@ class DesktopScene(Scene):
         if self._ambient_rect and self._ambient_rect.collidepoint(pos):
             self._open_scene_window("book")
             return
+        # widget « À faire » : chaque ligne ouvre la scène concernée en fenêtre
+        for r, scene in self._todo_rects:
+            if r.collidepoint(pos):
+                self._open_scene_window(scene)
+                return
         if self._menu_rect and self._menu_rect.collidepoint(pos):
             self.app.scenes.go("menu")
             return
@@ -559,6 +622,7 @@ class DesktopScene(Scene):
             (_L("Réglages", "Settings"), lambda: self.app.scenes.go("settings", return_to="desktop")),
             (_L("Fermer toutes les fenêtres", "Close all windows"), self._close_all_windows),
             (_L("Revoir l'accueil", "Show welcome again"), desktop_onboarding.reset),
+            (_L("Revoir le tutoriel", "Replay the tutorial"), desktop_tutorial.reset),
         ]
 
     def _launch_and_snap(self, key, side):
@@ -656,6 +720,46 @@ class DesktopScene(Scene):
                           fonts.small(bold=True), config.COL_BG if hov else config.COL_AMBER,
                           align="center")
 
+    def _draw_tutorial(self, surf):
+        """Bandeau du tutoriel guidé (au-dessus des fenêtres) + halo pulsé sur
+        l'icône visée par l'étape courante."""
+        cur = desktop_tutorial.active_step()
+        if cur is None:
+            self._tuto_skip_rect = None
+            return
+        idx, step = cur
+        total = len(desktop_tutorial.STEPS)
+        W, H = 700, 46
+        x = (config.SCREEN_WIDTH - W) // 2
+        y = TOPBAR_H + 6
+        band = pygame.Rect(x, y, W, H)
+        panel = pygame.Surface((W, H), pygame.SRCALPHA)
+        panel.fill((*config.COL_PANEL, 238))
+        surf.blit(panel, (x, y))
+        pygame.draw.rect(surf, config.COL_AMBER, band, 1, border_radius=6)
+        widgets.draw_text(surf, _L(f"TUTORIEL {idx + 1}/{total}", f"TUTORIAL {idx + 1}/{total}"),
+                          (x + 12, y + 6), fonts.tiny(bold=True), config.COL_CYAN)
+        widgets.draw_text(surf, desktop_tutorial.step_title(step),
+                          (x + 110, y + 5), fonts.small(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, widgets.fit_text(desktop_tutorial.step_hint(step),
+                                                 fonts.tiny(), W - 130),
+                          (x + 12, y + 26), fonts.tiny(), config.COL_TEXT)
+        skip = pygame.Rect(band.right - 78, y + 5, 68, 18)
+        self._tuto_skip_rect = skip
+        hov = skip.collidepoint(pygame.mouse.get_pos())
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL, skip, border_radius=4)
+        pygame.draw.rect(surf, config.COL_BORDER, skip, 1, border_radius=4)
+        widgets.draw_text(surf, _L("Passer", "Skip"), skip.center, fonts.tiny(bold=True),
+                          config.COL_TEXT_DIM, align="center")
+        # halo pulsé sur l'icône cible (si l'étape en désigne une)
+        target = step.get("target")
+        info = self._icon_rects.get(target) if target else None
+        if info:
+            r = info[0]
+            pulse = 3 + (pygame.time.get_ticks() // 180) % 4
+            pygame.draw.rect(surf, config.COL_AMBER, r.inflate(pulse * 2, pulse * 2), 2,
+                             border_radius=10)
+
     # -------------------------------------------------------------- draw
     @property
     def _track_scene(self):
@@ -668,9 +772,18 @@ class DesktopScene(Scene):
         self._draw_wallpaper(surf)
         self._draw_desktop_icons(surf)
         self._draw_ambient(surf)
+        self._draw_todo(surf)
         self.wm.draw(surf)
         self._draw_topbar(surf)
         self._draw_taskbar(surf)
+        if desktop_onboarding.seen() and not desktop_tutorial.done():
+            self._draw_tutorial(surf)
+        else:
+            self._tuto_skip_rect = None
+        if self._quarter_card_pending() is not None:
+            self._draw_quarter_card(surf)
+        else:
+            self._qcard_rects = {}
         if self.start_open:
             self._draw_launcher(surf)
         if self._ctx_menu is not None:
@@ -693,12 +806,20 @@ class DesktopScene(Scene):
                           (config.SCREEN_WIDTH // 2, area.centery),
                           fonts.title(bold=True), (22, 26, 34), align="center")
 
+    def _icon_visible(self, key):
+        """Une icône soumise au déblocage progressif (ICON_FEATURE) n'apparaît
+        que si la fonctionnalité est ouverte au grade courant."""
+        feat = ICON_FEATURE.get(key)
+        return feat is None or unlocks_mod.unlocked(self.app.gs.player, feat)
+
     def _icon_list(self):
         """Liste (clé, libellé, icon_kind, couleur accent) des icônes du
         bureau : apps natives + Terminal (toujours) + app de la voie (une fois
         choisie) — dans une grille, pas une colonne, pour rester lisible même
-        si la liste s'allonge."""
-        items = [(k, lbl, kind, config.COL_AMBER) for k, lbl, kind, _cls in APPS]
+        si la liste s'allonge. Les icônes verrouillées (ICON_FEATURE) sont
+        masquées jusqu'au grade requis."""
+        items = [(k, lbl, kind, config.COL_AMBER) for k, lbl, kind, _cls in APPS
+                 if self._icon_visible(k)]
         items.append(("terminal", "Terminal", "terminal", config.COL_CYAN))
         track = getattr(self.app.gs.player, "track", "General")
         info = TRACK_APP.get(track)
@@ -706,8 +827,27 @@ class DesktopScene(Scene):
             _scene_name, label, kind = info
             items.append(("track", label, kind, config.COL_PRESTIGE))
         # anciens boutons du rail latéral du terminal : icônes du bureau
-        items += [(k, lbl, kind, config.COL_CYAN) for k, lbl, kind, _scene in QUICK_APPS]
+        items += [(k, lbl, kind, config.COL_CYAN) for k, lbl, kind, _scene in QUICK_APPS
+                  if self._icon_visible(k)]
         return items
+
+    def _check_new_icons(self):
+        """Toast « nouvelle app installée » quand une icône verrouillée vient
+        d'apparaître (promotion) — l'état vu est persisté dans la sauvegarde
+        (player.flags) pour ne notifier qu'une fois par partie."""
+        p = self.app.gs.player
+        items = self._icon_list()
+        keys = [k for k, _lbl, _kind, _acc in items]
+        seen = p.flags.get("desktop_seen_apps")
+        if seen is None:
+            p.flags["desktop_seen_apps"] = keys
+            return
+        new = [(k, lbl) for k, lbl, _kind, _acc in items if k not in seen]
+        for _k, label in new:
+            self.app.notify(_L(f"Nouvelle app sur le bureau : {label}",
+                               f"New desktop app: {label}"), "prestige")
+        if new:
+            p.flags["desktop_seen_apps"] = keys
 
     def _draw_desktop_icons(self, surf):
         self._icon_rects = {}
@@ -768,6 +908,123 @@ class DesktopScene(Scene):
             widgets.draw_series(surf, spark, hist[-40:], gcol, baseline=False,
                                 show_extrema=False, y_fmt=None)
 
+    # -------------------------------------------------- bilan du trimestre
+    def _quarter_card_pending(self):
+        """Dernier bilan de trimestre non encore acquitté (dict), ou None.
+        Posé par GameState.advance_step (flags['last_quarter_report']),
+        acquitté par flags['quarter_report_ack'] — persiste donc au save."""
+        p = self.app.gs.player
+        rep = p.flags.get("last_quarter_report")
+        if not rep or not rep.get("total"):
+            return None
+        if p.flags.get("quarter_report_ack") == rep.get("quarter"):
+            return None
+        return rep
+
+    def _ack_quarter_card(self):
+        p = self.app.gs.player
+        rep = p.flags.get("last_quarter_report") or {}
+        p.flags["quarter_report_ack"] = rep.get("quarter")
+
+    def _draw_quarter_card(self, surf):
+        """Carte de synthèse au changement de trimestre : objectifs atteints,
+        récompenses, attribution de performance par source — un moment de
+        respiration dans le temps continu, refermé d'un clic."""
+        rep = self._quarter_card_pending()
+        p = self.app.gs.player
+        cur = config.CONTINENTS[p.continent]["currency"]
+        W, H = 440, 300
+        x = (config.SCREEN_WIDTH - W) // 2
+        y = (config.SCREEN_HEIGHT - H) // 2
+        card = pygame.Rect(x, y, W, H)
+        self._qcard_rects = {"card": card}
+        shadow = pygame.Surface((W + 10, H + 10), pygame.SRCALPHA)
+        shadow.fill((0, 0, 0, 130))
+        surf.blit(shadow, (x + 4, y + 5))
+        pygame.draw.rect(surf, config.COL_PANEL, card, border_radius=8)
+        pygame.draw.rect(surf, config.COL_CYAN, card, 2, border_radius=8)
+        widgets.draw_text(surf, _L(f"BILAN DU TRIMESTRE T{rep.get('quarter', '?')}",
+                                   f"QUARTER Q{rep.get('quarter', '?')} REVIEW"),
+                          (x + 20, y + 16), fonts.head(bold=True), config.COL_CYAN)
+        ly = y + 52
+        done, total = rep.get("done", 0), rep.get("total", 0)
+        col = config.COL_UP if done == total else config.COL_AMBER if done else config.COL_DOWN
+        widgets.draw_text(surf, _L(f"Objectifs : {done}/{total} atteints",
+                                   f"Objectives: {done}/{total} met"),
+                          (x + 20, ly), fonts.small(bold=True), col)
+        ly += 24
+        if rep.get("rep") or rep.get("cash"):
+            widgets.draw_text(surf, _L(f"Récompenses : +{rep.get('rep', 0)} rép · "
+                                       f"+{widgets.format_money(rep.get('cash', 0), cur)}",
+                                       f"Rewards: +{rep.get('rep', 0)} rep · "
+                                       f"+{widgets.format_money(rep.get('cash', 0), cur)}"),
+                              (x + 20, ly), fonts.small(), config.COL_TEXT)
+            ly += 24
+        # attribution de performance : d'où vient la variation du trimestre
+        attribution = getattr(p, "last_quarter_attribution", None) or {}
+        entries = sorted(attribution.items(), key=lambda kv: -abs(kv[1]))[:4]
+        if entries:
+            ly += 4
+            widgets.draw_text(surf, _L("D'OÙ VIENT LA PERFORMANCE",
+                                       "WHERE PERFORMANCE CAME FROM"),
+                              (x + 20, ly), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+            ly += 20
+            for cat, delta in entries:
+                sign = "+" if delta >= 0 else ""
+                ccol = config.COL_UP if delta >= 0 else config.COL_DOWN
+                widgets.draw_text(surf, cat.capitalize(), (x + 28, ly), fonts.tiny(), config.COL_TEXT)
+                widgets.draw_text(surf, f"{sign}{widgets.format_money(delta, cur)}",
+                                  (x + W - 28, ly), fonts.tiny(bold=True), ccol, align="right")
+                ly += 18
+        mp = pygame.mouse.get_pos()
+        ok_btn = pygame.Rect(x + W - 110, y + H - 44, 90, 30)
+        car_btn = pygame.Rect(x + W - 260, y + H - 44, 140, 30)
+        self._qcard_rects["ok"] = ok_btn
+        self._qcard_rects["career"] = car_btn
+        for r, label, accent in ((car_btn, _L("Carrière →", "Career →"), config.COL_TEXT_DIM),
+                                 (ok_btn, "OK", config.COL_CYAN)):
+            hov = r.collidepoint(mp)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL, r, border_radius=5)
+            pygame.draw.rect(surf, accent, r, 1, border_radius=5)
+            widgets.draw_text(surf, label, r.center, fonts.small(bold=True), accent, align="center")
+
+    def _draw_todo(self, surf):
+        """Widget « À FAIRE » (au-dessus du widget patrimoine, sous les
+        fenêtres) : les actions en attente les plus prioritaires
+        (core/todo.py), chacune cliquable vers la scène concernée — la boucle
+        de jeu reste lisible même toutes fenêtres fermées."""
+        from core import todo as todo_mod
+        self._todo_rects = []
+        items = todo_mod.suggestions(self.app.gs.player, self.app.market)
+        if not items:
+            return
+        W = 260
+        row_h = 20
+        H = 26 + row_h * len(items) + 6
+        x = config.SCREEN_WIDTH - W - 16
+        # juste au-dessus du widget patrimoine (208x96 + marge, cf. _draw_ambient)
+        y = config.SCREEN_HEIGHT - TASKBAR_H - 96 - 12 - H - 8
+        r = pygame.Rect(x, y, W, H)
+        panel = pygame.Surface((W, H), pygame.SRCALPHA)
+        panel.fill((*config.COL_PANEL, 232))
+        surf.blit(panel, (x, y))
+        pygame.draw.rect(surf, config.COL_BORDER, r, 1, border_radius=6)
+        widgets.draw_text(surf, _L("À FAIRE", "TO DO"), (x + 10, y + 6),
+                          fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        mp = pygame.mouse.get_pos()
+        colors = {"warn": config.COL_AMBER, "bad": config.COL_DOWN, "info": config.COL_CYAN}
+        iy = y + 24
+        for it in items:
+            row = pygame.Rect(x + 4, iy, W - 8, row_h)
+            self._todo_rects.append((row, it["scene"]))
+            if row.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+            col = colors.get(it["kind"], config.COL_TEXT)
+            pygame.draw.circle(surf, col, (row.x + 8, row.centery), 3)
+            widgets.draw_text(surf, widgets.fit_text(it["label"], fonts.tiny(), W - 32),
+                              (row.x + 18, row.y + 4), fonts.tiny(), config.COL_TEXT)
+            iy += row_h
+
     def _draw_topbar(self, surf):
         bar = pygame.Rect(0, 0, config.SCREEN_WIDTH, TOPBAR_H)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, bar)
@@ -816,7 +1073,8 @@ class DesktopScene(Scene):
         # quick-launch (à gauche) : apps natives + Terminal
         self._launch_rects = {}
         x = self._start_rect.right + 10
-        quick = [(k, kind) for k, _l, kind, _cls in APPS] + [("terminal", "terminal")]
+        quick = [(k, kind) for k, _l, kind, _cls in APPS
+                 if self._icon_visible(k)] + [("terminal", "terminal")]
         for key, kind in quick:
             r = pygame.Rect(x, bar.y + 4, 26, TASKBAR_H - 8)
             self._launch_rects[key] = r

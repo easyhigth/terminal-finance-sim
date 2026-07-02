@@ -11,8 +11,8 @@ et le même verrou de déblocage (`core/unlocks`). Étape 1 : actions au comptan
 import pygame
 
 from apps.base import DesktopApp
+from core import audio, config, unlocks
 from core import conditional_orders as CO
-from core import config, unlocks
 from core import portfolio as PF
 from core import portfolio_margin as PM
 from ui import fonts, widgets
@@ -21,6 +21,8 @@ ROW_H = 24
 QTY_PRESETS = [1, 5, 10, 25, 100]
 COND_ROW_H = 20
 COND_LIST_MAX_H = 88   # zone réservée aux ordres en cours (0 si aucun)
+FEED_MAX = 5           # derniers ordres exécutés affichés en bas de fenêtre
+FEED_FLASH_MS = 900    # durée du flash de fond sur le dernier ordre
 
 
 class TradingApp(DesktopApp):
@@ -34,6 +36,9 @@ class TradingApp(DesktopApp):
         self.search = ""
         self.qty_text = "10"
         self.msg = ""
+        # fil des derniers ordres EXÉCUTÉS de la session (achat/vente), avec
+        # flash de confirmation sur le plus récent — le trade doit se SENTIR.
+        self.order_feed = []
         self.scroll = 0
         self._max_scroll = 0
         self._row_rects = {}
@@ -92,8 +97,8 @@ class TradingApp(DesktopApp):
             return
         r = PF.buy(self.app.gs.player, self.market, tk, qty)
         if r["ok"]:
-            self.msg = f"Acheté {qty:g}×{tk} @ {r['price']:.2f}."
-            self._autosave()
+            self.msg = ""
+            self._push_feed(f"ACHAT {qty:g}×{tk} @ {r['price']:.2f}", "up")
         else:
             self.msg = f"Achat refusé ({r['reason']})."
 
@@ -109,10 +114,21 @@ class TradingApp(DesktopApp):
             return
         r = PF.sell(self.app.gs.player, self.market, tk, qty)
         if r["ok"]:
-            self.msg = f"Vendu {r['qty']:g}×{tk} @ {r['price']:.2f} (P&L {r['realized']:+.0f})."
-            self._autosave()
+            self.msg = ""
+            self._push_feed(f"VENTE {r['qty']:g}×{tk} @ {r['price']:.2f} "
+                            f"(P&L {r['realized']:+,.0f})",
+                            "up" if r["realized"] >= 0 else "down")
         else:
             self.msg = f"Vente refusée ({r['reason']})."
+
+    def _push_feed(self, text, kind):
+        """Empile un ordre exécuté dans le fil de confirmation (flash + son)
+        et déclenche l'autosave — le trade doit se voir ET s'entendre."""
+        self.order_feed.insert(0, {"text": text, "kind": kind,
+                                   "ts": pygame.time.get_ticks()})
+        del self.order_feed[FEED_MAX:]
+        audio.play("order")
+        self._autosave()
 
     def _autosave(self):
         p = self.app.gs.player
@@ -333,13 +349,42 @@ class TradingApp(DesktopApp):
         else:
             msg_y = list_area.bottom + 6
 
-        # message
-        mcol = config.COL_UP if self.msg.startswith(("Acheté", "Vendu")) else config.COL_WARN
-        widgets.draw_text(surf, widgets.fit_text(self.msg, fonts.small(), rect.w - 2 * pad),
-                          (rect.x + pad, msg_y), fonts.small(), mcol)
+        # message d'erreur/info, sinon fil des derniers ordres exécutés
+        if self.msg:
+            widgets.draw_text(surf, widgets.fit_text(self.msg, fonts.small(), rect.w - 2 * pad),
+                              (rect.x + pad, msg_y), fonts.small(), config.COL_WARN)
+        else:
+            self._draw_feed(surf, rect, msg_y, pad)
 
         if self._order_prompt is not None:
             self._draw_order_prompt(surf, rect)
+
+    def _draw_feed(self, surf, rect, y, pad):
+        """Fil des derniers ordres exécutés : le plus récent en couleur avec un
+        flash de fond qui s'estompe (confirmation bien visible), les
+        précédents en gris, sur la même ligne tant qu'il reste de la place."""
+        if not self.order_feed:
+            return
+        colors = {"up": config.COL_UP, "down": config.COL_DOWN}
+        x = rect.x + pad
+        max_x = rect.right - pad
+        now = pygame.time.get_ticks()
+        for i, entry in enumerate(self.order_feed):
+            font = fonts.small(bold=True) if i == 0 else fonts.tiny()
+            col = colors.get(entry["kind"], config.COL_TEXT) if i == 0 else config.COL_TEXT_DIM
+            text = entry["text"] if i == 0 else "· " + entry["text"]
+            w = font.size(text)[0]
+            if x + w > max_x:
+                break
+            if i == 0:
+                age = now - entry["ts"]
+                if age < FEED_FLASH_MS:
+                    alpha = int(120 * (1 - age / FEED_FLASH_MS))
+                    flash = pygame.Surface((w + 8, 18), pygame.SRCALPHA)
+                    flash.fill((*colors.get(entry["kind"], config.COL_TEXT), alpha))
+                    surf.blit(flash, (x - 4, y - 1))
+            widgets.draw_text(surf, text, (x, y), font, col)
+            x += w + 10
 
     def _draw_row(self, surf, tk, area, y, cur):
         m = self.market

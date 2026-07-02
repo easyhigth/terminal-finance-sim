@@ -14,6 +14,7 @@ import random
 import pygame
 
 from core import archetypes, config, firms
+from core import difficulty as diff_mod
 from core import profile as profile_mod
 from core import startscenarios as scen
 from core.game_state import GameState, PlayerState
@@ -32,11 +33,16 @@ class RunSetupScene(Scene):
         self.arch_idx = 0
         self.firm_idx = 0
         self.hardcore = False
+        self.diff_idx = next(i for i, p in enumerate(diff_mod.PRESETS)
+                             if p["id"] == diff_mod.DEFAULT)
+        self.daily = False           # « Défi du jour » : marché du jour partagé
         self.page = 1
         self._scen_rects = {}
         self._arch_rects = {}
         self._firm_rects = {}
         self._hardcore_rect = None
+        self._diff_rects = {}
+        self._daily_rect = None
         self._scrolls = {}
         fy = config.SCREEN_HEIGHT - 50
         self.back_btn = widgets.Button((40, fy, 200, 42), t("runsetup.back"), config.COL_TEXT_DIM)
@@ -74,6 +80,13 @@ class RunSetupScene(Scene):
                 if self._hardcore_rect and self._hardcore_rect.collidepoint(event.pos):
                     self.hardcore = not self.hardcore
                     return
+                for idx, rect in self._diff_rects.items():
+                    if rect.collidepoint(event.pos):
+                        self.diff_idx = idx
+                        return
+                if self._daily_rect and self._daily_rect.collidepoint(event.pos):
+                    self.daily = not self.daily
+                    return
             if self.next_btn.handle(event):
                 self.page = 2
                 return
@@ -103,6 +116,8 @@ class RunSetupScene(Scene):
         scen.apply(gs.player, scen.SCENARIOS[self.scen_idx]["id"])  # conditions de départ
         archetypes.apply(gs.player, archetypes.ARCHETYPES[self.arch_idx]["id"])  # philosophie de run
         firms.apply(gs.player, firms.FIRMS[self.firm_idx]["id"])  # ADN de la firme employeuse
+        # difficulté du run : APRÈS le scénario (qui fixe le cash de base)
+        diff_mod.apply(gs.player, diff_mod.PRESETS[self.diff_idx]["id"])
         # asymétrie novice/expert : un profil qui a déjà prouvé sa maîtrise dans
         # une partie antérieure démarre "vétéran" — complexité ouverte plus vite,
         # onboarding écourté (cf. CLAUDE.md, brief stratégique point 4).
@@ -110,7 +125,14 @@ class RunSetupScene(Scene):
             gs.player.flags["veteran"] = True
             gs.player.onboarding_done = True
         from core import market as _mkt
-        gs.player.market_seed = random.randint(1, 2_000_000_000)
+        if self.daily:
+            # défi du jour : même graine pour tous les joueurs aujourd'hui —
+            # le marché étant reconstruit depuis (seed, pas), tout le monde
+            # affronte exactement les mêmes conditions.
+            gs.player.market_seed = diff_mod.daily_seed()
+            diff_mod.mark_daily(gs.player)
+        else:
+            gs.player.market_seed = random.randint(1, 2_000_000_000)
         # démarre la carrière après 5 ans de marché : les graphes ont un passé
         gs.player.market_step = _mkt.WARMUP_STEPS
         self.app.gs = gs
@@ -136,10 +158,11 @@ class RunSetupScene(Scene):
 
         fy = config.SCREEN_HEIGHT - 50
         hardcore_top = fy - 8 - 60
+        diff_top = hardcore_top - 8 - 52
         top = 104
 
         if self.page == 1:
-            bottom = hardcore_top - 12
+            bottom = diff_top - 12
             col_w = (config.SCREEN_WIDTH - 80 - 20) // 2
 
             scen_rect = pygame.Rect(40, top, col_w, bottom - top)
@@ -152,6 +175,7 @@ class RunSetupScene(Scene):
                 surf, arch_rect, t("runsetup.archetype"), config.COL_AMBER,
                 [(a["name"], a["tagline"] + "  " + a["desc"]) for a in archetypes.ARCHETYPES], self.arch_idx, "arch")
 
+            self._draw_difficulty_bar(surf, pygame.Rect(40, diff_top, config.SCREEN_WIDTH - 80, 52))
             self._draw_hardcore_bar(surf, pygame.Rect(40, hardcore_top, config.SCREEN_WIDTH - 80, 60))
             self.back_btn.draw(surf)
             self.next_btn.draw(surf)
@@ -211,6 +235,48 @@ class RunSetupScene(Scene):
         st.set_bounds(list_area, content_h)
         st.scroll = widgets.draw_scrollbar(surf, panel_rect, list_area, st.scroll, st.max_scroll, content_h)
         return rects
+
+    def _draw_difficulty_bar(self, surf, rect):
+        """Barre DIFFICULTÉ (3 presets, cf. core/difficulty.py) + case à cocher
+        « Défi du jour » (marché du jour partagé par tous les joueurs)."""
+        from core.i18n import get_lang
+        en = get_lang() == "en"
+        pygame.draw.rect(surf, config.COL_PANEL, rect)
+        pygame.draw.rect(surf, config.COL_BORDER, rect, 1)
+        widgets.draw_text(surf, "DIFFICULTÉ" if not en else "DIFFICULTY",
+                          (rect.x + 14, rect.y + 8), fonts.small(bold=True), config.COL_CYAN)
+        self._diff_rects = {}
+        x = rect.x + 140
+        mp = pygame.mouse.get_pos()
+        for i, p in enumerate(diff_mod.PRESETS):
+            w = 110
+            r = pygame.Rect(x, rect.y + 8, w, 24)
+            self._diff_rects[i] = r
+            sel = (i == self.diff_idx)
+            hov = r.collidepoint(mp)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if (sel or hov) else config.COL_PANEL, r, border_radius=4)
+            pygame.draw.rect(surf, config.COL_CYAN if sel else config.COL_BORDER, r, 2 if sel else 1, border_radius=4)
+            widgets.draw_text(surf, diff_mod.label(p), r.center, fonts.small(bold=sel),
+                              config.COL_CYAN if sel else config.COL_TEXT_DIM, align="center")
+            x += w + 8
+        widgets.draw_text(surf, diff_mod.desc(diff_mod.PRESETS[self.diff_idx]),
+                          (rect.x + 140, rect.y + 36), fonts.tiny(), config.COL_TEXT_DIM)
+        # défi du jour (à droite) : marché déterministe partagé du jour
+        dr = pygame.Rect(rect.right - 300, rect.y + 8, 286, 24)
+        self._daily_rect = dr
+        accent = config.COL_PRESTIGE if self.daily else config.COL_BORDER
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD if self.daily else config.COL_PANEL, dr, border_radius=4)
+        pygame.draw.rect(surf, accent, dr, 2 if self.daily else 1, border_radius=4)
+        # case à cocher vectorielle (pas de glyphe unicode, non garanti par la
+        # police embarquée — même précaution que ui/desktop_icons.py)
+        box = pygame.Rect(dr.x + 10, dr.centery - 6, 12, 12)
+        pygame.draw.rect(surf, accent, box, 1)
+        if self.daily:
+            pygame.draw.rect(surf, config.COL_PRESTIGE, box.inflate(-6, -6))
+        label = ("Défi du jour : marché partagé" if not en
+                 else "Daily challenge: shared market")
+        widgets.draw_text(surf, label, (box.right + 8, dr.y + 5), fonts.small(bold=self.daily),
+                          config.COL_PRESTIGE if self.daily else config.COL_TEXT_DIM)
 
     def _draw_hardcore_bar(self, surf, rect):
         self._hardcore_rect = rect

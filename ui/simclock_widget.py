@@ -15,23 +15,29 @@ import pygame
 
 from core import config
 from core.sim_clock import SPEEDS
-from ui import widgets
+from ui import fonts, widgets
 
 BTN_W, BTN_H = 30, 20
 GAP = 4
 GEAR_W = 28
+CHEAT_W = 44
 PAD_RIGHT = 8
 
 
-def cluster_width():
-    """Largeur totale réservée à droite de la bande d'onglets (boutons + gear)."""
+def cluster_width(cheats=False):
+    """Largeur totale réservée à droite de la bande d'onglets (boutons + gear).
+    En mode test (`app.cheats`), un bouton CHEAT s'ajoute à gauche du bouton
+    pause — accessible depuis n'importe quelle scène (bureau compris)."""
     n = 1 + len(SPEEDS)
-    return n * BTN_W + n * GAP + GEAR_W + PAD_RIGHT + 8
+    w = n * BTN_W + n * GAP + GEAR_W + PAD_RIGHT + 8
+    if cheats:
+        w += CHEAT_W + GAP
+    return w
 
 
-def _rects():
-    """Rects (repère fenêtre) : pause, x1, x2, x3 (gauche→droite) puis gear, le
-    tout aligné à droite, centré verticalement dans la bande d'onglets."""
+def _rects(cheats=False):
+    """Rects (repère fenêtre) : [cheat,] pause, x1, x2, x3 (gauche→droite) puis
+    gear, le tout aligné à droite, centré verticalement dans la bande d'onglets."""
     y = (config.TAB_BAR_H - BTN_H) // 2
     gear = pygame.Rect(config.SCREEN_WIDTH - PAD_RIGHT - GEAR_W, y, GEAR_W, BTN_H)
     rects = {"gear": gear}
@@ -40,6 +46,8 @@ def _rects():
         rects[sp] = pygame.Rect(x, y, BTN_W, BTN_H)
         x -= BTN_W + GAP
     rects["pause"] = pygame.Rect(x, y, BTN_W, BTN_H)
+    if cheats:
+        rects["cheat"] = pygame.Rect(x - GAP - CHEAT_W, y, CHEAT_W, BTN_H)
     return rects
 
 
@@ -88,13 +96,31 @@ def _btn_bg(surf, rect, active, hover, accent):
     pygame.draw.rect(surf, accent if active else config.COL_BORDER, rect, 1, border_radius=4)
 
 
+def toggle_cheat_panel(app):
+    """Ouvre/ferme le panneau de triche GLOBAL (mode test uniquement) — celui
+    porté par l'app et dessiné par core/pages.py par-dessus la scène courante,
+    donc accessible partout (bureau compris), contrairement au panneau propre
+    au terminal (scenes/scene_terminal.py, inchangé)."""
+    if not getattr(app, "cheats", False):
+        return
+    panel = getattr(app, "cheat_panel", None)
+    if panel is None or panel.closed:
+        from ui.cheatpanel import CheatPanel
+        app.cheat_panel = CheatPanel(app, pos=(config.SCREEN_WIDTH - 270, 60))
+    else:
+        panel.closed = True
+
+
 # ----------------------------------------------------------------- API
 def handle_click(app, win_pos):
     """Clic en repère FENÊTRE (bande d'onglets). Retourne True si consommé."""
     clock = getattr(app, "sim_clock", None)
     if clock is None:
         return False
-    rects = _rects()
+    rects = _rects(cheats=getattr(app, "cheats", False))
+    if "cheat" in rects and rects["cheat"].collidepoint(win_pos):
+        toggle_cheat_panel(app)
+        return True
     if rects["gear"].collidepoint(win_pos):
         cur = app.scenes.current_name or "terminal"
         if cur != "settings":
@@ -115,10 +141,19 @@ def draw(surf, app):
     clock = getattr(app, "sim_clock", None)
     if clock is None:
         return
-    rects = _rects()
+    rects = _rects(cheats=getattr(app, "cheats", False))
     # PageManager a remplacé pygame.mouse.get_pos par une version translatée en
     # repère canvas ; pour la bande d'onglets on veut le repère fenêtre.
     mx, my = _window_mouse()
+    # bouton CHEAT (mode test uniquement) : ouvre le panneau de triche global
+    cr = rects.get("cheat")
+    if cr is not None:
+        panel = getattr(app, "cheat_panel", None)
+        active = panel is not None and not panel.closed
+        _btn_bg(surf, cr, active, cr.collidepoint((mx, my)), config.COL_DOWN)
+        widgets.draw_text(surf, "CHEAT", cr.center, fonts.tiny(bold=True),
+                          config.COL_DOWN if (active or cr.collidepoint((mx, my)))
+                          else config.COL_TEXT_DIM, align="center")
     # pause
     pr = rects["pause"]
     paused = clock.paused or clock.auto_paused

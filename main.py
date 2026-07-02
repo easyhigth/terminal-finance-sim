@@ -187,6 +187,8 @@ class App:
         self.clock = pygame.time.Clock()
         self.running = True
         self.cheats = False           # activé par main_cheat.py (commandes de test)
+        self.cheat_panel = None       # panneau de triche global (bouton CHEAT de la
+                                      # bande d'onglets, mode test uniquement)
         self.sim_clock = SimClock()   # horloge de jeu temps réel (vitesse, pause)
         self.pending_market_steps = 0  # pas de marché bancarisés par l'horloge, à jouer au terminal
 

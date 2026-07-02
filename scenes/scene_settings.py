@@ -14,7 +14,7 @@ requise pour ouvrir les réglages.
 """
 import pygame
 
-from core import anim_settings, audio, config, display_settings
+from core import anim_settings, audio, colorblind_settings, config, display_settings
 from core.i18n import get_lang, set_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
@@ -65,6 +65,13 @@ class SettingsScene(Scene):
         self.rows.append((_L("Animations", "Animations"),
                           self._seg([(("anim", False), _L("Normales", "Normal"), not anim_settings.reduce_motion()),
                                      (("anim", True), _L("Réduites", "Reduced"), anim_settings.reduce_motion())])))
+        # DALTONISME / CONTRASTE — remplace vert/rouge par bleu/orange sur les
+        # paires hausse-baisse / favorable-défavorable (cf. core/colorblind_settings)
+        self.rows.append((_L("Contraste", "Contrast"),
+                          self._seg([(("colorblind", False), _L("Standard", "Standard"),
+                                      not colorblind_settings.is_enabled()),
+                                     (("colorblind", True), _L("Daltonien (bleu/orange)", "Colorblind (blue/orange)"),
+                                      colorblind_settings.is_enabled())])))
         # VITESSE DE JEU (live ; l'horloge n'avance qu'au terminal)
         cur_speed = getattr(self.app.sim_clock, "speed", 1)
         self.rows.append((_L("Vitesse du jeu", "Game speed"),
@@ -145,6 +152,8 @@ class SettingsScene(Scene):
             set_lang(val)
         elif kind == "anim":
             anim_settings.set_reduce_motion(val)
+        elif kind == "colorblind":
+            colorblind_settings.set_enabled(val)
         elif kind == "speed":
             self.app.sim_clock.set_speed(val)
         self._build()   # reconstruit libellés + états actifs

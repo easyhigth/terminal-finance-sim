@@ -6,9 +6,9 @@ Extrait de scene_terminal_commands.py pour limiter sa taille ; mixé dans
 TerminalScene avec les autres mixins de commandes.
 """
 
+from core import audio, config
 from core import badges as badges_mod
 from core import career as career_mod
-from core import config
 from core import deals as deals_mod
 from core import dilemmas as dilemmas_mod
 from core import history as history_mod
@@ -458,6 +458,7 @@ class TerminalTimeMixin:
         # dilemme éventuel à trancher
         dil = dilemmas_mod.maybe_trigger(p, random)
         if dil:
+            audio.play("dilemma")
             self._log(_L(f"  § DÉCISION REQUISE : {dil['title']} — tapez DECIDE.", f"  § DECISION REQUIRED: {dil['title']} — type DECIDE."))
             self.app.notify(_L(f"Décision requise : {dil['title']}", f"Decision required: {dil['title']}"), "warn")
         # bilan de trimestre / quarter en toast

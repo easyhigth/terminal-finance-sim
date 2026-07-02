@@ -589,12 +589,19 @@ def draw_tile(surf, rect, label, value, accent=config.COL_AMBER,
               value_color)
 
 
-def draw_error_panel(surf, message, hint=None, top=40, title_color=config.COL_DOWN):
+def draw_error_panel(surf, message, hint=None, top=40, title_color=None):
     """Écran de repli standard quand des données attendues (ticker, dataset…)
     sont manquantes/invalides. Affiche un message d'erreur + une indication
     optionnelle. N'affiche PAS de bouton retour : la scène appelante garde
     son propre `back_btn` (déjà créé dans on_enter) et le dessine après cet
-    appel, pour rester cohérente avec le reste de l'écran."""
+    appel, pour rester cohérente avec le reste de l'écran.
+
+    `title_color` par défaut résolu à l'APPEL (pas à la définition de la
+    fonction) : un défaut figé sur `config.COL_DOWN` gèlerait la couleur
+    d'origine, insensible au mode contraste élevé (core/colorblind_settings)
+    qui réassigne cet attribut au vol."""
+    if title_color is None:
+        title_color = config.COL_DOWN
     draw_text(surf, message, (40, top), fonts.title(bold=True), title_color)
     if hint:
         draw_text(surf, hint, (40, top + 60), fonts.body(), config.COL_TEXT_DIM)

@@ -1,0 +1,286 @@
+"""
+scene_desktop_widgets.py — Mixin des overlays « ambiants » du bureau
+(DesktopWidgetsMixin) : carte d'accueil, bandeau du tutoriel guidé, widget
+patrimoine, carte « Bilan du trimestre », widget « À FAIRE ». Extrait de
+`scene_desktop.py` pour limiter sa taille (même principe que les mixins
+`scenes/scene_terminal_*.py` du terminal) ; mixé dans `DesktopScene` aux
+côtés de `DesktopMenusMixin`.
+
+Ces méthodes ne dessinent RIEN de permanent : elles vivent au-dessus des
+fenêtres, informent en un coup d'œil (patrimoine, trimestre, prochaine
+étape du tutoriel) même quand tout est fermé/minimisé.
+"""
+import pygame
+
+from core import config, desktop_onboarding, desktop_tutorial
+from core import portfolio_margin as pm_mod
+from scenes.scene_desktop_common import _L, TASKBAR_H, TOPBAR_H
+from ui import fonts, widgets
+
+
+class DesktopWidgetsMixin:
+    # ------------------------------------------------------ tutoriel guidé
+    def _check_tutorial(self):
+        """Valide l'étape courante du tutoriel de prise en main dès que l'état
+        du bureau la satisfait (fenêtre ouverte, ancrage…) — détection sur
+        l'ÉTAT, pas sur le clic, comme le parcours du terminal."""
+        if not desktop_onboarding.seen() or desktop_tutorial.done():
+            return
+        cur = desktop_tutorial.active_step(self)
+        if cur is None:
+            return
+        _idx, step = cur
+        try:
+            ok = bool(step["check"](self))
+        except Exception:
+            ok = False
+        if not ok:
+            return
+        if desktop_tutorial.advance():
+            self.app.notify(_L("Tutoriel terminé — le poste de travail est à vous !",
+                               "Tutorial complete — the workstation is yours!"), "prestige")
+        else:
+            self.app.notify(_L("Étape validée ✓", "Step complete ✓"), "good")
+
+    def _draw_onboarding(self, surf):
+        """Carte d'accueil (1re visite du bureau) : quelques repères pour
+        comprendre le poste de travail. NON modale — se referme au clic."""
+        shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
+        shade.fill((0, 0, 0, 150))
+        surf.blit(shade, (0, 0))
+        W, H = 560, 320
+        x = (config.SCREEN_WIDTH - W) // 2
+        y = (config.SCREEN_HEIGHT - H) // 2
+        card = pygame.Rect(x, y, W, H)
+        self._onboard_card = card
+        pygame.draw.rect(surf, config.COL_PANEL, card, border_radius=8)
+        pygame.draw.rect(surf, config.COL_AMBER, card, 2, border_radius=8)
+        widgets.draw_text(surf, _L("Bienvenue sur votre poste de travail",
+                                   "Welcome to your workstation"),
+                          (x + 24, y + 20), fonts.head(bold=True), config.COL_AMBER)
+        lines = [
+            _L("• Les icônes ouvrent des APPLICATIONS en fenêtres déplaçables.",
+               "• Icons open APPLICATIONS as draggable windows."),
+            _L("• Glissez une fenêtre vers un bord pour l'ancrer ; double-clic sur",
+               "• Drag a window to an edge to snap it; double-click the title bar"),
+            _L("  la barre de titre pour l'agrandir. Alt+Tab pour changer de fenêtre.",
+               "  to maximize. Alt+Tab to switch windows."),
+            _L("• Le TERMINAL (icône dédiée) reste le moteur : le temps s'écoule même",
+               "• The TERMINAL (its own icon) stays the engine: time flows even when"),
+            _L("  fenêtre fermée. ⏸/▶▶ en haut à droite règlent la vitesse.",
+               "  its window is closed. ⏸/▶▶ top-right control speed."),
+            _L("• Clic DROIT sur une icône, une fenêtre ou le fond : menu d'actions.",
+               "• RIGHT-click an icon, a window or the background: action menu."),
+            _L("• Le widget en bas à droite suit votre patrimoine en direct.",
+               "• The bottom-right widget tracks your net worth live."),
+            _L("• Ctrl+/ cherche dans vos positions, watchlist, inbox, mandats et deals.",
+               "• Ctrl+/ searches your positions, watchlist, inbox, mandates and deals."),
+        ]
+        ly = y + 58
+        for ln in lines:
+            widgets.draw_text(surf, ln, (x + 24, ly), fonts.small(), config.COL_TEXT)
+            ly += 24
+        btn = pygame.Rect(x + W - 160, y + H - 44, 136, 30)
+        self._onboard_btn = btn
+        hov = btn.collidepoint(pygame.mouse.get_pos())
+        pygame.draw.rect(surf, config.COL_AMBER if hov else config.COL_PANEL_HEAD, btn, border_radius=5)
+        pygame.draw.rect(surf, config.COL_AMBER, btn, 1, border_radius=5)
+        widgets.draw_text(surf, _L("Commencer", "Get started"), btn.center,
+                          fonts.small(bold=True), config.COL_BG if hov else config.COL_AMBER,
+                          align="center")
+
+    def _draw_tutorial(self, surf):
+        """Bandeau du tutoriel guidé (au-dessus des fenêtres) + halo pulsé sur
+        l'icône visée par l'étape courante."""
+        cur = desktop_tutorial.active_step(self)
+        if cur is None:
+            self._tuto_skip_rect = None
+            return
+        idx, step = cur
+        total = len(desktop_tutorial.STEPS)
+        W, H = 700, 46
+        x = (config.SCREEN_WIDTH - W) // 2
+        y = TOPBAR_H + 6
+        band = pygame.Rect(x, y, W, H)
+        panel = pygame.Surface((W, H), pygame.SRCALPHA)
+        panel.fill((*config.COL_PANEL, 238))
+        surf.blit(panel, (x, y))
+        pygame.draw.rect(surf, config.COL_AMBER, band, 1, border_radius=6)
+        widgets.draw_text(surf, _L(f"TUTORIEL {idx + 1}/{total}", f"TUTORIAL {idx + 1}/{total}"),
+                          (x + 12, y + 6), fonts.tiny(bold=True), config.COL_CYAN)
+        widgets.draw_text(surf, desktop_tutorial.step_title(step),
+                          (x + 110, y + 5), fonts.small(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, widgets.fit_text(desktop_tutorial.step_hint(step),
+                                                 fonts.tiny(), W - 130),
+                          (x + 12, y + 26), fonts.tiny(), config.COL_TEXT)
+        skip = pygame.Rect(band.right - 78, y + 5, 68, 18)
+        self._tuto_skip_rect = skip
+        hov = skip.collidepoint(pygame.mouse.get_pos())
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL, skip, border_radius=4)
+        pygame.draw.rect(surf, config.COL_BORDER, skip, 1, border_radius=4)
+        widgets.draw_text(surf, _L("Passer", "Skip"), skip.center, fonts.tiny(bold=True),
+                          config.COL_TEXT_DIM, align="center")
+        # halo pulsé sur l'icône cible (si l'étape en désigne une)
+        target = step.get("target")
+        info = self._icon_rects.get(target) if target else None
+        if info:
+            r = info[0]
+            pulse = 3 + (pygame.time.get_ticks() // 180) % 4
+            pygame.draw.rect(surf, config.COL_AMBER, r.inflate(pulse * 2, pulse * 2), 2,
+                             border_radius=10)
+
+    def _draw_ambient(self, surf):
+        """Widget « ambiant » du bureau (coin bas-droit, au-dessus de la barre
+        des tâches, sous les fenêtres) : patrimoine net, cash, levier et une
+        mini-courbe de `player.cash_history` — le pouls du compte reste visible
+        même quand toutes les fenêtres sont fermées ou minimisées. Cliquer ouvre
+        le portefeuille (fenêtre « book »)."""
+        p = self.app.gs.player
+        m = self.app.market
+        cur = config.CONTINENTS[p.continent]["currency"]
+        W, H = 208, 96
+        x = config.SCREEN_WIDTH - W - 16
+        y = config.SCREEN_HEIGHT - TASKBAR_H - H - 12
+        r = pygame.Rect(x, y, W, H)
+        self._ambient_rect = r
+        hov = r.collidepoint(pygame.mouse.get_pos())
+        panel = pygame.Surface((W, H), pygame.SRCALPHA)
+        panel.fill((*config.COL_PANEL, 232))
+        surf.blit(panel, (x, y))
+        pygame.draw.rect(surf, config.COL_AMBER if hov else config.COL_BORDER, r, 1, border_radius=6)
+        nw = pm_mod.net_worth(p, m) if m else p.cash
+        lev = pm_mod.leverage(p, m) if m else 0.0
+        widgets.draw_text(surf, "PATRIMOINE NET", (x + 10, y + 8), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        # variation depuis le début de l'historique (couleur up/down)
+        hist = [v for v in (p.cash_history or []) if v]
+        base = hist[0] if hist else nw
+        up = nw >= base
+        widgets.draw_text(surf, widgets.format_money(nw, cur), (x + 10, y + 20),
+                          fonts.small(bold=True), config.COL_UP if up else config.COL_DOWN)
+        widgets.draw_text(surf, f"Cash {widgets.format_money(p.cash, cur)}", (x + 10, y + 40),
+                          fonts.tiny(), config.COL_TEXT)
+        levcol = config.COL_DOWN if lev > 2.0 else config.COL_AMBER if lev > 1.0 else config.COL_TEXT_DIM
+        widgets.draw_text(surf, f"Levier {lev:.2f}x", (x + 10, y + 54), fonts.tiny(bold=True), levcol)
+        # mini-sparkline du patrimoine
+        spark = pygame.Rect(x + 10, y + H - 20, W - 20, 14)
+        if len(hist) >= 2:
+            gcol = config.COL_UP if hist[-1] >= hist[0] else config.COL_DOWN
+            widgets.draw_series(surf, spark, hist[-40:], gcol, baseline=False,
+                                show_extrema=False, y_fmt=None)
+
+    # -------------------------------------------------- bilan du trimestre
+    def _quarter_card_pending(self):
+        """Dernier bilan de trimestre non encore acquitté (dict), ou None.
+        Posé par GameState.advance_step (flags['last_quarter_report']),
+        acquitté par flags['quarter_report_ack'] — persiste donc au save."""
+        p = self.app.gs.player
+        rep = p.flags.get("last_quarter_report")
+        if not rep or not rep.get("total"):
+            return None
+        if p.flags.get("quarter_report_ack") == rep.get("quarter"):
+            return None
+        return rep
+
+    def _ack_quarter_card(self):
+        p = self.app.gs.player
+        rep = p.flags.get("last_quarter_report") or {}
+        p.flags["quarter_report_ack"] = rep.get("quarter")
+
+    def _draw_quarter_card(self, surf):
+        """Carte de synthèse au changement de trimestre : objectifs atteints,
+        récompenses, attribution de performance par source — un moment de
+        respiration dans le temps continu, refermé d'un clic."""
+        rep = self._quarter_card_pending()
+        p = self.app.gs.player
+        cur = config.CONTINENTS[p.continent]["currency"]
+        W, H = 440, 300
+        x = (config.SCREEN_WIDTH - W) // 2
+        y = (config.SCREEN_HEIGHT - H) // 2
+        card = pygame.Rect(x, y, W, H)
+        self._qcard_rects = {"card": card}
+        shadow = pygame.Surface((W + 10, H + 10), pygame.SRCALPHA)
+        shadow.fill((0, 0, 0, 130))
+        surf.blit(shadow, (x + 4, y + 5))
+        pygame.draw.rect(surf, config.COL_PANEL, card, border_radius=8)
+        pygame.draw.rect(surf, config.COL_CYAN, card, 2, border_radius=8)
+        widgets.draw_text(surf, _L(f"BILAN DU TRIMESTRE T{rep.get('quarter', '?')}",
+                                   f"QUARTER Q{rep.get('quarter', '?')} REVIEW"),
+                          (x + 20, y + 16), fonts.head(bold=True), config.COL_CYAN)
+        ly = y + 52
+        done, total = rep.get("done", 0), rep.get("total", 0)
+        col = config.COL_UP if done == total else config.COL_AMBER if done else config.COL_DOWN
+        widgets.draw_text(surf, _L(f"Objectifs : {done}/{total} atteints",
+                                   f"Objectives: {done}/{total} met"),
+                          (x + 20, ly), fonts.small(bold=True), col)
+        ly += 24
+        if rep.get("rep") or rep.get("cash"):
+            widgets.draw_text(surf, _L(f"Récompenses : +{rep.get('rep', 0)} rép · "
+                                       f"+{widgets.format_money(rep.get('cash', 0), cur)}",
+                                       f"Rewards: +{rep.get('rep', 0)} rep · "
+                                       f"+{widgets.format_money(rep.get('cash', 0), cur)}"),
+                              (x + 20, ly), fonts.small(), config.COL_TEXT)
+            ly += 24
+        # attribution de performance : d'où vient la variation du trimestre
+        attribution = getattr(p, "last_quarter_attribution", None) or {}
+        entries = sorted(attribution.items(), key=lambda kv: -abs(kv[1]))[:4]
+        if entries:
+            ly += 4
+            widgets.draw_text(surf, _L("D'OÙ VIENT LA PERFORMANCE",
+                                       "WHERE PERFORMANCE CAME FROM"),
+                              (x + 20, ly), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+            ly += 20
+            for cat, delta in entries:
+                sign = "+" if delta >= 0 else ""
+                ccol = config.COL_UP if delta >= 0 else config.COL_DOWN
+                widgets.draw_text(surf, cat.capitalize(), (x + 28, ly), fonts.tiny(), config.COL_TEXT)
+                widgets.draw_text(surf, f"{sign}{widgets.format_money(delta, cur)}",
+                                  (x + W - 28, ly), fonts.tiny(bold=True), ccol, align="right")
+                ly += 18
+        mp = pygame.mouse.get_pos()
+        ok_btn = pygame.Rect(x + W - 110, y + H - 44, 90, 30)
+        car_btn = pygame.Rect(x + W - 260, y + H - 44, 140, 30)
+        self._qcard_rects["ok"] = ok_btn
+        self._qcard_rects["career"] = car_btn
+        for r, label, accent in ((car_btn, _L("Carrière →", "Career →"), config.COL_TEXT_DIM),
+                                 (ok_btn, "OK", config.COL_CYAN)):
+            hov = r.collidepoint(mp)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL, r, border_radius=5)
+            pygame.draw.rect(surf, accent, r, 1, border_radius=5)
+            widgets.draw_text(surf, label, r.center, fonts.small(bold=True), accent, align="center")
+
+    def _draw_todo(self, surf):
+        """Widget « À FAIRE » (au-dessus du widget patrimoine, sous les
+        fenêtres) : les actions en attente les plus prioritaires
+        (core/todo.py), chacune cliquable vers la scène concernée — la boucle
+        de jeu reste lisible même toutes fenêtres fermées."""
+        from core import todo as todo_mod
+        self._todo_rects = []
+        items = todo_mod.suggestions(self.app.gs.player, self.app.market)
+        if not items:
+            return
+        W = 260
+        row_h = 20
+        H = 26 + row_h * len(items) + 6
+        x = config.SCREEN_WIDTH - W - 16
+        # juste au-dessus du widget patrimoine (208x96 + marge, cf. _draw_ambient)
+        y = config.SCREEN_HEIGHT - TASKBAR_H - 96 - 12 - H - 8
+        r = pygame.Rect(x, y, W, H)
+        panel = pygame.Surface((W, H), pygame.SRCALPHA)
+        panel.fill((*config.COL_PANEL, 232))
+        surf.blit(panel, (x, y))
+        pygame.draw.rect(surf, config.COL_BORDER, r, 1, border_radius=6)
+        widgets.draw_text(surf, _L("À FAIRE", "TO DO"), (x + 10, y + 6),
+                          fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        mp = pygame.mouse.get_pos()
+        colors = {"warn": config.COL_AMBER, "bad": config.COL_DOWN, "info": config.COL_CYAN}
+        iy = y + 24
+        for it in items:
+            row = pygame.Rect(x + 4, iy, W - 8, row_h)
+            self._todo_rects.append((row, it["scene"]))
+            if row.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+            col = colors.get(it["kind"], config.COL_TEXT)
+            pygame.draw.circle(surf, col, (row.x + 8, row.centery), 3)
+            widgets.draw_text(surf, widgets.fit_text(it["label"], fonts.tiny(), W - 32),
+                              (row.x + 18, row.y + 4), fonts.tiny(), config.COL_TEXT)
+            iy += row_h

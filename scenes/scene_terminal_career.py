@@ -6,9 +6,9 @@ limiter sa taille ; mixé dans TerminalScene avec les autres mixins de commandes
 """
 
 from core import archetypes as archetypes_mod
+from core import audio, config
 from core import badges as badges_mod
 from core import career as career_mod
-from core import config
 from core import deals as deals_mod
 from core import legacy as legacy_mod
 from core import ma as ma_mod
@@ -321,11 +321,14 @@ class TerminalCareerMixin:
 
     def _check_badges(self):
         """Attribue les nouveaux badges et notifie (toast + journal)."""
-        for b in badges_mod.check_new(self.app.gs.player, self.market):
+        new_badges = badges_mod.check_new(self.app.gs.player, self.market)
+        for b in new_badges:
             bname = badges_mod.badge_name(b)
             self.app.notify(_L(f"✶ Badge : {bname}", f"✶ Badge: {bname}"), "prestige")
             career_mod.log(self.app.gs.player, "info", _L(f"Badge débloqué : {bname}", f"Badge unlocked: {bname}"))
         earned, revoked = badges_mod.check_streaks(self.app.gs.player)
+        if new_badges or earned:
+            audio.play("badge")
         for b in earned:
             bname = badges_mod.streak_badge_name(b)
             self.app.notify(_L(f"✶ Badge à enjeu : {bname}", f"✶ Streak badge: {bname}"), "prestige")

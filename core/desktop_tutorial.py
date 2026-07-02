@@ -11,7 +11,15 @@ JSON dédié sous `config.SAVE_DIR`, par machine et non par sauvegarde — on
 n'apprend le bureau qu'une fois, pas à chaque nouvelle partie. « Revoir le
 tutoriel » (menu contextuel du fond du bureau) remet à zéro.
 
-Logique sans pygame ; les `check` reçoivent la DesktopScene (accès à `wm`).
+Les deux dernières étapes (premier achat, stop-loss) portent sur le TRADING,
+verrouillé jusqu'au grade Associate (core/unlocks.py) — souvent bien après la
+fin des 5 premières étapes. Elles ont un `gate(desktop) -> bool` : tant que le
+trading n'est pas débloqué, `active_step()` retourne None (pas de bandeau
+« en attente » qui pointerait vers une icône encore invisible) ; la séquence
+reprend d'elle-même, sans action du joueur, dès la promotion.
+
+Logique sans pygame ; les `check`/`gate` reçoivent la DesktopScene (accès à
+`wm`/`app`).
 """
 import json
 import os
@@ -51,6 +59,23 @@ def _mission_open(desktop):
     return _win(desktop, "scene:mission") is not None
 
 
+def _trade_unlocked(desktop):
+    from core import unlocks
+    return unlocks.unlocked(desktop.app.gs.player, "trade")
+
+
+def _first_buy_done(desktop):
+    w = _win(desktop, "trading")
+    if w is None:
+        return False
+    return any(e["text"].startswith("ACHAT") for e in getattr(w.app_obj, "order_feed", []))
+
+
+def _stop_loss_placed(desktop):
+    orders = getattr(desktop.app.gs.player, "conditional_orders", None) or []
+    return any(o.get("kind") == "stop" for o in orders)
+
+
 STEPS = [
     {"id": "research", "target": "research",
      "title": ("Ouvrez l'app Recherche", "Open the Research app"),
@@ -77,6 +102,16 @@ STEPS = [
      "hint": ("Ouvrez « Mission » : accomplir le travail de votre grade rapporte cash et réputation.",
               "Open “Mission”: doing your grade's work earns cash and reputation."),
      "check": _mission_open},
+    {"id": "first_buy", "target": "trading", "gate": _trade_unlocked,
+     "title": ("Passez votre premier ordre", "Place your first order"),
+     "hint": ("Vous êtes Associate : le Trading est ouvert. Ouvrez l'app et achetez quelques actions.",
+              "You're an Associate: Trading is open. Open the app and buy a few shares."),
+     "check": _first_buy_done},
+    {"id": "stop_loss", "target": None, "gate": _trade_unlocked,
+     "title": ("Posez un stop-loss", "Place a stop-loss"),
+     "hint": ("Sur une valeur détenue, cliquez « ORD » pour poser un stop-loss : une vente automatique si le cours chute.",
+              "On a held position, click “ORD” to place a stop-loss: an automatic sell if the price drops."),
+     "check": _stop_loss_placed},
 ]
 
 
@@ -105,12 +140,20 @@ def done():
     return st["done"] or st["step"] >= len(STEPS)
 
 
-def active_step():
-    """(index, étape) courante, ou None si terminé/passé."""
+def active_step(desktop=None):
+    """(index, étape) courante, ou None si terminé/passé — aussi None si
+    l'étape courante a un `gate` non satisfait (ex. trading pas encore
+    débloqué) : rien à afficher tant que ce n'est pas pertinent, la séquence
+    reprendra d'elle-même une fois la condition remplie. `desktop=None`
+    ignore les gates (tests logiques sans instance de scène)."""
     st = _load()
     if st["done"] or st["step"] >= len(STEPS):
         return None
-    return st["step"], STEPS[st["step"]]
+    step = STEPS[st["step"]]
+    gate = step.get("gate")
+    if gate is not None and desktop is not None and not gate(desktop):
+        return None
+    return st["step"], step
 
 
 def advance():

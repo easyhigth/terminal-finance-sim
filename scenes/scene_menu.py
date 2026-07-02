@@ -7,6 +7,8 @@ import math
 import pygame
 
 from core import anim_settings, config
+from core import portfolio as pf_mod
+from core import score as score_mod
 from core.game_state import GameState
 from core.i18n import get_lang, t, toggle_lang
 from core.scene_manager import Scene
@@ -16,6 +18,10 @@ from ui.logo import draw_ta_logo
 # Ticker décoratif — tickers fictifs cohérents avec l'univers du jeu
 _TICKER = ("MVC +1.2%   LWNH -0.4%   C&D500 +0.7%   KAK40 +0.3%   MIRC +0.9%   "
            "TSMX -1.1%   NKX225 +0.5%   POME +0.2%   EURUSD 1.0842   ")
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 
 class MenuScene(Scene):
@@ -45,6 +51,27 @@ class MenuScene(Scene):
         self.buttons["continue"].enabled = self.auto is not None
         self.buttons["load"].enabled = len(GameState.list_saves()) > 0
         self.t = 0.0
+        self._notify_session_recap()
+
+    def _notify_session_recap(self):
+        """Toast d'au revoir en revenant au menu depuis une partie EN COURS
+        (pas un game over — qui a déjà son propre écran de bilan — ni un run
+        sandbox, jamais persisté). Réutilise le score composite déjà calculé
+        pour le game over (core/score.py) : un repère de progression avant de
+        refermer le jeu, sans nouvel état à maintenir."""
+        p = self.app.gs.player
+        if not p.market_seed or p.game_over or getattr(p, "sandbox", False):
+            return
+        market = self.app.ensure_market()
+        nw = pf_mod.net_worth(p, market)
+        cur = config.CONTINENTS.get(p.continent, {}).get("currency", "$")
+        score = score_mod.compute_final_score(p, market).total
+        self.app.notify(
+            _L(f"À bientôt {p.name} — {p.grade} · {widgets.format_money(nw, cur)} · "
+               f"score {score:.0f}/100 · {len(p.badges)} badge(s)",
+               f"See you soon {p.name} — {p.grade} · {widgets.format_money(nw, cur)} · "
+               f"score {score:.0f}/100 · {len(p.badges)} badge(s)"),
+            "prestige")
 
     def _anim_label(self):
         return "ANIM : RÉDUITE" if anim_settings.reduce_motion() else "ANIM : NORMALE"

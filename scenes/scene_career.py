@@ -11,6 +11,7 @@ import pygame
 
 from core import badges as badges_mod
 from core import career, config
+from core import difficulty as difficulty_mod
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
@@ -59,6 +60,10 @@ class CareerScene(Scene):
             widgets.draw_text(surf, "Titres : " + " · ".join(p.titles),
                               (config.SCREEN_WIDTH - 40, 30), fonts.small(bold=True),
                               config.COL_WARN, align="right")
+        status = difficulty_mod.status_label(p)
+        if status:
+            widgets.draw_badge(surf, status.upper(), (config.SCREEN_WIDTH - 40, 96),
+                               config.COL_PRESTIGE, align="right")
 
         M = config.MARGIN
         top = 100

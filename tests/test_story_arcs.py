@@ -83,3 +83,16 @@ def test_real_market_signature_compatible():
     m = Market(seed=42)
     m.sync_to(WARMUP_STEPS)
     assert story_arcs.on_step(p, m) == []
+
+
+def test_new_arcs_use_known_inbox_categories():
+    from scenes.scene_inbox import _KIND
+    for arc in ARCS:
+        for st in arc["stages"]:
+            assert st["category"] in _KIND, (arc["id"], st["category"])
+
+
+def test_six_arcs_present_with_unique_ids():
+    ids = {a["id"] for a in ARCS}
+    assert {"mentor", "journalist", "client_worried", "rival_truce",
+            "regulator", "whale_client"} <= ids

@@ -8,7 +8,7 @@ Réussite (≥ seuil) → promotion.
 """
 import pygame
 
-from core import config, exam
+from core import audio, config, exam
 from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
@@ -224,6 +224,7 @@ class EvaluationScene(Scene):
             return
         if self.passed and p.can_promote():
             p.promote()
+            audio.play("promotion")
             from core import profile
             profile.record_grade_reached(p.grade_index)
             p.reputation = min(100, p.reputation + 8)

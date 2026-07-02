@@ -110,3 +110,21 @@ def daily_seed(date=None):
 def mark_daily(player, date=None):
     d = date or datetime.date.today()
     player.flags["daily_challenge"] = d.isoformat()
+
+
+def is_daily_challenge(player):
+    return bool(player.flags.get("daily_challenge"))
+
+
+def status_label(player):
+    """Libellé court pour un badge en jeu (topbar, écran Carrière) — inclut
+    le preset seulement s'il diffère du défaut (Normal, cas le plus courant,
+    n'a pas besoin d'être rappelé en permanence) et le défi du jour s'il est
+    actif. Retourne None si rien à signaler (Normal + pas de défi)."""
+    bits = []
+    pid = get_id(player)
+    if pid != DEFAULT:
+        bits.append(label(preset(pid)))
+    if is_daily_challenge(player):
+        bits.append(_L("Défi du jour", "Daily challenge"))
+    return " · ".join(bits) if bits else None

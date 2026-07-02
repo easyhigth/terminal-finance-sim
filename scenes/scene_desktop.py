@@ -149,6 +149,7 @@ class DesktopScene(Scene):
         self._onboard_card = None    # carte d'accueil (rect) — 1re visite
         self._onboard_btn = None
         self._tuto_skip_rect = None  # bouton « Passer » du tutoriel guidé
+        self._qcard_rects = {}       # boutons de la carte « Bilan du trimestre »
         # recherche globale (Ctrl+/ — Ctrl+F est déjà pris par le rail du
         # terminal pour M&A, cf. RAIL_SHORTCUTS) : cherche dans les DONNÉES DE
         # PARTIE (positions, watchlist, inbox, mandats, deals), pas le contenu
@@ -259,6 +260,19 @@ class DesktopScene(Scene):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and self.start_open:
             self.start_open = False
             return
+        # carte « Bilan du trimestre » (au-dessus des fenêtres) : ses boutons
+        # sont prioritaires, un clic ailleurs sur la carte est absorbé.
+        if self._quarter_card_pending() is not None \
+                and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            card = self._qcard_rects.get("card")
+            for key, r in self._qcard_rects.items():
+                if key != "card" and r and r.collidepoint(event.pos):
+                    self._ack_quarter_card()
+                    if key == "career":
+                        self._open_scene_window("career")
+                    return
+            if card and card.collidepoint(event.pos):
+                return
         # bouton « Passer » du tutoriel guidé (dessiné au-dessus des fenêtres)
         if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
                 and self._tuto_skip_rect and self._tuto_skip_rect.collidepoint(event.pos)):
@@ -766,6 +780,10 @@ class DesktopScene(Scene):
             self._draw_tutorial(surf)
         else:
             self._tuto_skip_rect = None
+        if self._quarter_card_pending() is not None:
+            self._draw_quarter_card(surf)
+        else:
+            self._qcard_rects = {}
         if self.start_open:
             self._draw_launcher(surf)
         if self._ctx_menu is not None:
@@ -889,6 +907,86 @@ class DesktopScene(Scene):
             gcol = config.COL_UP if hist[-1] >= hist[0] else config.COL_DOWN
             widgets.draw_series(surf, spark, hist[-40:], gcol, baseline=False,
                                 show_extrema=False, y_fmt=None)
+
+    # -------------------------------------------------- bilan du trimestre
+    def _quarter_card_pending(self):
+        """Dernier bilan de trimestre non encore acquitté (dict), ou None.
+        Posé par GameState.advance_step (flags['last_quarter_report']),
+        acquitté par flags['quarter_report_ack'] — persiste donc au save."""
+        p = self.app.gs.player
+        rep = p.flags.get("last_quarter_report")
+        if not rep or not rep.get("total"):
+            return None
+        if p.flags.get("quarter_report_ack") == rep.get("quarter"):
+            return None
+        return rep
+
+    def _ack_quarter_card(self):
+        p = self.app.gs.player
+        rep = p.flags.get("last_quarter_report") or {}
+        p.flags["quarter_report_ack"] = rep.get("quarter")
+
+    def _draw_quarter_card(self, surf):
+        """Carte de synthèse au changement de trimestre : objectifs atteints,
+        récompenses, attribution de performance par source — un moment de
+        respiration dans le temps continu, refermé d'un clic."""
+        rep = self._quarter_card_pending()
+        p = self.app.gs.player
+        cur = config.CONTINENTS[p.continent]["currency"]
+        W, H = 440, 300
+        x = (config.SCREEN_WIDTH - W) // 2
+        y = (config.SCREEN_HEIGHT - H) // 2
+        card = pygame.Rect(x, y, W, H)
+        self._qcard_rects = {"card": card}
+        shadow = pygame.Surface((W + 10, H + 10), pygame.SRCALPHA)
+        shadow.fill((0, 0, 0, 130))
+        surf.blit(shadow, (x + 4, y + 5))
+        pygame.draw.rect(surf, config.COL_PANEL, card, border_radius=8)
+        pygame.draw.rect(surf, config.COL_CYAN, card, 2, border_radius=8)
+        widgets.draw_text(surf, _L(f"BILAN DU TRIMESTRE T{rep.get('quarter', '?')}",
+                                   f"QUARTER Q{rep.get('quarter', '?')} REVIEW"),
+                          (x + 20, y + 16), fonts.head(bold=True), config.COL_CYAN)
+        ly = y + 52
+        done, total = rep.get("done", 0), rep.get("total", 0)
+        col = config.COL_UP if done == total else config.COL_AMBER if done else config.COL_DOWN
+        widgets.draw_text(surf, _L(f"Objectifs : {done}/{total} atteints",
+                                   f"Objectives: {done}/{total} met"),
+                          (x + 20, ly), fonts.small(bold=True), col)
+        ly += 24
+        if rep.get("rep") or rep.get("cash"):
+            widgets.draw_text(surf, _L(f"Récompenses : +{rep.get('rep', 0)} rép · "
+                                       f"+{widgets.format_money(rep.get('cash', 0), cur)}",
+                                       f"Rewards: +{rep.get('rep', 0)} rep · "
+                                       f"+{widgets.format_money(rep.get('cash', 0), cur)}"),
+                              (x + 20, ly), fonts.small(), config.COL_TEXT)
+            ly += 24
+        # attribution de performance : d'où vient la variation du trimestre
+        attribution = getattr(p, "last_quarter_attribution", None) or {}
+        entries = sorted(attribution.items(), key=lambda kv: -abs(kv[1]))[:4]
+        if entries:
+            ly += 4
+            widgets.draw_text(surf, _L("D'OÙ VIENT LA PERFORMANCE",
+                                       "WHERE PERFORMANCE CAME FROM"),
+                              (x + 20, ly), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+            ly += 20
+            for cat, delta in entries:
+                sign = "+" if delta >= 0 else ""
+                ccol = config.COL_UP if delta >= 0 else config.COL_DOWN
+                widgets.draw_text(surf, cat.capitalize(), (x + 28, ly), fonts.tiny(), config.COL_TEXT)
+                widgets.draw_text(surf, f"{sign}{widgets.format_money(delta, cur)}",
+                                  (x + W - 28, ly), fonts.tiny(bold=True), ccol, align="right")
+                ly += 18
+        mp = pygame.mouse.get_pos()
+        ok_btn = pygame.Rect(x + W - 110, y + H - 44, 90, 30)
+        car_btn = pygame.Rect(x + W - 260, y + H - 44, 140, 30)
+        self._qcard_rects["ok"] = ok_btn
+        self._qcard_rects["career"] = car_btn
+        for r, label, accent in ((car_btn, _L("Carrière →", "Career →"), config.COL_TEXT_DIM),
+                                 (ok_btn, "OK", config.COL_CYAN)):
+            hov = r.collidepoint(mp)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL, r, border_radius=5)
+            pygame.draw.rect(surf, accent, r, 1, border_radius=5)
+            widgets.draw_text(surf, label, r.center, fonts.small(bold=True), accent, align="center")
 
     def _draw_todo(self, surf):
         """Widget « À FAIRE » (au-dessus du widget patrimoine, sous les

@@ -554,6 +554,11 @@ class GameState:
             p.quarter_flows = {}
             p.quarter_nw_anchor = nw
             quarter_report = career.close_quarter(p)
+            # mémorisé pour la carte « Bilan du trimestre » du bureau
+            # (scenes/scene_desktop.py) — JSON-sérialisable, persiste au save.
+            p.flags["last_quarter_report"] = dict(quarter_report,
+                                                  quarter=prev_quarter,
+                                                  nw=round(nw, 2))
             career.ensure_objectives(p)
             from core import review as _review
             review_offer = _review.maybe_trigger(p, True)

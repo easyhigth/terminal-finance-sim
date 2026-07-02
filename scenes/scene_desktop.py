@@ -33,9 +33,10 @@ from apps.app_sheet import SheetApp
 from apps.app_trading import TradingApp
 from apps.app_watchlist import WatchlistApp
 from apps.scene_host import SceneHostApp
-from core import config, desktop_onboarding
+from core import config, desktop_onboarding, desktop_tutorial
 from core import portfolio as pf_mod
 from core import portfolio_margin as pm_mod
+from core import unlocks as unlocks_mod
 from core.scene_manager import Scene
 from scenes.scene_more import SECTIONS
 from ui import desktop_icons, fonts, widgets
@@ -96,6 +97,16 @@ QUICK_APPS = [
     ("qcommands", "Aide", "help", "commands"),
 ]
 
+# Icônes du bureau soumises au déblocage progressif (core/unlocks.py) : la
+# complexité arrive par paliers de grade, comme les commandes du terminal —
+# une icône verrouillée n'apparaît tout simplement pas (et son apparition au
+# grade suivant fait office de récompense, cf. `_check_new_icons`).
+ICON_FEATURE = {
+    "trading": "trade",
+    "qmandates": "mandates",
+    "qdeals": "deals",
+}
+
 # Scènes hébergées (menu Démarrer) nécessitant un actif par défaut si non fourni.
 _NEEDS_TICKER = {"company", "financials", "ma_target"}
 _NEEDS_TICKERS = {"compare", "graph"}
@@ -136,6 +147,7 @@ class DesktopScene(Scene):
         self._ctx_menu = None        # menu contextuel (clic droit) : dict ou None
         self._onboard_card = None    # carte d'accueil (rect) — 1re visite
         self._onboard_btn = None
+        self._tuto_skip_rect = None  # bouton « Passer » du tutoriel guidé
         # recherche globale (Ctrl+/ — Ctrl+F est déjà pris par le rail du
         # terminal pour M&A, cf. RAIL_SHORTCUTS) : cherche dans les DONNÉES DE
         # PARTIE (positions, watchlist, inbox, mandats, deals), pas le contenu
@@ -171,6 +183,31 @@ class DesktopScene(Scene):
     def update(self, dt):
         self._tick_market()
         self.wm.update(dt)
+        self._check_new_icons()
+        self._check_tutorial()
+
+    # ------------------------------------------------------ tutoriel guidé
+    def _check_tutorial(self):
+        """Valide l'étape courante du tutoriel de prise en main dès que l'état
+        du bureau la satisfait (fenêtre ouverte, ancrage…) — détection sur
+        l'ÉTAT, pas sur le clic, comme le parcours du terminal."""
+        if not desktop_onboarding.seen() or desktop_tutorial.done():
+            return
+        cur = desktop_tutorial.active_step()
+        if cur is None:
+            return
+        _idx, step = cur
+        try:
+            ok = bool(step["check"](self))
+        except Exception:
+            ok = False
+        if not ok:
+            return
+        if desktop_tutorial.advance():
+            self.app.notify(_L("Tutoriel terminé — le poste de travail est à vous !",
+                               "Tutorial complete — the workstation is yours!"), "prestige")
+        else:
+            self.app.notify(_L("Étape validée ✓", "Step complete ✓"), "good")
 
     # ------------------------------------------------------------- events
     def handle_event(self, event):
@@ -220,6 +257,12 @@ class DesktopScene(Scene):
                 self.start_open = False
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and self.start_open:
             self.start_open = False
+            return
+        # bouton « Passer » du tutoriel guidé (dessiné au-dessus des fenêtres)
+        if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                and self._tuto_skip_rect and self._tuto_skip_rect.collidepoint(event.pos)):
+            desktop_tutorial.skip()
+            self._tuto_skip_rect = None
             return
         if self.wm.handle_event(event):
             return
@@ -559,6 +602,7 @@ class DesktopScene(Scene):
             (_L("Réglages", "Settings"), lambda: self.app.scenes.go("settings", return_to="desktop")),
             (_L("Fermer toutes les fenêtres", "Close all windows"), self._close_all_windows),
             (_L("Revoir l'accueil", "Show welcome again"), desktop_onboarding.reset),
+            (_L("Revoir le tutoriel", "Replay the tutorial"), desktop_tutorial.reset),
         ]
 
     def _launch_and_snap(self, key, side):
@@ -656,6 +700,46 @@ class DesktopScene(Scene):
                           fonts.small(bold=True), config.COL_BG if hov else config.COL_AMBER,
                           align="center")
 
+    def _draw_tutorial(self, surf):
+        """Bandeau du tutoriel guidé (au-dessus des fenêtres) + halo pulsé sur
+        l'icône visée par l'étape courante."""
+        cur = desktop_tutorial.active_step()
+        if cur is None:
+            self._tuto_skip_rect = None
+            return
+        idx, step = cur
+        total = len(desktop_tutorial.STEPS)
+        W, H = 700, 46
+        x = (config.SCREEN_WIDTH - W) // 2
+        y = TOPBAR_H + 6
+        band = pygame.Rect(x, y, W, H)
+        panel = pygame.Surface((W, H), pygame.SRCALPHA)
+        panel.fill((*config.COL_PANEL, 238))
+        surf.blit(panel, (x, y))
+        pygame.draw.rect(surf, config.COL_AMBER, band, 1, border_radius=6)
+        widgets.draw_text(surf, _L(f"TUTORIEL {idx + 1}/{total}", f"TUTORIAL {idx + 1}/{total}"),
+                          (x + 12, y + 6), fonts.tiny(bold=True), config.COL_CYAN)
+        widgets.draw_text(surf, desktop_tutorial.step_title(step),
+                          (x + 110, y + 5), fonts.small(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, widgets.fit_text(desktop_tutorial.step_hint(step),
+                                                 fonts.tiny(), W - 130),
+                          (x + 12, y + 26), fonts.tiny(), config.COL_TEXT)
+        skip = pygame.Rect(band.right - 78, y + 5, 68, 18)
+        self._tuto_skip_rect = skip
+        hov = skip.collidepoint(pygame.mouse.get_pos())
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL, skip, border_radius=4)
+        pygame.draw.rect(surf, config.COL_BORDER, skip, 1, border_radius=4)
+        widgets.draw_text(surf, _L("Passer", "Skip"), skip.center, fonts.tiny(bold=True),
+                          config.COL_TEXT_DIM, align="center")
+        # halo pulsé sur l'icône cible (si l'étape en désigne une)
+        target = step.get("target")
+        info = self._icon_rects.get(target) if target else None
+        if info:
+            r = info[0]
+            pulse = 3 + (pygame.time.get_ticks() // 180) % 4
+            pygame.draw.rect(surf, config.COL_AMBER, r.inflate(pulse * 2, pulse * 2), 2,
+                             border_radius=10)
+
     # -------------------------------------------------------------- draw
     @property
     def _track_scene(self):
@@ -671,6 +755,10 @@ class DesktopScene(Scene):
         self.wm.draw(surf)
         self._draw_topbar(surf)
         self._draw_taskbar(surf)
+        if desktop_onboarding.seen() and not desktop_tutorial.done():
+            self._draw_tutorial(surf)
+        else:
+            self._tuto_skip_rect = None
         if self.start_open:
             self._draw_launcher(surf)
         if self._ctx_menu is not None:
@@ -693,12 +781,20 @@ class DesktopScene(Scene):
                           (config.SCREEN_WIDTH // 2, area.centery),
                           fonts.title(bold=True), (22, 26, 34), align="center")
 
+    def _icon_visible(self, key):
+        """Une icône soumise au déblocage progressif (ICON_FEATURE) n'apparaît
+        que si la fonctionnalité est ouverte au grade courant."""
+        feat = ICON_FEATURE.get(key)
+        return feat is None or unlocks_mod.unlocked(self.app.gs.player, feat)
+
     def _icon_list(self):
         """Liste (clé, libellé, icon_kind, couleur accent) des icônes du
         bureau : apps natives + Terminal (toujours) + app de la voie (une fois
         choisie) — dans une grille, pas une colonne, pour rester lisible même
-        si la liste s'allonge."""
-        items = [(k, lbl, kind, config.COL_AMBER) for k, lbl, kind, _cls in APPS]
+        si la liste s'allonge. Les icônes verrouillées (ICON_FEATURE) sont
+        masquées jusqu'au grade requis."""
+        items = [(k, lbl, kind, config.COL_AMBER) for k, lbl, kind, _cls in APPS
+                 if self._icon_visible(k)]
         items.append(("terminal", "Terminal", "terminal", config.COL_CYAN))
         track = getattr(self.app.gs.player, "track", "General")
         info = TRACK_APP.get(track)
@@ -706,8 +802,27 @@ class DesktopScene(Scene):
             _scene_name, label, kind = info
             items.append(("track", label, kind, config.COL_PRESTIGE))
         # anciens boutons du rail latéral du terminal : icônes du bureau
-        items += [(k, lbl, kind, config.COL_CYAN) for k, lbl, kind, _scene in QUICK_APPS]
+        items += [(k, lbl, kind, config.COL_CYAN) for k, lbl, kind, _scene in QUICK_APPS
+                  if self._icon_visible(k)]
         return items
+
+    def _check_new_icons(self):
+        """Toast « nouvelle app installée » quand une icône verrouillée vient
+        d'apparaître (promotion) — l'état vu est persisté dans la sauvegarde
+        (player.flags) pour ne notifier qu'une fois par partie."""
+        p = self.app.gs.player
+        items = self._icon_list()
+        keys = [k for k, _lbl, _kind, _acc in items]
+        seen = p.flags.get("desktop_seen_apps")
+        if seen is None:
+            p.flags["desktop_seen_apps"] = keys
+            return
+        new = [(k, lbl) for k, lbl, _kind, _acc in items if k not in seen]
+        for _k, label in new:
+            self.app.notify(_L(f"Nouvelle app sur le bureau : {label}",
+                               f"New desktop app: {label}"), "prestige")
+        if new:
+            p.flags["desktop_seen_apps"] = keys
 
     def _draw_desktop_icons(self, surf):
         self._icon_rects = {}
@@ -816,7 +931,8 @@ class DesktopScene(Scene):
         # quick-launch (à gauche) : apps natives + Terminal
         self._launch_rects = {}
         x = self._start_rect.right + 10
-        quick = [(k, kind) for k, _l, kind, _cls in APPS] + [("terminal", "terminal")]
+        quick = [(k, kind) for k, _l, kind, _cls in APPS
+                 if self._icon_visible(k)] + [("terminal", "terminal")]
         for key, kind in quick:
             r = pygame.Rect(x, bar.y + 4, 26, TASKBAR_H - 8)
             self._launch_rects[key] = r

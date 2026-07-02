@@ -9,6 +9,7 @@ import math
 import pygame
 
 from core import config
+from core import hall_of_fame as hof_mod
 from core import score as score_mod
 from core.game_state import GameState
 from core.scene_manager import Scene
@@ -49,6 +50,14 @@ class GameOverScene(Scene):
             GameState.delete(config.AUTOSAVE_SLOT)
         market = getattr(self.app, "market", None)
         self.score = score_mod.compute_final_score(p, market)
+        # panthéon local : le run terminé entre au classement (une seule fois
+        # par run — flag joueur — et seulement sur un VRAI game over, pas une
+        # simple visite de la scène).
+        self.hof_rank = None
+        if p.game_over and not p.flags.get("hof_recorded"):
+            p.flags["hof_recorded"] = True
+            self.hof_rank = hof_mod.record(p, self.score.total)
+        self.hof_top = hof_mod.top(5)
         self.menu_btn = widgets.Button(
             (config.SCREEN_WIDTH // 2 - 150, 660, 300, 26),
             "RETOUR AU MENU", config.COL_AMBER)
@@ -90,8 +99,12 @@ class GameOverScene(Scene):
         col = widgets._lerp_col(config.COL_DOWN, (120, 20, 24), pulse)
         widgets.draw_text(surf, "GAME OVER", (cx, 50),
                           fonts.title(bold=True), col, align="center")
-        widgets.draw_text(surf, "FIN DE CARRIÈRE", (cx, 84),
-                          fonts.small(), config.COL_TEXT_DIM, align="center")
+        subtitle = "FIN DE CARRIÈRE"
+        if self.hof_rank:
+            subtitle += f" — PANTHÉON LOCAL : n°{self.hof_rank}"
+        widgets.draw_text(surf, subtitle, (cx, 84), fonts.small(),
+                          config.COL_PRESTIGE if self.hof_rank else config.COL_TEXT_DIM,
+                          align="center")
 
         info = config.CONTINENTS.get(p.continent, {})
         cur = info.get("currency", "$")
@@ -157,6 +170,22 @@ class GameOverScene(Scene):
             y += 4
             y += widgets.draw_text_wrapped(surf, "Titres : " + " · ".join(p.titles),
                                            (inner.x, y), fonts.tiny(), config.COL_WARN, inner.w)
+        # panthéon local : les meilleurs runs de ce poste, toutes parties
+        # confondues (core/hall_of_fame.py) — un point de comparaison qui
+        # donne envie de relancer.
+        if self.hof_top:
+            y += 10
+            widgets.draw_text(surf, "PANTHÉON LOCAL", (inner.x, y),
+                              fonts.tiny(bold=True), config.COL_PRESTIGE)
+            y += 18
+            for i, run in enumerate(self.hof_top, start=1):
+                mine = (self.hof_rank == i)
+                col = config.COL_PRESTIGE if mine else config.COL_TEXT
+                txt = (f"{i}. {run['name']} — {run['grade']} · "
+                       f"{run['quarters']} trim. · score {run['score']:g}")
+                widgets.draw_text(surf, widgets.fit_text(txt, fonts.tiny(), inner.w),
+                                  (inner.x, y), fonts.tiny(bold=mine), col)
+                y += 16
         surf.set_clip(prev_clip)
         content_h = (y + self.scroll_report) - inner.y
         self._report_max_scroll = max(0, content_h - list_area.h)

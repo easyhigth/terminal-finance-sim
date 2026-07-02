@@ -17,7 +17,11 @@ import pygame
 if os.environ.get("SDL_VIDEODRIVER") != "dummy":
     os.environ.setdefault("PYGAME_FORCE_SCALE", "photo")
 
-from core import config, display_settings
+from core import (
+    colorblind_settings,  # noqa: F401 -- applique la palette persistée à l'import
+    config,
+    display_settings,
+)
 from core.game_state import GameState
 from core.market import Market
 from core.pages import PageManager

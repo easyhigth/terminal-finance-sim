@@ -81,9 +81,9 @@ from scenes.scene_runsetup import RunSetupScene
 from scenes.scene_sandbox import SandboxScene
 from scenes.scene_saves import SavesScene
 from scenes.scene_settings import SettingsScene
+from scenes.scene_sheet_redirect import SheetRedirectScene
 from scenes.scene_shop import ShopScene
 from scenes.scene_splash import SplashScene
-from scenes.scene_spreadsheet import SpreadsheetScene
 from scenes.scene_stresstest import StressTestScene
 from scenes.scene_structured import StructuredScene
 from scenes.scene_swaps import SwapsScene
@@ -119,7 +119,7 @@ def build_scene_manager(app):
     m.register("track", TrackScene(app))
     m.register("risk", RiskScene(app))
     m.register("quant", QuantScene(app))
-    m.register("spreadsheet", SpreadsheetScene(app))
+    m.register("spreadsheet", SheetRedirectScene(app))   # alias → app Tableur du bureau
     m.register("saves", SavesScene(app))
     m.register("gameover", GameOverScene(app))
     m.register("company", CompanyScene(app))
@@ -192,8 +192,7 @@ class App:
 
         # état de jeu courant (créé à la sélection du continent)
         self.gs = GameState()
-        self.sheet = None       # tableur plein écran historique (créé à la 1re ouverture)
-        self.workbook = None    # classeur multi-feuilles de l'app Tableur du bureau
+        self.workbook = None    # classeur multi-feuilles de l'app Tableur (LE tableur du jeu)
         self.market = None  # moteur de marché (créé/synchronisé à l'entrée du terminal)
         self.notes = NotificationCenter()   # centre de notifications (toasts)
 

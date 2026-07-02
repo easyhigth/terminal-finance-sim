@@ -59,3 +59,77 @@ def test_tutorial_targets_are_desktop_icons():
     for step in dt.STEPS:
         if step["target"] is not None:
             assert step["target"] in icon_keys
+
+
+def test_trading_steps_are_gated_by_trade_unlock():
+    trading_steps = [s for s in dt.STEPS if s["id"] in ("first_buy", "stop_loss")]
+    assert len(trading_steps) == 2
+    for step in trading_steps:
+        assert callable(step.get("gate"))
+
+
+class _FakeWindow:
+    def __init__(self, key, app_obj):
+        self.key = key
+        self.app_obj = app_obj
+
+
+class _FakeWM:
+    def __init__(self, windows):
+        self.windows = windows
+
+
+class _FakeApp:
+    def __init__(self, grade_index, conditional_orders=None):
+        from core.game_state import PlayerState
+        self.gs = type("GS", (), {})()
+        p = PlayerState()
+        p.grade_index = grade_index
+        p.conditional_orders = conditional_orders or []
+        self.gs.player = p
+
+
+class _FakeDesktop:
+    def __init__(self, grade_index=0, windows=None, conditional_orders=None):
+        self.app = _FakeApp(grade_index, conditional_orders)
+        self.wm = _FakeWM(windows or [])
+
+
+def test_active_step_skips_gated_trading_step_before_associate():
+    # avance jusqu'à l'étape "first_buy" (index 5)
+    for _ in range(5):
+        dt.advance()
+    desktop = _FakeDesktop(grade_index=0)   # Intern : trading verrouillé
+    assert dt.active_step(desktop) is None
+    assert dt.active_step() is not None   # sans desktop : gate ignoré
+
+
+def test_active_step_resumes_once_trade_unlocked():
+    for _ in range(5):
+        dt.advance()
+    desktop = _FakeDesktop(grade_index=4)   # Associate : trading débloqué
+    idx, step = dt.active_step(desktop)
+    assert idx == 5
+    assert step["id"] == "first_buy"
+
+
+def test_first_buy_check_reads_trading_order_feed():
+    from core.desktop_tutorial import STEPS
+    step = next(s for s in STEPS if s["id"] == "first_buy")
+    empty_trading = type("App", (), {"order_feed": []})()
+    desktop = _FakeDesktop(windows=[_FakeWindow("trading", empty_trading)])
+    assert step["check"](desktop) is False
+    bought_trading = type("App", (), {"order_feed": [{"text": "ACHAT 10×MVC @ 42.00"}]})()
+    desktop2 = _FakeDesktop(windows=[_FakeWindow("trading", bought_trading)])
+    assert step["check"](desktop2) is True
+
+
+def test_stop_loss_check_reads_player_conditional_orders():
+    from core.desktop_tutorial import STEPS
+    step = next(s for s in STEPS if s["id"] == "stop_loss")
+    desktop_none = _FakeDesktop(conditional_orders=[])
+    assert step["check"](desktop_none) is False
+    desktop_stop = _FakeDesktop(conditional_orders=[{"kind": "stop", "ticker": "MVC"}])
+    assert step["check"](desktop_stop) is True
+    desktop_target = _FakeDesktop(conditional_orders=[{"kind": "target", "ticker": "MVC"}])
+    assert step["check"](desktop_target) is False

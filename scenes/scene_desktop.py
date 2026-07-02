@@ -222,7 +222,7 @@ class DesktopScene(Scene):
         l'ÉTAT, pas sur le clic, comme le parcours du terminal."""
         if not desktop_onboarding.seen() or desktop_tutorial.done():
             return
-        cur = desktop_tutorial.active_step()
+        cur = desktop_tutorial.active_step(self)
         if cur is None:
             return
         _idx, step = cur
@@ -761,7 +761,7 @@ class DesktopScene(Scene):
     def _draw_tutorial(self, surf):
         """Bandeau du tutoriel guidé (au-dessus des fenêtres) + halo pulsé sur
         l'icône visée par l'étape courante."""
-        cur = desktop_tutorial.active_step()
+        cur = desktop_tutorial.active_step(self)
         if cur is None:
             self._tuto_skip_rect = None
             return

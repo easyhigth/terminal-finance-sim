@@ -60,7 +60,10 @@ class CheatPanel:
             self.msg = f"Grade → {config.GRADES[gi]}"
         elif key == "eval":
             self.closed = True
-            self.app.scenes.go("evaluation", return_to="terminal")
+            # route_scene : sur le bureau, ouvre l'examen en FENÊTRE plutôt que
+            # de basculer plein écran (le panneau est désormais accessible
+            # partout via le bouton CHEAT de la bande d'onglets).
+            self.app.route_scene("evaluation", return_to="terminal")
 
     def handle(self, event):
         """Retourne True si l'event est consommé."""

@@ -10,8 +10,12 @@ pour tout essayer soi-même sans devoir progresser :
     REP <0-100>    règle la réputation
     CHEAT          rappelle la liste des commandes de triche
 
+Un bouton CHEAT apparaît aussi dans la bande d'onglets (à gauche du bouton
+pause) : il ouvre le panneau de triche (cash/réputation/grade/examen) depuis
+n'importe quel écran, bureau compris.
+
 Lancement :  python main_cheat.py
-(Le jeu normal — python main.py — n'expose AUCUNE de ces commandes.)
+(Le jeu normal — python main.py — n'expose AUCUNE de ces commandes ni ce bouton.)
 """
 from main import App
 

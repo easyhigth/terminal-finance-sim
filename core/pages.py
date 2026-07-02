@@ -226,7 +226,8 @@ class PageManager:
         """Largeur disponible pour les onglets, avant le bouton « + ». Quand
         les contrôles d'horloge sont visibles, on réserve leur largeur à droite
         pour qu'aucun onglet ne passe dessous."""
-        reserve = simclock_widget.cluster_width() if self._clock_visible() else 0
+        reserve = (simclock_widget.cluster_width(cheats=getattr(self.app, "cheats", False))
+                   if self._clock_visible() else 0)
         return config.SCREEN_WIDTH - NEW_TAB_W - 8 - reserve
 
     def _tab_metrics(self):
@@ -315,6 +316,15 @@ class PageManager:
             attrs["pos"] = (raw_pos[0], raw_pos[1] - TAB_BAR_H)
             event = pygame.event.Event(event.type, attrs)
 
+        # panneau de triche GLOBAL (mode test, ouvert via le bouton CHEAT de la
+        # bande d'onglets) : dessiné par-dessus la scène courante, il capte la
+        # souris en priorité (repère canvas, comme lui).
+        panel = getattr(self.app, "cheat_panel", None)
+        if panel is not None and not panel.closed and panel.handle(event):
+            if panel.closed:
+                self.app.cheat_panel = None
+            return
+
         # déplacement d'un popup en cours : prioritaire sur tout le reste
         if event.type == pygame.MOUSEMOTION and self._drag_page is not None:
             self._drag_page.popup_rect.topleft = (event.pos[0] - self._drag_off[0],
@@ -369,6 +379,10 @@ class PageManager:
         for i, page in enumerate(self.pages):
             if i != self.active and page.popup:
                 self._draw_popup(game_surf, page)
+        # panneau de triche global (mode test) : au-dessus de tout le canvas
+        panel = getattr(self.app, "cheat_panel", None)
+        if panel is not None and not panel.closed:
+            panel.draw(game_surf)
         self._draw_tab_bar(surf)
 
     def _draw_popup(self, surf, page):

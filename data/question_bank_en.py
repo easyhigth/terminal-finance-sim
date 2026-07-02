@@ -471,4 +471,28 @@ QUESTIONS_EN = {
                     "Guarantee alpha"],
         "expl": "Rebalancing brings weights back to target: it mechanically trims outperformers and tops up laggards.",
     },
+    "q59": {
+        "q": "A stop-loss order placed on a long position triggers when the price:",
+        "choices": ["Falls to the set threshold, triggering an automatic sale",
+                    "Rises to the set threshold, triggering an automatic purchase",
+                    "Stays flat for a full trading session",
+                    "Crosses its 200-day moving average"],
+        "expl": "A stop-loss automatically sells as soon as the price drops to the trigger level, capping a loss without watching the market continuously.",
+    },
+    "q60": {
+        "q": "Unlike a stop-loss, a take-profit order:",
+        "choices": ["Triggers when the price rises to the set threshold, locking in a gain",
+                    "Triggers when the price falls, to cap a loss",
+                    "Automatically cancels every other open position",
+                    "Can only be placed on a short position"],
+        "expl": "A take-profit sells as soon as the price reaches the set upside target, locking in a gain without watching the market continuously — the upside mirror of a stop-loss.",
+    },
+    "q61": {
+        "q": "Across global equity markets, the Asia, Europe and Americas trading sessions:",
+        "choices": ["Partially overlap through the day, one market opening before another closes",
+                    "Are all open at exactly the same hours worldwide",
+                    "Never open on the same calendar day",
+                    "Are closed at all times except on Fridays"],
+        "expl": "Time zones stagger the sessions: as Asia closes, Europe is already open, then the Americas take over — global liquidity never fully stops.",
+    },
 }

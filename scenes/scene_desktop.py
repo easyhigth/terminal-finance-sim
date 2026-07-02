@@ -107,6 +107,29 @@ ICON_FEATURE = {
     "qdeals": "deals",
 }
 
+# Raccourcis Ctrl+<lettre> des icônes du bureau — mêmes mnémoniques que les
+# raccourcis du terminal (RAIL_SHORTCUTS, scenes/scene_terminal.py, garder
+# synchronisé) pour ne pas avoir deux dialectes. Ctrl+T/W/Tab sont réservés
+# par la barre d'onglets (core/pages.py), Ctrl+K par la palette, Ctrl+/ par
+# la recherche globale — jamais réutilisés ici.
+DESKTOP_SHORTCUTS = {
+    pygame.K_m: "qmarket",
+    pygame.K_p: "qbook",
+    pygame.K_i: "qinbox",
+    pygame.K_n: "qnews",
+    pygame.K_j: "qmission",
+    pygame.K_a: "qmandates",
+    pygame.K_d: "qdeals",
+    pygame.K_x: "qexamcert",
+    pygame.K_b: "qshop",
+    pygame.K_o: "qmore",
+    pygame.K_s: "save",
+    pygame.K_h: "qcommands",
+}
+# icône -> libellé de raccourci (tooltip au survol)
+_ICON_SHORTCUT = {icon: "Ctrl+" + pygame.key.name(k).upper()
+                  for k, icon in DESKTOP_SHORTCUTS.items()}
+
 # Scènes hébergées (menu Démarrer) nécessitant un actif par défaut si non fourni.
 _NEEDS_TICKER = {"company", "financials", "ma_target"}
 _NEEDS_TICKERS = {"compare", "graph"}
@@ -223,6 +246,15 @@ class DesktopScene(Scene):
                 and (event.mod & pygame.KMOD_CTRL)):
             self._open_search()
             return
+        # Ctrl+<lettre> : lance l'icône correspondante (mêmes mnémoniques que
+        # les raccourcis du terminal) — seulement si l'icône est visible au
+        # grade courant.
+        if (event.type == pygame.KEYDOWN and (event.mod & pygame.KMOD_CTRL)
+                and not (event.mod & (pygame.KMOD_SHIFT | pygame.KMOD_ALT))):
+            key = DESKTOP_SHORTCUTS.get(event.key)
+            if key and self._icon_visible(key):
+                self._launch(key)
+                return
         # menu contextuel ouvert : il capture les clics/échap en priorité
         if self._ctx_menu is not None and self._handle_ctx_event(event):
             return
@@ -878,6 +910,11 @@ class DesktopScene(Scene):
             widgets.draw_text(surf, widgets.fit_text(label, fonts.small(bold=True), ICON_W - 6),
                               (r.centerx, r.bottom - 18), fonts.small(bold=True),
                               config.COL_TEXT, align="center")
+            # tooltip raccourci clavier (seulement si aucune fenêtre ne
+            # recouvre l'icône — sinon le survol appartient à la fenêtre)
+            sc_label = _ICON_SHORTCUT.get(key)
+            if hov and sc_label and self.wm._topmost_at(mp) is None:
+                widgets.draw_tooltip(surf, f"{label} · {sc_label}", (r.x, r.bottom + 2))
 
     def _draw_ambient(self, surf):
         """Widget « ambiant » du bureau (coin bas-droit, au-dessus de la barre

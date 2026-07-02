@@ -36,13 +36,15 @@ def _L(fr, en):
 from ui import keynav, widgets
 from ui.worldmap import WorldMap
 
-# Raccourcis directs Ctrl+<lettre> vers les commandes du rail latéral. Les
+# Raccourcis directs Ctrl+<lettre> vers les accès rapides (ex-rail latéral,
+# désormais icônes du bureau — mêmes mnémoniques que DESKTOP_SHORTCUTS de
+# scenes/scene_desktop.py, garder synchronisé). Les
 # lettres simples et Maj+lettre sont réservées à la saisie au clavier dans la
 # ligne de commande (cf. handle_event, fallback unicode imprimable) — Ctrl
 # est donc le seul modificateur disponible pour des déclencheurs instantanés
 # sans ambiguïté. Mnémonique en priorité (M=Marché, P=Portefeuille…), avec un
 # repli logique quand la lettre attendue est déjà prise par une autre entrée
-# du rail (ex. Mandats → A, M&A → F pour Fusions). Documenté dans
+# (ex. Mandats → A, M&A → F pour Fusions). Documenté dans
 # data/shortcuts_data.py (cf. ShortcutsPanel) — garder synchronisé.
 RAIL_SHORTCUTS = {
     pygame.K_m: "MARKETHUB",
@@ -287,7 +289,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                 self._career_scroll = max(0, min(self._career_max_scroll,
                     self._career_scroll + (-28 if event.button == 4 else 28)))
                 return
-        # 2) souris : boutons console + rail latéral + carte
+        # 2) souris : boutons console + carte
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._onboarding_skip_rect and self._onboarding_skip_rect.collidepoint(event.pos):
                 onboarding_mod.skip(self.app.gs.player)
@@ -361,14 +363,14 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             if ctrl and shift and event.key in MORE_SHORTCUTS:
                 self._run_command(MORE_SHORTCUTS[event.key])
                 return
-            # Ctrl+<lettre> : raccourcis directs vers les commandes du rail
+            # Ctrl+<lettre> : raccourcis directs vers les accès rapides
             if ctrl and not shift and event.key in RAIL_SHORTCUTS:
                 cmd = RAIL_SHORTCUTS[event.key]
                 if unlocks_mod.cmd_unlocked(self.app.gs.player, cmd):
                     self._run_command(cmd)
                 return
 
-            # navigation hiérarchique des blocs (rail / panneaux) : tant que le
+            # navigation hiérarchique des blocs (panneaux) : tant que le
             # focus est « dans » la ligne de commande, elle capte la saisie
             # comme avant (comportement historique, zéro régression) ; Échap
             # remonte au niveau bloc d'où l'on peut naviguer aux flèches.

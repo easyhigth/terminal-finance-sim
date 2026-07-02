@@ -8,8 +8,8 @@ import math
 
 import pygame
 
+from core import audio, config
 from core import badges as badges_mod
-from core import config
 from core import difficulty as difficulty_mod
 from core import hall_of_fame as hof_mod
 from core import score as score_mod
@@ -64,7 +64,8 @@ class GameOverScene(Scene):
             # badges dépendant de l'issue de la partie (panthéon...) : plus
             # aucun pas de marché ne sera joué après cet écran, donc c'est
             # ici — pas dans la boucle de jeu — qu'il faut les attribuer.
-            badges_mod.check_new(p, market)
+            if badges_mod.check_new(p, market):
+                audio.play("badge")
         self.hof_top = hof_mod.top(5)
         # classement du défi du jour à part (marché différent des runs
         # classiques, comparer les scores mélangés serait trompeur)

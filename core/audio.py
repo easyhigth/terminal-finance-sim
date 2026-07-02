@@ -39,6 +39,14 @@ _SPECS = {
     "alert":     [(740.0, 0.10, 0.7), (740.0, 0.10, 0.0), (740.0, 0.10, 0.7)],
     "bell":      [(1046.5, 0.18, 0.7), (1318.5, 0.22, 0.6)],
     "error":     [(330.0, 0.12, 0.6), (247.0, 0.16, 0.6)],
+    # arpège ascendant (do-mi-sol) façon fanfare courte : promotion de grade.
+    "promotion": [(523.25, 0.08, 0.6), (659.25, 0.08, 0.65), (783.99, 0.16, 0.75)],
+    # étincelle brève et aiguë : déblocage d'un badge/succès.
+    "badge":     [(1046.5, 0.05, 0.5), (1568.0, 0.10, 0.65)],
+    # ping-pong neutre à deux tons, distinct de "alert" (répétition d'un
+    # même ton, plus pressant) — une décision attend, sans connotation
+    # positive/négative.
+    "dilemma":   [(600.0, 0.08, 0.6), (500.0, 0.08, 0.6)],
 }
 
 

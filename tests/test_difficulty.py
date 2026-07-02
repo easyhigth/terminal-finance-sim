@@ -51,3 +51,39 @@ def test_mark_daily_records_iso_date():
     p = PlayerState()
     difficulty.mark_daily(p, datetime.date(2026, 7, 2))
     assert p.flags["daily_challenge"] == "2026-07-02"
+
+
+def test_crisis_multipliers_by_preset():
+    p = PlayerState()
+    assert difficulty.crisis_bad_mult(p) == 1.0
+    assert difficulty.crisis_sev_mult(p) == 1.0
+    p.flags["difficulty"] = "relaxed"
+    assert difficulty.crisis_bad_mult(p) < 1.0
+    p.flags["difficulty"] = "demanding"
+    assert difficulty.crisis_bad_mult(p) > 1.0
+    assert difficulty.crisis_sev_mult(p) > 1.0
+
+
+def test_scenarios_severity_scales_with_difficulty():
+    """Même tirage rng : un scénario néfaste est plus sévère en Exigeant."""
+    import random
+
+    from core import scenarios
+    from core.market import Market
+
+    def crisis_with(player):
+        m = Market(seed=7)
+        m.sync_to(30)
+        rng = random.Random(123)
+        for _ in range(200):
+            s = scenarios.maybe_trigger(m, rng=rng, player=player)
+            if s and s["kind"] == "bad":
+                return s
+        return None
+
+    normal = crisis_with(PlayerState())
+    hard_p = PlayerState()
+    hard_p.flags["difficulty"] = "demanding"
+    hard = crisis_with(hard_p)
+    assert normal is not None and hard is not None
+    assert hard["severity"] >= normal["severity"]

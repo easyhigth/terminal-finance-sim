@@ -52,7 +52,7 @@ class TerminalTimeMixin:
         events_before = len(self.recent_events)
         mandate_offers_before = len(p.mandate_offers)
         # crise/boom éventuel AVANT le pas (le choc s'applique dès ce tour)
-        scenario = scenarios_mod.maybe_trigger(m)
+        scenario = scenarios_mod.maybe_trigger(m, player=p)
         if scenario and m.crises:
             m.crises[-1].start_nw = pf_mod.net_worth(p, m)
         # pas de marché (déterministe)

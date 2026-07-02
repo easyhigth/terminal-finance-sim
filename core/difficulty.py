@@ -35,19 +35,22 @@ DEFAULT = "normal"
 PRESETS = [
     {"id": "relaxed",
      "name": ("Détendu", "Relaxed"),
-     "desc": ("Capital +50 %, salaire +25 %, marge clémente — pour explorer sans pression.",
-              "Capital +50%, salary +25%, lenient margin — explore without pressure."),
-     "cash_mult": 1.5, "salary_mult": 1.25, "maint_margin_mult": 0.8},
+     "desc": ("Capital +50 %, salaire +25 %, marge clémente, crises plus rares — pour explorer sans pression.",
+              "Capital +50%, salary +25%, lenient margin, rarer crises — explore without pressure."),
+     "cash_mult": 1.5, "salary_mult": 1.25, "maint_margin_mult": 0.8,
+     "crisis_bad_mult": 0.7, "crisis_sev_mult": 0.9},
     {"id": "normal",
      "name": ("Normal", "Normal"),
      "desc": ("L'équilibre de référence du jeu.",
               "The game's reference balance."),
-     "cash_mult": 1.0, "salary_mult": 1.0, "maint_margin_mult": 1.0},
+     "cash_mult": 1.0, "salary_mult": 1.0, "maint_margin_mult": 1.0,
+     "crisis_bad_mult": 1.0, "crisis_sev_mult": 1.0},
     {"id": "demanding",
      "name": ("Exigeant", "Demanding"),
-     "desc": ("Capital -25 %, salaire -20 %, marge stricte — chaque levier compte.",
-              "Capital -25%, salary -20%, strict margin — every lever counts."),
-     "cash_mult": 0.75, "salary_mult": 0.8, "maint_margin_mult": 1.25},
+     "desc": ("Capital -25 %, salaire -20 %, marge stricte, crises plus dures — chaque levier compte.",
+              "Capital -25%, salary -20%, strict margin, harsher crises — every lever counts."),
+     "cash_mult": 0.75, "salary_mult": 0.8, "maint_margin_mult": 1.25,
+     "crisis_bad_mult": 1.35, "crisis_sev_mult": 1.15},
 ]
 
 _BY_ID = {p["id"]: p for p in PRESETS}
@@ -75,6 +78,17 @@ def salary_mult(player):
 
 def maint_margin_mult(player):
     return preset(get_id(player))["maint_margin_mult"]
+
+
+def crisis_bad_mult(player):
+    """Multiplicateur du poids des scénarios NÉFASTES (core/scenarios.py) —
+    les booms (kind good) ne sont pas touchés."""
+    return preset(get_id(player))["crisis_bad_mult"]
+
+
+def crisis_sev_mult(player):
+    """Multiplicateur de la sévérité tirée pour un scénario néfaste."""
+    return preset(get_id(player))["crisis_sev_mult"]
 
 
 def apply(player, preset_id):

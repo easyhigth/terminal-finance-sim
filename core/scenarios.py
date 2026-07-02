@@ -241,12 +241,16 @@ def macro_stress(market):
     return min(score, 4.0)
 
 
-def maybe_trigger(market, rng=None):
+def maybe_trigger(market, rng=None, player=None):
     """Déclenche éventuellement un scénario. Retourne un dict narratif ou None.
 
     Le dict retourné inclut désormais `severity` (multiplicateur réellement
     tiré) et `region` (région ciblée si le scénario est régional, sinon None),
     en plus des champs historiques {id, name, kind, story}.
+
+    `player` (optionnel) : la difficulté du run (core/difficulty.py) module le
+    poids des scénarios NÉFASTES et leur sévérité — les booms (kind good) ne
+    sont pas touchés. Comportement inchangé si omis (tests, sandbox).
     """
     from core.i18n import get_lang
     lang = get_lang()
@@ -260,6 +264,11 @@ def maybe_trigger(market, rng=None):
     stress = macro_stress(market)
     if rng.random() > min(0.9, TRIGGER_PROBABILITY * stress):
         return None
+    bad_mult = sev_mult = 1.0
+    if player is not None:
+        from core import difficulty
+        bad_mult = difficulty.crisis_bad_mult(player)
+        sev_mult = difficulty.crisis_sev_mult(player)
     pool = localized(lang)
     weights = []
     for x in pool:
@@ -268,6 +277,8 @@ def maybe_trigger(market, rng=None):
             w *= stress
         elif stress < 0.85 and x["kind"] == "good":
             w *= (1.0 / max(stress, 0.4))
+        if x["kind"] == "bad":
+            w *= bad_mult          # difficulté du run (neutre à 1.0)
         if x["id"] in contagion:
             w *= CONTAGION_BOOST
         weights.append(w)
@@ -281,6 +292,8 @@ def maybe_trigger(market, rng=None):
     sev_min = s.get("sev_min", 1.0)
     sev_max = s.get("sev_max", 1.0)
     severity = rng.uniform(sev_min, sev_max) if sev_max > sev_min else sev_min
+    if s["kind"] == "bad":
+        severity *= sev_mult       # difficulté du run (neutre à 1.0)
 
     regions = dict(s.get("regions") or {})
     region = None

@@ -808,7 +808,12 @@ class DesktopScene(Scene):
 
     def _icon_visible(self, key):
         """Une icône soumise au déblocage progressif (ICON_FEATURE) n'apparaît
-        que si la fonctionnalité est ouverte au grade courant."""
+        que si la fonctionnalité est ouverte au grade courant. « Décide »
+        (qdecide) n'apparaît que quand un dilemme attend réellement une
+        décision — sinon l'icône ouvrait un écran vide, redondant avec le
+        widget « À FAIRE »."""
+        if key == "qdecide":
+            return bool(self.app.gs.player.pending_dilemmas)
         feat = ICON_FEATURE.get(key)
         return feat is None or unlocks_mod.unlocked(self.app.gs.player, feat)
 
@@ -842,7 +847,10 @@ class DesktopScene(Scene):
         if seen is None:
             p.flags["desktop_seen_apps"] = keys
             return
-        new = [(k, lbl) for k, lbl, _kind, _acc in items if k not in seen]
+        # qdecide apparaît/disparaît au gré des dilemmes : ce n'est pas un
+        # déblocage, pas de toast « nouvelle app » pour elle.
+        new = [(k, lbl) for k, lbl, _kind, _acc in items
+               if k not in seen and k != "qdecide"]
         for _k, label in new:
             self.app.notify(_L(f"Nouvelle app sur le bureau : {label}",
                                f"New desktop app: {label}"), "prestige")

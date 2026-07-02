@@ -31,7 +31,7 @@ class DealScene(Scene):
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         fy = config.SCREEN_HEIGHT - 56
         self.continue_btn = widgets.Button((config.SCREEN_WIDTH // 2 - 130, fy, 260, 44),
-                                           "RETOUR AU TERMINAL", config.COL_UP)
+                                           "CONTINUER", config.COL_UP)
 
     # ------------------------------------------------------------- events
     def handle_event(self, event):

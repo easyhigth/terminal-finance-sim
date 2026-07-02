@@ -29,7 +29,7 @@ class DilemmaScene(Scene):
         self.focus = 0   # index de l'option ayant le focus clavier
         self.continue_btn = widgets.Button(
             (config.SCREEN_WIDTH // 2 - 130, config.SCREEN_HEIGHT - 78, 260, 48),
-            "RETOUR AU TERMINAL", config.COL_UP)
+            "CONTINUER", config.COL_UP)
 
     def handle_event(self, event):
         if self.dilemma is None:

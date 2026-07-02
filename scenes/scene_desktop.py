@@ -34,6 +34,7 @@ from apps.app_trading import TradingApp
 from apps.app_watchlist import WatchlistApp
 from apps.scene_host import SceneHostApp
 from core import config, desktop_onboarding, desktop_tutorial
+from core import difficulty as difficulty_mod
 from core import portfolio as pf_mod
 from core import portfolio_margin as pm_mod
 from core import unlocks as unlocks_mod
@@ -1105,6 +1106,12 @@ class DesktopScene(Scene):
         widgets.draw_text(surf, f"Cash {widgets.format_money(p.cash, cur)}  ·  "
                                 f"Patrimoine {widgets.format_money(nw, cur)}",
                           (300, 9), fonts.small(bold=True), config.COL_AMBER)
+        # badge difficulté/défi du jour (rappel discret — sinon oublié dès la
+        # création de partie passée, cf. core/difficulty.status_label)
+        status = difficulty_mod.status_label(p)
+        if status:
+            widgets.draw_badge(surf, status.upper(), (bar.right - 12, 8),
+                               config.COL_PRESTIGE, align="right")
 
         # NB : les contrôles pause/vitesse/⚙ NE sont PAS redessinés ici — ils
         # vivent une seule fois dans la bande d'onglets (ui/simclock_widget.py,

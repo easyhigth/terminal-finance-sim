@@ -65,7 +65,10 @@ APPS = [
 # les autres apps, ouvrable en même temps (ex. suivre le FX pendant que le
 # desk M&A tourne dans une autre fenêtre).
 TRACK_APP = {
-    "Portfolio": ("portfolio_unified", "Portefeuille", "portfolio"),
+    # la voie Portfolio ouvre LE portefeuille (book) — même écran que la
+    # commande PORTFOLIO, l'icône Portef. et le widget patrimoine ; la vue
+    # « Analyse des positions » (ex-portefeuille unifié) reste dans PLUS.
+    "Portfolio": ("book", "Portefeuille", "portfolio"),
     "M&A": ("ma", "M&A", "ma"),
     "Risk": ("risk", "Risque", "risk"),
     "Quant": ("quant", "Quant", "quant"),
@@ -863,8 +866,13 @@ class DesktopScene(Scene):
         track = getattr(self.app.gs.player, "track", "General")
         info = TRACK_APP.get(track)
         if info:
-            _scene_name, label, kind = info
-            items.append(("track", label, kind, config.COL_PRESTIGE))
+            scene_name, label, kind = info
+            # pas de doublon : si la scène de la voie a déjà son icône d'accès
+            # rapide (ex. Portfolio→book/« Portef. », Advisory→mandates), on ne
+            # l'affiche pas une seconde fois en icône de voie.
+            quick_scenes = {scene for _k, _l, _kind2, scene in QUICK_APPS}
+            if scene_name not in quick_scenes:
+                items.append(("track", label, kind, config.COL_PRESTIGE))
         # anciens boutons du rail latéral du terminal : icônes du bureau
         items += [(k, lbl, kind, config.COL_CYAN) for k, lbl, kind, _scene in QUICK_APPS
                   if self._icon_visible(k)]

@@ -33,10 +33,13 @@ def _max_leverage(player):
 
 def _maint_margin(player):
     """Marge de maintenance effective (plus clémente pour la voie Risk,
-    modulée par l'ADN de la firme — hedge fund plus stricte, etc.)."""
+    modulée par l'ADN de la firme — hedge fund plus stricte, etc. — et par
+    la difficulté du run, cf. core/difficulty.py)."""
+    from core import difficulty
     m = tracks.perk(player, "maint_margin")
     base = MAINT_MARGIN if m is None else m
-    return base * firms.perk(player, "maint_margin_mult")
+    return (base * firms.perk(player, "maint_margin_mult")
+            * difficulty.maint_margin_mult(player))
 
 
 # ---------------------------------------------------------------------------

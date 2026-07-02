@@ -65,7 +65,10 @@ APPS = [
 # les autres apps, ouvrable en même temps (ex. suivre le FX pendant que le
 # desk M&A tourne dans une autre fenêtre).
 TRACK_APP = {
-    "Portfolio": ("portfolio_unified", "Portefeuille", "portfolio"),
+    # la voie Portfolio ouvre LE portefeuille (book) — même écran que la
+    # commande PORTFOLIO, l'icône Portef. et le widget patrimoine ; la vue
+    # « Analyse des positions » (ex-portefeuille unifié) reste dans PLUS.
+    "Portfolio": ("book", "Portefeuille", "portfolio"),
     "M&A": ("ma", "M&A", "ma"),
     "Risk": ("risk", "Risque", "risk"),
     "Quant": ("quant", "Quant", "quant"),
@@ -106,6 +109,29 @@ ICON_FEATURE = {
     "qmandates": "mandates",
     "qdeals": "deals",
 }
+
+# Raccourcis Ctrl+<lettre> des icônes du bureau — mêmes mnémoniques que les
+# raccourcis du terminal (RAIL_SHORTCUTS, scenes/scene_terminal.py, garder
+# synchronisé) pour ne pas avoir deux dialectes. Ctrl+T/W/Tab sont réservés
+# par la barre d'onglets (core/pages.py), Ctrl+K par la palette, Ctrl+/ par
+# la recherche globale — jamais réutilisés ici.
+DESKTOP_SHORTCUTS = {
+    pygame.K_m: "qmarket",
+    pygame.K_p: "qbook",
+    pygame.K_i: "qinbox",
+    pygame.K_n: "qnews",
+    pygame.K_j: "qmission",
+    pygame.K_a: "qmandates",
+    pygame.K_d: "qdeals",
+    pygame.K_x: "qexamcert",
+    pygame.K_b: "qshop",
+    pygame.K_o: "qmore",
+    pygame.K_s: "save",
+    pygame.K_h: "qcommands",
+}
+# icône -> libellé de raccourci (tooltip au survol)
+_ICON_SHORTCUT = {icon: "Ctrl+" + pygame.key.name(k).upper()
+                  for k, icon in DESKTOP_SHORTCUTS.items()}
 
 # Scènes hébergées (menu Démarrer) nécessitant un actif par défaut si non fourni.
 _NEEDS_TICKER = {"company", "financials", "ma_target"}
@@ -223,6 +249,15 @@ class DesktopScene(Scene):
                 and (event.mod & pygame.KMOD_CTRL)):
             self._open_search()
             return
+        # Ctrl+<lettre> : lance l'icône correspondante (mêmes mnémoniques que
+        # les raccourcis du terminal) — seulement si l'icône est visible au
+        # grade courant.
+        if (event.type == pygame.KEYDOWN and (event.mod & pygame.KMOD_CTRL)
+                and not (event.mod & (pygame.KMOD_SHIFT | pygame.KMOD_ALT))):
+            key = DESKTOP_SHORTCUTS.get(event.key)
+            if key and self._icon_visible(key):
+                self._launch(key)
+                return
         # menu contextuel ouvert : il capture les clics/échap en priorité
         if self._ctx_menu is not None and self._handle_ctx_event(event):
             return
@@ -623,6 +658,8 @@ class DesktopScene(Scene):
             (_L("Fermer toutes les fenêtres", "Close all windows"), self._close_all_windows),
             (_L("Revoir l'accueil", "Show welcome again"), desktop_onboarding.reset),
             (_L("Revoir le tutoriel", "Replay the tutorial"), desktop_tutorial.reset),
+            (_L("Tutoriels (leçons guidées)", "Tutorials (guided lessons)"),
+             lambda: self._open_scene_window("tutorials")),
         ]
 
     def _launch_and_snap(self, key, side):
@@ -808,7 +845,12 @@ class DesktopScene(Scene):
 
     def _icon_visible(self, key):
         """Une icône soumise au déblocage progressif (ICON_FEATURE) n'apparaît
-        que si la fonctionnalité est ouverte au grade courant."""
+        que si la fonctionnalité est ouverte au grade courant. « Décide »
+        (qdecide) n'apparaît que quand un dilemme attend réellement une
+        décision — sinon l'icône ouvrait un écran vide, redondant avec le
+        widget « À FAIRE »."""
+        if key == "qdecide":
+            return bool(self.app.gs.player.pending_dilemmas)
         feat = ICON_FEATURE.get(key)
         return feat is None or unlocks_mod.unlocked(self.app.gs.player, feat)
 
@@ -824,8 +866,13 @@ class DesktopScene(Scene):
         track = getattr(self.app.gs.player, "track", "General")
         info = TRACK_APP.get(track)
         if info:
-            _scene_name, label, kind = info
-            items.append(("track", label, kind, config.COL_PRESTIGE))
+            scene_name, label, kind = info
+            # pas de doublon : si la scène de la voie a déjà son icône d'accès
+            # rapide (ex. Portfolio→book/« Portef. », Advisory→mandates), on ne
+            # l'affiche pas une seconde fois en icône de voie.
+            quick_scenes = {scene for _k, _l, _kind2, scene in QUICK_APPS}
+            if scene_name not in quick_scenes:
+                items.append(("track", label, kind, config.COL_PRESTIGE))
         # anciens boutons du rail latéral du terminal : icônes du bureau
         items += [(k, lbl, kind, config.COL_CYAN) for k, lbl, kind, _scene in QUICK_APPS
                   if self._icon_visible(k)]
@@ -842,7 +889,10 @@ class DesktopScene(Scene):
         if seen is None:
             p.flags["desktop_seen_apps"] = keys
             return
-        new = [(k, lbl) for k, lbl, _kind, _acc in items if k not in seen]
+        # qdecide apparaît/disparaît au gré des dilemmes : ce n'est pas un
+        # déblocage, pas de toast « nouvelle app » pour elle.
+        new = [(k, lbl) for k, lbl, _kind, _acc in items
+               if k not in seen and k != "qdecide"]
         for _k, label in new:
             self.app.notify(_L(f"Nouvelle app sur le bureau : {label}",
                                f"New desktop app: {label}"), "prestige")
@@ -868,6 +918,11 @@ class DesktopScene(Scene):
             widgets.draw_text(surf, widgets.fit_text(label, fonts.small(bold=True), ICON_W - 6),
                               (r.centerx, r.bottom - 18), fonts.small(bold=True),
                               config.COL_TEXT, align="center")
+            # tooltip raccourci clavier (seulement si aucune fenêtre ne
+            # recouvre l'icône — sinon le survol appartient à la fenêtre)
+            sc_label = _ICON_SHORTCUT.get(key)
+            if hov and sc_label and self.wm._topmost_at(mp) is None:
+                widgets.draw_tooltip(surf, f"{label} · {sc_label}", (r.x, r.bottom + 2))
 
     def _draw_ambient(self, surf):
         """Widget « ambiant » du bureau (coin bas-droit, au-dessus de la barre

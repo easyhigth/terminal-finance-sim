@@ -84,8 +84,10 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   en cours. Toute navigation vers l'ancienne scène plein écran `"spreadsheet"` (bouton
   « → TABLEUR », entrée PLUS) est interceptée par `DesktopScene._open_scene_window` et
   redirigée vers cette app native (`_open_sheet_app`) — un seul tableur sur le bureau. La
-  scène `scene_spreadsheet.py` (avec son propre `app.sheet`, distinct de `app.workbook`) reste
-  inchangée et n'est plus utilisée QUE hors bureau (terminal classique).
+  scène plein écran `scene_spreadsheet.py` (et son état `app.sheet`) a depuis été RETIRÉE :
+  le nom `"spreadsheet"` reste enregistré comme ALIAS (`scenes/scene_sheet_redirect.py`) qui
+  atterrit sur le bureau avec l'app Tableur ouverte — un seul tableur, un seul état
+  (`app.workbook`).
   **Étape 4 : le bureau devient l'ÉCRAN MAÎTRE**, et le TERMINAL lui-même devient une fenêtre
   comme les autres (plus de scène plein écran séparée pour jouer). `DesktopScene` crée à
   l'arrivée une instance TERMINAL persistante (`self._terminal_host`, un `SceneHostApp`) qui

@@ -30,7 +30,7 @@ class StressTestScene(Scene):
         self.focus = 0
         self.continue_btn = widgets.Button(
             (config.SCREEN_WIDTH // 2 - 130, config.SCREEN_HEIGHT - 78, 260, 48),
-            "RETOUR AU TERMINAL", config.COL_UP)
+            "CONTINUER", config.COL_UP)
         self.back_btn = widgets.Button(config.back_button_rect(),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 

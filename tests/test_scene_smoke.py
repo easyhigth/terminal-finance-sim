@@ -83,11 +83,16 @@ _KNOWN_SCENES = [
     "analytics", "performance", "explorer", "tutorials", "splash", "markethub", "wall",
     "settings", "shop",
     "examcert", "stresstest", "history", "team", "alerts", "frontier_lab",
-    "dashboard", "compare", "achievements",
+    "compare", "achievements",
 ]
 
 
-@pytest.mark.parametrize("name", _KNOWN_SCENES)
+# scènes ALIAS qui redirigent ailleurs dès le 1er update (pas de visite
+# stationnaire possible) — testées par leurs tests dédiés plus bas.
+_REDIRECT_SCENES = {"spreadsheet"}
+
+
+@pytest.mark.parametrize("name", [n for n in _KNOWN_SCENES if n not in _REDIRECT_SCENES])
 def test_scene_smoke(app, name):
     """Visite une scène (on_enter via go(), puis update()+draw() x2) et
     s'assure qu'aucune exception n'est levée."""
@@ -105,10 +110,22 @@ def test_terminal_after_every_scene_still_works(app):
 
 
 # --------------------------------------------------------- export vers le tableur
-# Couvre l'option "→ TABLEUR" ajoutée sur les écrans d'états financiers
-# (scene_financials.py / scene_ma_target.py) : ouverture de scene_spreadsheet
-# avec les données importées, et retour vers l'écran d'origine avec le bon
-# contexte (ticker conservé).
+# Couvre l'option "→ TABLEUR" des écrans d'états financiers
+# (scene_financials.py / scene_ma_target.py). Le tableur plein écran
+# historique a été retiré : toute navigation vers "spreadsheet" (alias
+# scenes/scene_sheet_redirect.py) atterrit désormais sur le BUREAU avec l'app
+# Tableur native ouverte (classeur app.workbook) et les données importées.
+
+def _redirected_sheet(app):
+    """Suit la redirection "spreadsheet" → bureau et retourne le classeur de
+    l'app Tableur ouverte en fenêtre."""
+    assert app.scenes.current_name == "spreadsheet"
+    app.scenes.current.update(0.016)
+    assert app.scenes.current_name == "desktop"
+    desk = app.scenes.current
+    win = next(w for w in desk.wm.windows if w.key == "sheet")
+    return win.app_obj
+
 
 def test_financials_open_spreadsheet_income(app):
     ticker = app.market.companies[0]["ticker"]
@@ -116,24 +133,19 @@ def test_financials_open_spreadsheet_income(app):
     scene = app.scenes.current
     scene.update(0.016)
     scene._open_spreadsheet("income")
-    assert app.scenes.current_name == "spreadsheet"
-    sheet = app.scenes.current
-    assert sheet.import_title == f"{ticker} — Compte de résultat"
+    sheet_app = _redirected_sheet(app)
+    s = sheet_app.sheet
+    assert s.get_raw("A1") == f"{ticker} — Compte de résultat"
     # libellé de la première ligne importée (Chiffre d'affaires) en A3
-    assert sheet.sheet.get_raw("A3") == "Chiffre d'affaires"
+    assert s.get_raw("A3") == "Chiffre d'affaires"
     # valeur numérique importée et lisible par le moteur de formules
-    assert isinstance(sheet.sheet.get_value("B3"), float)
-    # le retour ramène bien sur la fiche financière du même ticker
-    sheet.handle_event(pygame.event.Event(
-        pygame.MOUSEBUTTONDOWN, button=1, pos=sheet.back_btn.rect.center))
-    assert app.scenes.current_name == "financials"
-    assert app.scenes.current.ticker == ticker
+    assert isinstance(s.get_value("B3"), float)
 
 
 def test_financials_open_spreadsheet_balance_fits_grid(app):
     """Le bilan (~14 lignes) doit tenir entièrement dans la grille du tableur
     (régression : la grille était trop petite -> lignes tronquées silencieusement)."""
-    from scenes.scene_spreadsheet import N_ROWS
+    from apps.app_sheet import N_ROWS
     ticker = app.market.companies[0]["ticker"]
     app.scenes.go("financials", ticker=ticker, return_to="terminal")
     scene = app.scenes.current
@@ -141,10 +153,10 @@ def test_financials_open_spreadsheet_balance_fits_grid(app):
     n_bal_rows = (len(scene.block[0]["balance"]["assets_lines"])
                   + len(scene.block[0]["balance"]["liab_lines"]))
     scene._open_spreadsheet("balance")
-    sheet = app.scenes.current
+    sheet_app = _redirected_sheet(app)
     assert n_bal_rows + 2 <= N_ROWS   # +2 lignes d'en-tête (titre, années)
     last_row = 2 + n_bal_rows
-    assert sheet.sheet.get_raw(f"A{last_row}") != ""
+    assert sheet_app.sheet.get_raw(f"A{last_row}") != ""
 
 
 def test_financials_overview_exposes_earnings_and_relative_value(app):
@@ -185,7 +197,7 @@ def test_financials_overview_handles_no_earnings_yet(app):
     assert scene.metrics["last_earnings"] is None
 
 
-def test_ma_target_open_spreadsheet_roundtrip(app):
+def test_ma_target_open_spreadsheet_redirects_to_desktop_sheet(app):
     from data.ma_targets import all_targets
     target = all_targets()[0]
     app.scenes.go("ma_target", ticker=target["ticker"], return_to="ma")
@@ -193,10 +205,5 @@ def test_ma_target_open_spreadsheet_roundtrip(app):
     scene.tab = "ÉTATS FINANCIERS"
     scene.update(0.016)
     scene._open_spreadsheet("balance")
-    assert app.scenes.current_name == "spreadsheet"
-    sheet = app.scenes.current
-    assert sheet.import_title == f"{target['ticker']} — Bilan"
-    sheet.handle_event(pygame.event.Event(
-        pygame.MOUSEBUTTONDOWN, button=1, pos=sheet.back_btn.rect.center))
-    assert app.scenes.current_name == "ma_target"
-    assert app.scenes.current.ticker == target["ticker"]
+    sheet_app = _redirected_sheet(app)
+    assert sheet_app.sheet.get_raw("A1") == f"{target['ticker']} — Bilan"

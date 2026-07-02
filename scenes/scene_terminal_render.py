@@ -94,9 +94,8 @@ class TerminalRenderMixin:
         for w in self.datawins:
             w.draw(surf)
 
-        # overlay : panneau de triche (mode test uniquement)
-        if self.cheat_panel is not None:
-            self.cheat_panel.draw(surf)
+        # (le panneau de triche est désormais GLOBAL : porté par l'app et
+        # dessiné par core/pages.py par-dessus n'importe quelle scène)
 
         # overlay : panneau des raccourcis clavier
         if self.shortcuts_panel is not None:

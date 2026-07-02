@@ -36,13 +36,15 @@ def _L(fr, en):
 from ui import keynav, widgets
 from ui.worldmap import WorldMap
 
-# Raccourcis directs Ctrl+<lettre> vers les commandes du rail latéral. Les
+# Raccourcis directs Ctrl+<lettre> vers les accès rapides (ex-rail latéral,
+# désormais icônes du bureau — mêmes mnémoniques que DESKTOP_SHORTCUTS de
+# scenes/scene_desktop.py, garder synchronisé). Les
 # lettres simples et Maj+lettre sont réservées à la saisie au clavier dans la
 # ligne de commande (cf. handle_event, fallback unicode imprimable) — Ctrl
 # est donc le seul modificateur disponible pour des déclencheurs instantanés
 # sans ambiguïté. Mnémonique en priorité (M=Marché, P=Portefeuille…), avec un
 # repli logique quand la lettre attendue est déjà prise par une autre entrée
-# du rail (ex. Mandats → A, M&A → F pour Fusions). Documenté dans
+# (ex. Mandats → A, M&A → F pour Fusions). Documenté dans
 # data/shortcuts_data.py (cf. ShortcutsPanel) — garder synchronisé.
 RAIL_SHORTCUTS = {
     pygame.K_m: "MARKETHUB",
@@ -169,8 +171,8 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         if not hasattr(self, "datawins"):
             self.datawins = []        # fenêtres de données déplaçables (overlay)
             self._restore_workspace()
-        self.cheat_panel = None   # panneau de triche (overlay, mode test uniquement)
-        self._cheat_btn_rect = None
+        self._cheat_btn_rect = None   # bouton triche : ouvre le panneau GLOBAL
+                                      # (ui/simclock_widget.toggle_cheat_panel)
         self.shortcuts_panel = None   # panneau des raccourcis clavier (overlay)
         self._shortcuts_btn_rect = None
         self._settings_btn_rect = None   # bouton ⚙ RÉGLAGES (topbar)
@@ -246,12 +248,6 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                 if self.shortcuts_panel.closed:
                     self.shortcuts_panel = None
                 return
-        # 0bis) panneau de triche (mode test uniquement) : priorité sur tout le reste
-        if self.cheat_panel is not None:
-            if self.cheat_panel.handle(event):
-                if self.cheat_panel.closed:
-                    self.cheat_panel = None
-                return
         # 1) fenêtres de données déplaçables (la plus au-dessus d'abord)
         for w in reversed(self.datawins):
             if w.handle(event):
@@ -293,18 +289,19 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                 self._career_scroll = max(0, min(self._career_max_scroll,
                     self._career_scroll + (-28 if event.button == 4 else 28)))
                 return
-        # 2) souris : boutons console + rail latéral + carte
+        # 2) souris : boutons console + carte
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._onboarding_skip_rect and self._onboarding_skip_rect.collidepoint(event.pos):
                 onboarding_mod.skip(self.app.gs.player)
                 return
             if (getattr(self.app, "cheats", False) and self._cheat_btn_rect
                     and self._cheat_btn_rect.collidepoint(event.pos)):
-                if self.cheat_panel is None:
-                    from ui.cheatpanel import CheatPanel
-                    self.cheat_panel = CheatPanel(self.app)
-                else:
-                    self.cheat_panel = None
+                # panneau de triche GLOBAL (unique, porté par l'app, dessiné
+                # par core/pages.py par-dessus tout) — même action que le
+                # bouton CHEAT de la bande d'onglets, plus de panneau local
+                # en doublon.
+                from ui import simclock_widget
+                simclock_widget.toggle_cheat_panel(self.app)
                 return
             for key, rect in self._console_btns.items():
                 if rect.collidepoint(event.pos):
@@ -366,14 +363,14 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             if ctrl and shift and event.key in MORE_SHORTCUTS:
                 self._run_command(MORE_SHORTCUTS[event.key])
                 return
-            # Ctrl+<lettre> : raccourcis directs vers les commandes du rail
+            # Ctrl+<lettre> : raccourcis directs vers les accès rapides
             if ctrl and not shift and event.key in RAIL_SHORTCUTS:
                 cmd = RAIL_SHORTCUTS[event.key]
                 if unlocks_mod.cmd_unlocked(self.app.gs.player, cmd):
                     self._run_command(cmd)
                 return
 
-            # navigation hiérarchique des blocs (rail / panneaux) : tant que le
+            # navigation hiérarchique des blocs (panneaux) : tant que le
             # focus est « dans » la ligne de commande, elle capte la saisie
             # comme avant (comportement historique, zéro régression) ; Échap
             # remonte au niveau bloc d'où l'on peut naviguer aux flèches.

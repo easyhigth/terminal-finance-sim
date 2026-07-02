@@ -2,7 +2,8 @@
 workbook.py — Classeur multi-feuilles pour l'app Tableur du bureau
 (`apps/app_sheet.py`).
 
-Contrairement à l'ancienne scène tableur plein écran (`scenes/scene_spreadsheet.py`,
+Contrairement à l'ancienne scène tableur plein écran (retirée — "spreadsheet" est
+désormais un alias vers l'app du bureau, cf. scenes/scene_sheet_redirect.py ;
 un seul `Spreadsheet` ÉCRASÉ à chaque export), le classeur du bureau garde
 PLUSIEURS feuilles (onglets, comme Excel) : exporter un état financier ou une
 fiche cible M&A remplit la feuille ACTIVE si elle est vierge, sinon ouvre une
@@ -150,7 +151,7 @@ class Workbook:
 
 def _seed_financial(s, data, n_cols, n_rows):
     """Remplit `s` à partir d'un export d'état financier/fiche
-    (title/years/rows) — même format que `scene_spreadsheet._seed_import`."""
+    (title/years/rows) — format historique des exports d'états financiers."""
     title = data.get("title", "DONNÉES IMPORTÉES")
     years = data.get("years") or []
     rows = data.get("rows") or []

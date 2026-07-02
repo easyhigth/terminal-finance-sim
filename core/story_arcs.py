@@ -2,11 +2,12 @@
 story_arcs.py — Arcs narratifs de l'inbox (logique pure, sans pygame).
 
 De petites histoires en 3 messages (data/story_arcs.py) étalées sur des
-semaines de jeu — un mentor, une journaliste, un petit client inquiet — avec
-un dénouement à léger effet (réputation / trésorerie via `adjust_*`, catégorie
-d'attribution "relations"). Par opposition aux évènements mécaniques
-(mandats, crises), un arc a une CONTINUITÉ : le même expéditeur revient, et la
-partie gagne une mémoire.
+semaines de jeu — un mentor, une journaliste, un petit client inquiet, un
+rival direct, un régulateur, une cliente exigeante — avec un dénouement à
+léger effet (réputation / trésorerie via `adjust_*`, catégorie d'attribution
+"relations"). Par opposition aux évènements mécaniques (mandats, crises), un
+arc a une CONTINUITÉ : le même expéditeur revient, et la partie gagne une
+mémoire.
 
 Déterminisme : le déclenchement et l'espacement sont dérivés du pas de marché
 (`market.step_count`) et de l'ordre fixe des ARCS — pas de tirage non seedé.

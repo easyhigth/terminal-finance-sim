@@ -97,6 +97,9 @@ SECTIONS = [
             "HEDGE, ALM, TUTO, CERT…)"),
     ]),
     ("Bureau — icônes en fenêtre", [
+        ("TAB / MAJ+TAB / ↑↓←→", "Focalise une icône du bureau au clavier (liseré blanc, "
+            "aucune fenêtre ouverte au premier plan) — TAB parcourt la grille dans l'ordre, "
+            "les flèches selon la position réelle ; ENTRÉE lance l'icône, ÉCHAP efface le focus"),
         ("CTRL+lettre", "Ouvre directement l'icône du bureau correspondante en fenêtre "
             "(mêmes mnémoniques que les raccourcis du terminal ci-dessus), sans avoir à "
             "cliquer — seulement si l'icône est visible au grade courant"),

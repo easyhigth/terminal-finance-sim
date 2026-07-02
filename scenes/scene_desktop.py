@@ -61,7 +61,7 @@ from scenes.scene_desktop_common import (
 )
 from scenes.scene_desktop_menus import DesktopMenusMixin
 from scenes.scene_desktop_widgets import DesktopWidgetsMixin
-from ui import desktop_icons, fonts, widgets
+from ui import desktop_icons, fonts, keynav, widgets
 from ui.window_manager import WindowManager
 
 
@@ -76,6 +76,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                                         config.SCREEN_HEIGHT - TOPBAR_H - TASKBAR_H)
         self.start_open = False
         self._icon_rects = {}       # clé -> (Rect, icon_kind, label) — icônes du bureau
+        self._icon_focus = None     # clé de l'icône ayant le focus clavier (ou None)
         self._launch_rects = {}     # clé app -> Rect (barre des tâches quick-launch)
         self._task_rects = {}       # Window -> Rect (barre des tâches)
         self._start_rect = None     # bouton menu Démarrer
@@ -203,6 +204,40 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             desktop_tutorial.skip()
             self._tuto_skip_rect = None
             return
+        # navigation clavier des icônes du bureau : seulement quand aucune
+        # fenêtre n'a le focus (une fenêtre ouverte capte normalement le
+        # clavier, cf. wm.handle_event ci-dessous — cohérent avec le
+        # comportement d'un vrai bureau). TAB/MAJ+TAB parcourt les icônes
+        # dans l'ordre d'affichage (grille) ; les flèches naviguent selon la
+        # position réelle (cf. ui/keynav.nearest_in_direction, même primitive
+        # que le terminal) ; ENTRÉE lance l'icône focalisée ; ÉCHAP efface le
+        # focus (liseré blanc, cf. ui/keynav.draw_focus_ring).
+        if (event.type == pygame.KEYDOWN and self.wm.focused is None
+                and not self.start_open and self._ctx_menu is None):
+            if event.key == pygame.K_TAB and not (event.mod & pygame.KMOD_ALT):
+                keys = list(self._icon_rects)
+                if keys:
+                    if self._icon_focus not in keys:
+                        self._icon_focus = keys[0]
+                    else:
+                        step = -1 if (event.mod & pygame.KMOD_SHIFT) else 1
+                        self._icon_focus = keys[(keys.index(self._icon_focus) + step) % len(keys)]
+                return
+            if event.key in keynav.DIRECTIONS:
+                rects = {k: r for k, (r, _kind, _label) in self._icon_rects.items()}
+                if rects:
+                    if self._icon_focus not in rects:
+                        self._icon_focus = next(iter(rects))
+                    else:
+                        self._icon_focus = keynav.nearest_in_direction(
+                            rects, self._icon_focus, keynav.DIRECTIONS[event.key])
+                return
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and self._icon_focus in self._icon_rects:
+                self._launch(self._icon_focus)
+                return
+            if event.key == pygame.K_ESCAPE and self._icon_focus is not None:
+                self._icon_focus = None
+                return
         if self.wm.handle_event(event):
             return
         if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
@@ -214,6 +249,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         # icônes du bureau + quick-launch : ouvrir/ramener l'app
         for key, (r, _kind, _label) in self._icon_rects.items():
             if r.collidepoint(pos):
+                self._icon_focus = key
                 self._launch(key)
                 return
         for key, r in self._launch_rects.items():
@@ -486,6 +522,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             if hov:
                 pygame.draw.rect(surf, config.COL_PANEL, r, border_radius=8)
                 pygame.draw.rect(surf, accent, r, 1, border_radius=8)
+            keynav.draw_focus_ring(surf, r, key == self._icon_focus)
             desktop_icons.draw(surf, (r.centerx, r.y + 28), kind, accent)
             widgets.draw_text(surf, widgets.fit_text(label, fonts.small(bold=True), ICON_W - 6),
                               (r.centerx, r.bottom - 18), fonts.small(bold=True),

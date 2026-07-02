@@ -87,6 +87,9 @@ SECTIONS_EN = [
             "HEDGE, ALM, TUTO, CERT…)"),
     ]),
     ("Desktop — icons as windows", [
+        ("TAB / SHIFT+TAB / ↑↓←→", "Gives keyboard focus to a desktop icon (white outline, "
+            "no window in front) — TAB cycles the grid in order, arrows move by real "
+            "on-screen position ; ENTER launches the icon, ESC clears the focus"),
         ("CTRL+letter", "Directly opens the matching desktop icon as a window "
             "(same mnemonics as the terminal shortcuts above), no click needed — "
             "only if the icon is visible at the current grade"),

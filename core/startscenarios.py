@@ -30,6 +30,11 @@ SCENARIOS = [
      "desc": "Capital confortable mais réputation fragile : une erreur d'éthique "
              "et c'est fini.",
      "cash": 400_000.0, "grade_index": 0, "reputation": 30, "crisis": False},
+    {"id": "veteran_rush", "name": "Vétéran pressé",
+     "desc": "Promu Senior VP en accéléré, capital solide — mais réputation encore "
+             "fragile pour le rang. Pas de lune de miel : mandats, deals et M&A "
+             "vous attendent dès le premier jour, sans marge d'apprentissage.",
+     "cash": 2_000_000.0, "grade_index": 7, "reputation": 55, "crisis": False},
 ]
 _BY_ID = {s["id"]: s for s in SCENARIOS}
 

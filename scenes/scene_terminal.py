@@ -169,8 +169,8 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         if not hasattr(self, "datawins"):
             self.datawins = []        # fenêtres de données déplaçables (overlay)
             self._restore_workspace()
-        self.cheat_panel = None   # panneau de triche (overlay, mode test uniquement)
-        self._cheat_btn_rect = None
+        self._cheat_btn_rect = None   # bouton triche : ouvre le panneau GLOBAL
+                                      # (ui/simclock_widget.toggle_cheat_panel)
         self.shortcuts_panel = None   # panneau des raccourcis clavier (overlay)
         self._shortcuts_btn_rect = None
         self._settings_btn_rect = None   # bouton ⚙ RÉGLAGES (topbar)
@@ -246,12 +246,6 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                 if self.shortcuts_panel.closed:
                     self.shortcuts_panel = None
                 return
-        # 0bis) panneau de triche (mode test uniquement) : priorité sur tout le reste
-        if self.cheat_panel is not None:
-            if self.cheat_panel.handle(event):
-                if self.cheat_panel.closed:
-                    self.cheat_panel = None
-                return
         # 1) fenêtres de données déplaçables (la plus au-dessus d'abord)
         for w in reversed(self.datawins):
             if w.handle(event):
@@ -300,11 +294,12 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                 return
             if (getattr(self.app, "cheats", False) and self._cheat_btn_rect
                     and self._cheat_btn_rect.collidepoint(event.pos)):
-                if self.cheat_panel is None:
-                    from ui.cheatpanel import CheatPanel
-                    self.cheat_panel = CheatPanel(self.app)
-                else:
-                    self.cheat_panel = None
+                # panneau de triche GLOBAL (unique, porté par l'app, dessiné
+                # par core/pages.py par-dessus tout) — même action que le
+                # bouton CHEAT de la bande d'onglets, plus de panneau local
+                # en doublon.
+                from ui import simclock_widget
+                simclock_widget.toggle_cheat_panel(self.app)
                 return
             for key, rect in self._console_btns.items():
                 if rect.collidepoint(event.pos):

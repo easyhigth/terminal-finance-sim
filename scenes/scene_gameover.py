@@ -10,6 +10,7 @@ import pygame
 
 from core import badges as badges_mod
 from core import config
+from core import difficulty as difficulty_mod
 from core import hall_of_fame as hof_mod
 from core import score as score_mod
 from core.game_state import GameState
@@ -65,6 +66,13 @@ class GameOverScene(Scene):
             # ici — pas dans la boucle de jeu — qu'il faut les attribuer.
             badges_mod.check_new(p, market)
         self.hof_top = hof_mod.top(5)
+        # classement du défi du jour à part (marché différent des runs
+        # classiques, comparer les scores mélangés serait trompeur)
+        self.hof_daily_top = None
+        self.hof_daily_rank = None
+        if difficulty_mod.is_daily_challenge(p):
+            self.hof_daily_top = hof_mod.top_for_daily(p.flags.get("daily_challenge"), n=5)
+            self.hof_daily_rank = hof_mod.daily_rank(p)
         self.menu_btn = widgets.Button(
             (config.SCREEN_WIDTH // 2 - 150, 660, 300, 26),
             "RETOUR AU MENU", config.COL_AMBER)
@@ -188,8 +196,26 @@ class GameOverScene(Scene):
             for i, run in enumerate(self.hof_top, start=1):
                 mine = (self.hof_rank == i)
                 col = config.COL_PRESTIGE if mine else config.COL_TEXT
+                # marqué pour signaler un run de défi du jour (marché
+                # différent — le score n'est pas rigoureusement comparable
+                # aux runs classiques du dessus/dessous).
+                tag = " [défi]" if run.get("daily_date") else ""
                 txt = (f"{i}. {run['name']} — {run['grade']} · "
-                       f"{run['quarters']} trim. · score {run['score']:g}")
+                       f"{run['quarters']} trim. · score {run['score']:g}{tag}")
+                widgets.draw_text(surf, widgets.fit_text(txt, fonts.tiny(), inner.w),
+                                  (inner.x, y), fonts.tiny(bold=mine), col)
+                y += 16
+        # classement du défi du jour à part (marché déterministe partagé,
+        # comparaison équitable uniquement entre joueurs du MÊME jour).
+        if self.hof_daily_top:
+            y += 10
+            widgets.draw_text(surf, "CLASSEMENT DU DÉFI DU JOUR", (inner.x, y),
+                              fonts.tiny(bold=True), config.COL_CYAN)
+            y += 18
+            for i, run in enumerate(self.hof_daily_top, start=1):
+                mine = (self.hof_daily_rank == i)
+                col = config.COL_CYAN if mine else config.COL_TEXT
+                txt = f"{i}. {run['name']} — {run['grade']} · score {run['score']:g}"
                 widgets.draw_text(surf, widgets.fit_text(txt, fonts.tiny(), inner.w),
                                   (inner.x, y), fonts.tiny(bold=mine), col)
                 y += 16

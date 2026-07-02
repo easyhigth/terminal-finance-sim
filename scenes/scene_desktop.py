@@ -144,6 +144,7 @@ class DesktopScene(Scene):
         self._launcher_rects = []   # [(Rect, scene, kwargs)] items du menu Démarrer
         self._menu_rect = None
         self._ambient_rect = None    # widget patrimoine (clic → portefeuille)
+        self._todo_rects = []        # lignes du widget « À faire » (clic → scène)
         self._ctx_menu = None        # menu contextuel (clic droit) : dict ou None
         self._onboard_card = None    # carte d'accueil (rect) — 1re visite
         self._onboard_btn = None
@@ -292,6 +293,11 @@ class DesktopScene(Scene):
         if self._ambient_rect and self._ambient_rect.collidepoint(pos):
             self._open_scene_window("book")
             return
+        # widget « À faire » : chaque ligne ouvre la scène concernée en fenêtre
+        for r, scene in self._todo_rects:
+            if r.collidepoint(pos):
+                self._open_scene_window(scene)
+                return
         if self._menu_rect and self._menu_rect.collidepoint(pos):
             self.app.scenes.go("menu")
             return
@@ -752,6 +758,7 @@ class DesktopScene(Scene):
         self._draw_wallpaper(surf)
         self._draw_desktop_icons(surf)
         self._draw_ambient(surf)
+        self._draw_todo(surf)
         self.wm.draw(surf)
         self._draw_topbar(surf)
         self._draw_taskbar(surf)
@@ -882,6 +889,43 @@ class DesktopScene(Scene):
             gcol = config.COL_UP if hist[-1] >= hist[0] else config.COL_DOWN
             widgets.draw_series(surf, spark, hist[-40:], gcol, baseline=False,
                                 show_extrema=False, y_fmt=None)
+
+    def _draw_todo(self, surf):
+        """Widget « À FAIRE » (au-dessus du widget patrimoine, sous les
+        fenêtres) : les actions en attente les plus prioritaires
+        (core/todo.py), chacune cliquable vers la scène concernée — la boucle
+        de jeu reste lisible même toutes fenêtres fermées."""
+        from core import todo as todo_mod
+        self._todo_rects = []
+        items = todo_mod.suggestions(self.app.gs.player, self.app.market)
+        if not items:
+            return
+        W = 260
+        row_h = 20
+        H = 26 + row_h * len(items) + 6
+        x = config.SCREEN_WIDTH - W - 16
+        # juste au-dessus du widget patrimoine (208x96 + marge, cf. _draw_ambient)
+        y = config.SCREEN_HEIGHT - TASKBAR_H - 96 - 12 - H - 8
+        r = pygame.Rect(x, y, W, H)
+        panel = pygame.Surface((W, H), pygame.SRCALPHA)
+        panel.fill((*config.COL_PANEL, 232))
+        surf.blit(panel, (x, y))
+        pygame.draw.rect(surf, config.COL_BORDER, r, 1, border_radius=6)
+        widgets.draw_text(surf, _L("À FAIRE", "TO DO"), (x + 10, y + 6),
+                          fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        mp = pygame.mouse.get_pos()
+        colors = {"warn": config.COL_AMBER, "bad": config.COL_DOWN, "info": config.COL_CYAN}
+        iy = y + 24
+        for it in items:
+            row = pygame.Rect(x + 4, iy, W - 8, row_h)
+            self._todo_rects.append((row, it["scene"]))
+            if row.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+            col = colors.get(it["kind"], config.COL_TEXT)
+            pygame.draw.circle(surf, col, (row.x + 8, row.centery), 3)
+            widgets.draw_text(surf, widgets.fit_text(it["label"], fonts.tiny(), W - 32),
+                              (row.x + 18, row.y + 4), fonts.tiny(), config.COL_TEXT)
+            iy += row_h
 
     def _draw_topbar(self, surf):
         bar = pygame.Rect(0, 0, config.SCREEN_WIDTH, TOPBAR_H)

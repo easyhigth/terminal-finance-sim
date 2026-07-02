@@ -168,7 +168,12 @@ def act(player, market, rng=None):
     sont plus agressifs (percées et sniping plus fréquents, ~1.5-2x la
     probabilité de base) ; un depeg de stablecoin actif augmente légèrement
     leur propension au débauchage de mandats. En « Expansion »/« Calme », le
-    comportement de base est inchangé."""
+    comportement de base est inchangé.
+
+    Difficulté du run (core/difficulty.py) : un multiplicateur uniforme sur
+    les quatre probabilités — Exigeant rend les rivaux plus mordants, Détendu
+    plus passifs — appliqué APRÈS les ajustements de régime de marché
+    ci-dessus (les deux effets se cumulent)."""
     rng = rng or random
     ensure(player, rng)
     events = []
@@ -183,6 +188,13 @@ def act(player, market, rng=None):
     depegged = bool(crypto.active_depegs(market))
     poach_prob = ACT_POACH_PROB * 1.3 if depegged else ACT_POACH_PROB
     claim_prob = ACT_CLAIM_TARGET_PROB * 1.5 if stressed else ACT_CLAIM_TARGET_PROB
+
+    from core import difficulty
+    aggro = difficulty.rival_aggro_mult(player)
+    surge_prob *= aggro
+    snipe_prob *= aggro
+    poach_prob *= aggro
+    claim_prob *= aggro
 
     # 1) PERCÉE : un rival réalise un gros coup -> bond de score (peut dépasser le joueur)
     if rng.random() < surge_prob:

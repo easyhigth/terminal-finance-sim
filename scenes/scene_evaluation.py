@@ -245,6 +245,18 @@ class EvaluationScene(Scene):
                     tid = unlocks.FEATURE_TUTORIAL.get(feat)
                     if tid and not p.flags.get("pending_tutorial"):
                         p.flags["pending_tutorial"] = tid
+                    # trace persistante (le toast est éphémère) : un mot du
+                    # manager dans l'inbox explique le nouveau périmètre et
+                    # renvoie vers le tutoriel dédié s'il existe.
+                    label = unlocks.feature_label(feat)
+                    body = (f"Votre promotion au grade {p.grade} ouvre un nouveau "
+                            f"périmètre : {label}. Prenez le temps de vous y faire "
+                            "la main avant d'engager du capital.")
+                    if tid:
+                        body += (" Un tutoriel dédié vous attend (écran TUTORIELS, "
+                                 "ou l'icône Aide du bureau).")
+                    inbox.push(p, "manager", "Votre manager",
+                               f"Nouveau périmètre : {label}", body)
         else:
             p.reputation = max(0, p.reputation - 5)
             pct = int(ratio * 100)

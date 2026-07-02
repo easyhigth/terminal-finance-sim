@@ -11,9 +11,8 @@ et le même verrou de déblocage (`core/unlocks`). Étape 1 : actions au comptan
 import pygame
 
 from apps.base import DesktopApp
-from core import audio
+from core import audio, config, unlocks
 from core import conditional_orders as CO
-from core import config, unlocks
 from core import portfolio as PF
 from core import portfolio_margin as PM
 from ui import fonts, widgets

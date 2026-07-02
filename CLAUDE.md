@@ -310,6 +310,35 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   `scenes/scene_runsetup.py`) garantit que toutes les périodes ont assez d'historique dès le jour 1
   (verrous : `tests/test_market_query.py::test_graph_step_periods_map_to_expected_horizons` et
   `test_history_available_from_career_start_for_all_graph_periods`).
+  **Étape 18 (jouabilité/onboarding)** : (1) **tutoriel guidé du bureau**
+  (`core/desktop_tutorial.py`, JSON par machine, distinct de `desktop_onboarding`) : 5 étapes
+  validées sur l'ÉTAT du bureau (fenêtre ouverte, ancrage…), bandeau + halo pulsé sur l'icône
+  cible, bouton « Passer », « Revoir le tutoriel » au menu contextuel ; démarre après la carte
+  d'accueil. L'étape « Tapez ADV » du parcours terminal (`core/onboarding.py`) a été reformulée
+  (commande supprimée depuis le temps continu). (2) **déblocage progressif des icônes du
+  bureau** (`ICON_FEATURE` dans `scene_desktop.py` → `core/unlocks`) : Trading/Mandats/Deals
+  n'apparaissent qu'au grade requis (icônes ET quick-launch), toast « Nouvelle app » à
+  l'apparition (état vu dans `player.flags`). (3) **widget « À FAIRE »** (`core/todo.py`, pur) :
+  actions en attente priorisées (dilemme, revue, stress test, marge, mandats, deals, inbox),
+  lignes cliquables, dessiné au-dessus du widget patrimoine. (4) **carte « Bilan du
+  trimestre »** : `advance_step` pose `flags['last_quarter_report']`, le bureau affiche une
+  carte (objectifs, récompenses, attribution par source) acquittée par trimestre
+  (`flags['quarter_report_ack']`). (5) **difficulté + Défi du jour** (`core/difficulty.py`) :
+  presets Détendu/Normal/Exigeant (cash de départ, salaire, marge de maintenance — via
+  `player.flags['difficulty']`, défaut normal donc saves antérieures inchangées) et graine de
+  marché dérivée de la date (`daily_seed()`, marché partagé entre joueurs le même jour),
+  choisis dans `scene_runsetup`. (6) **fil d'ordres du Trading** (`apps/app_trading.py`) :
+  derniers ordres exécutés en bas de fenêtre, flash + son « order ». (7) **arcs narratifs**
+  (`core/story_arcs.py` + `data/story_arcs.py`) : 3 histoires de 3 messages inbox étalées dans
+  le temps (cadence déterministe sur le pas de marché, état dans `player.flags`), léger effet
+  rep/cash au dénouement, livrées par `scene_terminal_time` ; à chaque déblocage de
+  fonctionnalité, un mot du manager arrive aussi dans l'inbox (`scene_evaluation`).
+  (8) **panthéon local** (`core/hall_of_fame.py`, JSON persistant entre parties comme
+  `core/profile.py`) : chaque VRAI game over classe le run par score composite (top 10) ;
+  rang + top 5 affichés dans `scene_gameover`. (9) **bouton CHEAT global** (mode test
+  uniquement) : bande d'onglets, à gauche du bouton pause (`ui/simclock_widget.py`), ouvre le
+  `CheatPanel` porté par l'app (`app.cheat_panel`) et dessiné/routé par `core/pages.py`
+  par-dessus n'importe quelle scène (bureau compris).
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, un jour de jeu dure ~16 s réelles
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 90`), soit un nouveau pas de marché (5 jours) toutes

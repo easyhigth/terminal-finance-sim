@@ -185,6 +185,23 @@ CONTINENTS = {
     },
 }
 
+# Nom de continent -> nom d'attribut COL_* correspondant. CONTINENTS[x]["color"]
+# ci-dessus est figé à l'import (piège classique des dicts littéraux) : le
+# mode contraste élevé (core/colorblind_settings.py) réassigne les attributs
+# COL_* du module à l'exécution, mais ne peut pas retrouver/patcher toutes les
+# copies déjà capturées dans des dicts. `continent_color(name)` relit
+# l'attribut par son NOM à chaque appel — toujours à jour, à utiliser à la
+# place de CONTINENTS[name]["color"] dans tout nouveau code.
+CONTINENT_COLOR_ATTR = {
+    "Europe": "COL_EUROPE", "USA": "COL_USA", "Asia": "COL_ASIA",
+    "Am.Nord": "COL_NORTHAM", "Am.Sud": "COL_SOUTHAM", "Afrique": "COL_AFRICA",
+    "Océanie": "COL_OCEANIA",
+}
+
+
+def continent_color(name):
+    return globals().get(CONTINENT_COLOR_ATTR.get(name, ""), COL_AMBER)
+
 # ---------------------------------------------------------------------------
 # TEMPS — calendrier de jeu
 # ---------------------------------------------------------------------------

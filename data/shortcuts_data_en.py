@@ -49,25 +49,25 @@ SECTIONS_EN = [
         ("PAGE UP / PAGE DOWN", "Scroll the console history"),
         ("ESC (console focus)", "Goes up to block level (the console stays selected, "
             "white outline visible) — a 2nd ESC at block level opens the menu"),
-        ("TAB (block level)", "Moves to the next block: CONSOLE → RAIL → INDICES → "
+        ("TAB (block level)", "Moves to the next block: CONSOLE → INDICES → "
             "HEALTH → COMPANIES → CAREER → FEED (SHIFT+TAB to go back)"),
         ("↑ / ↓ / ← / → (block level)", "Moves the focus to the nearest block in "
             "that direction, based on its real position on screen"),
-        ("ENTER (RAIL/INDICES/COMPANIES block)", "Enters the block: the arrow keys "
-            "then navigate its inner rows (commands, indices, followed companies)"),
+        ("ENTER (INDICES/COMPANIES block)", "Enters the block: the arrow keys "
+            "then navigate its inner rows (indices, followed companies)"),
         ("ENTER (HEALTH/CAREER/FEED block)", "Opens the associated scene directly "
             "(these blocks have no navigable inner content)"),
-        ("ENTER (inner item)", "Activates the item: runs the rail command, opens "
+        ("ENTER (inner item)", "Activates the item: opens "
             "an index's chart, opens a followed company's sheet"),
         ("ESC (block level, inside a block)", "Goes back up from the inner content "
-            "to block level (e.g. leaves the rail list without leaving the terminal)"),
+            "to block level (e.g. leaves the indices list without leaving the terminal)"),
         ("Worked example", "Focus on the CONSOLE block (empty) → ESC to go up to "
-            "block level → ↓ to reach the block below (RAIL) → ENTER to enter it "
-            "→ ↑/↓ to pick a command → ENTER to run it"),
+            "block level → ↓ to reach the block below (INDICES) → ENTER to enter it "
+            "→ ↑/↓ to pick an index → ENTER to open its chart"),
     ]),
     ("Direct CTRL+letter shortcuts (terminal)", [
-        ("Click rail / COMMAND_NAME", "Each rail button corresponds to a typeable "
-                                       "command (e.g. SHOP, INBOX, NEWS, MORE, SHORTCUTS…)"),
+        ("COMMAND_NAME", "Each shortcut below corresponds to a typeable "
+                         "command in the console (e.g. SHOP, INBOX, NEWS, MORE, SHORTCUTS…)"),
         ("CTRL+M / P / I / N / J", "Market / Portfolio / Inbox / News / Mission"),
         ("CTRL+A / D / F / E", "Mandates / Deals / M&A / Decide"),
         ("CTRL+X / B / T / L / G", "Exam-Cert / Shop / Spreadsheet / Academy / Glossary"),
@@ -85,6 +85,20 @@ SECTIONS_EN = [
             "or by typing their command directly (ETF, BONDS, CMDTY, CRYPTO, STRUCT, "
             "CREDIT, SWAP, GOV, FX, OPTIONS, IPO, GP, PA, ATTR, ALERT, QUANT, FRONTIER, "
             "HEDGE, ALM, TUTO, CERT…)"),
+    ]),
+    ("Desktop — icons as windows", [
+        ("CTRL+letter", "Directly opens the matching desktop icon as a window "
+            "(same mnemonics as the terminal shortcuts above), no click needed — "
+            "only if the icon is visible at the current grade"),
+        ("CTRL+M / P / I / N / J", "Market / Portfolio / Inbox / News / Mission"),
+        ("CTRL+A / D / X / B / O", "Mandates / Deals / Exam-Cert / Shop / More"),
+        ("CTRL+S / H", "Quick save (slot 1) / Help (commands)"),
+        ("CTRL+/", "Global search — positions, watchlist, inbox, mandates, deals "
+            "(not to be confused with CTRL+K, the general navigation palette)"),
+        ("ALT+TAB / ALT+SHIFT+TAB", "Switches to the next/previous window (OS-style), "
+            "whatever screen is currently in front"),
+        ("Right click", "Opens a context menu depending on the target: icon, a "
+            "window's title bar, taskbar entry, or the desktop background"),
     ]),
     ("Floating windows and this panel", [
         ("ESC", "Closes the most recent floating window, or this panel if it's open"),

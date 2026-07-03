@@ -2,6 +2,8 @@
 prix entre deux pas du moteur de marché — épinglage exact aux clôtures,
 amplitude bornée, reconstructibilité depuis (seed, step, clé, minute), gel
 hors session de cotation."""
+import pytest
+
 from core import intraday
 from core.sim_clock import SimClock
 
@@ -135,3 +137,61 @@ def test_noise_amplitude_tuned_for_a_lively_looking_market():
     lo, hi = intraday._VOL_MULT_RANGE
     assert lo >= 0.5
     assert hi <= 5.0
+
+
+# ============ densification des graphes "par pas" (1M/3M/1A/3A/5A/MAX) ========
+def test_points_per_segment_denser_for_shorter_periods():
+    """Retour joueur : la densité de bruit doit "s'adapter à la taille de la
+    période cliquée" — plus dense pour les fenêtres courtes/zoomées."""
+    p1m = intraday.points_per_segment_for_n_steps(6)
+    p3m = intraday.points_per_segment_for_n_steps(18)
+    p1a = intraday.points_per_segment_for_n_steps(73)
+    p3a = intraday.points_per_segment_for_n_steps(219)
+    p5a = intraday.points_per_segment_for_n_steps(365)
+    pmax = intraday.points_per_segment_for_n_steps(None)
+    assert p1m >= p3m >= p1a >= p3a >= p5a >= 0
+    assert pmax == 0
+    assert p1m > 0
+
+
+def test_densify_step_series_preserves_real_closes_exactly():
+    m = _FakeMarket(step_count=10)
+    closes = [90.0, 95.0, 100.0, 98.0]     # pas 7, 8, 9, 10
+    dense = intraday.densify_step_series(m, "AAA", closes, points_per_segment=4)
+    # chaque clôture réelle doit rester un point EXACT de la série renvoyée
+    for c in closes:
+        assert c in dense
+    assert dense[0] == closes[0]
+    assert dense[-1] == closes[-1]
+    assert len(dense) == 1 + (len(closes) - 1) * 4
+
+
+def test_densify_step_series_noop_when_disabled_or_too_short():
+    m = _FakeMarket(step_count=10)
+    closes = [90.0, 95.0, 100.0]
+    assert intraday.densify_step_series(m, "AAA", closes, points_per_segment=0) == closes
+    assert intraday.densify_step_series(m, "AAA", [100.0], points_per_segment=4) == [100.0]
+    assert intraday.densify_step_series(m, "AAA", [], points_per_segment=4) == []
+
+
+def test_densify_step_series_deterministic_and_bounded():
+    m = _FakeMarket(step_count=10)
+    closes = [90.0, 95.0, 100.0, 98.0]
+    a = intraday.densify_step_series(m, "AAA", closes, points_per_segment=4)
+    b = intraday.densify_step_series(m, "AAA", closes, points_per_segment=4)
+    assert a == b
+    lo, hi = min(closes), max(closes)
+    margin = hi * intraday._NOISE_PCT * intraday._VOL_MULT_RANGE[1] * 1.5
+    assert all(lo - margin <= v <= hi + margin for v in a)
+
+
+def test_densify_step_series_respects_region_freeze():
+    # place fermée au pas d'arrivée -> damp=0 -> tracé linéaire pur (pas de bruit)
+    m_closed = _FakeMarket(step_count=0)   # USA fermé au pas 0 (cf. market_hours)
+    closes = [90.0, 100.0]
+    dense_closed = intraday.densify_step_series(m_closed, "AAA", closes,
+                                                 points_per_segment=4, region="USA")
+    total = intraday.minutes_per_step()
+    for j in range(1, 5):
+        expected = 90.0 + (100.0 - 90.0) * (total * j / 4) / total
+        assert dense_closed[j] == pytest.approx(expected)

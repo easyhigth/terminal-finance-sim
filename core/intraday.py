@@ -264,6 +264,51 @@ def intraday_series(market, sim_clock, day, key, history, window_minutes, n_poin
     return out
 
 
+def points_per_segment_for_n_steps(n_steps):
+    """Densité de bruit à insérer entre deux clôtures consécutives d'une série
+    "par pas" (1M/3M/1A/3A/5A/MAX), en fonction du nombre de pas affichés —
+    "l'adaptation du graphe à la taille de la période cliquée" (retour joueur) :
+    plus la fenêtre est courte/zoomée, plus chaque segment mérite du détail ;
+    plus elle est longue (5A/MAX), plus il y a déjà de points réels à l'écran
+    et moins la densification apporte (tout en coûtant plus cher à calculer/
+    dessiner) — désactivée au-delà de 3A."""
+    if n_steps is None:
+        return 0                       # MAX : historique long, déjà assez dense
+    if n_steps <= 6:
+        return 6                       # 1M
+    if n_steps <= 18:
+        return 4                       # 3M
+    if n_steps <= 73:
+        return 2                       # 1A
+    if n_steps <= 219:
+        return 1                       # 3A
+    return 0                           # 5A : trop de segments pour que ça vaille le coût
+
+
+def densify_step_series(market, key, closes, points_per_segment=4, region=None, vol_mult=1.0):
+    """Remplace les segments de droite nus entre clôtures "par pas" consécutives
+    par un tracé organique (pont brownien déterministe, réutilise `wiggle`) —
+    chaque clôture réelle reste un point EXACT de la série retournée (le bruit
+    est épinglé à 0 aux deux bornes de chaque segment), seuls des points
+    intermédiaires sont ajoutés. `closes[-1]` doit correspondre au pas courant
+    (`market.step_count`)."""
+    n = len(closes)
+    if n < 2 or points_per_segment < 1:
+        return list(closes)
+    total = minutes_per_step()
+    base_step = market.step_count - (n - 1)
+    out = [closes[0]]
+    for i in range(n - 1):
+        prev, cur = closes[i], closes[i + 1]
+        step_k = base_step + i + 1
+        damp = region_open_factor(region, step_k) if region else 1.0
+        for j in range(1, points_per_segment + 1):
+            pm = total * j / points_per_segment
+            out.append(wiggle(market.seed, step_k, key, prev, cur, pm, damp=damp,
+                              vol_mult=vol_mult))
+    return out
+
+
 # Fenêtres « courtes » proposées dans les sélecteurs de période, en minutes de
 # jeu — reconstruites par animation intraday (pont brownien) car plus fines que
 # le pas du moteur (DAYS_PER_STEP=5 jours). En plus des périodes « par pas »

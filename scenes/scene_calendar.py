@@ -62,7 +62,7 @@ class CalendarScene(Scene):
                 if self.stake_focus:
                     self.stake_focus = False
                     return
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
                 return
             if self.stake_focus:
                 if event.key == pygame.K_BACKSPACE:
@@ -75,7 +75,7 @@ class CalendarScene(Scene):
                     self.stake_str += event.unicode
                     return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.tuto_btn.handle(event):
             self.app.scenes.go("tutorials", tid="calendar", return_to="calendar")

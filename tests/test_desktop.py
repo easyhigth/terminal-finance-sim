@@ -668,6 +668,80 @@ def test_terminal_internal_navigation_opens_desktop_window():
     assert any(w.key == "scene:shop" for w in desk.wm.windows)
 
 
+def test_back_button_closes_own_window_instead_of_forcing_terminal_open(app):
+    """Régression : cliquer « retour »/« continuer » dans une scène hébergée
+    (ex. mission, dont return_to vaut "terminal" par défaut) doit FERMER la
+    fenêtre courante — pas ouvrir/focaliser en plus la fenêtre "terminal" en
+    laissant la fenêtre appelante ouverte derrière. Avant correctif,
+    self.app.scenes.go(self.return_to) ouvrait toujours une fenêtre
+    supplémentaire sans jamais fermer l'appelante."""
+    app.gs.player.grade_index = 3
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._open_scene_window("mission")
+    mission = w.app_obj.scene
+    assert mission.return_to == "terminal"
+    assert any(win.key == "scene:mission" for win in desk.wm.windows)
+
+    mission.app.scenes.back(mission.return_to)
+
+    assert not any(win.key == "scene:mission" for win in desk.wm.windows)
+    assert app.scenes.current_name == "desktop"   # jamais de bascule plein écran
+
+
+def test_back_does_not_force_open_a_window_that_was_not_already_open(app):
+    """Après le correctif, `back()` ne fait QUE fermer la fenêtre appelante —
+    il n'ouvre plus jamais la fenêtre cible (return_to) si elle n'était pas
+    déjà ouverte, contrairement à l'ancien comportement basé sur go()."""
+    app.gs.player.grade_index = 9
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.wm.close(next(w for w in desk.wm.windows if w.key == "scene:terminal"))
+    w = desk._open_scene_window("book")
+    book = w.app_obj.scene
+    book.app.scenes.back(book.return_to)
+    assert not any(win.key == "scene:book" for win in desk.wm.windows)
+    assert not any(win.key == "scene:terminal" for win in desk.wm.windows)
+
+
+def test_deliberate_forward_navigation_to_terminal_still_opens_it(app):
+    """Contrairement à un bouton retour, une navigation délibérée vers le
+    terminal (ex. « Acheter » depuis la fiche société, qui pré-remplit une
+    commande BUY) doit continuer à ouvrir/focaliser la fenêtre terminal SANS
+    fermer la fenêtre appelante — seul go(self.return_to) est requalifié en
+    back(), pas les go() explicites vers un autre nom de scène."""
+    app.gs.player.grade_index = 9
+    app.gs.player.cash = 5_000_000.0
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    tk = app.market.top_companies(n=1)[0]["ticker"]
+    w = desk._open_scene_window("company", ticker=tk, return_to="markethub")
+    comp = w.app_obj.scene
+    comp.update(0.016)
+    comp.draw(app.screen)
+    comp.handle_event(_click(comp.buy_btn.rect.centerx, comp.buy_btn.rect.centery))
+    assert any(win.key == "scene:company" for win in desk.wm.windows)
+    assert any(win.key == "scene:terminal" for win in desk.wm.windows)
+    term = desk._terminal_host.scene
+    assert term.cmd.startswith(f"BUY {tk}")
+
+
+def test_terminal_has_no_local_clickable_cheat_button(app):
+    """Le bouton CHEAT ne doit exister qu'à un seul endroit : la bande
+    d'onglets du bureau (ui/simclock_widget, cf. core/pages.py) — la scène
+    terminale ne doit plus en dessiner/exposer de copie locale cliquable
+    (double accès source de confusion, corrigé)."""
+    app.cheats = True
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk._launch("terminal")
+    term = desk._terminal_host.scene
+    term.update(0.016)
+    term.draw(app.screen)
+    assert not hasattr(term, "_cheat_btn_rect")
+    assert getattr(app, "cheat_panel", None) is None
+
+
 # --------------------------------------------------- scènes hébergées (étape 2)
 def test_scene_host_wraps_and_draws(app):
     from apps.scene_host import SceneHostApp

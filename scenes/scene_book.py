@@ -241,7 +241,7 @@ class BookScene(Scene, PopupMixin):
                 if self.text_focus:
                     self.text_focus = None
                     return
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
                 return
             if self.text_focus == "key":
                 if event.key == pygame.K_BACKSPACE:
@@ -261,7 +261,7 @@ class BookScene(Scene, PopupMixin):
                 return
 
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.analytics_btn.handle(event):
             self.app.scenes.go("analytics", return_to="book")

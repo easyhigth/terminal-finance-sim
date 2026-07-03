@@ -34,7 +34,7 @@ class DilemmaScene(Scene):
     def handle_event(self, event):
         if self.dilemma is None:
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.state == "decide":
@@ -55,7 +55,7 @@ class DilemmaScene(Scene):
                 elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                     self._choose(self.focus)
                 elif event.key == pygame.K_ESCAPE:
-                    self.app.scenes.go(self.return_to)
+                    self.app.scenes.back(self.return_to)
 
     def _choose(self, i):
         p = self.app.gs.player
@@ -71,7 +71,7 @@ class DilemmaScene(Scene):
         if p.check_game_over():
             self.app.scenes.go("gameover")
         else:
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
 
     def update(self, dt):
         self.continue_btn.update(pygame.mouse.get_pos(), dt)

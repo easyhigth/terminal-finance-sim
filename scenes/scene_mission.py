@@ -51,7 +51,7 @@ class MissionScene(Scene):
                     self.calc = None
                 return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.calc_btn.handle(event):
             if self.calc is None:
@@ -61,7 +61,7 @@ class MissionScene(Scene):
                 self.calc = None
             return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
 
         item = self._item()
@@ -97,7 +97,7 @@ class MissionScene(Scene):
             elif self.state == "feedback" and self.continue_btn.rect.collidepoint(event.pos):
                 self._next_item()
             elif self.state == "result" and self.continue_btn.rect.collidepoint(event.pos):
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
 
     def _advance_state_via_key(self):
         if self.state == "intro":
@@ -105,7 +105,7 @@ class MissionScene(Scene):
         elif self.state == "feedback":
             self._next_item()
         elif self.state == "result":
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
 
     def _item(self):
         if 0 <= self.idx < len(self.mission["items"]):

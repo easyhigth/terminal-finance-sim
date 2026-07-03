@@ -410,6 +410,11 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             return host
 
         w = self.wm.open(key, factory)
+        # « retour » (self.app.scenes.back(...)) DEPUIS cette scène ferme CETTE
+        # fenêtre plutôt que d'en ouvrir une autre (cf. apps/scene_host.py::
+        # _Router.back) — sans ce câblage, un bouton retour resterait ouvert
+        # tout en focalisant la fenêtre cible en plus, encombrant le bureau.
+        w.app_obj.bind_closer(lambda: self.wm.close(w))
         if existing is not None and kw:
             w.app_obj.reenter(**kw)   # met à jour le contexte (ticker…) si déjà ouverte
         if attention:

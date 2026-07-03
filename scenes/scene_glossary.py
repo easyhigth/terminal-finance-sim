@@ -56,7 +56,7 @@ class GlossaryScene(Scene):
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
             elif event.key == pygame.K_BACKSPACE:
                 self.search = self.search[:-1]
                 self._rebuild_list()
@@ -92,7 +92,7 @@ class GlossaryScene(Scene):
                         self.cursor = visible.index(term)
 
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
 
     def update(self, dt):
         self._t += dt

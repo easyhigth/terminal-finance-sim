@@ -131,10 +131,10 @@ class CompanyScene(Scene):
             self._handle_picker_event(event)
             return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to, **self.return_kwargs)
+            self.app.scenes.back(self.return_to, **self.return_kwargs)
             return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to, **self.return_kwargs)
+            self.app.scenes.back(self.return_to, **self.return_kwargs)
             return
         if self.buy_btn.handle(event):
             self.app.pending_input = f"BUY {self.ticker} "
@@ -177,7 +177,7 @@ class CompanyScene(Scene):
                     self.search = ""
                     self._picker_cursor = 0
                 else:
-                    self.app.scenes.go(self.return_to, **self.return_kwargs)
+                    self.app.scenes.back(self.return_to, **self.return_kwargs)
                 return
             if event.key == pygame.K_BACKSPACE:
                 self.search = self.search[:-1]
@@ -199,7 +199,7 @@ class CompanyScene(Scene):
                 self._picker_cursor = 0
                 return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to, **self.return_kwargs)
+            self.app.scenes.back(self.return_to, **self.return_kwargs)
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):

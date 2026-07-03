@@ -65,7 +65,7 @@ class AcademyScene(Scene):
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
                 return
             elif event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN, pygame.K_KP_ENTER):
                 self.cursor, activate = widgets.list_key_nav(
@@ -78,7 +78,7 @@ class AcademyScene(Scene):
                     self._mark_read(lid)
                 return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
         if self.tuto_btn.handle(event):
             self.app.scenes.go("tutorials", return_to="academy")
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 4:

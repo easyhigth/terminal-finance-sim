@@ -81,7 +81,7 @@ class IPOScene(Scene):
                 if self.amount_focus:
                     self.amount_focus = False
                     return
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
                 return
             if self.amount_focus:
                 if event.key == pygame.K_BACKSPACE:
@@ -94,7 +94,7 @@ class IPOScene(Scene):
                     self.amount_str += event.unicode
                     return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.tuto_btn.handle(event):
             self.app.scenes.go("tutorials", tid="ipo", return_to="ipo")

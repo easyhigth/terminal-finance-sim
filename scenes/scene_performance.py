@@ -30,10 +30,10 @@ class PerformanceScene(Scene):
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
 
     def update(self, dt):
         self.back_btn.update(pygame.mouse.get_pos(), dt)

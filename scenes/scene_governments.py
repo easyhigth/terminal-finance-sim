@@ -45,7 +45,7 @@ class GovernmentsScene(Scene):
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
         if event.type == pygame.KEYDOWN and event.key in (pygame.K_UP, pygame.K_DOWN) and self._code_order:
             idx = self._code_order.index(self.sel) if self.sel in self._code_order else 0
             idx = (idx + (1 if event.key == pygame.K_DOWN else -1)) % len(self._code_order)
@@ -60,7 +60,7 @@ class GovernmentsScene(Scene):
                 self.list_scroll = max(0, min(self._list_max, self.list_scroll))
             return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
         if self.bonds_btn.handle(event):
             self.app.scenes.go("bonds", return_to="governments")
         if event.type == pygame.MOUSEBUTTONDOWN:

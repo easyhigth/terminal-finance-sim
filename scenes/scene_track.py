@@ -83,14 +83,14 @@ class TrackScene(Scene):
             p.flags["can_choose_track"] = False
             p.flags["track_chosen_day"] = p.day
             self.app.gs.save(config.AUTOSAVE_SLOT)
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         # grade max : reconversion libre, gratuite et instantanée
         res = tracks.switch_track(p, getattr(self.app, "market", None), self.selected)
         if res["ok"]:
             self.app.gs.save(config.AUTOSAVE_SLOT)
             self.app.notify(_L(f"Reconversion : {self.selected}", f"Track switch: {self.selected}"), "info")
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -99,7 +99,7 @@ class TrackScene(Scene):
                     self._select(name)
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
                 return
             if not self._locked() and event.key in (
                     pygame.K_TAB, pygame.K_RIGHT, pygame.K_LEFT, pygame.K_UP, pygame.K_DOWN):
@@ -109,7 +109,7 @@ class TrackScene(Scene):
             elif not self._locked() and event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                 self._select(self._names[self.focus])
         if self.back.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
         if not self._locked() and self.confirm.handle(event):
             self._confirm_track()
 

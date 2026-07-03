@@ -264,7 +264,7 @@ class CommandsScene(Scene):
                     self.search = ""
                     self._layout()
                     return
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
             elif event.key == pygame.K_BACKSPACE:
                 self.search = self.search[:-1]
                 self.scroll = 0
@@ -297,7 +297,7 @@ class CommandsScene(Scene):
                         self._copy(label)
                         return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
 
     def _copy(self, label):
         text = _copy_text(label)

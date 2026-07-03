@@ -284,7 +284,7 @@ class MarketExplorerScene(Scene, PopupMixin):
                 if self.selected:
                     self.selected.clear()
                     return
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
                 return
             elif event.key == pygame.K_BACKSPACE:
                 self.search = self.search[:-1]
@@ -310,7 +310,7 @@ class MarketExplorerScene(Scene, PopupMixin):
                 return
 
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.add_btn.handle(event):
             self._bulk_add()

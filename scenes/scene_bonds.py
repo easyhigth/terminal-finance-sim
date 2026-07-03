@@ -75,7 +75,7 @@ class BondsScene(Scene, PopupMixin):
                 if self.search_box.text:
                     self.search_box.text = ""
                     return
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
                 return
             elif event.key == pygame.K_BACKSPACE:
                 self.search_box.handle_typing(event)
@@ -99,7 +99,7 @@ class BondsScene(Scene, PopupMixin):
                 self.scroll = 0
                 return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.gov_btn.handle(event):
             self.app.scenes.go("governments", return_to="bonds")

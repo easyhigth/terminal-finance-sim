@@ -1949,3 +1949,57 @@ def test_scene_host_default_size_close_to_full_resolution():
     dw, dh = SceneHostApp.default_size
     assert dw >= config.SCREEN_WIDTH * 0.8
     assert dh >= 600
+
+
+# ============================ indicateur discret « sauvegardé » (topbar) ======
+def test_saved_ago_label_empty_when_never_saved(app):
+    from scenes.scene_desktop import _saved_ago_label
+    app.gs.last_saved = 0.0
+    assert _saved_ago_label(app.gs) == ""
+
+
+def test_saved_ago_label_instant_just_after_save(app):
+    import time
+
+    from scenes.scene_desktop import _saved_ago_label
+    app.gs.last_saved = time.time()
+    assert "instant" in _saved_ago_label(app.gs)
+
+
+def test_saved_ago_label_seconds_and_minutes(app):
+    import time
+
+    from scenes.scene_desktop import _saved_ago_label
+    app.gs.last_saved = time.time() - 30
+    assert _saved_ago_label(app.gs) == "· Sauvegardé il y a 30s"
+    app.gs.last_saved = time.time() - 125
+    assert _saved_ago_label(app.gs) == "· Sauvegardé il y a 2min"
+
+
+def test_topbar_draws_without_error_with_and_without_saved_label(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    app.gs.last_saved = 0.0
+    desk.draw(app.screen)   # jamais sauvegardé : ne doit pas lever
+    import time
+    app.gs.last_saved = time.time()
+    desk.draw(app.screen)   # juste sauvegardé : ne doit pas lever
+
+
+def test_settings_screen_has_autosave_cadence_row(app):
+    app.scenes.go("settings", return_to="desktop")
+    sc = app.scenes.current
+    labels = [label for label, _btns in sc.rows]
+    assert any("auto" in lbl.lower() for lbl in labels)
+
+
+def test_changing_autosave_cadence_persists_via_core_module(app):
+    from core import autosave_settings as AS
+    app.scenes.go("settings", return_to="desktop")
+    sc = app.scenes.current
+    row = next(btns for label, btns in sc.rows if "auto" in label.lower())
+    disabled_btn = next(b for b in row if b.action == ("autosave", None))
+    click = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=disabled_btn.rect.center)
+    sc.handle_event(click)
+    assert AS.get_interval() is None
+    AS.set_interval(0.0)   # restaure la valeur par défaut pour les autres tests

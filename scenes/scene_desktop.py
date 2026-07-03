@@ -32,6 +32,8 @@ trimestre, à faire) et les menus/recherche sont deux MIXINS séparés
 mixins `scene_terminal_*.py` du terminal) — tous partagent leurs constantes
 via `scene_desktop_common.py` pour éviter tout import circulaire entre eux.
 """
+import time
+
 import pygame
 
 from apps.scene_host import SceneHostApp
@@ -66,6 +68,24 @@ from ui.window_manager import WindowManager
 
 _ICON_DRAG_THRESHOLD = 6   # px : sous ce seuil un glisser d'icône reste un simple clic
 _CLOSED_STACK_MAX = 8      # profondeur de l'historique « fenêtres fermées » (CTRL+MAJ+Z)
+
+
+def _saved_ago_label(gs):
+    """« Sauvegardé à l'instant / il y a Xs / il y a Xmin », ou "" si aucune
+    sauvegarde n'a encore eu lieu cette session (last_saved == 0). Utile
+    depuis que la cadence de l'autosave est configurable (core/
+    autosave_settings.py) : elle ne se déclenche plus forcément à chaque
+    action, ce discret repère confirme qu'une sauvegarde récente existe
+    (ou non) sans avoir à ouvrir l'écran Sauvegardes."""
+    last_saved = getattr(gs, "last_saved", 0.0)
+    if not last_saved:
+        return ""
+    age = time.time() - last_saved
+    if age < 5:
+        return "· Sauvegardé à l'instant"
+    if age < 60:
+        return f"· Sauvegardé il y a {int(age)}s"
+    return f"· Sauvegardé il y a {int(age // 60)}min"
 
 
 class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
@@ -731,9 +751,17 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         widgets.draw_text(surf, clock_txt, (90, 9), fonts.small(bold=True), config.COL_TEXT)
         # trésorerie / patrimoine net
         nw = pf_mod.net_worth(p, m) if m else p.cash
-        widgets.draw_text(surf, f"Cash {widgets.format_money(p.cash, cur)}  ·  "
-                                f"Patrimoine {widgets.format_money(nw, cur)}",
-                          (300, 9), fonts.small(bold=True), config.COL_AMBER)
+        saved_txt = _saved_ago_label(self.app.gs)
+        line = f"Cash {widgets.format_money(p.cash, cur)}  ·  Patrimoine {widgets.format_money(nw, cur)}"
+        widgets.draw_text(surf, line, (300, 9), fonts.small(bold=True), config.COL_AMBER)
+        if saved_txt:
+            # indicateur DISCRET (petit, gris) — pas une notification, juste
+            # la confirmation silencieuse qu'une sauvegarde vient d'avoir
+            # lieu (utile depuis que la cadence est configurable, cf.
+            # core/autosave_settings.py : on ne sauvegarde plus forcément à
+            # chaque action).
+            sx = 300 + fonts.small(bold=True).size(line)[0] + 14
+            widgets.draw_text(surf, saved_txt, (sx, 12), fonts.tiny(), config.COL_TEXT_DIM)
         # badge difficulté/défi du jour (rappel discret — sinon oublié dès la
         # création de partie passée, cf. core/difficulty.status_label)
         status = difficulty_mod.status_label(p)

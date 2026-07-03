@@ -69,7 +69,7 @@ class HistoryScene(Scene):
         self.tuto_btn = widgets.Button(
             (config.back_button_rect(200)[0] + 220,
              config.back_button_rect(200)[1], 150, 42),
-            "📘 TUTO", config.COL_CYAN)
+            "TUTO", config.COL_CYAN)
         self.scroll_timeline = 0
         self._timeline_max_scroll = 0
         self._timeline_list_rect = None

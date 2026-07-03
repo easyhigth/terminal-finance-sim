@@ -84,7 +84,7 @@ class ShopScene(Scene, PopupMixin):
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.explorer_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
                                             config.back_button_rect(160)[1], 170, 42),
-                                           "🔍 EXPLORATEUR", config.COL_CYAN)
+                                           "EXPLORATEUR", config.COL_CYAN)
 
     def refresh_data(self):
         """Reconstruit le catalogue (cours/positions à jour) sans toucher à

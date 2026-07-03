@@ -418,7 +418,7 @@ class PageManager:
             pygame.draw.rect(surf, border_col, rect, 1)
             label = page.label()
             if page.popup:
-                label = "⧉ " + label
+                label = "◇ " + label
             # icônes fermer/popup masquées si l'onglet est trop compressé
             # pour leur laisser de la place sans écraser le libellé.
             show_close = len(self.pages) > 1 and rect.w >= 50
@@ -434,7 +434,7 @@ class PageManager:
                                   config.COL_TEXT_DIM)
             if show_pop:
                 pop_rect = pygame.Rect(rect.right - 36, rect.y + 4, 14, 14)
-                widgets.draw_text(surf, "⧉", (pop_rect.x, pop_rect.y - 1), fonts.tiny(),
+                widgets.draw_text(surf, "◇", (pop_rect.x, pop_rect.y - 1), fonts.tiny(),
                                   config.COL_TEXT_DIM)
         surf.set_clip(prev_clip)
         new_col = config.COL_TEXT_DIM if blocked else config.COL_CYAN
@@ -448,7 +448,7 @@ class PageManager:
             bar_x = int((viewport.w - bar_w) * (self._tab_scroll_x / self._tab_max_scroll_x))
             pygame.draw.rect(surf, config.COL_AMBER_DIM, (bar_x, TAB_BAR_H - 3, bar_w, 3))
         if blocked:
-            widgets.draw_text(surf, "🔒 examen en cours — onglets verrouillés",
+            widgets.draw_text(surf, "[verr.] examen en cours — onglets verrouillés",
                               (new_rect.right + 12, 6), fonts.tiny(), config.COL_WARN)
         # contrôles d'horloge (pause / x1 / x2 / x3) + ⚙ RÉGLAGES, sur leur
         # propre ligne (bande d'onglets), à droite — ne chevauchent jamais le

@@ -118,7 +118,7 @@ class CheatPanel:
         tr = self._title_rect()
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, tr,
                          border_top_left_radius=6, border_top_right_radius=6)
-        widgets.draw_text(surf, "🛠 TRICHE (test)", (tr.x + 8, tr.y + 4),
+        widgets.draw_text(surf, "TRICHE (test)", (tr.x + 8, tr.y + 4),
                           fonts.tiny(bold=True), config.COL_DOWN)
         widgets.draw_text(surf, "✕", (self._close_rect().centerx, tr.y + 4),
                           fonts.small(bold=True), config.COL_TEXT_DIM, align="center")

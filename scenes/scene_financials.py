@@ -338,7 +338,7 @@ class FinancialsScene(Scene):
                               fonts.tiny(), config.COL_TEXT_DIM)
             y += 15
         if mt.get("earnings_anticipation"):
-            widgets.draw_text(surf, f"⏳ Publication dans {mt['steps_to_earnings']} pas",
+            widgets.draw_text(surf, f"» Publication dans {mt['steps_to_earnings']} pas",
                               (inner.x, y), fonts.tiny(), config.COL_WARN)
             y += 15
         pead = mt.get("pead_drift_remaining") or 0.0

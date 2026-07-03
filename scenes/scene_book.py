@@ -46,7 +46,7 @@ class BookScene(Scene, PopupMixin):
         self.analytics_btn = widgets.Button(
             (250, config.SCREEN_HEIGHT - 50, 230, 42), "ANALYSE DÉTAILLÉE (PA)", config.COL_CYAN)
         self.shop_btn = widgets.Button(
-            (490, config.SCREEN_HEIGHT - 50, 160, 42), "🛒 SHOP", config.COL_AMBER)
+            (490, config.SCREEN_HEIGHT - 50, 160, 42), "SHOP", config.COL_AMBER)
         self._name_rects = {}     # label -> Rect (clic → fiche flottante)
         self._chart_rects = {}    # ticker -> Rect (clic → graphe, actions uniquement)
         self._row_cls = {}

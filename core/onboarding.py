@@ -77,8 +77,8 @@ def progress(p, app=None):
     if app is not None:
         app.notify(_L(f"✓ {title} (+2 réputation)", f"✓ {title} (+2 reputation)"), "good")
         if finished:
-            app.notify(_L("🎓 Parcours d'intégration terminé — vous connaissez l'essentiel.",
-                          "🎓 Onboarding complete — you know the essentials."), "prestige")
+            app.notify(_L("✶ Parcours d'intégration terminé — vous connaissez l'essentiel.",
+                          "✶ Onboarding complete — you know the essentials."), "prestige")
     return step
 
 

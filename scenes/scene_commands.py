@@ -315,7 +315,7 @@ class CommandsScene(Scene):
         widgets.draw_text(surf, "CATALOGUE DES COMMANDES", (40, 24),
                           fonts.title(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, "Cliquez une commande pour la copier dans le terminal · "
-                                "molette / ▲▼ PgUp-PgDn pour défiler · 🔒 = verrouillée à votre grade.",
+                                "molette / ▲▼ PgUp-PgDn pour défiler · [verr.] = verrouillée à votre grade.",
                           (42, 76), fonts.small(), config.COL_TEXT_DIM)
 
         # ---- recherche ----
@@ -362,7 +362,7 @@ class CommandsScene(Scene):
                         self._hit.append((row.copy(), label))
                         label_col = config.COL_TEXT_DIM if lock_g is not None else (
                             config.COL_CYAN if hovered else config.COL_AMBER)
-                        badge = f"🔒 {config.GRADES[lock_g]}" if lock_g is not None else ""
+                        badge = f"[verr.] {config.GRADES[lock_g]}" if lock_g is not None else ""
                         avail_w = self._col_w - 8 - (fonts.tiny().size(badge)[0] + 6 if badge else 0)
                         canonical, synonyms = _split_canonical(label)
                         name_rect = widgets.draw_text(surf, widgets.fit_text(canonical, fonts.small(bold=True),

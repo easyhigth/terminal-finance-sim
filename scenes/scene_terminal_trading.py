@@ -187,11 +187,11 @@ class TerminalTradingMixin:
         rate = self.market.macro["rate"]["v"] if hasattr(self.market, "macro") else 3.0
         from core import portfolio_margin as pm_mod
         self._log(_L(
-            f"  ℹ Coût annualisé du levier : intérêts sur capital emprunté ≈ taux "
+            f"  » Coût annualisé du levier : intérêts sur capital emprunté ≈ taux "
             f"directeur ({rate:.1f}%) + {pm_mod.MARGIN_SPREAD*100:.0f}% de surcoût · "
             f"short = + {pm_mod.SHORT_FEE_ANNUAL*100:.0f}%/an d'emprunt de titres "
             "(prélevé chaque tour, tapez MARGIN).",
-            f"  ℹ Annualized leverage cost: interest on borrowed cash ≈ policy "
+            f"  » Annualized leverage cost: interest on borrowed cash ≈ policy "
             f"rate ({rate:.1f}%) + {pm_mod.MARGIN_SPREAD*100:.0f}% spread · "
             f"short = + {pm_mod.SHORT_FEE_ANNUAL*100:.0f}%/yr stock borrow fee "
             "(charged every turn, type MARGIN)."))

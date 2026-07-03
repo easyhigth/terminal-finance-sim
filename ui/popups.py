@@ -248,7 +248,7 @@ class CompanyPopup(DataWindow):
         mp = pygame.mouse.get_pos()
         self._expand_rect = pygame.Rect(content.right - 90, content.bottom - 18, 90, 18)
         hov = self._expand_rect.collidepoint(mp)
-        widgets.draw_text(surf, "AGRANDIR ⤢", (self._expand_rect.centerx, self._expand_rect.y + 2),
+        widgets.draw_text(surf, "AGRANDIR", (self._expand_rect.centerx, self._expand_rect.y + 2),
                           fonts.tiny(bold=True), self.accent if hov else config.COL_TEXT_DIM,
                           align="center")
         self._detail_rect = pygame.Rect(self._expand_rect.x - 8 - 150, content.bottom - 18, 150, 18)

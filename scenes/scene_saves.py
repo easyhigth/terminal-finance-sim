@@ -52,7 +52,7 @@ class SavesScene(Scene):
         self._path_box.center = (config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2)
         pb_bottom = self._path_box.bottom
         self._import_btn = widgets.Button((config.SCREEN_WIDTH - 240, 24, 200, 36),
-                                          f"⇩ {_L('IMPORTER', 'IMPORT')}", config.COL_CYAN)
+                                          _L('IMPORTER', 'IMPORT'), config.COL_CYAN)
         self._path_ok_btn = widgets.Button((self._path_box.centerx - 170, pb_bottom - 50, 160, 36),
                                            _L("VALIDER", "CONFIRM"), config.COL_CYAN)
         self._path_cancel_btn = widgets.Button((self._path_box.centerx + 10, pb_bottom - 50, 160, 36),

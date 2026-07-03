@@ -31,7 +31,7 @@ class QuantScene(Scene):
         self.toggle_btn = widgets.Button(
             (220, config.SCREEN_HEIGHT-66, 200, 44), "TYPE : CALL", config.COL_UP)
         self.tuto_btn = widgets.Button(
-            (440, config.SCREEN_HEIGHT-66, 150, 44), "📘 TUTO", config.COL_CYAN)
+            (440, config.SCREEN_HEIGHT-66, 150, 44), "TUTO", config.COL_CYAN)
         self._params = {}
 
     def _can(self):

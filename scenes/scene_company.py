@@ -16,6 +16,7 @@ from core import market_hours as mh_mod
 from core import news as N
 from core.scene_manager import Scene
 from ui import fonts, widgets
+from ui.glossary_hint import GlossaryHint
 
 N_YEARS = 5
 _EMPH = {"Marge brute", "EBITDA", "Résultat d'exploitation (EBIT)", "Résultat avant impôt",
@@ -69,6 +70,7 @@ class CompanyScene(Scene):
         self._tab_rects = {}
         self._chart_kind_rects = {}
         self._chart_flash = widgets.TickFlash()
+        self._gloss = GlossaryHint()
         m = self.app.market
         if m is not None:
             m.track_company(self.ticker)
@@ -129,6 +131,8 @@ class CompanyScene(Scene):
     def handle_event(self, event):
         if not self.metrics:
             self._handle_picker_event(event)
+            return
+        if self._gloss.handle_event(event):
             return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.back(self.return_to, **self.return_kwargs)
@@ -226,6 +230,7 @@ class CompanyScene(Scene):
     # ------------------------------------------------------------- draw
     def draw(self, surf):
         surf.fill(config.COL_BG)
+        self._gloss.begin_frame()
         mt = self.metrics
         if not mt:
             self._draw_picker(surf)
@@ -276,6 +281,8 @@ class CompanyScene(Scene):
             self.graph_btn.draw(surf)
         if self._tooltip:
             widgets.draw_tooltip(surf, *self._tooltip)
+        from core.i18n import get_lang
+        self._gloss.draw_popup(surf, get_lang())
 
     # ------------------------------------------------------ mode recherche
     def _draw_picker(self, surf):
@@ -389,36 +396,40 @@ class CompanyScene(Scene):
         ph = rect.bottom - ph_top
         panel = pygame.Rect(rect.x, ph_top, 560, ph)
         inner = widgets.draw_panel(surf, panel, "Fondamentaux & valorisation", accent)
+        # 3e élément optionnel : terme du glossaire (data/glossary_data.py) à
+        # ouvrir en un clic sur le libellé — cf. ui/glossary_hint.py. None
+        # quand il n'y a pas d'entrée de glossaire pertinente (le libellé
+        # reste alors un simple texte, non cliquable).
         col_valo = [
-            ("Capitalisation", widgets.format_money(mt["mktcap"] * 1e6, cur)),
-            ("Chiffre d'affaires", widgets.format_money(mt["revenue"] * 1e6, cur)),
-            ("EBITDA", widgets.format_money(mt["ebitda"] * 1e6, cur)),
-            ("Résultat net", widgets.format_money(mt["net_income"] * 1e6, cur)),
-            ("BPA (EPS)", _fmt(mt["eps"], " " + cur, 2)),
-            ("P/E", _fmt(mt["pe"], "x", 1)),
-            ("EV", widgets.format_money(mt["ev"] * 1e6, cur)),
-            ("EV / EBITDA", _fmt(mt["ev_ebitda"], "x", 1)),
-            ("P / Sales", _fmt(mt["ps"], "x", 1)),
+            ("Capitalisation", widgets.format_money(mt["mktcap"] * 1e6, cur), None),
+            ("Chiffre d'affaires", widgets.format_money(mt["revenue"] * 1e6, cur), None),
+            ("EBITDA", widgets.format_money(mt["ebitda"] * 1e6, cur), "EBITDA"),
+            ("Résultat net", widgets.format_money(mt["net_income"] * 1e6, cur), None),
+            ("BPA (EPS)", _fmt(mt["eps"], " " + cur, 2), None),
+            ("P/E", _fmt(mt["pe"], "x", 1), "P/E"),
+            ("EV", widgets.format_money(mt["ev"] * 1e6, cur), "EV"),
+            ("EV / EBITDA", _fmt(mt["ev_ebitda"], "x", 1), "EV/EBITDA"),
+            ("P / Sales", _fmt(mt["ps"], "x", 1), "P/S"),
         ]
         col_risk = [
-            ("Marge nette", _fmt(mt["net_margin"] * 100, "%", 1)),
-            ("Marge EBITDA", _fmt(mt["ebitda_margin"] * 100, "%", 1)),
-            ("FCF yield", _fmt(mt["fcf_yield"], "%", 1)),
-            ("Dette nette", widgets.format_money(mt["net_debt"] * 1e6, cur)),
-            ("Dette / EBITDA", _fmt(mt["nd_ebitda"], "x", 1)),
-            ("Notation crédit", mt["credit_rating"]),
-            ("Rendement div.", _fmt(mt["div_yield"] * 100, "%", 2)),
-            ("Payout", _fmt(mt["payout"], "%", 0)),
-            ("Bêta", _fmt(mt["beta"], "", 2)),
-            ("Actions (M)", _fmt(mt["shares"], "", 1)),
+            ("Marge nette", _fmt(mt["net_margin"] * 100, "%", 1), None),
+            ("Marge EBITDA", _fmt(mt["ebitda_margin"] * 100, "%", 1), None),
+            ("FCF yield", _fmt(mt["fcf_yield"], "%", 1), "FCF"),
+            ("Dette nette", widgets.format_money(mt["net_debt"] * 1e6, cur), None),
+            ("Dette / EBITDA", _fmt(mt["nd_ebitda"], "x", 1), None),
+            ("Notation crédit", mt["credit_rating"], None),
+            ("Rendement div.", _fmt(mt["div_yield"] * 100, "%", 2), None),
+            ("Payout", _fmt(mt["payout"], "%", 0), None),
+            ("Bêta", _fmt(mt["beta"], "", 2), "Beta"),
+            ("Actions (M)", _fmt(mt["shares"], "", 1), None),
         ]
         cw = inner.w // 2
         for ci, col in enumerate((col_valo, col_risk)):
             x = inner.x + ci * cw
             xr = x + cw - 14
             yy = inner.y
-            for label, val in col:
-                widgets.draw_text(surf, label, (x, yy), fonts.tiny(), config.COL_TEXT_DIM)
+            for label, val, term in col:
+                self._gloss.label(surf, (x, yy), label, fonts.tiny(), config.COL_TEXT_DIM, term=term)
                 widgets.draw_text(surf, str(val), (xr, yy), fonts.small(bold=True),
                                   config.COL_WHITE, align="right")
                 yy += 26
@@ -729,10 +740,11 @@ class CompanyScene(Scene):
                 return ("cher", config.COL_DOWN)
             return ("en ligne", config.COL_TEXT)
 
-        for label, key in [("P/E", "pe"), ("EV/EBITDA", "ev_ebitda"), ("P/S", "ps")]:
+        for label, key, term in [("P/E", "pe", "P/E"), ("EV/EBITDA", "ev_ebitda", "EV/EBITDA"),
+                                 ("P/S", "ps", "P/S")]:
             v, r = mt.get(key), (med.get(key) if med else None)
             txt, col = verdict(v, r)
-            widgets.draw_text(surf, label, (inner.x, y), fonts.small(bold=True), config.COL_WHITE)
+            self._gloss.label(surf, (inner.x, y), label, fonts.small(bold=True), config.COL_WHITE, term=term)
             widgets.draw_text(surf, f"{fmt(v)}  /  méd. secteur {fmt(r)}", (inner.x, y + 18),
                               fonts.small(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, txt, (inner.right, y + 6), fonts.head(bold=True),
@@ -755,18 +767,18 @@ class CompanyScene(Scene):
         right = pygame.Rect(rect.x + half + 20, rect.y, rect.w - half - 20, rect.h)
         rinner = widgets.draw_panel(surf, right, "Profil rentabilité / risque", self.accent)
         rows = [
-            ("Marge nette", _fmt(mt["net_margin"] * 100, "%", 1)),
-            ("Marge EBITDA", _fmt(mt["ebitda_margin"] * 100, "%", 1)),
-            ("FCF yield", _fmt(mt["fcf_yield"], "%", 1)),
-            ("Dette / EBITDA", _fmt(mt["nd_ebitda"], "x", 1)),
-            ("Notation crédit", mt["credit_rating"]),
-            ("Rendement dividende", _fmt(mt["div_yield"] * 100, "%", 2)),
-            ("Payout", _fmt(mt["payout"], "%", 0)),
-            ("Bêta", _fmt(mt["beta"], "", 2)),
+            ("Marge nette", _fmt(mt["net_margin"] * 100, "%", 1), None),
+            ("Marge EBITDA", _fmt(mt["ebitda_margin"] * 100, "%", 1), None),
+            ("FCF yield", _fmt(mt["fcf_yield"], "%", 1), "FCF"),
+            ("Dette / EBITDA", _fmt(mt["nd_ebitda"], "x", 1), None),
+            ("Notation crédit", mt["credit_rating"], None),
+            ("Rendement dividende", _fmt(mt["div_yield"] * 100, "%", 2), None),
+            ("Payout", _fmt(mt["payout"], "%", 0), None),
+            ("Bêta", _fmt(mt["beta"], "", 2), "Beta"),
         ]
         yy = rinner.y
-        for label, val in rows:
-            widgets.draw_text(surf, label, (rinner.x, yy), fonts.small(), config.COL_TEXT_DIM)
+        for label, val, term in rows:
+            self._gloss.label(surf, (rinner.x, yy), label, fonts.small(), config.COL_TEXT_DIM, term=term)
             widgets.draw_text(surf, str(val), (rinner.right, yy), fonts.small(bold=True),
                               config.COL_WHITE, align="right")
             yy += 26

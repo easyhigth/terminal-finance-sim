@@ -2,7 +2,7 @@
 conditionnelle (ConditionalFormat). Logique pure, sans pygame."""
 import pytest
 
-from core.workbook import ConditionalFormat, Workbook
+from core.workbook import TEMPLATES, ConditionalFormat, Workbook, template_list
 
 
 def test_add_tab_creates_and_focuses_new_sheet():
@@ -41,6 +41,57 @@ def test_import_financial_opens_new_sheet_if_active_not_blank():
     assert len(wb.tabs) == n_before + 1
     assert tab is wb.active
     assert tab.name == "Cible M&A"
+
+
+# --------------------------------------------- modèles prêts à l'emploi
+def test_template_list_matches_templates_dict():
+    listed = dict(template_list())
+    assert set(listed) == set(TEMPLATES)
+    for key, tpl in TEMPLATES.items():
+        assert listed[key] == tpl["title"]
+
+
+def test_import_template_unknown_key_returns_none():
+    wb = Workbook(10, 5)
+    assert wb.import_template("nope") is None
+
+
+def test_import_template_fills_blank_active_sheet():
+    wb = Workbook(24, 10)
+    tab = wb.import_template("returns")
+    assert tab is wb.active
+    assert wb.active.sheet.get_raw("A1") == "RENDEMENT D'UN INVESTISSEMENT"
+
+
+def test_import_template_opens_new_sheet_if_active_not_blank():
+    wb = Workbook(24, 10)
+    wb.active.sheet.set("A1", "modèle en cours")
+    n_before = len(wb.tabs)
+    tab = wb.import_template("returns")
+    assert len(wb.tabs) == n_before + 1
+    assert tab is wb.active
+    assert tab.name == "Rendement d'un investissement"
+
+
+def test_returns_template_formulas_evaluate_correctly():
+    wb = Workbook(24, 10)
+    tab = wb.import_template("returns")
+    assert tab.sheet.get_value("B7") == pytest.approx(100.0)     # (110-100)*10
+    assert tab.sheet.get_value("B8") == pytest.approx(10.0)      # (110/100-1)*100
+
+
+def test_loan_template_pmt_formula_evaluates():
+    wb = Workbook(24, 10)
+    tab = wb.import_template("loan")
+    val = tab.sheet.get_value("B7")
+    assert isinstance(val, float) and val < 0   # mensualité = sortie de trésorerie
+
+
+def test_networth_template_uses_live_market_functions():
+    wb = Workbook(24, 10)
+    tab = wb.import_template("networth")
+    assert tab.sheet.get_raw("B3") == "=NETWORTH()"
+    assert tab.sheet.get_raw("B4") == "=CASH()"
 
 
 # --------------------------------------------- mise en forme conditionnelle

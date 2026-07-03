@@ -129,6 +129,12 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self._onboard_btn = None
         self._tuto_skip_rect = None  # bouton « Passer » du tutoriel guidé
         self._qcard_rects = {}       # boutons de la carte « Bilan du trimestre »
+        self._assistant_open = False   # carte « Assistant » (F1)
+        self._assistant_rects = {}
+        self._digest_rects = {}        # boutons de la carte « En votre absence »
+        self._checklist_rects = []     # lignes du widget « Routine du jour » (clic → coche)
+        self._risk_badge_rect = None   # pastille de risque unifiée (barre supérieure)
+        self._risk_badge_reasons = ""
         # recherche globale (Ctrl+/ — Ctrl+F est déjà pris par le rail du
         # terminal pour M&A, cf. RAIL_SHORTCUTS) : cherche dans les DONNÉES DE
         # PARTIE (positions, watchlist, inbox, mandats, deals), pas le contenu
@@ -207,8 +213,63 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         (tenu à jour en continu, cf. `_sync_layout_flag`) à leur position/
         taille/état d'origine — appelé une seule fois, à la création de
         l'instance TERMINAL persistante (cf. on_enter) : la disposition de
-        la DERNIÈRE session (nouvelle partie, reprise depuis le menu…)."""
-        self._apply_layout(self.app.gs.player.flags.get("desktop_layout"))
+        la DERNIÈRE session (nouvelle partie, reprise depuis le menu…).
+        Si AUCUNE disposition n'a jamais été enregistrée (tout premier
+        atterrissage sur le bureau de cette carrière — pas juste de cette
+        App() : la clé `flags["desktop_seeded"]` distingue « jamais vu » de
+        « vu mais tout fermé »), ouvre une disposition de départ adaptée à la
+        voie choisie plutôt qu'un bureau totalement vide — moins de clics
+        pour un joueur qui découvre le jeu."""
+        layout = self.app.gs.player.flags.get("desktop_layout")
+        if layout:
+            self._apply_layout(layout)
+        elif not self.app.gs.player.flags.get("desktop_seeded"):
+            self._seed_default_layout()
+        self.app.gs.player.flags["desktop_seeded"] = True
+
+    # Marge réservée à gauche pour la grille d'icônes du bureau (jusqu'à ~4
+    # colonnes à 94px, cf. ICON_W/ICON_GAP dans scene_desktop_common.py) — la
+    # disposition de départ ne doit JAMAIS recouvrir les icônes, sous peine de
+    # les rendre injoignables au tout premier lancement.
+    _SEED_ICON_MARGIN = 420
+
+    def _seed_default_layout(self):
+        """Ouvre 2-3 fenêtres pertinentes déjà bien rangées (Marché à gauche,
+        Portefeuille/app de la voie à droite), entièrement dans la moitié
+        DROITE du bureau pour ne jamais recouvrir la grille d'icônes — au
+        lieu d'un bureau vide, seulement au tout premier atterrissage (cf.
+        `_restore_layout`)."""
+        area = self.wm.work_area
+        free_x = area.x + self._SEED_ICON_MARGIN
+        win = pygame.Rect(free_x, area.y + 12, area.right - free_x - 12, area.h - 24)
+        if win.w < 300:
+            return   # écran trop étroit pour une disposition à 2 colonnes : rien ne s'ouvre
+        left = pygame.Rect(win.x, win.y, win.w // 2 - 6, win.h)
+        right_x = left.right + 12
+        right_w = win.right - right_x
+        track = getattr(self.app.gs.player, "track", "General")
+        info = TRACK_APP.get(track)
+        track_scene = info[0] if info else None
+        if track_scene:
+            top = pygame.Rect(right_x, win.y, right_w, win.h // 2 - 6)
+            bottom = pygame.Rect(right_x, top.bottom + 12, right_w, win.h - top.h - 12)
+            w = self._open_scene_window("markethub")
+            if w:
+                w.rect = left
+            w = self._open_scene_window("book")
+            if w:
+                w.rect = top
+            w = self._open_scene_window(track_scene)
+            if w:
+                w.rect = bottom
+        else:
+            right = pygame.Rect(right_x, win.y, right_w, win.h)
+            w = self._open_scene_window("markethub")
+            if w:
+                w.rect = left
+            w = self._open_scene_window("book")
+            if w:
+                w.rect = right
 
     def _save_pinned_layout(self):
         """« Enregistrer ma disposition » (menu contextuel) : fige un
@@ -261,6 +322,17 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
 
     # ------------------------------------------------------------- events
     def handle_event(self, event):
+        # carte Assistant ouverte : capture tout en priorité (même règle que
+        # les autres cartes modales du bureau — bilan trimestre, recherche…)
+        if self._assistant_open:
+            self._handle_assistant_event(event)
+            return
+        # F1 : ouvre l'Assistant « que faire maintenant ? » — LA suggestion la
+        # plus prioritaire (core/todo.py), en langage simple, pour le joueur
+        # qui ne sait pas par où commencer parmi les nombreuses icônes.
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_F1:
+            self._assistant_open = True
+            return
         # recherche globale ouverte : capture tout en priorité
         if self._search_open:
             self._handle_search_event(event)
@@ -357,6 +429,24 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                     return
             if card and card.collidepoint(event.pos):
                 return
+        # carte « En votre absence » (résumé condensé des notifications reçues
+        # bureau vide) : même priorité/comportement que la carte trimestre,
+        # sauf si celle-ci est déjà affichée (jamais deux cartes modales
+        # empilées — le trimestre passe d'abord).
+        elif self._absence_digest_pending() is not None \
+                and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            card = self._digest_rects.get("card")
+            ok = self._digest_rects.get("ok")
+            more = self._digest_rects.get("more")
+            if ok and ok.collidepoint(event.pos):
+                self._ack_absence_digest()
+                return
+            if more and more.collidepoint(event.pos):
+                self._ack_absence_digest()
+                self._open_scene_window("notifications")
+                return
+            if card and card.collidepoint(event.pos):
+                return
         # bouton « Passer » du tutoriel guidé (dessiné au-dessus des fenêtres)
         if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
                 and self._tuto_skip_rect and self._tuto_skip_rect.collidepoint(event.pos)):
@@ -445,6 +535,10 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         if self._ambient_rect and self._ambient_rect.collidepoint(pos):
             self._open_scene_window("book")
             return
+        # pastille de risque (barre supérieure) → ouvre le portefeuille
+        if self._risk_badge_rect and self._risk_badge_rect.collidepoint(pos):
+            self._open_scene_window("book")
+            return
         # widget « À faire » : chaque ligne ouvre la scène concernée en fenêtre
         for r, scene in self._todo_rects:
             if r.collidepoint(pos):
@@ -453,6 +547,9 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         # widget calendrier macro → ouvre l'écran Calendrier en fenêtre
         if self._calendar_rect and self._calendar_rect.collidepoint(pos):
             self._open_scene_window("calendar")
+            return
+        # widget « Routine du jour » : coche/décoche l'action cliquée
+        if self._handle_checklist_click(pos):
             return
         if self._menu_rect and self._menu_rect.collidepoint(pos):
             self.app.scenes.go("menu")
@@ -650,6 +747,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self._draw_ambient(surf)
         self._draw_todo(surf)
         self._draw_calendar_widget(surf)
+        self._draw_checklist_widget(surf)
         self.wm.draw(surf)
         self._draw_topbar(surf)
         self._draw_taskbar(surf)
@@ -661,12 +759,18 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             self._draw_quarter_card(surf)
         else:
             self._qcard_rects = {}
+            if self._absence_digest_pending() is not None:
+                self._draw_absence_digest(surf)
+            else:
+                self._digest_rects = {}
         if self.start_open:
             self._draw_launcher(surf)
         if self._ctx_menu is not None:
             self._draw_context_menu(surf)
         if self._search_open:
             self._draw_search(surf)
+        if self._assistant_open:
+            self._draw_assistant_card(surf)
         if not desktop_onboarding.seen():
             self._draw_onboarding(surf)
 
@@ -860,11 +964,14 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             # chaque action).
             sx = 300 + fonts.small(bold=True).size(line)[0] + 14
             widgets.draw_text(surf, saved_txt, (sx, 12), fonts.tiny(), config.COL_TEXT_DIM)
-        # badge difficulté/défi du jour (rappel discret — sinon oublié dès la
-        # création de partie passée, cf. core/difficulty.status_label)
+        # indicateur de risque unifié (pastille), toujours à l'extrême droite ;
+        # le badge difficulté/défi du jour se pousse à sa gauche s'il est présent
+        # (cf. core/risk_indicator.py — un seul repère plutôt que d'avoir à
+        # interpréter levier/marge/concentration séparément soi-même).
+        risk_right = self._draw_risk_badge(surf, bar)
         status = difficulty_mod.status_label(p)
         if status:
-            widgets.draw_badge(surf, status.upper(), (bar.right - 12, 8),
+            widgets.draw_badge(surf, status.upper(), (risk_right - 14, 8),
                                config.COL_PRESTIGE, align="right")
 
         # NB : les contrôles pause/vitesse/⚙ NE sont PAS redessinés ici — ils

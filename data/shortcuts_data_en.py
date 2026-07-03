@@ -91,6 +91,10 @@ SECTIONS_EN = [
             "HEDGE, ALM, TUTO, CERT…)"),
     ]),
     ("Desktop — icons as windows", [
+        ("F1", "Opens the ASSISTANT: shows the single most urgent suggestion of the "
+            "moment (core/todo.py — pending dilemma, margin under watch, mandate offer, "
+            "deal near its deadline…) in large text with a button to go straight to it, "
+            "instead of guessing which icon to open"),
         ("TAB / SHIFT+TAB / ↑↓←→", "Gives keyboard focus to a desktop icon (white outline, "
             "no window in front) — TAB cycles the grid in order, arrows move by real "
             "on-screen position ; ENTER launches the icon, ESC clears the focus"),

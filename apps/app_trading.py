@@ -19,6 +19,7 @@ from ui import fonts, widgets
 
 ROW_H = 24
 QTY_PRESETS = [1, 5, 10, 25, 100]
+AMOUNT_PRESETS = [500, 1000, 5000, 10000]
 COND_ROW_H = 20
 COND_LIST_MAX_H = 88   # zone réservée aux ordres en cours (0 si aucun)
 FEED_MAX = 5           # derniers ordres exécutés affichés en bas de fenêtre
@@ -35,6 +36,12 @@ class TradingApp(DesktopApp):
         self.market = self.app.ensure_market()
         self.search = ""
         self.qty_text = "10"
+        # "shares" (qty_text = nombre de titres) ou "amount" (qty_text = montant
+        # en devise — le nombre de titres est calculé au moment de l'ordre,
+        # cf. `_qty_for_ticker`) : évite au joueur de calculer lui-même combien
+        # d'actions représente "je veux investir 5000€".
+        self.qty_mode = "shares"
+        self._qty_mode_rects = {}
         self.msg = ""
         # fil des derniers ordres EXÉCUTÉS de la session (achat/vente), avec
         # flash de confirmation sur le plus récent — le trade doit se SENTIR.
@@ -79,6 +86,19 @@ class TradingApp(DesktopApp):
         except ValueError:
             return 0.0
 
+    def _qty_for_ticker(self, tk):
+        """Quantité RÉELLE en titres pour `tk` — convertit le montant saisi
+        en nombre de titres si `qty_mode == "amount"` (arrondi au titre
+        inférieur, comme un vrai ordre ne peut pas acheter une fraction
+        d'action), sinon renvoie directement la quantité saisie."""
+        raw = self._qty()
+        if self.qty_mode != "amount":
+            return raw
+        price = self.market.price_of(tk)
+        if not price or price <= 0:
+            return 0.0
+        return float(int(raw / price))
+
     def _rows(self):
         m = self.market
         q = self.search.strip()
@@ -95,7 +115,7 @@ class TradingApp(DesktopApp):
         if not self._can_trade():
             self.msg = "Trading débloqué au grade Associate."
             return
-        qty = self._qty()
+        qty = self._qty_for_ticker(tk)
         if qty <= 0:
             self.msg = "Quantité invalide."
             return
@@ -109,7 +129,7 @@ class TradingApp(DesktopApp):
         held = self._held(tk)
         if held <= 0:
             return
-        qty = min(self._qty(), held)
+        qty = min(self._qty_for_ticker(tk), held)
         if qty <= 0:
             self.msg = "Quantité invalide."
             return
@@ -217,11 +237,18 @@ class TradingApp(DesktopApp):
                                          self.scroll + (-48 if event.button == 4 else 48)))
                 return True
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for mode, r in self._qty_mode_rects.items():
+                if r.collidepoint(event.pos):
+                    if mode != self.qty_mode:
+                        self.qty_mode = mode
+                        self.qty_text = "10" if mode == "shares" else "1000"
+                    return True
+            step = 1.0 if self.qty_mode == "shares" else 50.0
             if self._qty_minus and self._qty_minus.collidepoint(event.pos):
-                self.qty_text = f"{max(0.0, self._qty() - 1):g}"
+                self.qty_text = f"{max(0.0, self._qty() - step):g}"
                 return True
             if self._qty_plus and self._qty_plus.collidepoint(event.pos):
-                self.qty_text = f"{self._qty() + 1:g}"
+                self.qty_text = f"{self._qty() + step:g}"
                 return True
             for val, r in self._preset_rects.items():
                 if r.collidepoint(event.pos):
@@ -331,10 +358,24 @@ class TradingApp(DesktopApp):
                                 f"levier {st['leverage']:.2f}x",
                           (rect.right - pad, rect.y + pad + 4), fonts.small(bold=True),
                           config.COL_DOWN if st["margin_call"] else config.COL_TEXT_DIM, align="right")
-        # quantité
+        # quantité — bascule "Titres" (nombre d'actions) / "€" (montant investi,
+        # le jeu calcule la quantité correspondante au moment de l'ordre) :
+        # évite au joueur de calculer lui-même "combien d'actions pour 5000€".
         qy = sr.bottom + 8
         widgets.draw_text(surf, "QUANTITÉ", (rect.x + pad, qy + 4), fonts.tiny(bold=True), config.COL_TEXT_DIM)
-        qx = rect.x + pad + 76
+        mx = rect.x + pad + 76
+        self._qty_mode_rects = {}
+        for mode, label in (("shares", "Titres"), ("amount", cur)):
+            w = fonts.tiny(bold=True).size(label)[0] + 12
+            r = pygame.Rect(mx, qy, w, 22)
+            self._qty_mode_rects[mode] = r
+            active = self.qty_mode == mode
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if active else config.COL_BG, r, border_radius=3)
+            pygame.draw.rect(surf, config.COL_AMBER if active else config.COL_BORDER, r, 1, border_radius=3)
+            widgets.draw_text(surf, label, r.center, fonts.tiny(bold=True),
+                              config.COL_AMBER if active else config.COL_TEXT_DIM, align="center")
+            mx += w + 4
+        qx = mx + 8
         self._qty_minus = pygame.Rect(qx, qy, 22, 22)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._qty_minus, border_radius=3)
         widgets.draw_text(surf, "-", self._qty_minus.center, fonts.small(bold=True), config.COL_AMBER, align="center")
@@ -347,13 +388,15 @@ class TradingApp(DesktopApp):
         widgets.draw_text(surf, "+", self._qty_plus.center, fonts.small(bold=True), config.COL_AMBER, align="center")
         px = self._qty_plus.right + 12
         self._preset_rects = {}
-        for val in QTY_PRESETS:
-            w = fonts.tiny(bold=True).size(f"x{val}")[0] + 12
+        presets = QTY_PRESETS if self.qty_mode == "shares" else AMOUNT_PRESETS
+        for val in presets:
+            plabel = f"x{val}" if self.qty_mode == "shares" else f"{val:g}"
+            w = fonts.tiny(bold=True).size(plabel)[0] + 12
             r = pygame.Rect(px, qy, w, 22)
             self._preset_rects[val] = r
             pygame.draw.rect(surf, config.COL_BG, r, border_radius=3)
             pygame.draw.rect(surf, config.COL_BORDER, r, 1, border_radius=3)
-            widgets.draw_text(surf, f"x{val}", r.center, fonts.tiny(bold=True), config.COL_TEXT_DIM, align="center")
+            widgets.draw_text(surf, plabel, r.center, fonts.tiny(bold=True), config.COL_TEXT_DIM, align="center")
             px += w + 6
 
         # liste (rétrécie si des ordres conditionnels sont en cours, pour leur

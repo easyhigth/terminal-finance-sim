@@ -14,7 +14,16 @@ requise pour ouvrir les réglages.
 """
 import pygame
 
-from core import anim_settings, audio, autosave_settings, colorblind_settings, config, display_settings
+from core import (
+    anim_settings,
+    audio,
+    autosave_settings,
+    colorblind_settings,
+    config,
+    daily_checklist,
+    display_settings,
+    experience_mode,
+)
 from core.i18n import get_lang, set_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
@@ -78,6 +87,20 @@ class SettingsScene(Scene):
                           self._seg([(("autosave", v), autosave_settings.preset_label(v, lang),
                                       cur_interval == v)
                                      for v, _label in autosave_settings.PRESETS])))
+        # MODE DÉBUTANT/EXPERT — masque les pages financières avancées non
+        # pertinentes pour la voie choisie (menu Démarrer + palette Ctrl+K)
+        cur_mode = experience_mode.get_mode()
+        self.rows.append((_L("Mode d'affichage des pages", "Page display mode"),
+                          self._seg([(("xpmode", "beginner"), _L("Débutant (simplifié)", "Beginner (simplified)"),
+                                      cur_mode == "beginner"),
+                                     (("xpmode", "expert"), _L("Expert (tout afficher)", "Expert (show all)"),
+                                      cur_mode == "expert")])))
+        # CHECKLIST DE ROUTINE QUOTIDIENNE — pense-bête désactivable une fois
+        # maîtrisée (widget « ROUTINE DU JOUR » du bureau)
+        cur_checklist = daily_checklist.is_enabled(self.app.gs.player)
+        self.rows.append((_L("Routine quotidienne", "Daily routine"),
+                          self._seg([(("checklist", True), _L("Affichée", "Shown"), cur_checklist),
+                                     (("checklist", False), _L("Masquée", "Hidden"), not cur_checklist)])))
         # VITESSE DE JEU (live ; l'horloge n'avance qu'au terminal)
         cur_speed = getattr(self.app.sim_clock, "speed", 1)
         self.rows.append((_L("Vitesse du jeu", "Game speed"),
@@ -164,6 +187,10 @@ class SettingsScene(Scene):
             self.app.sim_clock.set_speed(val)
         elif kind == "autosave":
             autosave_settings.set_interval(val)
+        elif kind == "xpmode":
+            experience_mode.set_mode(val)
+        elif kind == "checklist":
+            daily_checklist.set_enabled(self.app.gs.player, val)
         self._build()   # reconstruit libellés + états actifs
 
     def update(self, dt):

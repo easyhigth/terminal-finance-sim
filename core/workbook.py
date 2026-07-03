@@ -15,6 +15,53 @@ Logique pure (pas de pygame) : testable seule.
 """
 from core.spreadsheet_engine import Spreadsheet, col_to_idx, idx_to_col
 
+# Modèles prêts à l'emploi (bouton « Modèle ▾ » de l'app Tableur,
+# apps/app_sheet.py) : au lieu de partir d'une grille totalement vide —
+# intimidante pour qui ne sait pas par où commencer — quelques feuilles
+# pré-construites pour les analyses courantes. Purement des formules du
+# moteur existant (core/spreadsheet_engine) ; les modèles "en direct"
+# utilisent les fonctions marché externes (NETWORTH/CASH, cf.
+# apps/app_sheet.py::_market_fn), toujours valables sans dépendre d'un
+# ticker particulier (contrairement à PRICE("TICKER"), qui varie d'une
+# partie à l'autre selon le roster).
+TEMPLATES = {
+    "returns": {
+        "title": "Rendement d'un investissement",
+        "cells": [
+            ("A1", "RENDEMENT D'UN INVESTISSEMENT"),
+            ("A3", "Prix d'achat"), ("B3", "100"),
+            ("A4", "Prix actuel"), ("B4", "110"),
+            ("A5", "Quantité"), ("B5", "10"),
+            ("A7", "Gain/perte (valeur)"), ("B7", "=(B4-B3)*B5"),
+            ("A8", "Rendement (%)"), ("B8", "=(B4/B3-1)*100"),
+        ],
+    },
+    "networth": {
+        "title": "Suivi du patrimoine (en direct)",
+        "cells": [
+            ("A1", "SUIVI DU PATRIMOINE (EN DIRECT)"),
+            ("A3", "Patrimoine net"), ("B3", "=NETWORTH()"),
+            ("A4", "Trésorerie"), ("B4", "=CASH()"),
+            ("A5", "Part investie (%)"), ("B5", "=(B3-B4)/B3*100"),
+        ],
+    },
+    "loan": {
+        "title": "Mensualité d'emprunt",
+        "cells": [
+            ("A1", "MENSUALITÉ D'EMPRUNT"),
+            ("A3", "Montant emprunté"), ("B3", "100000"),
+            ("A4", "Taux annuel (%)"), ("B4", "5"),
+            ("A5", "Durée (mois)"), ("B5", "60"),
+            ("A7", "Mensualité"), ("B7", "=PMT(B4/100/12,B5,B3)"),
+        ],
+    },
+}
+
+
+def template_list():
+    """[(clé, titre), ...] pour le menu du bouton « Modèle ▾ »."""
+    return [(k, tpl["title"]) for k, tpl in TEMPLATES.items()]
+
 
 class SheetChart:
     """Un graphe inséré sur une feuille (comme un objet graphique Excel) :
@@ -135,6 +182,23 @@ class Workbook:
                 if s.get_raw(f"{idx_to_col(c)}{r}") != "":
                     return False
         return True
+
+    def import_template(self, key):
+        """Remplit la feuille ACTIVE si elle est vierge ; sinon crée une
+        NOUVELLE feuille nommée d'après le modèle — même règle que
+        `import_financial`, jamais d'écrasement silencieux. Renvoie l'onglet
+        rempli (et le rend actif), ou None si `key` est inconnue."""
+        tpl = TEMPLATES.get(key)
+        if not tpl:
+            return None
+        if self.is_blank():
+            tab = self.active
+        else:
+            tab = self.add_tab(name=tpl["title"])
+        for ref, val in tpl["cells"]:
+            tab.sheet.set(ref, val)
+        self.active_index = self.tabs.index(tab)
+        return tab
 
     def import_financial(self, data):
         """Remplit la feuille ACTIVE si elle est vierge ; sinon crée une

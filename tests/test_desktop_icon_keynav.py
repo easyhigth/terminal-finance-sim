@@ -21,6 +21,7 @@ def desktop():
     p.grade_index = 9
     p.cash = 5_000_000.0
     p.reputation = 80
+    p.flags["desktop_seeded"] = True   # pas de disposition de départ pour ces tests
     a.scenes.go("desktop")
     sc = a.scenes.current
     sc.update(0.016)

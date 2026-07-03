@@ -7,7 +7,7 @@ mixé dans `DesktopScene` aux côtés de `DesktopWidgetsMixin`.
 """
 import pygame
 
-from core import app_catalog, config, desktop_onboarding, desktop_tutorial, fuzzy
+from core import app_catalog, config, desktop_onboarding, desktop_tutorial, experience_mode, fuzzy
 from scenes.scene_desktop_common import _L, APPS, TASKBAR_H, TOPBAR_H, _scene_label
 from ui import fonts, keynav, widgets
 
@@ -328,11 +328,25 @@ class DesktopMenusMixin:
         else:
             self._open_start_menu()
 
-    def _start_filtered_sections(self):
-        if not self._start_search.strip():
-            return app_catalog.SECTIONS
+    def _start_visible_sections(self):
+        """Sections du catalogue, expurgées des pages "avancées" en mode
+        débutant (core/experience_mode.py) — non pertinentes pour la voie du
+        joueur restent masquées, JAMAIS supprimées : un passage en mode
+        expert (Réglages) les fait toutes réapparaître instantanément."""
+        p = self.app.gs.player
         out = []
         for title, items in app_catalog.SECTIONS:
+            kept = [it for it in items if not experience_mode.scene_hidden(it[1], p)]
+            if kept:
+                out.append((title, kept))
+        return out
+
+    def _start_filtered_sections(self):
+        sections = self._start_visible_sections()
+        if not self._start_search.strip():
+            return sections
+        out = []
+        for title, items in sections:
             kept = fuzzy.filter_sorted(self._start_search, items, key=lambda e: e[0])
             if kept:
                 out.append((title, kept))

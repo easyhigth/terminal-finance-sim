@@ -24,7 +24,7 @@ import pygame
 from apps.base import DesktopApp
 from core import config
 from core.spreadsheet_engine import col_to_idx, idx_to_col
-from core.workbook import ConditionalFormat, SheetChart, Workbook
+from core.workbook import ConditionalFormat, SheetChart, Workbook, template_list
 from ui import fonts, widgets
 
 N_ROWS = 24
@@ -116,6 +116,11 @@ class SheetApp(DesktopApp):
         self._fx_rect = None
         self._fx_item_rects = {}
         self._fx_panel_rect = None
+        # modèles prêts à l'emploi ("Modèle ▾", core/workbook.py::TEMPLATES)
+        self.tpl_open = False
+        self._tpl_rect = None
+        self._tpl_item_rects = {}
+        self._tpl_panel_rect = None
         self._chart_btn_rects = {}
         # graphiques : glisser une fenêtre de graphe déjà posée sur la feuille
         self._chart_rects = {}
@@ -273,6 +278,21 @@ class SheetApp(DesktopApp):
             self.edit_buf = "=" + self.edit_buf
         self.edit_buf += f"{name}("
         self.fx_open = False
+
+    def _insert_template(self, key):
+        """Remplit la feuille active (si vierge) ou en ouvre une nouvelle
+        (core/workbook.py::Workbook.import_template) — même règle « jamais
+        d'écrasement silencieux » que les exports d'états financiers/fiches
+        M&A. Annule toute édition de cellule en cours (le contenu de la
+        feuille change sous les pieds de l'utilisateur, une saisie en cours
+        n'aurait plus de sens)."""
+        self.editing = False
+        self.edit_buf = ""
+        tab = self.workbook.import_template(key)
+        self.tpl_open = False
+        if tab is not None:
+            self.sel = "A1"
+            self.msg = f"Modèle inséré : {tab.name}"
 
     # ------------------------------------------------------- annuler/rétablir
     def _record_undo(self, refs):
@@ -486,6 +506,20 @@ class SheetApp(DesktopApp):
                 self.fx_open = False
                 return True
 
+        if self.tpl_open:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                for key, r in self._tpl_item_rects.items():
+                    if r.collidepoint(event.pos):
+                        self._insert_template(key)
+                        return True
+                if not (self._tpl_panel_rect and self._tpl_panel_rect.collidepoint(event.pos)) \
+                        and not (self._tpl_rect and self._tpl_rect.collidepoint(event.pos)):
+                    self.tpl_open = False
+                return True
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                self.tpl_open = False
+                return True
+
         if self.cf_open and self._handle_cf_event(event):
             return True
 
@@ -508,6 +542,9 @@ class SheetApp(DesktopApp):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._fx_rect and self._fx_rect.collidepoint(event.pos):
                 self.fx_open = not self.fx_open
+                return True
+            if self._tpl_rect and self._tpl_rect.collidepoint(event.pos):
+                self.tpl_open = not self.tpl_open
                 return True
             if self._cf_rect and self._cf_rect.collidepoint(event.pos):
                 self.cf_open = not self.cf_open
@@ -741,6 +778,8 @@ class SheetApp(DesktopApp):
 
         if self.fx_open:
             self._draw_fx_panel(surf, rect)
+        if self.tpl_open:
+            self._draw_tpl_panel(surf, rect)
         if self.cf_open:
             self._draw_cf_panel(surf, rect)
 
@@ -783,7 +822,14 @@ class SheetApp(DesktopApp):
         pygame.draw.rect(surf, config.COL_PRESTIGE, self._fx_rect, 1, border_radius=3)
         widgets.draw_text(surf, "fx ▾", self._fx_rect.center, fonts.tiny(bold=True),
                           config.COL_PRESTIGE, align="center")
-        x = self._fx_rect.right + 10
+        x = self._fx_rect.right + 6
+        self._tpl_rect = pygame.Rect(x, bar.y + 2, 76, TOOLBAR_H - 4)
+        hov = self._tpl_rect.collidepoint(mp) or self.tpl_open
+        pygame.draw.rect(surf, config.COL_PANEL if hov else config.COL_BG, self._tpl_rect, border_radius=3)
+        pygame.draw.rect(surf, config.COL_AMBER, self._tpl_rect, 1, border_radius=3)
+        widgets.draw_text(surf, "Modèle ▾", self._tpl_rect.center, fonts.tiny(bold=True),
+                          config.COL_AMBER, align="center")
+        x = self._tpl_rect.right + 10
         pygame.draw.line(surf, config.COL_BORDER, (x - 5, bar.y + 3), (x - 5, bar.bottom - 3), 1)
         self._chart_btn_rects = {}
         for kind, label in CHART_TYPES:
@@ -841,6 +887,30 @@ class SheetApp(DesktopApp):
                 y += 16
             y += 6
         surf.set_clip(prev_clip)
+
+    def _draw_tpl_panel(self, surf, rect):
+        """Panneau « Modèle ▾ » : quelques feuilles prêtes à l'emploi
+        (core/workbook.py::TEMPLATES) — un clic remplit la feuille active
+        (si vierge) ou en ouvre une nouvelle, même règle que les exports
+        d'états financiers/fiches M&A (jamais d'écrasement silencieux)."""
+        items = template_list()
+        H = 12 + 20 * len(items) + 6
+        panel = pygame.Rect(self._tpl_rect.x, self._tpl_rect.bottom + 2, 240, H)
+        panel.right = min(panel.right, rect.right - 4)
+        panel.bottom = min(panel.bottom, rect.bottom - 4)
+        pygame.draw.rect(surf, config.COL_PANEL, panel)
+        pygame.draw.rect(surf, config.COL_AMBER, panel, 2)
+        self._tpl_panel_rect = panel
+        self._tpl_item_rects = {}
+        mp = pygame.mouse.get_pos()
+        y = panel.y + 6
+        for key, title in items:
+            r = pygame.Rect(panel.x + 4, y, panel.w - 8, 18)
+            self._tpl_item_rects[key] = r
+            if r.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, r)
+            widgets.draw_text(surf, title, (r.x + 4, r.y + 1), fonts.tiny(bold=True), config.COL_AMBER)
+            y += 20
 
     def _draw_cf_panel(self, surf, rect):
         """Panneau « mise en forme conditionnelle » : définit une règle

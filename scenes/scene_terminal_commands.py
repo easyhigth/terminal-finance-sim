@@ -35,6 +35,7 @@ CMD_NAMES = [
     "GP", "GPC", "GPO", "GPCH", "COMP", "HS", "HVOL", "BETA", "CORR",
     "GEG", "GC", "RV", "ECO", "DEFINE", "PA", "ATTR",
     "TRADES", "NOTE", "IDEAS", "CRITERIA", "JSTATS", "ACHIEVEMENTS", "SUCCES", "BADGES",
+    "STATS",
 ]
 
 
@@ -319,6 +320,8 @@ class TerminalCommandsMixin:
             self.app.scenes.go("career", return_to="terminal")
         elif cmd in ("ACHIEVEMENTS", "SUCCES", "SUCCESS", "BADGES"):
             self.app.scenes.go("achievements", return_to="terminal")
+        elif cmd == "STATS":
+            self.app.scenes.go("stats", return_to="terminal")
         elif cmd in ("INBOX", "MAIL", "MESSAGES"):
             self.app.scenes.go("inbox", return_to="terminal")
         elif cmd in ("DECIDE", "DECISION", "DILEMMA"):

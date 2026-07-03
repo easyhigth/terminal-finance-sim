@@ -87,6 +87,7 @@ from scenes.scene_settings import SettingsScene
 from scenes.scene_sheet_redirect import SheetRedirectScene
 from scenes.scene_shop import ShopScene
 from scenes.scene_splash import SplashScene
+from scenes.scene_stats import StatsScene
 from scenes.scene_stresstest import StressTestScene
 from scenes.scene_structured import StructuredScene
 from scenes.scene_swaps import SwapsScene
@@ -173,6 +174,7 @@ def build_scene_manager(app):
     m.register("history", HistoryScene(app))
     m.register("team", TeamScene(app))
     m.register("achievements", AchievementsScene(app))
+    m.register("stats", StatsScene(app))
     return m
 
 

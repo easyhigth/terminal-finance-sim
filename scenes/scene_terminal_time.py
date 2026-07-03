@@ -91,7 +91,8 @@ class TerminalTimeMixin:
             inbox_mod.on_deal_sniped(p, d, rival)
             career_mod.log(p, "deal", f"{rival} rafle « {d['title']} »")
             self.app.notify(_L(f"Deal perdu : {d['title']} — raflé par {rival}",
-                                f"Deal lost: {d['title']} — snatched by {rival}"), "bad")
+                                f"Deal lost: {d['title']} — snatched by {rival}"), "bad",
+                            action="deals")
         # rivaux ACTIFS : percées, snipe de deals en retard, débauchage de mandats
         for ev in rivals_mod.act(p, m, random):
             self.recent_events.insert(0, {"title": ev["text"][:70], "kind": ev["kind"]})
@@ -231,7 +232,8 @@ class TerminalTimeMixin:
                 f"(liquidation {widgets.format_money(mc['liquidated'], cur)})",
                 f"Margin call: leverage {mc['leverage_before']:.2f}x → {mc['leverage_after']:.2f}x "
                 f"(liquidated {widgets.format_money(mc['liquidated'], cur)})"))
-            self.app.notify(_L("Appel de marge : liquidation forcée","Margin call: forced liquidation"), "bad")
+            self.app.notify(_L("Appel de marge : liquidation forcée","Margin call: forced liquidation"), "bad",
+                            action="book")
         elif p.portfolio:
             # alerte préventive : on prévient AVANT que la marge ne déclenche une
             # liquidation forcée (mc ci-dessus), pas seulement après coup.
@@ -389,13 +391,15 @@ class TerminalTimeMixin:
                           f"  ★★ TRANSFORMATIVE MANDATE: {offer['client']}{profile_txt} — "
                           f"{widgets.format_money(offer['capital'], cur)} (type MANDATES to view)."))
                 self.app.notify(_L(f"Mandat transformant : {offer['client']}",
-                                   f"Transformative mandate: {offer['client']}"), "prestige")
+                                   f"Transformative mandate: {offer['client']}"), "prestige",
+                                action="mandates")
             else:
                 self._log(_L(f"  ✶ OFFRE DE MANDAT : {offer['client']}{profile_txt} — {widgets.format_money(offer['capital'], cur)} "
                           f"(MANDATES pour voir).",
                           f"  ✶ MANDATE OFFER: {offer['client']}{profile_txt} — {widgets.format_money(offer['capital'], cur)} "
                           f"(type MANDATES to view)."))
-                self.app.notify(_L(f"Offre de mandat : {offer['client']}", f"Mandate offer: {offer['client']}"), "info")
+                self.app.notify(_L(f"Offre de mandat : {offer['client']}", f"Mandate offer: {offer['client']}"), "info",
+                                action="mandates")
             inbox_mod.push(p, "client", offer["client"], "Proposition de mandat",
                            f"Nous souhaitons vous confier {widgets.format_money(offer['capital'], cur)} : "
                            f"objectif +{offer['target_pct']:.0f}% en {offer['horizon']} trimestres, "
@@ -409,7 +413,8 @@ class TerminalTimeMixin:
                       f"  ✶ NEW IPO: {ipo_offer['company_name']} ({ipo_offer['ticker']}) — "
                       f"{widgets.format_money(ipo_offer['price_min'], cur)}-"
                       f"{widgets.format_money(ipo_offer['price_max'], cur)} (type IPO to view)."))
-            self.app.notify(_L(f"Nouvelle IPO : {ipo_offer['ticker']}", f"New IPO: {ipo_offer['ticker']}"), "info")
+            self.app.notify(_L(f"Nouvelle IPO : {ipo_offer['ticker']}", f"New IPO: {ipo_offer['ticker']}"), "info",
+                            action="ipo")
         # nouvel évènement macro éventuel
         macro_event = macrocal_mod.maybe_schedule(p, random, m)
         if macro_event:
@@ -417,18 +422,21 @@ class TerminalTimeMixin:
                       f"{macro_event['resolve_step'] - m.step_count} pas (AGENDA pour voir).",
                       f"  ✶ MACRO CALENDAR: {macro_event['event_type']} in "
                       f"{macro_event['resolve_step'] - m.step_count} steps (type AGENDA to view)."))
-            self.app.notify(_L(f"Agenda macro : {macro_event['event_type']}", f"Macro calendar: {macro_event['event_type']}"), "info")
+            self.app.notify(_L(f"Agenda macro : {macro_event['event_type']}", f"Macro calendar: {macro_event['event_type']}"), "info",
+                            action="calendar")
         # revue de performance éventuelle (déclenchée par advance_step)
         if summary.get("review_offer"):
             self._log(_L("  ★ REVUE DE PERFORMANCE : votre manager souhaite vous voir (tapez REVIEW).",
                       "  ★ PERFORMANCE REVIEW: your manager wants to see you (type REVIEW)."))
-            self.app.notify(_L("Revue de performance annuelle","Annual performance review"), "info")
+            self.app.notify(_L("Revue de performance annuelle","Annual performance review"), "info",
+                            action="review")
         # stress test réglementaire éventuel (semestriel)
         stress_test = stresstest_mod.maybe_trigger(p, summary.get("quarter_changed"), m)
         if stress_test:
             self._log(_L("  ★ STRESS TEST RÉGLEMENTAIRE : le superviseur vous convoque (tapez STRESS).",
                       "  ★ REGULATORY STRESS TEST: the supervisor wants to see you (type STRESS)."))
-            self.app.notify(_L("Stress test réglementaire","Regulatory stress test"), "info")
+            self.app.notify(_L("Stress test réglementaire","Regulatory stress test"), "info",
+                            action="stresstest")
         # alertes de prix
         self._check_alerts()
         for d in summary["new_deals"]:
@@ -441,7 +449,8 @@ class TerminalTimeMixin:
             self._log(f"  @ {arc_msg['sender']} — {arc_msg['subject']} (INBOX).")
             self.app.notify(_L(f"Message : {arc_msg['sender']}",
                                f"Message: {arc_msg['sender']}"),
-                            "prestige" if arc_msg["finale"] else "info")
+                            "prestige" if arc_msg["finale"] else "info",
+                            action="inbox")
         # scrutin réglementaire : décroissance + risque d'enquête
         inv = dilemmas_mod.maybe_investigate(p, random)
         if inv:
@@ -460,7 +469,8 @@ class TerminalTimeMixin:
         if dil:
             audio.play("dilemma")
             self._log(_L(f"  § DÉCISION REQUISE : {dil['title']} — tapez DECIDE.", f"  § DECISION REQUIRED: {dil['title']} — type DECIDE."))
-            self.app.notify(_L(f"Décision requise : {dil['title']}", f"Decision required: {dil['title']}"), "warn")
+            self.app.notify(_L(f"Décision requise : {dil['title']}", f"Decision required: {dil['title']}"), "warn",
+                            action="dilemma")
         # bilan de trimestre / quarter en toast
         if summary.get("quarter_changed") and summary.get("quarter_report") \
                 and summary["quarter_report"]["total"]:

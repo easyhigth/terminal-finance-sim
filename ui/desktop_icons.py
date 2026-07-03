@@ -208,6 +208,15 @@ def _calc(surf, cx, cy, col):
             pygame.draw.rect(surf, col, (gx, gy, 3, 3))
 
 
+def _bell(surf, cx, cy, col):
+    """Cloche (centre de notifications) — distincte de `_alert` (triangle
+    d'alerte de prix) : une vraie forme de cloche, corps + battant + anse."""
+    pygame.draw.arc(surf, col, (cx - 10, cy - 12, 20, 22), 0.15, 2.99, 2)
+    pygame.draw.line(surf, col, (cx - 10, cy + 5), (cx + 10, cy + 5), 2)
+    pygame.draw.circle(surf, col, (cx, cy + 11), 2)
+    pygame.draw.circle(surf, col, (cx, cy - 13), 2, 1)
+
+
 _ICONS = {
     "research": _research, "trading": _trading, "sheet": _sheet,
     "terminal": _terminal, "ma": _ma, "risk": _risk, "quant": _quant,
@@ -216,7 +225,7 @@ _ICONS = {
     "inbox": _inbox, "news": _news, "mission": _mission, "deals": _deals,
     "decide": _decide, "examcert": _examcert, "wall": _wall, "shop": _shop,
     "explorer": _explorer, "graph": _graph, "save": _save, "help": _help,
-    "calc": _calc, "star": _star,
+    "calc": _calc, "star": _star, "bell": _bell,
 }
 
 

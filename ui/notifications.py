@@ -31,12 +31,20 @@ GAP = 8
 class NotificationCenter:
     def __init__(self):
         self.toasts = []      # actifs : {text, kind, age}
-        self.history = []     # derniers messages (pour un éventuel panneau)
+        self.history = []     # derniers messages, pour le centre de
+        #                        notifications (apps/app_notifications.py)
 
-    def push(self, text, kind="info"):
+    def push(self, text, kind="info", action=None, action_kwargs=None, day=None):
+        """`action` : nom de scène optionnel (cf. `App.route_scene`) ouvert en
+        cliquant la ligne d'historique correspondante dans le centre de
+        notifications — retrouver le contexte d'un évènement passé sans
+        rejouer la partie pour le voir. `day` : jour de jeu au moment de la
+        notification (affiché dans le panneau), passé par l'appelant car ce
+        module ne connaît pas `player`."""
         self.toasts.append({"text": text, "kind": kind, "age": 0.0})
-        self.history.append({"text": text, "kind": kind})
-        if len(self.history) > 40:
+        self.history.append({"text": text, "kind": kind, "action": action,
+                             "action_kwargs": action_kwargs or {}, "day": day})
+        if len(self.history) > 60:
             self.history.pop(0)
         # limite le nombre de toasts simultanés
         if len(self.toasts) > 5:

@@ -117,14 +117,13 @@ class DesktopMenusMixin:
     # ------------------------------------------------- menus contextuels (clic droit)
     def _snap_window(self, w, side):
         """Ancre une fenêtre sur une moitié de la zone de travail (comme le
-        glisser-vers-le-bord), en gardant `_restore_rect` pour revenir."""
+        glisser-vers-le-bord, même feedback son/visuel via `WindowManager.dock`)."""
         wa = self.wm.work_area
-        if w._restore_rect is None:
-            w._restore_rect = w.rect.copy()
         if side == "left":
-            w.rect = pygame.Rect(wa.x, wa.y, wa.w // 2, wa.h)
+            rect = pygame.Rect(wa.x, wa.y, wa.w // 2, wa.h)
         else:
-            w.rect = pygame.Rect(wa.x + wa.w // 2, wa.y, wa.w - wa.w // 2, wa.h)
+            rect = pygame.Rect(wa.x + wa.w // 2, wa.y, wa.w - wa.w // 2, wa.h)
+        self.wm.dock(w, rect)
 
     def _close_all_windows(self):
         """Ferme toutes les fenêtres SAUF le terminal (moteur de la partie) —

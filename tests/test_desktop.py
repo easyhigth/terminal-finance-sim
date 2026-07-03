@@ -1267,6 +1267,50 @@ def test_unpinned_windows_unaffected_when_none_pinned(app):
     assert wm._z_order() == wm.windows
 
 
+# ==================================== feedback son/visuel de docking ==========
+def test_maximize_toggle_sets_dock_flash(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("trading")
+    wm = desk.wm
+    assert w._dock_flash_until == 0
+    wm.maximize_toggle(w)
+    assert w._dock_flash_until > pygame.time.get_ticks()
+
+
+def test_snap_drag_to_edge_sets_dock_flash(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("research")
+    wm = desk.wm
+    tr = w.title_rect
+    wm.handle_event(_down(tr.centerx, tr.centery))
+    wm.handle_event(_motion(2, wm.work_area.centery))
+    wm.handle_event(_up(2, wm.work_area.centery))
+    assert w._dock_flash_until > pygame.time.get_ticks()
+
+
+def test_context_menu_snap_sets_dock_flash(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("sheet")
+    desk._snap_window(w, "left")
+    assert w._dock_flash_until > pygame.time.get_ticks()
+
+
+def test_dock_flash_fades_and_stops_drawing(app):
+    """Le liseré de docking s'éteint tout seul après DOCK_FLASH_MS (horloge
+    murale, pas de dépendance à dt) — vérifié via un dessin après expiration."""
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("trading")
+    wm = desk.wm
+    wm.maximize_toggle(w)
+    w._dock_flash_until = pygame.time.get_ticks() - 1   # déjà expiré
+    surf = pygame.Surface((w.rect.right + 10, w.rect.bottom + 10))
+    w.draw(surf, focused=True)   # ne doit pas lever d'exception une fois expiré
+
+
 # ============================== réactivité des graphes + flash vert/rouge ======
 def test_watchlist_uses_animated_live_price(app):
     """La Watchlist affiche le prix ANIMÉ (core/intraday.py), pas juste la

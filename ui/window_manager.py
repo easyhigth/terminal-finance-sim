@@ -16,13 +16,14 @@ surface, pour rester compatible avec les widgets existants (`ui/widgets.py`).
 """
 import pygame
 
-from core import config
+from core import audio, config
 from ui import desktop_icons, fonts, widgets
 
 TITLE_H = 26          # hauteur de la barre de titre
 BORDER = 2            # épaisseur du liseré de fenêtre
 RESIZE_GRIP = 14      # taille de la poignée de redimensionnement (coin bas-droit)
 BTN_W = TITLE_H       # boutons carrés dans la barre de titre
+DOCK_FLASH_MS = 240   # durée du liseré cyan pulsé après un ancrage/agrandissement
 
 
 class Window:
@@ -39,6 +40,7 @@ class Window:
         self.attention = False    # réclame l'attention (clignote dans la barre des tâches)
         self.pinned = False       # « toujours au premier plan » (menu contextuel de la
                                   # barre de titre) — cf. WindowManager._z_order
+        self._dock_flash_until = 0   # horloge murale : liseré pulsé après ancrage/agrandissement
 
     # --- sous-rectangles du chrome (recalculés à la volée depuis self.rect) ---
     @property
@@ -74,6 +76,14 @@ class Window:
         # corps
         pygame.draw.rect(surf, config.COL_BG, self.rect)
         pygame.draw.rect(surf, accent, self.rect, BORDER)
+        # liseré cyan pulsé bref juste après un ancrage/agrandissement (feedback
+        # visuel de docking, s'estompe tout seul via l'horloge murale)
+        remaining = self._dock_flash_until - pygame.time.get_ticks()
+        if remaining > 0:
+            alpha = max(0, min(255, int(255 * remaining / DOCK_FLASH_MS)))
+            flash = pygame.Surface((self.rect.w, self.rect.h), pygame.SRCALPHA)
+            pygame.draw.rect(flash, (*config.COL_CYAN, alpha), flash.get_rect(), BORDER + 2)
+            surf.blit(flash, self.rect.topleft)
         # barre de titre
         tr = self.title_rect
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if focused else config.COL_PANEL, tr)
@@ -232,9 +242,7 @@ class WindowManager:
                 drag._resizing = False
                 # relâché sur une zone d'ancrage -> on y colle la fenêtre
                 if was_moving and self._snap_preview is not None:
-                    if drag._restore_rect is None:
-                        drag._restore_rect = drag.rect.copy()
-                    drag.rect = self._snap_preview.copy()
+                    self.dock(drag, self._snap_preview)
                 self._snap_preview = None
                 return True
             # Aucune fenêtre du BUREAU n'est en train d'être glissée, mais
@@ -344,6 +352,22 @@ class WindowManager:
         else:
             w._restore_rect = w.rect.copy()
             w.rect = self.work_area.copy()
+        self._dock_feedback(w)
+
+    def dock(self, w, rect):
+        """Ancre `w` sur `rect` (moitié d'écran, plein écran…), en gardant
+        `_restore_rect` pour revenir en arrière — utilisé aussi bien par le
+        glisser-vers-le-bord (`handle_event`) que par le menu contextuel
+        (`scene_desktop_menus._snap_window`), pour un seul point de vérité sur
+        le feedback (son + liseré pulsé)."""
+        if w._restore_rect is None:
+            w._restore_rect = w.rect.copy()
+        w.rect = rect.copy()
+        self._dock_feedback(w)
+
+    def _dock_feedback(self, w):
+        audio.play("snap")
+        w._dock_flash_until = pygame.time.get_ticks() + DOCK_FLASH_MS
 
     # --------------------------------------------------------------- cycle
     def update(self, dt):

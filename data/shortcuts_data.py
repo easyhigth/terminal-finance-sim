@@ -120,9 +120,12 @@ SECTIONS = [
         ("CTRL+MAJ+D", "Afficher le bureau (façon Windows+D) : réduit toutes les "
             "fenêtres ouvertes ; un 2ᵉ appui restaure exactement celles qui l'étaient"),
         ("CTRL+MAJ+Z", "Rouvre la dernière fenêtre fermée, avec son contexte d'origine "
-            "(ticker, filtres…) — pas le terminal, toujours accessible par sa propre icône"),
-        ("Clic droit", "Ouvre un menu contextuel selon la cible : icône, barre de "
-            "titre d'une fenêtre, entrée de la barre des tâches, ou fond du bureau"),
+            "(ticker, filtres…) — pas le terminal, toujours accessible par sa propre icône. "
+            "Répéter remonte dans l'historique (jusqu'à 8 niveaux)"),
+        ("Clic droit (fond du bureau)", "Ouvre un menu contextuel selon la cible : icône, "
+            "barre de titre d'une fenêtre, entrée de la barre des tâches, ou fond du bureau — "
+            "sur le fond, liste aussi les 5 dernières fenêtres fermées, chacune rouvrable "
+            "individuellement (pas seulement la plus récente)"),
         ("Clic droit → Épingler", "Sur une barre de titre/entrée de barre des tâches : "
             "garde cette fenêtre TOUJOURS au premier plan (petite épingle dans sa barre "
             "de titre), même quand une autre fenêtre est focalisée — utile pour garder "

@@ -8,13 +8,19 @@ mixé dans `DesktopScene` aux côtés de `DesktopWidgetsMixin`.
 import pygame
 
 from core import app_catalog, config, desktop_onboarding, desktop_tutorial, fuzzy
-from scenes.scene_desktop_common import _L, TASKBAR_H, TOPBAR_H
+from scenes.scene_desktop_common import _L, APPS, TASKBAR_H, TOPBAR_H, _scene_label
 from ui import fonts, keynav, widgets
 
 START_COLS = 4
 START_BTN_W = 280
 START_BTN_H = 40
 START_BTN_GAP = 12
+
+_APP_LABEL = {key: label for key, label, _kind, _cls in APPS}
+
+
+def _app_label(key):
+    return _APP_LABEL.get(key, key.capitalize())
 
 
 class DesktopMenusMixin:
@@ -192,8 +198,24 @@ class DesktopMenusMixin:
              lambda: self._launch_and_snap(key, "right")),
         ]
 
+    def _closed_window_label(self, entry):
+        kind, key, _kwargs = entry
+        return _scene_label(key) if kind == "scene" else _app_label(key)
+
+    def _reopen_closed_entry(self, entry):
+        """Rouvre PRÉCISÉMENT `entry` (pas forcément le plus récent — choisi
+        dans la liste du menu contextuel) et le retire de la pile, où qu'il
+        s'y trouve."""
+        if entry in self._closed_stack:
+            self._closed_stack.remove(entry)
+        kind, key, kwargs = entry
+        if kind == "scene":
+            self._open_scene_window(key, **kwargs)
+        else:
+            self._launch(key)
+
     def _desktop_menu_items(self):
-        return [
+        items = [
             (_L("Menu Applications", "Applications menu"), self._open_start_menu),
             (_L("Réglages", "Settings"), lambda: self.app.scenes.go("settings", return_to="desktop")),
             (_L("Fermer toutes les fenêtres", "Close all windows"), self._close_all_windows),
@@ -202,6 +224,15 @@ class DesktopMenusMixin:
             (_L("Tutoriels (leçons guidées)", "Tutorials (guided lessons)"),
              lambda: self._open_scene_window("tutorials")),
         ]
+        # dernières fenêtres fermées (pile, la plus récente d'abord) : chaque
+        # entrée rouvre PRÉCISÉMENT celle-là avec son contexte d'origine —
+        # complète CTRL+MAJ+Z (qui ne rouvre que la toute dernière) pour
+        # remonter plus loin dans l'historique sans raccourci dédié par rang.
+        for entry in reversed(self._closed_stack[-5:]):
+            label = self._closed_window_label(entry)
+            items.append((_L(f"Rouvrir : {label}", f"Reopen: {label}"),
+                          lambda e=entry: self._reopen_closed_entry(e)))
+        return items
 
     def _launch_and_snap(self, key, side):
         w = self._launch(key)

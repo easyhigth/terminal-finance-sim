@@ -65,6 +65,7 @@ from ui import desktop_icons, fonts, keynav, widgets
 from ui.window_manager import WindowManager
 
 _ICON_DRAG_THRESHOLD = 6   # px : sous ce seuil un glisser d'icône reste un simple clic
+_CLOSED_STACK_MAX = 8      # profondeur de l'historique « fenêtres fermées » (CTRL+MAJ+Z)
 
 
 class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
@@ -77,8 +78,12 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self.wm.work_area = pygame.Rect(0, TOPBAR_H, config.SCREEN_WIDTH,
                                         config.SCREEN_HEIGHT - TOPBAR_H - TASKBAR_H)
         self.wm.on_close = self._record_closed_window
-        if not hasattr(self, "_last_closed"):
-            self._last_closed = None    # (kind, key, kwargs) — CTRL+MAJ+T pour rouvrir
+        if not hasattr(self, "_closed_stack"):
+            # pile des dernières fenêtres fermées, la plus récente EN FIN de
+            # liste — [(kind, key, kwargs), ...]. CTRL+MAJ+Z rouvre la
+            # dernière (pop) ; le menu contextuel du fond du bureau liste les
+            # 5 dernières pour remonter plus loin dans l'historique.
+            self._closed_stack = []
         self.start_open = False
         self._icon_rects = {}       # clé -> (Rect, icon_kind, label) — icônes du bureau
         self._icon_focus = None     # clé de l'icône ayant le focus clavier (ou None)
@@ -199,9 +204,10 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         # réservé par MORE_SHORTCUTS (scenes/scene_terminal.py) quand le
         # terminal a le focus. La fenêtre la plus récemment fermée (chrome
         # ✕, menu contextuel, ou « Fermer toutes les fenêtres ») se rouvre
-        # avec son contexte d'origine (ticker, kwargs…). N'empile pas
-        # d'historique multi-niveaux — un seul « dernier fermé », remplacé à
-        # chaque fermeture (cf. _record_closed_window).
+        # avec son contexte d'origine (ticker, kwargs…) — dépile la pile
+        # `_closed_stack` (jusqu'à 8 niveaux) ; remonter plus loin dans
+        # l'historique se fait depuis le menu contextuel du fond du bureau
+        # (liste des 5 dernières, cf. `_desktop_menu_items`).
         if (event.type == pygame.KEYDOWN and event.key == pygame.K_z
                 and (event.mod & pygame.KMOD_CTRL) and (event.mod & pygame.KMOD_SHIFT)):
             self._reopen_last_closed()
@@ -355,24 +361,27 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             self._show_desktop_restore = []
 
     def _record_closed_window(self, w):
-        """Callback de WindowManager.on_close : mémorise de quoi rouvrir la
-        fenêtre qui vient de se fermer (CTRL+MAJ+Z). Le terminal n'est jamais
-        mémorisé : instance persistante (le moteur tourne même fermée), se
-        rouvre toujours par sa propre icône, pas par « rouvrir »."""
+        """Callback de WindowManager.on_close : empile de quoi rouvrir la
+        fenêtre qui vient de se fermer (CTRL+MAJ+Z / menu contextuel). Le
+        terminal n'est jamais mémorisé : instance persistante (le moteur
+        tourne même fermée), se rouvre toujours par sa propre icône, pas par
+        « rouvrir »."""
         if w.key == "scene:terminal":
             return
         if w.key.startswith("scene:"):
             name = w.key[len("scene:"):]
             kwargs = dict(getattr(w.app_obj, "_kwargs", None) or {})
-            self._last_closed = ("scene", name, kwargs)
+            entry = ("scene", name, kwargs)
         else:
-            self._last_closed = ("app", w.key, {})
+            entry = ("app", w.key, {})
+        self._closed_stack.append(entry)
+        if len(self._closed_stack) > _CLOSED_STACK_MAX:
+            self._closed_stack.pop(0)
 
     def _reopen_last_closed(self):
-        if self._last_closed is None:
+        if not self._closed_stack:
             return
-        kind, key, kwargs = self._last_closed
-        self._last_closed = None
+        kind, key, kwargs = self._closed_stack.pop()
         if kind == "scene":
             self._open_scene_window(key, **kwargs)
         else:

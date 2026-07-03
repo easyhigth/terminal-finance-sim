@@ -30,6 +30,10 @@ SECTIONS_EN = [
         ("ESC", "Clear the current search, otherwise return to the previous screen"),
     ]),
     ("Per-screen exceptions", [
+        ("Explorer / Shop — CTRL+F", "Browser-style: gives keyboard focus back to the "
+            "search field (handy from the quantity field in Shop) and scrolls back to "
+            "the top of the filtered list — search itself is already typable without "
+            "any prior action, like most screens"),
         ("Shop — TAB", "Toggles the input focus between search and quantity"),
         ("Team — TAB", "Toggles the focus between the recruitment catalogue and the "
                         "current team ; ENTER hires or fires depending on the active pane"),

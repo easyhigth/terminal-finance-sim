@@ -317,6 +317,13 @@ class ShopScene(Scene, PopupMixin):
         if self.popups_handle_event(event):
             return
         if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_f and (event.mod & pygame.KMOD_CTRL):
+                # CTRL+F façon navigateur : (re)donne le focus de saisie au
+                # champ de recherche (utile si on tapait dans QUANTITÉ) et
+                # remonte en haut de la liste filtrée.
+                self.text_focus = "search"
+                self.scroll = 0
+                return
             if event.key == pygame.K_ESCAPE:
                 if self.popups_close_top():
                     return

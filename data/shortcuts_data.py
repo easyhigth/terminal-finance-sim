@@ -39,6 +39,10 @@ SECTIONS = [
         ("ÉCHAP", "Vider la recherche en cours, sinon revenir à l'écran précédent"),
     ]),
     ("Exceptions par écran", [
+        ("Explorateur / Boutique — CTRL+F", "Façon navigateur : redonne le focus à la "
+            "recherche (utile depuis le champ quantité en Boutique) et remonte en haut "
+            "de la liste filtrée — la recherche elle-même est déjà tapable sans action "
+            "préalable, comme la plupart des écrans"),
         ("Boutique (SHOP) — TAB", "Bascule le focus de saisie entre recherche et quantité"),
         ("Équipe — TAB", "Bascule le focus entre le catalogue de recrutement et l'équipe "
                           "actuelle ; ENTRÉE recrute ou licencie selon le volet actif"),

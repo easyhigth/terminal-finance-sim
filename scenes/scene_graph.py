@@ -344,21 +344,33 @@ class GraphScene(GraphRenderMixin, Scene, PopupMixin):
             n = None
         else:
             n = self.period
+        pps = intraday.points_per_segment_for_n_steps(n)
         if kind == "bond":
-            return BND.price_history(self.market, tk, n)
+            hist = BND.price_history(self.market, tk, n)
+            return intraday.densify_step_series(self.market, tk, hist, pps)
         if kind == "commodity":
-            return CMD.history(self.market, tk, n)
+            hist = CMD.history(self.market, tk, n)
+            return intraday.densify_step_series(self.market, tk, hist, pps)
         if kind == "crypto":
-            return CRY.history(self.market, tk, n)
+            hist = CRY.history(self.market, tk, n)
+            return intraday.densify_step_series(self.market, tk, hist, pps)
         if kind == "etf":
-            return ETF.nav_history(self.market, tk, n)
-        # action, période « par pas » (1M/3M/1A/…) : on ajoute un point « en
+            hist = ETF.nav_history(self.market, tk, n)
+            return intraday.densify_step_series(self.market, tk, hist, pps)
+        # action, période « par pas » (1M/3M/1A/…) : la courbe entre deux
+        # clôtures réelles est "densifiée" par du bruit épinglé (pont
+        # brownien déterministe, jamais une droite nue), plus dense pour les
+        # fenêtres courtes/zoomées que pour les longues (cf.
+        # `points_per_segment_for_n_steps`) — puis on ajoute un point « en
         # direct » animé en bout de courbe pour qu'elle respire entre deux pas
         # (sinon le graphe ne bougeait qu'au changement de pas).
         hist = self.market.history_of(tk, n)
+        region = self._region_of(tk)
+        dense = intraday.densify_step_series(self.market, tk, hist, pps,
+                                             region=region, vol_mult=vol_mult)
         return intraday.append_live(self.market, self.app.sim_clock,
-                                    self.app.gs.player.day, tk, hist,
-                                    region=self._region_of(tk), vol_mult=vol_mult,
+                                    self.app.gs.player.day, tk, dense,
+                                    region=region, vol_mult=vol_mult,
                                     target=self.market.next_price_of(tk))
 
     # -------------------------------------------------------------- draw

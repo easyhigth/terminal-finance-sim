@@ -10,7 +10,8 @@ jamais sérialisée — qui anime le prix entre la clôture précédente et la
 clôture courante avec un bruit déterministe multi-octaves, épinglé à zéro
 aux deux bornes du pas (le point affiché vaut exactement `prev_close` au
 début du pas et `cur_close` à la fin). Ça permet aux graphes de bouger
-visiblement (mini-variations ~0.05-0.1%) même à l'échelle « 5 minutes »,
+visiblement (variations de l'ordre du ‰ à quelques % selon la volatilité de
+l'actif, cf. `_NOISE_PCT`/`_VOL_MULT_RANGE`) même à l'échelle « 5 minutes »,
 sans jamais affecter le prix d'exécution des ordres : BUY/SELL/SHORT/COVER
 continuent d'utiliser `market.price`/`market.index_value`, inchangés.
 
@@ -23,20 +24,28 @@ MINUTES_PER_DAY = 24 * 60
 
 # Résolutions des octaves de bruit (minutes), du plus grossier au plus fin —
 # la plus fine (5 min) garantit de la texture même sur la fenêtre la plus
-# zoomée (« 5 dernières minutes »).
+# zoomée (« 5 dernières minutes »). Poids de l'octave fine relevé (0.2 → 0.3)
+# pour un tracé plus dense/dentelé, façon appli de trading grand public
+# (retour joueur : les graphes "de vraie appli" zigzaguent beaucoup plus que
+# notre courbe lissée précédente, cf. captures eToro fournies).
 _RESOLUTIONS = (720, 60, 5)
-_AMPLITUDES = (1.0, 0.45, 0.2)
-# Amplitude relative max du bruit affiché (~0.22%) : purement visuel (n'affecte
+_AMPLITUDES = (1.0, 0.5, 0.3)
+# Amplitude relative max du bruit affiché (~0.45%) : purement visuel (n'affecte
 # jamais market.price/index_value, donc jamais le prix d'exécution des ordres)
-# — poussé au-delà de la "vraie vie" (0.09% à l'origine) pour que le marché
-# semble vivant à l'écran même entre deux pas du moteur, sur retour joueur.
-_NOISE_PCT = 0.0022
+# — poussé une 2e fois au-delà de la valeur précédente (0.22%, elle-même déjà
+# au-delà de la "vraie vie" à 0.09% à l'origine) : à 0.22%, l'intraday restait
+# visuellement trop plat comparé à une vraie appli de trading (retour joueur,
+# captures eToro à l'appui) — viser une variation intrajournalière de l'ordre
+# de quelques % plutôt que quelques dixièmes de %.
+_NOISE_PCT = 0.0045
 
 # Sigma "moyen" du roster (cf. data/companies.py, profils sectoriels ~0.018-0.055) ;
 # sert de référence pour que les sociétés volatiles (tech/semicon...) bougent
-# visiblement plus que les défensives (utilities...) à l'écran.
+# visiblement plus que les défensives (utilities...) à l'écran. Plancher
+# relevé (0.6 → 0.8) pour que même les valeurs défensives restent lisiblement
+# animées plutôt que quasi plates.
 _TYPICAL_SIGMA = 0.035
-_VOL_MULT_RANGE = (0.6, 2.8)
+_VOL_MULT_RANGE = (0.8, 3.2)
 
 
 def minutes_per_step():
@@ -252,6 +261,51 @@ def intraday_series(market, sim_clock, day, key, history, window_minutes, n_poin
         val = wiggle(market.seed, step_k, key, prev, cur, pm, damp=damp,
                      vol_mult=vol_mult * speed_factor(sim_clock))
         out.append(val)
+    return out
+
+
+def points_per_segment_for_n_steps(n_steps):
+    """Densité de bruit à insérer entre deux clôtures consécutives d'une série
+    "par pas" (1M/3M/1A/3A/5A/MAX), en fonction du nombre de pas affichés —
+    "l'adaptation du graphe à la taille de la période cliquée" (retour joueur) :
+    plus la fenêtre est courte/zoomée, plus chaque segment mérite du détail ;
+    plus elle est longue (5A/MAX), plus il y a déjà de points réels à l'écran
+    et moins la densification apporte (tout en coûtant plus cher à calculer/
+    dessiner) — désactivée au-delà de 3A."""
+    if n_steps is None:
+        return 0                       # MAX : historique long, déjà assez dense
+    if n_steps <= 6:
+        return 6                       # 1M
+    if n_steps <= 18:
+        return 4                       # 3M
+    if n_steps <= 73:
+        return 2                       # 1A
+    if n_steps <= 219:
+        return 1                       # 3A
+    return 0                           # 5A : trop de segments pour que ça vaille le coût
+
+
+def densify_step_series(market, key, closes, points_per_segment=4, region=None, vol_mult=1.0):
+    """Remplace les segments de droite nus entre clôtures "par pas" consécutives
+    par un tracé organique (pont brownien déterministe, réutilise `wiggle`) —
+    chaque clôture réelle reste un point EXACT de la série retournée (le bruit
+    est épinglé à 0 aux deux bornes de chaque segment), seuls des points
+    intermédiaires sont ajoutés. `closes[-1]` doit correspondre au pas courant
+    (`market.step_count`)."""
+    n = len(closes)
+    if n < 2 or points_per_segment < 1:
+        return list(closes)
+    total = minutes_per_step()
+    base_step = market.step_count - (n - 1)
+    out = [closes[0]]
+    for i in range(n - 1):
+        prev, cur = closes[i], closes[i + 1]
+        step_k = base_step + i + 1
+        damp = region_open_factor(region, step_k) if region else 1.0
+        for j in range(1, points_per_segment + 1):
+            pm = total * j / points_per_segment
+            out.append(wiggle(market.seed, step_k, key, prev, cur, pm, damp=damp,
+                              vol_mult=vol_mult))
     return out
 
 

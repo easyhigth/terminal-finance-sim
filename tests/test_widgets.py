@@ -13,6 +13,10 @@ import pytest
 # proprement ce module au lieu de casser toute la collecte pytest.
 pytest.importorskip("pygame")
 
+import pygame
+
+pygame.font.init()   # requis par les tests dessinant du texte (prix/pastille) plus bas
+
 from ui import widgets
 
 
@@ -141,3 +145,61 @@ def test_tick_flash_no_change_keeps_previous_direction():
     flash.tick("MVC", 105.0, up, down, base)
     col = flash.tick("MVC", 105.0, up, down, base)    # valeur inchangée : reste en vert (dans le plateau)
     assert col == up
+
+
+# ============================ style « appli de trading » (dégradé + ligne) ====
+def test_fill_gradient_area_does_not_raise_on_a_simple_series():
+    import pygame
+    surf = pygame.Surface((200, 100))
+    rect = pygame.Rect(0, 0, 200, 100)
+    pts = [(0, 80), (50, 40), (100, 60), (150, 20), (200, 50)]
+    widgets.fill_gradient_area(surf, rect, pts, (64, 220, 240))   # ne doit pas lever
+
+
+def test_fill_gradient_area_noop_on_degenerate_input():
+    import pygame
+    surf = pygame.Surface((200, 100))
+    rect = pygame.Rect(0, 0, 200, 100)
+    widgets.fill_gradient_area(surf, rect, [], (64, 220, 240))
+    widgets.fill_gradient_area(surf, rect, [(0, 0)], (64, 220, 240))
+    widgets.fill_gradient_area(surf, pygame.Rect(0, 0, 0, 0), [(0, 0), (1, 1)], (64, 220, 240))
+
+
+def test_draw_current_price_line_draws_within_rect_bounds():
+    import pygame
+    surf = pygame.Surface((200, 100))
+    rect = pygame.Rect(10, 10, 180, 80)
+    widgets.draw_current_price_line(surf, rect, 40, "123.45", (64, 220, 240))
+    # la ligne est dessinée à y=40 (dans le rect) : vérifie juste l'absence
+    # d'exception et qu'un pixel de la ligne a bien la couleur attendue
+    assert surf.get_at((rect.centerx, 40))[:3] == (64, 220, 240)
+
+
+def test_draw_current_price_line_clamps_y_to_rect():
+    import pygame
+    surf = pygame.Surface((200, 100))
+    rect = pygame.Rect(10, 10, 180, 80)
+    widgets.draw_current_price_line(surf, rect, -500, "999", (64, 220, 240))   # ne doit pas lever
+    widgets.draw_current_price_line(surf, rect, 99999, "0", (64, 220, 240))    # ne doit pas lever
+
+
+def test_draw_series_area_fill_default_on_does_not_raise():
+    import pygame
+    surf = pygame.Surface((200, 100))
+    rect = pygame.Rect(0, 0, 200, 100)
+    widgets.draw_series(surf, rect, [10.0, 12.0, 9.0, 14.0, 11.0], (64, 220, 240))
+
+
+def test_draw_series_show_current_line_draws_price_pill():
+    import pygame
+    surf = pygame.Surface((200, 100))
+    rect = pygame.Rect(0, 0, 200, 100)
+    widgets.draw_series(surf, rect, [10.0, 12.0, 9.0, 14.0, 11.0], (64, 220, 240),
+                        show_current_line=True, y_fmt=lambda v: f"{v:.2f}")
+
+
+def test_draw_series_area_fill_can_be_disabled():
+    import pygame
+    surf = pygame.Surface((200, 100))
+    rect = pygame.Rect(0, 0, 200, 100)
+    widgets.draw_series(surf, rect, [10.0, 12.0, 9.0], (64, 220, 240), area_fill=False)

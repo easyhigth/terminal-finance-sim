@@ -178,6 +178,9 @@ class DesktopMenusMixin:
              lambda: self.wm.maximize_toggle(w)),
             (_L("Ancrer à gauche", "Snap left"), lambda: self._snap_window(w, "left")),
             (_L("Ancrer à droite", "Snap right"), lambda: self._snap_window(w, "right")),
+            (_L("Détacher (premier plan)" if w.pinned else "Épingler (toujours au premier plan)",
+                "Unpin" if w.pinned else "Pin (always on top)"),
+             lambda: setattr(w, "pinned", not w.pinned)),
             (_L("Fermer", "Close"), lambda: self.wm.close(w)),
         ]
 

@@ -109,6 +109,9 @@ SECTIONS_EN = [
             "(ticker, filters…) — not the terminal, always reachable via its own icon"),
         ("Right click", "Opens a context menu depending on the target: icon, a "
             "window's title bar, taskbar entry, or the desktop background"),
+        ("Right click → Pin", "On a title bar/taskbar entry: keeps this window ALWAYS "
+            "on top (small pin in its title bar), even when another window is "
+            "focused — handy to keep the watchlist or portfolio visible at all times"),
     ]),
     ("Floating windows and this panel", [
         ("ESC", "Closes the most recent floating window, or this panel if it's open"),

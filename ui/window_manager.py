@@ -37,6 +37,8 @@ class Window:
         self._resizing = False    # redimensionnement en cours
         self._restore_rect = None # taille/pos avant ancrage/maximisation (toggle)
         self.attention = False    # réclame l'attention (clignote dans la barre des tâches)
+        self.pinned = False       # « toujours au premier plan » (menu contextuel de la
+                                  # barre de titre) — cf. WindowManager._z_order
 
     # --- sous-rectangles du chrome (recalculés à la volée depuis self.rect) ---
     @property
@@ -81,6 +83,14 @@ class Window:
         desktop_icons.draw(surf, (tr.x + 18, tr.centery), icon_kind, icon_col)
         widgets.draw_text(surf, self.app_obj.title, (tr.x + 32, tr.y + 5),
                           fonts.small(bold=True), icon_col)
+        if self.pinned:
+            # petite épingle VECTORIELLE (tête + pointe) juste avant les boutons
+            # réduire/fermer — pas de glyphe Unicode « 📌 », non garanti par la
+            # police embarquée (même précaution que le reste de ce module).
+            px, py = tr.right - 3 * BTN_W + BTN_W // 2, tr.centery
+            pygame.draw.circle(surf, config.COL_AMBER, (px, py - 3), 3)
+            pygame.draw.polygon(surf, config.COL_AMBER,
+                                [(px - 2, py), (px + 2, py), (px, py + 5)])
         # boutons réduire / fermer (dessin vectoriel, cf. ui/desktop_icons.py —
         # les glyphes Unicode « – »/« ✕ » ne s'affichent pas de façon fiable)
         mr, cr = self.min_rect, self.close_rect
@@ -122,7 +132,17 @@ class WindowManager:
         self._last_title_click = (None, -10000)   # (window, ms) pour le double-clic
         self.on_close = None   # callable(Window) optionnel, appelé AVANT la fermeture
                                # (ex. DesktopScene mémorise la dernière fenêtre fermée
-                               # pour le raccourci "rouvrir", cf. Ctrl+Maj+T)
+                               # pour le raccourci "rouvrir", cf. Ctrl+Maj+Z)
+
+    def _z_order(self):
+        """Ordre de dessin/détection de clic : les fenêtres ÉPINGLÉES
+        (`Window.pinned`) passent TOUJOURS au-dessus des autres, quel que
+        soit l'ordre de focus/ouverture (self.windows) — l'ordre relatif
+        NORMAL est conservé À L'INTÉRIEUR de chaque groupe (épinglées entre
+        elles, non-épinglées entre elles). Utilisé par draw() et
+        _topmost_at() pour que ce qui est visuellement au-dessus soit aussi
+        ce qui reçoit le clic."""
+        return [w for w in self.windows if not w.pinned] + [w for w in self.windows if w.pinned]
 
     # --------------------------------------------------------------- ouverture
     def open(self, key, factory, x=None, y=None):
@@ -189,7 +209,7 @@ class WindowManager:
 
     # --------------------------------------------------------------- évènements
     def _topmost_at(self, pos):
-        for w in reversed(self.windows):
+        for w in reversed(self._z_order()):
             if not w.minimized and w.rect.collidepoint(pos):
                 return w
         return None
@@ -339,6 +359,6 @@ class WindowManager:
             surf.blit(overlay, self._snap_preview.topleft)
             pygame.draw.rect(surf, config.COL_CYAN, self._snap_preview, 2)
         focused = self.focused
-        for w in self.windows:
+        for w in self._z_order():
             if not w.minimized:
                 w.draw(surf, w is focused)

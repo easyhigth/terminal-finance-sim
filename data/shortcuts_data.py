@@ -119,6 +119,10 @@ SECTIONS = [
             "(ticker, filtres…) — pas le terminal, toujours accessible par sa propre icône"),
         ("Clic droit", "Ouvre un menu contextuel selon la cible : icône, barre de "
             "titre d'une fenêtre, entrée de la barre des tâches, ou fond du bureau"),
+        ("Clic droit → Épingler", "Sur une barre de titre/entrée de barre des tâches : "
+            "garde cette fenêtre TOUJOURS au premier plan (petite épingle dans sa barre "
+            "de titre), même quand une autre fenêtre est focalisée — utile pour garder "
+            "la watchlist ou le portefeuille visibles en permanence"),
     ]),
     ("Fenêtres flottantes et ce panneau", [
         ("ÉCHAP", "Ferme la fenêtre flottante la plus récente, ou ce panneau s'il est ouvert"),

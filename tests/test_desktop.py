@@ -1183,6 +1183,48 @@ def test_context_menu_snap_left_positions_window(app):
     assert w._restore_rect is not None              # peut revenir à la taille d'avant
 
 
+# ==================================================== épinglage de fenêtre ====
+def test_pin_toggle_via_context_menu_item(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("research")
+    assert w.pinned is False
+    items = dict(desk._window_menu_items(w))
+    items["Épingler (toujours au premier plan)"]()
+    assert w.pinned is True
+    items2 = dict(desk._window_menu_items(w))
+    items2["Détacher (premier plan)"]()
+    assert w.pinned is False
+
+
+def test_pinned_window_stays_on_top_after_other_window_focused(app):
+    wm = WindowManager(app)
+    w1 = wm.open("a", lambda: ResearchApp(app))
+    w2 = wm.open("b", lambda: SheetApp(app))
+    w1.rect.topleft = w2.rect.topleft = (100, 100)
+    w1.pinned = True
+    wm.focus(w2)   # w2 est la dernière ouverte/focalisée...
+    assert wm._topmost_at((150, 150)) is w1   # ...mais w1 reste au-dessus (épinglée)
+
+
+def test_two_pinned_windows_keep_relative_order_between_them(app):
+    wm = WindowManager(app)
+    w1 = wm.open("a", lambda: ResearchApp(app))
+    w2 = wm.open("b", lambda: SheetApp(app))
+    w1.rect.topleft = w2.rect.topleft = (100, 100)
+    w1.pinned = w2.pinned = True
+    assert wm._topmost_at((150, 150)) is w2   # ordre normal conservé entre épinglées
+    wm.focus(w1)
+    assert wm._topmost_at((150, 150)) is w1
+
+
+def test_unpinned_windows_unaffected_when_none_pinned(app):
+    wm = WindowManager(app)
+    wm.open("a", lambda: ResearchApp(app))
+    wm.open("b", lambda: SheetApp(app))
+    assert wm._z_order() == wm.windows
+
+
 # ============================== réactivité des graphes + flash vert/rouge ======
 def test_watchlist_uses_animated_live_price(app):
     """La Watchlist affiche le prix ANIMÉ (core/intraday.py), pas juste la

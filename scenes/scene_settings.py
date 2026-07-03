@@ -126,9 +126,20 @@ class SettingsScene(Scene):
         return btns
 
     def _layout(self):
+        """Pas de ligne ADAPTATIF : l'écran a gagné des réglages au fil des
+        versions (sauvegarde auto, mode débutant/expert, routine quotidienne…)
+        et un pas FIXE finissait par pousser les dernières lignes et le bouton
+        « Raccourcis clavier » SOUS le bord de l'écran — réglages injoignables
+        (bug V1.0). On répartit désormais la hauteur disponible (entre le
+        titre et le pied de page, bouton raccourcis déduit) entre toutes les
+        lignes, bornée à [40, 68] px pour rester lisible."""
         x0 = 360
-        y = config.content_top() + 30
-        row_h, gap = 58, 10
+        y0 = config.content_top() + 10
+        shortcuts_reserve = 38 + 24          # bouton « Raccourcis » + respiration
+        avail = config.footer_y() - 36 - y0 - shortcuts_reserve
+        pitch = max(40, min(68, avail // max(1, len(self.rows))))
+        btn_h = min(40, pitch - 6)
+        y = y0
         for _label, btns in self.rows:
             x = x0
             for b in btns:
@@ -138,9 +149,9 @@ class SettingsScene(Scene):
                     w = 56
                 else:
                     w = max(96, fonts.body(bold=True).size(b.label)[0] + 28)
-                b.rect = pygame.Rect(x, y, w, 40)
+                b.rect = pygame.Rect(x, y, w, btn_h)
                 x += w + 8
-            y += row_h + gap
+            y += pitch
 
     # ----------------------------------------------------------------- events
     def handle_event(self, event):

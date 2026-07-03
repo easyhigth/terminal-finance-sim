@@ -122,7 +122,7 @@ class FrontierLabScene(Scene):
             box_col = config.COL_UP if checked else config.COL_TEXT_DIM
             box = "[x]" if checked else "[ ]"
             widgets.draw_text(surf, box, (inner.x, y), fonts.small(bold=True), box_col)
-            label = tk + (" ★" if held else "")
+            label = tk + (" ✶" if held else "")
             col = config.COL_WHITE if checked else config.COL_TEXT_DIM
             widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), inner.w - 40),
                               (inner.x + 28, y), fonts.small(), col)
@@ -132,7 +132,7 @@ class FrontierLabScene(Scene):
         self._max_scroll = max(0, content_h - inner.h)
         self.scroll = max(0, min(self._max_scroll, self.scroll))
         self.scroll = widgets.draw_scrollbar(surf, rect, inner, self.scroll, self._max_scroll, content_h)
-        widgets.draw_text(surf, "★ = détenue actuellement · clic = inclure/exclure",
+        widgets.draw_text(surf, "✶ = détenue actuellement · clic = inclure/exclure",
                           (inner.x, inner.bottom - 12), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_lab(self, surf, rect):

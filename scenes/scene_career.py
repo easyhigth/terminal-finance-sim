@@ -145,7 +145,12 @@ class CareerScene(Scene):
                 next_q = p.grade_start_quarter + int(r["target"])
                 days_left = max(0, (next_q - 1) * config.DAYS_PER_QUARTER + 1 - p.day)
                 label += f" (encore {days_left} j)"
-            widgets.draw_text(surf, f"{mark} {label}", (inner.x, y), fonts.small(), col)
+            # libellé borné : les intitulés longs (« Voie de spécialisation
+            # choisie (TRACK) », ancienneté avec compte à rebours…) passaient
+            # SOUS la valeur x/y et débordaient même du panneau (le rendu
+            # n'est pas clippé au rect du panneau).
+            widgets.draw_text(surf, widgets.fit_text(f"{mark} {label}", fonts.small(), inner.w - 56),
+                              (inner.x, y), fonts.small(), col)
             widgets.draw_text(surf, f"{int(r['current'])}/{int(r['target'])}",
                               (inner.right, y), fonts.small(bold=True),
                               col, align="right")
@@ -159,7 +164,8 @@ class CareerScene(Scene):
             widgets.draw_text(surf, "✓ Critères remplis — tapez EVAL pour l'examen.",
                               (inner.x, y), fonts.small(bold=True), config.COL_UP)
         else:
-            widgets.draw_text(surf, "Manque : " + ", ".join(career.missing_criteria(p)),
+            widgets.draw_text(surf, widgets.fit_text("Manque : " + ", ".join(career.missing_criteria(p)),
+                                                     fonts.tiny(), inner.w),
                               (inner.x, y), fonts.tiny(), config.COL_WARN)
 
     def _draw_stats(self, surf, rect, p):
@@ -179,7 +185,9 @@ class CareerScene(Scene):
             ("Temps", f"jour {p.day} (T{p.quarter})", config.COL_WHITE),
         ]
         # pas de ligne adaptatif : toutes les lignes tiennent dans le panneau
-        step = max(18, min(25, inner.h // len(rows)))
+        # (plancher abaissé à 15 px — à 18, la dernière ligne « Temps » était
+        # coupée par le bord bas du panneau)
+        step = max(15, min(25, inner.h // len(rows)))
         y = inner.y
         for label, val, col in rows:
             widgets.draw_text(surf, label, (inner.x, y), fonts.small(), config.COL_TEXT_DIM)

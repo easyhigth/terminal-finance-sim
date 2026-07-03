@@ -14,6 +14,7 @@ import main
 from apps.app_research import ResearchApp
 from apps.app_sheet import SheetApp
 from apps.app_trading import TradingApp
+from core import config
 from ui.window_manager import TITLE_H, WindowManager
 
 
@@ -2743,3 +2744,53 @@ def test_absence_digest_does_not_reappear_for_already_seen_notifications(app):
     pending = scene._absence_digest_pending()
     assert pending is not None and len(pending) == 1
     assert pending[0]["text"] == "Second message"
+
+
+# =========================== audit V1.0 : robustesse & débordements UI ========
+def test_scene_host_draw_survives_degenerate_rect(app):
+    """Régression : une fenêtre à taille dégénérée (rect restauré d'une
+    sauvegarde corrompue) faisait planter smoothscale (taille négative) à
+    chaque frame — sauvegarde briquée."""
+    from apps.scene_host import SceneHostApp
+    host = SceneHostApp(app, "markethub", "Marché", {})
+    surf = pygame.Surface((200, 200))
+    host.draw(surf, pygame.Rect(10, 10, 0, 0))      # ne doit pas lever
+    host.draw(surf, pygame.Rect(10, 10, -5, 12))    # ne doit pas lever
+
+
+def test_apply_layout_clamps_degenerate_rects(app):
+    """Un rect de disposition hors bornes (fichier de save édité, autre
+    résolution) est ramené à une taille/position jouables."""
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    layout = [{"kind": "scene", "name": "markethub", "kwargs": {},
+               "rect": [5000, -300, 3, 2], "minimized": False, "pinned": False}]
+    desk._apply_layout(layout)
+    w = next(w for w in desk.wm.windows if w.key == "scene:markethub")
+    assert w.rect.w >= 300 and w.rect.h >= 200
+    assert 0 <= w.rect.x <= config.SCREEN_WIDTH - 60
+    assert w.rect.y >= 0
+
+
+def test_taskbar_entries_stay_on_screen_with_many_windows(app):
+    """Régression : au-delà d'une poignée de fenêtres, les entrées à largeur
+    fixe de la barre des tâches débordaient de l'écran — fenêtres
+    infocalisables. La largeur est désormais adaptative."""
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    for sc in ("markethub", "book", "graph", "inbox", "news", "career", "risk",
+               "quant", "alerts", "shop", "explorer", "glossary"):
+        desk._open_scene_window(sc)
+    desk.draw(app.screen)
+    assert len(desk._task_rects) >= 13
+    assert all(r.right <= config.SCREEN_WIDTH for r in desk._task_rects.values())
+
+
+def test_settings_all_rows_and_shortcuts_button_fit_on_screen(app):
+    """Régression : l'écran Réglages a gagné des lignes au fil des versions
+    et les dernières (Routine, Vitesse) + le bouton Raccourcis passaient sous
+    le bord de l'écran — injoignables."""
+    app.scenes.go("settings", return_to="desktop")
+    sc = app.scenes.current
+    assert sc.rows[-1][1][0].rect.bottom <= config.footer_y()
+    assert sc.shortcuts_btn.rect.bottom <= config.footer_y()

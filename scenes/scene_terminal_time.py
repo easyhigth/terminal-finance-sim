@@ -205,9 +205,9 @@ class TerminalTimeMixin:
             kind_label = _L("Stop-loss", "Stop-loss") if order["kind"] == "stop" else _L("Take-profit", "Take-profit")
             sign = "+" if res["realized"] >= 0 else ""
             self._log(_L(
-                f"  ⚑ {kind_label} déclenché : {order['ticker']} vendu à {res['price']:,.2f} "
+                f"  » {kind_label} déclenché : {order['ticker']} vendu à {res['price']:,.2f} "
                 f"(seuil {order['trigger']:,.2f}) — P&L réalisé {sign}{widgets.format_money(res['realized'], cur)}.",
-                f"  ⚑ {kind_label} triggered: {order['ticker']} sold at {res['price']:,.2f} "
+                f"  » {kind_label} triggered: {order['ticker']} sold at {res['price']:,.2f} "
                 f"(trigger {order['trigger']:,.2f}) — realized P&L {sign}{widgets.format_money(res['realized'], cur)}."))
             self.app.notify(_L(f"{kind_label} déclenché : {order['ticker']}",
                                f"{kind_label} triggered: {order['ticker']}"),
@@ -318,8 +318,8 @@ class TerminalTimeMixin:
             tag = {"good": "▲", "bad": "▼", "info": "◆"}.get(pol["kind"], "◆")
             self.recent_events.insert(0, {"title": f"{tag} {pname}", "kind": pol["kind"],
                                           "cash": 0, "rep": 0})
-            self._log(_L(f"  ⚑ POLITIQUE — {pname} : {pstory[:64]}…",
-                         f"  ⚑ POLITICS — {pname}: {pstory[:64]}…"))
+            self._log(_L(f"  » POLITIQUE — {pname} : {pstory[:64]}…",
+                         f"  » POLITICS — {pname}: {pstory[:64]}…"))
             today_news.append(news_mod.make("political", pol["kind"], pname, pol["region"], "politics"))
             # une news de PAYS atterrit aussi dans l'inbox
             inbox_mod.push(p, "country", pol["country"],
@@ -386,9 +386,9 @@ class TerminalTimeMixin:
         if offer:
             profile_txt = f" ({mandates_mod.profile_label(offer['client_profile'])})" if offer.get("client_profile") else ""
             if offer.get("transformant"):
-                self._log(_L(f"  ★★ MANDAT TRANSFORMANT : {offer['client']}{profile_txt} — "
+                self._log(_L(f"  ✶✶ MANDAT TRANSFORMANT : {offer['client']}{profile_txt} — "
                           f"{widgets.format_money(offer['capital'], cur)} (MANDATES pour voir).",
-                          f"  ★★ TRANSFORMATIVE MANDATE: {offer['client']}{profile_txt} — "
+                          f"  ✶✶ TRANSFORMATIVE MANDATE: {offer['client']}{profile_txt} — "
                           f"{widgets.format_money(offer['capital'], cur)} (type MANDATES to view)."))
                 self.app.notify(_L(f"Mandat transformant : {offer['client']}",
                                    f"Transformative mandate: {offer['client']}"), "prestige",
@@ -426,15 +426,15 @@ class TerminalTimeMixin:
                             action="calendar")
         # revue de performance éventuelle (déclenchée par advance_step)
         if summary.get("review_offer"):
-            self._log(_L("  ★ REVUE DE PERFORMANCE : votre manager souhaite vous voir (tapez REVIEW).",
-                      "  ★ PERFORMANCE REVIEW: your manager wants to see you (type REVIEW)."))
+            self._log(_L("  ✶ REVUE DE PERFORMANCE : votre manager souhaite vous voir (tapez REVIEW).",
+                      "  ✶ PERFORMANCE REVIEW: your manager wants to see you (type REVIEW)."))
             self.app.notify(_L("Revue de performance annuelle","Annual performance review"), "info",
                             action="review")
         # stress test réglementaire éventuel (semestriel)
         stress_test = stresstest_mod.maybe_trigger(p, summary.get("quarter_changed"), m)
         if stress_test:
-            self._log(_L("  ★ STRESS TEST RÉGLEMENTAIRE : le superviseur vous convoque (tapez STRESS).",
-                      "  ★ REGULATORY STRESS TEST: the supervisor wants to see you (type STRESS)."))
+            self._log(_L("  ✶ STRESS TEST RÉGLEMENTAIRE : le superviseur vous convoque (tapez STRESS).",
+                      "  ✶ REGULATORY STRESS TEST: the supervisor wants to see you (type STRESS)."))
             self.app.notify(_L("Stress test réglementaire","Regulatory stress test"), "info",
                             action="stresstest")
         # alertes de prix

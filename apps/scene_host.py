@@ -157,6 +157,11 @@ class SceneHostApp(DesktopApp):
 
     def draw(self, surf, rect):
         self._rect = rect
+        if rect.w < 1 or rect.h < 1:
+            # fenêtre dégénérée (ex. rect restauré d'une sauvegarde corrompue,
+            # cf. DesktopScene._apply_layout) : smoothscale planterait sur une
+            # taille négative/nulle — on ne dessine simplement rien.
+            return
         if self._offscreen is None:
             self._offscreen = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
         with self._mouse_patch():

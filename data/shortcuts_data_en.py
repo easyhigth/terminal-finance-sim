@@ -105,6 +105,8 @@ SECTIONS_EN = [
             "whatever screen is currently in front"),
         ("CTRL+SHIFT+D", "Show desktop (Windows+D style): minimizes every open "
             "window ; a 2nd press restores exactly the ones that were open"),
+        ("CTRL+SHIFT+Z", "Reopens the last closed window, with its original context "
+            "(ticker, filters…) — not the terminal, always reachable via its own icon"),
         ("Right click", "Opens a context menu depending on the target: icon, a "
             "window's title bar, taskbar entry, or the desktop background"),
     ]),

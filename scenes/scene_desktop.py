@@ -74,6 +74,9 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         # la barre des tâches (les fenêtres ancrées ne passent pas dessous).
         self.wm.work_area = pygame.Rect(0, TOPBAR_H, config.SCREEN_WIDTH,
                                         config.SCREEN_HEIGHT - TOPBAR_H - TASKBAR_H)
+        self.wm.on_close = self._record_closed_window
+        if not hasattr(self, "_last_closed"):
+            self._last_closed = None    # (kind, key, kwargs) — CTRL+MAJ+T pour rouvrir
         self.start_open = False
         self._icon_rects = {}       # clé -> (Rect, icon_kind, label) — icônes du bureau
         self._icon_focus = None     # clé de l'icône ayant le focus clavier (ou None)
@@ -184,6 +187,21 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         if (event.type == pygame.KEYDOWN and event.key == pygame.K_d
                 and (event.mod & pygame.KMOD_CTRL) and (event.mod & pygame.KMOD_SHIFT)):
             self._toggle_show_desktop()
+            return
+        # « Rouvrir la dernière fenêtre fermée » (CTRL+MAJ+Z, « annuler la
+        # fermeture » — complément naturel de CTRL+MAJ+D « Afficher le
+        # bureau »). Pas CTRL+MAJ+T : CTRL+T est déjà « nouvel onglet », capté
+        # par la bande d'onglets (core/pages.py) AVANT même d'atteindre cette
+        # scène, quel que soit MAJ ; et tout CTRL+MAJ+<lettre> par ailleurs
+        # réservé par MORE_SHORTCUTS (scenes/scene_terminal.py) quand le
+        # terminal a le focus. La fenêtre la plus récemment fermée (chrome
+        # ✕, menu contextuel, ou « Fermer toutes les fenêtres ») se rouvre
+        # avec son contexte d'origine (ticker, kwargs…). N'empile pas
+        # d'historique multi-niveaux — un seul « dernier fermé », remplacé à
+        # chaque fermeture (cf. _record_closed_window).
+        if (event.type == pygame.KEYDOWN and event.key == pygame.K_z
+                and (event.mod & pygame.KMOD_CTRL) and (event.mod & pygame.KMOD_SHIFT)):
+            self._reopen_last_closed()
             return
         # CTRL+O : bascule le menu Démarrer (même mnémonique que le rail du
         # terminal, RAIL_SHORTCUTS/commande MORE) — l'icône dédiée « Plus » a
@@ -313,6 +331,30 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 if w.key in self._show_desktop_restore:
                     w.minimized = False
             self._show_desktop_restore = []
+
+    def _record_closed_window(self, w):
+        """Callback de WindowManager.on_close : mémorise de quoi rouvrir la
+        fenêtre qui vient de se fermer (CTRL+MAJ+Z). Le terminal n'est jamais
+        mémorisé : instance persistante (le moteur tourne même fermée), se
+        rouvre toujours par sa propre icône, pas par « rouvrir »."""
+        if w.key == "scene:terminal":
+            return
+        if w.key.startswith("scene:"):
+            name = w.key[len("scene:"):]
+            kwargs = dict(getattr(w.app_obj, "_kwargs", None) or {})
+            self._last_closed = ("scene", name, kwargs)
+        else:
+            self._last_closed = ("app", w.key, {})
+
+    def _reopen_last_closed(self):
+        if self._last_closed is None:
+            return
+        kind, key, kwargs = self._last_closed
+        self._last_closed = None
+        if kind == "scene":
+            self._open_scene_window(key, **kwargs)
+        else:
+            self._launch(key)
 
     def _launch(self, key):
         if key == "terminal":

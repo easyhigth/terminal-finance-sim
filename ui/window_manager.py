@@ -120,6 +120,9 @@ class WindowManager:
                                      config.SCREEN_HEIGHT - config.TOPBAR_H)
         self._snap_preview = None     # Rect d'aperçu d'ancrage pendant un glisser
         self._last_title_click = (None, -10000)   # (window, ms) pour le double-clic
+        self.on_close = None   # callable(Window) optionnel, appelé AVANT la fermeture
+                               # (ex. DesktopScene mémorise la dernière fenêtre fermée
+                               # pour le raccourci "rouvrir", cf. Ctrl+Maj+T)
 
     # --------------------------------------------------------------- ouverture
     def open(self, key, factory, x=None, y=None):
@@ -147,6 +150,8 @@ class WindowManager:
 
     def close(self, w):
         if w in self.windows:
+            if self.on_close is not None:
+                self.on_close(w)
             self.windows.remove(w)
 
     def focus(self, w):

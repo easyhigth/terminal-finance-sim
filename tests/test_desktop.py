@@ -454,6 +454,53 @@ def test_window_snaps_to_left_half_on_drag_to_edge(app):
     assert wm._snap_preview is None
 
 
+def test_window_snaps_to_top_left_quarter_on_drag_to_corner(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("research")
+    wm = desk.wm
+    tr = w.title_rect
+    wm.handle_event(_down(tr.centerx, tr.centery))
+    wm.handle_event(_motion(wm.work_area.x + 2, wm.work_area.y + 2))
+    assert wm._snap_preview == wm._quarter_rect("tl")
+    wm.handle_event(_up(wm.work_area.x + 2, wm.work_area.y + 2))
+    assert w.rect == wm._quarter_rect("tl")
+
+
+def test_window_snaps_to_bottom_right_quarter_on_drag_to_corner(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("research")
+    wm = desk.wm
+    tr = w.title_rect
+    wm.handle_event(_down(tr.centerx, tr.centery))
+    wm.handle_event(_motion(wm.work_area.right - 2, wm.work_area.bottom - 2))
+    assert wm._snap_preview == wm._quarter_rect("br")
+    wm.handle_event(_up(wm.work_area.right - 2, wm.work_area.bottom - 2))
+    assert w.rect == wm._quarter_rect("br")
+
+
+def test_quarter_rects_tile_the_work_area_without_gaps_or_overlap(app):
+    wm = WindowManager(app)
+    wa = wm.work_area
+    tl, tr, bl, br = (wm._quarter_rect(s) for s in ("tl", "tr", "bl", "br"))
+    assert tl.w + tr.w == wa.w
+    assert tl.h + bl.h == wa.h
+    assert tl.topleft == wa.topleft
+    assert br.bottomright == wa.bottomright
+    assert tl.right == tr.x
+    assert tl.bottom == bl.y
+
+
+def test_context_menu_snap_to_quarter_positions_and_docks_window(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("sheet")
+    desk._snap_window(w, "tr")
+    assert w.rect == desk.wm._quarter_rect("tr")
+    assert w._dock_flash_until > pygame.time.get_ticks()
+
+
 def test_double_click_title_maximizes_and_restores(app):
     app.scenes.go("desktop")
     desk = app.scenes.current

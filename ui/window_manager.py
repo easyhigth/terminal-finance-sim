@@ -329,12 +329,39 @@ class WindowManager:
             self._snap_preview = self._snap_target(pos)
 
     EDGE = 16
+    CORNER = 40   # zone de coin plus large que EDGE : un coin exact (16x16) serait
+                  # quasi impossible à viser à la souris sur un écran de cette taille
+
+    def _quarter_rect(self, side):
+        """Rect d'un quart de `work_area` : side = "tl"/"tr"/"bl"/"br"."""
+        wa = self.work_area
+        half_w, half_h = wa.w // 2, wa.h // 2
+        x = wa.x if side[1] == "l" else wa.x + half_w
+        y = wa.y if side[0] == "t" else wa.y + half_h
+        w = half_w if side[1] == "l" else wa.w - half_w
+        h = half_h if side[0] == "t" else wa.h - half_h
+        return pygame.Rect(x, y, w, h)
 
     def _snap_target(self, pos):
-        """Zone d'ancrage selon la position du curseur près d'un bord de la
-        `work_area` : bord haut = maximiser, gauche/droite = moitié d'écran."""
+        """Zone d'ancrage selon la position du curseur près d'un bord (ou
+        coin) de la `work_area` : un COIN = quart d'écran (poste à 4
+        fenêtres ouvertes en permanence — marché/portefeuille/tableur/
+        watchlist) ; bord haut seul = maximiser ; gauche/droite seuls =
+        moitié d'écran (comportement historique, inchangé hors des coins)."""
         wa = self.work_area
         mx, my = pos
+        near_top = my <= wa.y + self.CORNER
+        near_bottom = my >= wa.bottom - self.CORNER
+        near_left = mx <= wa.x + self.CORNER
+        near_right = mx >= wa.right - self.CORNER
+        if near_top and near_left:
+            return self._quarter_rect("tl")
+        if near_top and near_right:
+            return self._quarter_rect("tr")
+        if near_bottom and near_left:
+            return self._quarter_rect("bl")
+        if near_bottom and near_right:
+            return self._quarter_rect("br")
         if my <= wa.y + self.EDGE:
             return wa.copy()
         if mx <= wa.x + self.EDGE:

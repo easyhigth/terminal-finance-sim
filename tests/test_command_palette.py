@@ -80,8 +80,8 @@ def test_no_match_shows_empty_list_without_crashing(app):
 
 def test_palette_does_not_leak_into_underlying_scene(app):
     """Pendant que la palette est ouverte, les touches tapées ne doivent pas
-    atteindre la scène sous-jacente (ex: la recherche de la page PLUS)."""
-    app.scenes.go("more", return_to="terminal")
+    atteindre la scène sous-jacente (ex: la recherche de l'explorateur)."""
+    app.scenes.go("explorer", return_to="terminal")
     sc = app.scenes.current
     app.scenes.handle_event(_ctrl_k())
     for ch in "quant":

@@ -16,13 +16,14 @@ surface, pour rester compatible avec les widgets existants (`ui/widgets.py`).
 """
 import pygame
 
-from core import config
+from core import audio, config
 from ui import desktop_icons, fonts, widgets
 
 TITLE_H = 26          # hauteur de la barre de titre
 BORDER = 2            # épaisseur du liseré de fenêtre
 RESIZE_GRIP = 14      # taille de la poignée de redimensionnement (coin bas-droit)
 BTN_W = TITLE_H       # boutons carrés dans la barre de titre
+DOCK_FLASH_MS = 240   # durée du liseré cyan pulsé après un ancrage/agrandissement
 
 
 class Window:
@@ -37,6 +38,9 @@ class Window:
         self._resizing = False    # redimensionnement en cours
         self._restore_rect = None # taille/pos avant ancrage/maximisation (toggle)
         self.attention = False    # réclame l'attention (clignote dans la barre des tâches)
+        self.pinned = False       # « toujours au premier plan » (menu contextuel de la
+                                  # barre de titre) — cf. WindowManager._z_order
+        self._dock_flash_until = 0   # horloge murale : liseré pulsé après ancrage/agrandissement
 
     # --- sous-rectangles du chrome (recalculés à la volée depuis self.rect) ---
     @property
@@ -72,6 +76,14 @@ class Window:
         # corps
         pygame.draw.rect(surf, config.COL_BG, self.rect)
         pygame.draw.rect(surf, accent, self.rect, BORDER)
+        # liseré cyan pulsé bref juste après un ancrage/agrandissement (feedback
+        # visuel de docking, s'estompe tout seul via l'horloge murale)
+        remaining = self._dock_flash_until - pygame.time.get_ticks()
+        if remaining > 0:
+            alpha = max(0, min(255, int(255 * remaining / DOCK_FLASH_MS)))
+            flash = pygame.Surface((self.rect.w, self.rect.h), pygame.SRCALPHA)
+            pygame.draw.rect(flash, (*config.COL_CYAN, alpha), flash.get_rect(), BORDER + 2)
+            surf.blit(flash, self.rect.topleft)
         # barre de titre
         tr = self.title_rect
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if focused else config.COL_PANEL, tr)
@@ -81,6 +93,14 @@ class Window:
         desktop_icons.draw(surf, (tr.x + 18, tr.centery), icon_kind, icon_col)
         widgets.draw_text(surf, self.app_obj.title, (tr.x + 32, tr.y + 5),
                           fonts.small(bold=True), icon_col)
+        if self.pinned:
+            # petite épingle VECTORIELLE (tête + pointe) juste avant les boutons
+            # réduire/fermer — pas de glyphe Unicode « 📌 », non garanti par la
+            # police embarquée (même précaution que le reste de ce module).
+            px, py = tr.right - 3 * BTN_W + BTN_W // 2, tr.centery
+            pygame.draw.circle(surf, config.COL_AMBER, (px, py - 3), 3)
+            pygame.draw.polygon(surf, config.COL_AMBER,
+                                [(px - 2, py), (px + 2, py), (px, py + 5)])
         # boutons réduire / fermer (dessin vectoriel, cf. ui/desktop_icons.py —
         # les glyphes Unicode « – »/« ✕ » ne s'affichent pas de façon fiable)
         mr, cr = self.min_rect, self.close_rect
@@ -120,6 +140,19 @@ class WindowManager:
                                      config.SCREEN_HEIGHT - config.TOPBAR_H)
         self._snap_preview = None     # Rect d'aperçu d'ancrage pendant un glisser
         self._last_title_click = (None, -10000)   # (window, ms) pour le double-clic
+        self.on_close = None   # callable(Window) optionnel, appelé AVANT la fermeture
+                               # (ex. DesktopScene mémorise la dernière fenêtre fermée
+                               # pour le raccourci "rouvrir", cf. Ctrl+Maj+Z)
+
+    def _z_order(self):
+        """Ordre de dessin/détection de clic : les fenêtres ÉPINGLÉES
+        (`Window.pinned`) passent TOUJOURS au-dessus des autres, quel que
+        soit l'ordre de focus/ouverture (self.windows) — l'ordre relatif
+        NORMAL est conservé À L'INTÉRIEUR de chaque groupe (épinglées entre
+        elles, non-épinglées entre elles). Utilisé par draw() et
+        _topmost_at() pour que ce qui est visuellement au-dessus soit aussi
+        ce qui reçoit le clic."""
+        return [w for w in self.windows if not w.pinned] + [w for w in self.windows if w.pinned]
 
     # --------------------------------------------------------------- ouverture
     def open(self, key, factory, x=None, y=None):
@@ -147,6 +180,8 @@ class WindowManager:
 
     def close(self, w):
         if w in self.windows:
+            if self.on_close is not None:
+                self.on_close(w)
             self.windows.remove(w)
 
     def focus(self, w):
@@ -184,7 +219,7 @@ class WindowManager:
 
     # --------------------------------------------------------------- évènements
     def _topmost_at(self, pos):
-        for w in reversed(self.windows):
+        for w in reversed(self._z_order()):
             if not w.minimized and w.rect.collidepoint(pos):
                 return w
         return None
@@ -207,9 +242,7 @@ class WindowManager:
                 drag._resizing = False
                 # relâché sur une zone d'ancrage -> on y colle la fenêtre
                 if was_moving and self._snap_preview is not None:
-                    if drag._restore_rect is None:
-                        drag._restore_rect = drag.rect.copy()
-                    drag.rect = self._snap_preview.copy()
+                    self.dock(drag, self._snap_preview)
                 self._snap_preview = None
                 return True
             # Aucune fenêtre du BUREAU n'est en train d'être glissée, mais
@@ -319,6 +352,22 @@ class WindowManager:
         else:
             w._restore_rect = w.rect.copy()
             w.rect = self.work_area.copy()
+        self._dock_feedback(w)
+
+    def dock(self, w, rect):
+        """Ancre `w` sur `rect` (moitié d'écran, plein écran…), en gardant
+        `_restore_rect` pour revenir en arrière — utilisé aussi bien par le
+        glisser-vers-le-bord (`handle_event`) que par le menu contextuel
+        (`scene_desktop_menus._snap_window`), pour un seul point de vérité sur
+        le feedback (son + liseré pulsé)."""
+        if w._restore_rect is None:
+            w._restore_rect = w.rect.copy()
+        w.rect = rect.copy()
+        self._dock_feedback(w)
+
+    def _dock_feedback(self, w):
+        audio.play("snap")
+        w._dock_flash_until = pygame.time.get_ticks() + DOCK_FLASH_MS
 
     # --------------------------------------------------------------- cycle
     def update(self, dt):
@@ -334,6 +383,6 @@ class WindowManager:
             surf.blit(overlay, self._snap_preview.topleft)
             pygame.draw.rect(surf, config.COL_CYAN, self._snap_preview, 2)
         focused = self.focused
-        for w in self.windows:
+        for w in self._z_order():
             if not w.minimized:
                 w.draw(surf, w is focused)

@@ -157,8 +157,8 @@ def test_terminal_command_opens_achievements_scene(app):
 
 
 def test_more_hub_lists_achievements_entry(app):
-    from scenes.scene_more import SECTIONS
-    scenes = {scene for _title, items in SECTIONS for _label, scene, _kw in items}
+    from core.app_catalog import SECTIONS
+    scenes = {scene for _title, items in SECTIONS for _label, scene, _kw, _desc in items}
     assert "achievements" in scenes
 
 

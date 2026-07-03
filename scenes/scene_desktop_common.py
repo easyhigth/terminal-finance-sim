@@ -15,7 +15,7 @@ from apps.app_research import ResearchApp
 from apps.app_sheet import SheetApp
 from apps.app_trading import TradingApp
 from apps.app_watchlist import WatchlistApp
-from scenes.scene_more import SECTIONS
+from core.app_catalog import SECTIONS
 
 TOPBAR_H = 36
 TASKBAR_H = 30
@@ -70,7 +70,6 @@ QUICK_APPS = [
     ("qshop", "Shop", "shop", "shop"),
     ("qexplorer", "Explorateur", "explorer", "explorer"),
     ("qgraph", "Graphes", "graph", "graph"),
-    ("qmore", "Plus", "apps", "more"),
     ("save", "Sauver", "save", None),
     ("qcommands", "Aide", "help", "commands"),
 ]
@@ -89,7 +88,9 @@ ICON_FEATURE = {
 # raccourcis du terminal (RAIL_SHORTCUTS, scenes/scene_terminal.py, garder
 # synchronisé) pour ne pas avoir deux dialectes. Ctrl+T/W/Tab sont réservés
 # par la barre d'onglets (core/pages.py), Ctrl+K par la palette, Ctrl+/ par
-# la recherche globale — jamais réutilisés ici.
+# la recherche globale — jamais réutilisés ici. Ctrl+O (Plus/Apps) n'est PAS
+# ici : il n'ouvre pas une icône mais bascule le menu Démarrer directement
+# (cf. DesktopScene.handle_event), pas de fenêtre dédiée à ouvrir.
 DESKTOP_SHORTCUTS = {
     pygame.K_m: "qmarket",
     pygame.K_p: "qbook",
@@ -100,7 +101,6 @@ DESKTOP_SHORTCUTS = {
     pygame.K_d: "qdeals",
     pygame.K_x: "qexamcert",
     pygame.K_b: "qshop",
-    pygame.K_o: "qmore",
     pygame.K_s: "save",
     pygame.K_h: "qcommands",
 }
@@ -112,8 +112,8 @@ _ICON_SHORTCUT = {icon: "Ctrl+" + pygame.key.name(k).upper()
 _NEEDS_TICKER = {"company", "financials", "ma_target"}
 _NEEDS_TICKERS = {"compare", "graph"}
 
-# Libellé lisible d'une scène (repris des sections du hub PLUS).
-_SCENE_LABEL = {scene: label for _title, items in SECTIONS for label, scene, _kw in items}
+# Libellé lisible d'une scène (repris du catalogue core/app_catalog.SECTIONS).
+_SCENE_LABEL = {scene: label for _title, items in SECTIONS for label, scene, _kw, _desc in items}
 
 ICON_W, ICON_H = 88, 78
 ICON_GAP = 6

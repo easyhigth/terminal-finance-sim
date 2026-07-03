@@ -74,6 +74,9 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         # la barre des tâches (les fenêtres ancrées ne passent pas dessous).
         self.wm.work_area = pygame.Rect(0, TOPBAR_H, config.SCREEN_WIDTH,
                                         config.SCREEN_HEIGHT - TOPBAR_H - TASKBAR_H)
+        self.wm.on_close = self._record_closed_window
+        if not hasattr(self, "_last_closed"):
+            self._last_closed = None    # (kind, key, kwargs) — CTRL+MAJ+T pour rouvrir
         self.start_open = False
         self._icon_rects = {}       # clé -> (Rect, icon_kind, label) — icônes du bureau
         self._icon_focus = None     # clé de l'icône ayant le focus clavier (ou None)
@@ -81,7 +84,14 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self._launch_rects = {}     # clé app -> Rect (barre des tâches quick-launch)
         self._task_rects = {}       # Window -> Rect (barre des tâches)
         self._start_rect = None     # bouton menu Démarrer
-        self._launcher_rects = []   # [(Rect, scene, kwargs)] items du menu Démarrer
+        self._launcher_rects = []   # [(Rect, scene, kwargs, locked, label, desc)] items VISIBLES
+        self._start_all_rects = []  # liste complète (navigation clavier), même format
+        self._start_search = ""     # recherche locale du menu Démarrer
+        self._start_cursor = 0      # curseur clavier (index dans _start_all_rects)
+        self._start_scroll = 0
+        self._start_max_scroll = 0
+        self._start_tooltip = None  # (texte, pos souris) affiché par _draw_launcher
+        self._launcher_list_rect = None
         self._menu_rect = None
         self._ambient_rect = None    # widget patrimoine (clic → portefeuille)
         self._todo_rects = []        # lignes du widget « À faire » (clic → scène)
@@ -178,21 +188,39 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 and (event.mod & pygame.KMOD_CTRL) and (event.mod & pygame.KMOD_SHIFT)):
             self._toggle_show_desktop()
             return
+        # « Rouvrir la dernière fenêtre fermée » (CTRL+MAJ+Z, « annuler la
+        # fermeture » — complément naturel de CTRL+MAJ+D « Afficher le
+        # bureau »). Pas CTRL+MAJ+T : CTRL+T est déjà « nouvel onglet », capté
+        # par la bande d'onglets (core/pages.py) AVANT même d'atteindre cette
+        # scène, quel que soit MAJ ; et tout CTRL+MAJ+<lettre> par ailleurs
+        # réservé par MORE_SHORTCUTS (scenes/scene_terminal.py) quand le
+        # terminal a le focus. La fenêtre la plus récemment fermée (chrome
+        # ✕, menu contextuel, ou « Fermer toutes les fenêtres ») se rouvre
+        # avec son contexte d'origine (ticker, kwargs…). N'empile pas
+        # d'historique multi-niveaux — un seul « dernier fermé », remplacé à
+        # chaque fermeture (cf. _record_closed_window).
+        if (event.type == pygame.KEYDOWN and event.key == pygame.K_z
+                and (event.mod & pygame.KMOD_CTRL) and (event.mod & pygame.KMOD_SHIFT)):
+            self._reopen_last_closed()
+            return
+        # CTRL+O : bascule le menu Démarrer (même mnémonique que le rail du
+        # terminal, RAIL_SHORTCUTS/commande MORE) — l'icône dédiée « Plus » a
+        # été retirée, le menu Démarrer couvrant déjà exactement le même
+        # besoin (toutes les pages, ouvrables en fenêtre).
+        if (event.type == pygame.KEYDOWN and event.key == pygame.K_o
+                and (event.mod & pygame.KMOD_CTRL) and not (event.mod & (pygame.KMOD_SHIFT | pygame.KMOD_ALT))):
+            self._toggle_start_menu()
+            return
         # clic droit : menu contextuel (icône, chrome de fenêtre, barre des
         # tâches ou fond du bureau) — avant le routage classique des fenêtres.
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
             if self._open_context_menu(event.pos):
                 return
-        # menu Démarrer ouvert : priorité à ses items / fermeture au clic dehors
-        if self.start_open and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            for r, name, kw in self._launcher_rects:
-                if r.collidepoint(event.pos):
-                    self._open_scene_window(name, **kw)
-                    return
-            if not (self._start_rect and self._start_rect.collidepoint(event.pos)):
-                self.start_open = False
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and self.start_open:
-            self.start_open = False
+        # menu Démarrer ouvert : capture tout (clavier + souris) en priorité —
+        # recherche locale, navigation clavier en grille, verrous par grade
+        # (cf. DesktopMenusMixin._handle_start_menu_event).
+        if self.start_open:
+            self._handle_start_menu_event(event)
             return
         # carte « Bilan du trimestre » (au-dessus des fenêtres) : ses boutons
         # sont prioritaires, un clic ailleurs sur la carte est absorbé.
@@ -253,7 +281,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             return
         pos = event.pos
         if self._start_rect and self._start_rect.collidepoint(pos):
-            self.start_open = not self.start_open
+            self._toggle_start_menu()
             return
         # icônes du bureau + quick-launch : ouvrir/ramener l'app
         for key, (r, _kind, _label) in self._icon_rects.items():
@@ -303,6 +331,30 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 if w.key in self._show_desktop_restore:
                     w.minimized = False
             self._show_desktop_restore = []
+
+    def _record_closed_window(self, w):
+        """Callback de WindowManager.on_close : mémorise de quoi rouvrir la
+        fenêtre qui vient de se fermer (CTRL+MAJ+Z). Le terminal n'est jamais
+        mémorisé : instance persistante (le moteur tourne même fermée), se
+        rouvre toujours par sa propre icône, pas par « rouvrir »."""
+        if w.key == "scene:terminal":
+            return
+        if w.key.startswith("scene:"):
+            name = w.key[len("scene:"):]
+            kwargs = dict(getattr(w.app_obj, "_kwargs", None) or {})
+            self._last_closed = ("scene", name, kwargs)
+        else:
+            self._last_closed = ("app", w.key, {})
+
+    def _reopen_last_closed(self):
+        if self._last_closed is None:
+            return
+        kind, key, kwargs = self._last_closed
+        self._last_closed = None
+        if kind == "scene":
+            self._open_scene_window(key, **kwargs)
+        else:
+            self._launch(key)
 
     def _launch(self, key):
         if key == "terminal":

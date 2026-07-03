@@ -70,7 +70,6 @@ from scenes.scene_mandates import MandatesScene
 from scenes.scene_markethub import MarketHubScene
 from scenes.scene_menu import MenuScene
 from scenes.scene_mission import MissionScene
-from scenes.scene_more import MoreScene
 from scenes.scene_news import NewsScene
 from scenes.scene_notifications import NotificationsScene
 from scenes.scene_options import OptionsScene
@@ -146,7 +145,6 @@ def build_scene_manager(app):
     m.register("etfs", ETFScene(app))
     m.register("news", NewsScene(app))
     m.register("notifications", NotificationsScene(app))
-    m.register("more", MoreScene(app))
     m.register("structured", StructuredScene(app))
     m.register("credit", CreditScene(app))
     m.register("alm", AlmScene(app))

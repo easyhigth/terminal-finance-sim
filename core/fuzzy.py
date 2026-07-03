@@ -1,7 +1,8 @@
 """
 fuzzy.py — Correspondance approximative (fuzzy) pour les recherches texte du
-jeu : palette de navigation (Ctrl+K, core/scene_manager.py) et recherche de
-la page PLUS (scenes/scene_more.py). Logique pure, sans pygame.
+jeu : palette de navigation (Ctrl+K, core/scene_manager.py) et recherche du
+menu Démarrer du bureau (scenes/scene_desktop_menus.py). Logique pure, sans
+pygame.
 
 `score(query, text)` retourne None si `query` n'est pas une sous-séquence
 (dans l'ordre, insensible à la casse/accents) de `text`, sinon un score

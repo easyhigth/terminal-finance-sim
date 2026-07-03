@@ -30,6 +30,10 @@ SECTIONS_EN = [
         ("ESC", "Clear the current search, otherwise return to the previous screen"),
     ]),
     ("Per-screen exceptions", [
+        ("Explorer / Shop — CTRL+F", "Browser-style: gives keyboard focus back to the "
+            "search field (handy from the quantity field in Shop) and scrolls back to "
+            "the top of the filtered list — search itself is already typable without "
+            "any prior action, like most screens"),
         ("Shop — TAB", "Toggles the input focus between search and quantity"),
         ("Team — TAB", "Toggles the focus between the recruitment catalogue and the "
                         "current team ; ENTER hires or fires depending on the active pane"),
@@ -71,17 +75,17 @@ SECTIONS_EN = [
         ("CTRL+M / P / I / N / J", "Market / Portfolio / Inbox / News / Mission"),
         ("CTRL+A / D / F / E", "Mandates / Deals / M&A / Decide"),
         ("CTRL+X / B / T / L / G", "Exam-Cert / Shop / Spreadsheet / Academy / Glossary"),
-        ("CTRL+O / S / H / K", "More (all pages) / Save / Help / Command palette"),
-        ("CTRL+SHIFT+letter", "Pages only available from MORE (e.g. CTRL+SHIFT+E "
+        ("CTRL+O / S / H / K", "Start menu (all pages) / Save / Help / Command palette"),
+        ("CTRL+SHIFT+letter", "Pages only available from the start menu (e.g. CTRL+SHIFT+E "
             "Explorer, +C Career, +B Detailed book, +H History, +T Team, "
             "+R Risk/VaR, +A Macro calendar, +V Annual review, +L Rivals, +S Stress test, "
-            "+W Saves, +O Track/specialization) — see the MORE panel (CTRL+O) for "
+            "+W Saves, +O Track/specialization) — see the start menu (CTRL+O) for "
             "the full list and search by name"),
         ("CTRL+1 / 2 / 3", "Quick-save to SLOT1/2/3, from any screen in the game "
             "(the SAVE command always saves to SLOT1 only)"),
         ("CTRL+SHIFT+1 / 2 / 3", "Quick-load from SLOT1/2/3, from any screen in the game "
             "(same slots as the SAVE command / Saves screen)"),
-        ("Other pages", "Always reachable via CTRL+O (MORE) then arrows/search, "
+        ("Other pages", "Always reachable via CTRL+O (start menu) then arrows/search, "
             "or by typing their command directly (ETF, BONDS, CMDTY, CRYPTO, STRUCT, "
             "CREDIT, SWAP, GOV, FX, OPTIONS, IPO, GP, PA, ATTR, ALERT, QUANT, FRONTIER, "
             "HEDGE, ALM, TUTO, CERT…)"),
@@ -94,7 +98,10 @@ SECTIONS_EN = [
             "(same mnemonics as the terminal shortcuts above), no click needed — "
             "only if the icon is visible at the current grade"),
         ("CTRL+M / P / I / N / J", "Market / Portfolio / Inbox / News / Mission"),
-        ("CTRL+A / D / X / B / O", "Mandates / Deals / Exam-Cert / Shop / More"),
+        ("CTRL+A / D / X / B", "Mandates / Deals / Exam-Cert / Shop"),
+        ("CTRL+O", "Toggles the start menu (all pages, searchable by name) — pages "
+            "locked by grade show a padlock and an explanatory tooltip, others a short "
+            "description on hover/focus"),
         ("CTRL+S / H", "Quick save (slot 1) / Help (commands)"),
         ("CTRL+/", "Global search — positions, watchlist, inbox, mandates, deals "
             "(not to be confused with CTRL+K, the general navigation palette)"),
@@ -102,8 +109,16 @@ SECTIONS_EN = [
             "whatever screen is currently in front"),
         ("CTRL+SHIFT+D", "Show desktop (Windows+D style): minimizes every open "
             "window ; a 2nd press restores exactly the ones that were open"),
+        ("CTRL+SHIFT+Z", "Reopens the last closed window, with its original context "
+            "(ticker, filters…) — not the terminal, always reachable via its own icon"),
         ("Right click", "Opens a context menu depending on the target: icon, a "
             "window's title bar, taskbar entry, or the desktop background"),
+        ("Right click → Pin", "On a title bar/taskbar entry: keeps this window ALWAYS "
+            "on top (small pin in its title bar), even when another window is "
+            "focused — handy to keep the watchlist or portfolio visible at all times"),
+        ("↑ / ↓ / ENTER / ESC (context menu)", "The context menu (right click) can also "
+            "be navigated by keyboard — white outline on the highlighted item, ENTER "
+            "activates it, ESC closes without doing anything"),
     ]),
     ("Floating windows and this panel", [
         ("ESC", "Closes the most recent floating window, or this panel if it's open"),

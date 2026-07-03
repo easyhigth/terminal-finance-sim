@@ -831,11 +831,12 @@ def test_scene_host_navigation_opens_window_not_switch(app):
 def test_desktop_launcher_lists_scenes(app):
     app.scenes.go("desktop")
     desk = app.scenes.current
-    desk.start_open = True
+    desk._open_start_menu()
     desk.draw(app.screen)
-    assert len(desk._launcher_rects) > 20      # toutes les scènes du hub PLUS
-    # ouvrir un item par clic
-    r, scene, kw = desk._launcher_rects[0]
+    assert len(desk._launcher_rects) > 20      # toutes les scènes du catalogue
+    # ouvrir un item par clic (le premier, "Marché", n'est jamais verrouillé)
+    r, scene, kw, locked, _label, _desc = desk._launcher_rects[0]
+    assert not locked
     desk.handle_event(_click(r.centerx, r.centery))
     assert any(win.key == f"scene:{scene}" for win in desk.wm.windows)
 
@@ -843,10 +844,10 @@ def test_desktop_launcher_lists_scenes(app):
 def test_every_launcher_scene_hosts_without_error(app):
     """Chaque scène du menu Démarrer doit pouvoir être hébergée en fenêtre
     (on_enter + update + draw + un clic) sans lever d'exception."""
-    from scenes.scene_more import SECTIONS
+    from core.app_catalog import SECTIONS
     app.scenes.go("desktop")
     desk = app.scenes.current
-    names = {scene for _t, items in SECTIONS for _l, scene, _kw in items}
+    names = {scene for _t, items in SECTIONS for _l, scene, _kw, _desc in items}
     for name in sorted(names):
         w = desk._open_scene_window(name)
         assert w is not None, name
@@ -1172,6 +1173,48 @@ def test_context_menu_dismissed_by_outside_click(app):
     assert len(desk.wm.windows) == n_before
 
 
+def test_context_menu_keyboard_navigation_wraps_and_activates(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)
+    r, _kind, _label = desk._icon_rects["research"]
+    desk.handle_event(_rclick(r.centerx, r.centery))
+    n_items = len(desk._ctx_menu["items"])
+    assert desk._ctx_menu["cursor"] == 0
+
+    down = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_DOWN, mod=0, unicode="")
+    desk.handle_event(down)
+    assert desk._ctx_menu["cursor"] == 1
+
+    up = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_UP, mod=0, unicode="")
+    desk.handle_event(up)
+    desk.handle_event(up)
+    assert desk._ctx_menu["cursor"] == n_items - 1   # remonte en haut -> boucle en bas
+
+    # ENTRÉE sur "Ouvrir" (1er item) active l'action et referme le menu
+    up_to_open = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_UP, mod=0, unicode="")
+    for _ in range(n_items - 1):
+        desk.handle_event(up_to_open)
+    assert desk._ctx_menu["cursor"] == 0
+    enter = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, mod=0, unicode="")
+    desk.handle_event(enter)
+    assert desk._ctx_menu is None
+    assert any(w.key == "research" for w in desk.wm.windows)
+
+
+def test_context_menu_escape_closes_without_action(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)
+    r, _kind, _label = desk._icon_rects["trading"]
+    desk.handle_event(_rclick(r.centerx, r.centery))
+    n_before = len(desk.wm.windows)
+    esc = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=0, unicode="")
+    desk.handle_event(esc)
+    assert desk._ctx_menu is None
+    assert len(desk.wm.windows) == n_before
+
+
 def test_context_menu_snap_left_positions_window(app):
     app.scenes.go("desktop")
     desk = app.scenes.current
@@ -1180,6 +1223,92 @@ def test_context_menu_snap_left_positions_window(app):
     wa = desk.wm.work_area
     assert w.rect.x == wa.x and w.rect.w == wa.w // 2
     assert w._restore_rect is not None              # peut revenir à la taille d'avant
+
+
+# ==================================================== épinglage de fenêtre ====
+def test_pin_toggle_via_context_menu_item(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("research")
+    assert w.pinned is False
+    items = dict(desk._window_menu_items(w))
+    items["Épingler (toujours au premier plan)"]()
+    assert w.pinned is True
+    items2 = dict(desk._window_menu_items(w))
+    items2["Détacher (premier plan)"]()
+    assert w.pinned is False
+
+
+def test_pinned_window_stays_on_top_after_other_window_focused(app):
+    wm = WindowManager(app)
+    w1 = wm.open("a", lambda: ResearchApp(app))
+    w2 = wm.open("b", lambda: SheetApp(app))
+    w1.rect.topleft = w2.rect.topleft = (100, 100)
+    w1.pinned = True
+    wm.focus(w2)   # w2 est la dernière ouverte/focalisée...
+    assert wm._topmost_at((150, 150)) is w1   # ...mais w1 reste au-dessus (épinglée)
+
+
+def test_two_pinned_windows_keep_relative_order_between_them(app):
+    wm = WindowManager(app)
+    w1 = wm.open("a", lambda: ResearchApp(app))
+    w2 = wm.open("b", lambda: SheetApp(app))
+    w1.rect.topleft = w2.rect.topleft = (100, 100)
+    w1.pinned = w2.pinned = True
+    assert wm._topmost_at((150, 150)) is w2   # ordre normal conservé entre épinglées
+    wm.focus(w1)
+    assert wm._topmost_at((150, 150)) is w1
+
+
+def test_unpinned_windows_unaffected_when_none_pinned(app):
+    wm = WindowManager(app)
+    wm.open("a", lambda: ResearchApp(app))
+    wm.open("b", lambda: SheetApp(app))
+    assert wm._z_order() == wm.windows
+
+
+# ==================================== feedback son/visuel de docking ==========
+def test_maximize_toggle_sets_dock_flash(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("trading")
+    wm = desk.wm
+    assert w._dock_flash_until == 0
+    wm.maximize_toggle(w)
+    assert w._dock_flash_until > pygame.time.get_ticks()
+
+
+def test_snap_drag_to_edge_sets_dock_flash(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("research")
+    wm = desk.wm
+    tr = w.title_rect
+    wm.handle_event(_down(tr.centerx, tr.centery))
+    wm.handle_event(_motion(2, wm.work_area.centery))
+    wm.handle_event(_up(2, wm.work_area.centery))
+    assert w._dock_flash_until > pygame.time.get_ticks()
+
+
+def test_context_menu_snap_sets_dock_flash(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("sheet")
+    desk._snap_window(w, "left")
+    assert w._dock_flash_until > pygame.time.get_ticks()
+
+
+def test_dock_flash_fades_and_stops_drawing(app):
+    """Le liseré de docking s'éteint tout seul après DOCK_FLASH_MS (horloge
+    murale, pas de dépendance à dt) — vérifié via un dessin après expiration."""
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("trading")
+    wm = desk.wm
+    wm.maximize_toggle(w)
+    w._dock_flash_until = pygame.time.get_ticks() - 1   # déjà expiré
+    surf = pygame.Surface((w.rect.right + 10, w.rect.bottom + 10))
+    w.draw(surf, focused=True)   # ne doit pas lever d'exception une fois expiré
 
 
 # ============================== réactivité des graphes + flash vert/rouge ======

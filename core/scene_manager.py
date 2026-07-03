@@ -134,9 +134,9 @@ class SceneManager:
     def _scene_label(self, name):
         if name == "terminal":
             return "Terminal"
-        from scenes.scene_more import SECTIONS
+        from core.app_catalog import SECTIONS
         for _title, items in SECTIONS:
-            for label, scene_name, _kw in items:
+            for label, scene_name, _kw, _desc in items:
                 if scene_name == name:
                     return label
         return name.capitalize()
@@ -169,8 +169,8 @@ class SceneManager:
 
     # --- palette de navigation globale (Ctrl+K) ---------------------------
     def _palette_entries(self):
-        from scenes.scene_more import SECTIONS
-        return [(label, scene, kw) for _, items in SECTIONS for (label, scene, kw) in items]
+        from core.app_catalog import SECTIONS
+        return [(label, scene, kw) for _, items in SECTIONS for (label, scene, kw, _desc) in items]
 
     def _palette_ticker_matches(self, query, limit=6):
         """Suggestions d'actifs (ticker/nom) correspondant à la saisie, pour

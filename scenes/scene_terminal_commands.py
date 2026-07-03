@@ -416,7 +416,15 @@ class TerminalCommandsMixin:
         elif cmd in ("NEWS", "ACTUS", "ACTUALITES", "EVENTS"):
             self.app.scenes.go("news", return_to="terminal")
         elif cmd in ("MORE", "PLUS", "PAGES"):
-            self.app.scenes.go("more", return_to="terminal")
+            # ouvre le menu Démarrer du bureau (toutes les pages, cf.
+            # core/app_catalog.py) — plus d'écran PLUS séparé à ouvrir en
+            # fenêtre, le menu Démarrer couvrait déjà exactement le même
+            # besoin. `.scenes.scenes` (dict des instances enregistrées, cf.
+            # core/scene_manager.SceneManager) donne accès direct à
+            # l'instance persistante du bureau, hébergé ou non.
+            desktop = self.app.scenes.scenes.get("desktop")
+            if desktop is not None:
+                desktop._open_start_menu()
         elif cmd in ("SHORTCUTS", "RACCOURCIS", "KEYS", "TOUCHES"):
             self._toggle_shortcuts_panel()
         elif cmd == "REG":

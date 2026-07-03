@@ -47,6 +47,10 @@ _SPECS = {
     # même ton, plus pressant) — une décision attend, sans connotation
     # positive/négative.
     "dilemma":   [(600.0, 0.08, 0.6), (500.0, 0.08, 0.6)],
+    # clic sec bref, aigu puis grave : fenêtre ancrée/maximisée (feedback de
+    # docking, cf. ui/window_manager.py) — distinct de "order" (deux tons
+    # montants, plus long) pour rester discret sur une action très fréquente.
+    "snap":      [(880.0, 0.04, 0.45), (523.25, 0.05, 0.4)],
 }
 
 

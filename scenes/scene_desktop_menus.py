@@ -122,13 +122,17 @@ class DesktopMenusMixin:
 
     # ------------------------------------------------- menus contextuels (clic droit)
     def _snap_window(self, w, side):
-        """Ancre une fenêtre sur une moitié de la zone de travail (comme le
-        glisser-vers-le-bord, même feedback son/visuel via `WindowManager.dock`)."""
+        """Ancre une fenêtre sur une moitié ou un quart de la zone de travail
+        (comme le glisser-vers-un-bord/coin, même feedback son/visuel via
+        `WindowManager.dock`). `side` : "left"/"right" (moitié) ou
+        "tl"/"tr"/"bl"/"br" (quart, cf. `WindowManager._quarter_rect`)."""
         wa = self.wm.work_area
         if side == "left":
             rect = pygame.Rect(wa.x, wa.y, wa.w // 2, wa.h)
-        else:
+        elif side == "right":
             rect = pygame.Rect(wa.x + wa.w // 2, wa.y, wa.w - wa.w // 2, wa.h)
+        else:
+            rect = self.wm._quarter_rect(side)
         self.wm.dock(w, rect)
 
     def _close_all_windows(self):
@@ -183,6 +187,14 @@ class DesktopMenusMixin:
              lambda: self.wm.maximize_toggle(w)),
             (_L("Ancrer à gauche", "Snap left"), lambda: self._snap_window(w, "left")),
             (_L("Ancrer à droite", "Snap right"), lambda: self._snap_window(w, "right")),
+            (_L("Ancrer en quart (haut-gauche)", "Snap to quarter (top-left)"),
+             lambda: self._snap_window(w, "tl")),
+            (_L("Ancrer en quart (haut-droit)", "Snap to quarter (top-right)"),
+             lambda: self._snap_window(w, "tr")),
+            (_L("Ancrer en quart (bas-gauche)", "Snap to quarter (bottom-left)"),
+             lambda: self._snap_window(w, "bl")),
+            (_L("Ancrer en quart (bas-droit)", "Snap to quarter (bottom-right)"),
+             lambda: self._snap_window(w, "br")),
             (_L("Détacher (premier plan)" if w.pinned else "Épingler (toujours au premier plan)",
                 "Unpin" if w.pinned else "Pin (always on top)"),
              lambda: setattr(w, "pinned", not w.pinned)),

@@ -212,6 +212,18 @@ class WindowManager:
                     drag.rect = self._snap_preview.copy()
                 self._snap_preview = None
                 return True
+            # Aucune fenêtre du BUREAU n'est en train d'être glissée, mais
+            # l'appli focalisée peut avoir son PROPRE état de glisser en cours
+            # (ex. un popup de données ou la calculatrice déplacés À
+            # L'INTÉRIEUR d'une scène hébergée, cf. ui/datawindow.py/
+            # ui/calculator.py) : sans cette transmission, le MOUSEBUTTONUP ne
+            # lui parvient jamais (seul MOUSEMOTION est routé plus bas), donc
+            # son drapeau `dragging` ne repasse jamais à False — le popup
+            # reste « collé » à la souris indéfiniment (bug corrigé ici).
+            w = self.focused
+            if w is not None:
+                return bool(w.app_obj.handle_event(event, w.content_rect))
+            return False
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             w = self._topmost_at(event.pos)

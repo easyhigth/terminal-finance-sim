@@ -82,7 +82,7 @@ class DealScene(Scene):
         if self.app.gs.player.check_game_over():
             self.app.scenes.go("gameover")
         else:
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
 
     def update(self, dt):
         mp = pygame.mouse.get_pos()

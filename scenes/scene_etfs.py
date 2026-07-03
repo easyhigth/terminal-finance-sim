@@ -96,7 +96,7 @@ class ETFScene(Scene, PopupMixin):
                 if self.search:
                     self.search = ""
                     return
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
                 return
             elif event.key == pygame.K_BACKSPACE:
                 self.search = self.search[:-1]
@@ -120,7 +120,7 @@ class ETFScene(Scene, PopupMixin):
                 self.scroll = 0
                 return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.explore_btn.handle(event):
             self.app.scenes.go("explorer", return_to="etfs")

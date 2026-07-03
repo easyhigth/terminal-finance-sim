@@ -76,7 +76,7 @@ class CommoditiesScene(Scene, PopupMixin):
                 if self.search_box.text:
                     self.search_box.text = ""
                     return
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
                 return
             elif event.key == pygame.K_BACKSPACE:
                 self.search_box.handle_typing(event)
@@ -100,7 +100,7 @@ class CommoditiesScene(Scene, PopupMixin):
                 self.scroll = 0
                 return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
             if self._list_rect and self._list_rect.collidepoint(event.pos):
                 self.scroll = max(0, min(self._max_scroll,

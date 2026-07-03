@@ -140,10 +140,10 @@ class PortfolioUnifiedScene(Scene):
                 return
             return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 4:
             self.scroll = max(0, self.scroll - 40)

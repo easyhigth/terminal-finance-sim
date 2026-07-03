@@ -153,11 +153,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         if not hasattr(self, "datawins"):
             self.datawins = []        # fenêtres de données déplaçables (overlay)
             self._restore_workspace()
-        self._cheat_btn_rect = None   # bouton triche : ouvre le panneau GLOBAL
-                                      # (ui/simclock_widget.toggle_cheat_panel)
         self.shortcuts_panel = None   # panneau des raccourcis clavier (overlay)
-        self._shortcuts_btn_rect = None
-        self._settings_btn_rect = None   # bouton ⚙ RÉGLAGES (topbar)
         # navigation hiérarchique au clavier : pile de focus bloc → contenu
         # interne (cf. ui/keynav.ZoneStack). Par défaut le focus reste « dans »
         # la console comme avant (saisie immédiate), Échap permet de remonter
@@ -275,15 +271,6 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._onboarding_skip_rect and self._onboarding_skip_rect.collidepoint(event.pos):
                 onboarding_mod.skip(self.app.gs.player)
-                return
-            if (getattr(self.app, "cheats", False) and self._cheat_btn_rect
-                    and self._cheat_btn_rect.collidepoint(event.pos)):
-                # panneau de triche GLOBAL (unique, porté par l'app, dessiné
-                # par core/pages.py par-dessus tout) — même action que le
-                # bouton CHEAT de la bande d'onglets, plus de panneau local
-                # en doublon.
-                from ui import simclock_widget
-                simclock_widget.toggle_cheat_panel(self.app)
                 return
             for key, rect in self._console_btns.items():
                 if rect.collidepoint(event.pos):

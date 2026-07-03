@@ -32,6 +32,7 @@ class _Router:
         self._real = real_scenes
         self._opener = opener            # callable(name, **kwargs)
         self._host_name = host_name
+        self._closer = None              # callable() -> ferme la fenêtre de CETTE scène
 
     @property
     def scenes(self):
@@ -45,8 +46,25 @@ class _Router:
     def current_name(self):
         return self._host_name
 
+    def bind_closer(self, cb):
+        self._closer = cb
+
     def go(self, name, **kwargs):
         self._opener(name, **kwargs)
+
+    def back(self, name, **kwargs):
+        """« Retour » (bouton précédent/continuer) : ferme la fenêtre
+        hébergeant CETTE scène plutôt que d'en ouvrir une AUTRE pour `name` —
+        contrairement à `go()`, qui ouvre toujours une fenêtre supplémentaire
+        sans jamais fermer l'appelante (correct pour une navigation
+        délibérée, ex. "Acheter" → terminal, mais faux pour un bouton retour :
+        avant ce correctif, cliquer « retour » ouvrait/focalisait la fenêtre
+        `name` tout en laissant la fenêtre courante ouverte derrière — un
+        bureau qui s'encombre et un focus volé de façon inattendue)."""
+        if self._closer is not None:
+            self._closer()
+        else:
+            self.go(name, **kwargs)
 
     def __getattr__(self, k):
         return getattr(self._real, k)
@@ -94,6 +112,13 @@ class SceneHostApp(DesktopApp):
     # --- navigation (routée vers l'ouverture de fenêtres) -----------------
     def bind_opener(self, cb):
         self._opener_cb = cb
+
+    def bind_closer(self, cb):
+        """cb: callable() qui ferme la fenêtre du BUREAU hébergeant cette
+        scène — câblé par DesktopScene._open_scene_window pour que
+        `self.app.scenes.back(...)`, appelé DANS la scène hébergée, ferme la
+        bonne fenêtre (cf. _Router.back)."""
+        self.router.bind_closer(cb)
 
     def _route_open(self, name, **kwargs):
         if self._opener_cb is not None:

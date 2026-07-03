@@ -79,10 +79,10 @@ class SavesScene(Scene):
             self._handle_confirm_event(event)
             return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self._import_btn.handle(event):
             self.path_prompt = {"kind": "import"}

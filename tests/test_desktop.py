@@ -77,6 +77,137 @@ def test_close_button_click_closes(app):
     assert w not in wm.windows
 
 
+def test_internal_popup_drag_releases_on_mouseup_not_stuck_to_cursor(app):
+    """Régression : un popup (DataWindow) glissé À L'INTÉRIEUR d'une scène
+    hébergée (ex. fiche société ouverte depuis le terminal) doit se détacher
+    du curseur au relâchement de la souris. Avant correctif, WindowManager ne
+    transmettait MOUSEBUTTONUP à l'appli focalisée QUE si le WindowManager
+    lui-même draguait la fenêtre OS — un drag interne à l'appli ne recevait
+    donc jamais le relâchement et restait collé au curseur indéfiniment."""
+    from apps.scene_host import SceneHostApp
+    app.scenes.go("terminal")
+    wm = WindowManager(app)
+    host = SceneHostApp(app, "terminal", "Terminal", {})
+    w = wm.open("scene:terminal", lambda: host)
+    w.rect = pygame.Rect(0, 40, 1180, 620)
+    host.on_open()
+    term = host.scene
+    tk = app.market.top_companies(n=1)[0]["ticker"]
+    term._open_company_popup(tk)
+    popup = term.datawins[0]
+
+    def to_screen(logical_pos):
+        lx, ly = logical_pos
+        r = w.content_rect
+        return (int(r.x + lx * r.w / 1280), int(r.y + ly * r.h / 720))
+
+    title_screen = to_screen((popup.rect.x + 10, popup.rect.y + 5))
+    wm.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=title_screen))
+    assert popup.dragging is True
+
+    moved_screen = to_screen((popup.rect.x + 80, popup.rect.y + 60))
+    wm.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=moved_screen))
+    assert popup.dragging is True   # toujours en cours de glisser
+
+    wm.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, button=1, pos=moved_screen))
+    assert popup.dragging is False   # relâché : ne doit plus suivre la souris
+
+    # une nouvelle motion, sans nouveau clic, ne doit plus bouger le popup
+    rect_after_release = popup.rect.copy()
+    wm.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=to_screen((200, 200))))
+    assert popup.rect == rect_after_release
+
+
+def test_internal_calculator_drag_releases_on_mouseup(app):
+    """Même régression que ci-dessus, pour la calculatrice flottante des
+    scènes mission/évaluation (ui/calculator.py, même patron de glisser)."""
+    from apps.scene_host import SceneHostApp
+    from ui.calculator import Calculator
+    app.gs.player.grade_index = 3
+    app.scenes.go("terminal")
+    wm = WindowManager(app)
+    host = SceneHostApp(app, "mission", "Mission", {})
+    w = wm.open("scene:mission", lambda: host)
+    w.rect = pygame.Rect(0, 40, 1180, 620)
+    host.on_open()
+    mission = host.scene
+    mission.calc = Calculator(pos=(500, 110))
+    calc = mission.calc
+
+    def to_screen(logical_pos):
+        lx, ly = logical_pos
+        r = w.content_rect
+        return (int(r.x + lx * r.w / 1280), int(r.y + ly * r.h / 720))
+
+    title_screen = to_screen((calc.rect.x + 10, calc.rect.y + 5))
+    wm.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=title_screen))
+    assert calc.dragging is True
+
+    moved_screen = to_screen((calc.rect.x + 50, calc.rect.y + 40))
+    wm.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=moved_screen))
+    wm.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, button=1, pos=moved_screen))
+    assert calc.dragging is False
+
+
+def test_internal_shortcuts_panel_drag_releases_on_mouseup(app):
+    """Même régression, pour le panneau de raccourcis clavier (ui/shortcutspanel
+    .py) ouvert DEPUIS le terminal hébergé — même mécanisme de glisser interne."""
+    from apps.scene_host import SceneHostApp
+    app.scenes.go("terminal")
+    wm = WindowManager(app)
+    host = SceneHostApp(app, "terminal", "Terminal", {})
+    w = wm.open("scene:terminal", lambda: host)
+    w.rect = pygame.Rect(0, 40, 1180, 620)
+    host.on_open()
+    term = host.scene
+    term._toggle_shortcuts_panel()
+    panel = term.shortcuts_panel
+
+    def to_screen(logical_pos):
+        lx, ly = logical_pos
+        r = w.content_rect
+        return (int(r.x + lx * r.w / 1280), int(r.y + ly * r.h / 720))
+
+    title_screen = to_screen((panel.rect.x + 10, panel.rect.y + 5))
+    wm.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=title_screen))
+    assert panel.dragging is True
+
+    moved_screen = to_screen((panel.rect.x + 40, panel.rect.y + 30))
+    wm.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=moved_screen))
+    wm.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, button=1, pos=moved_screen))
+    assert panel.dragging is False
+
+
+def test_internal_sheet_chart_drag_releases_on_mouseup_via_window_manager(app):
+    """Même régression, pour un graphique inséré dans le Tableur (app native,
+    pas une scène hébergée) — passe par le VRAI WindowManager cette fois
+    (les autres tests sheet_app_drag_chart_* appellent handle_event directement
+    sur l'app, sans passer par le routage du WindowManager)."""
+    wm = WindowManager(app)
+    w = wm.open("sheet", lambda: SheetApp(app))
+    w.rect = pygame.Rect(0, 40, 940, 560)
+    sa = w.app_obj
+    sa.on_open()
+    for i, v in enumerate((1, 2, 3), start=1):
+        sa.sheet.set(f"A{i}", str(v))
+    sa.range_anchor, sa.range_end = "A1", "A3"
+    sa._add_chart("line")
+    sa.draw(app.screen, w.content_rect)
+    chart = sa.workbook.active.charts[0]
+    title_r = sa._chart_title_rects[chart.id]
+    x0, y0 = chart.x, chart.y
+
+    wm.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=title_r.center))
+    new_pos = (title_r.centerx + 40, title_r.centery + 30)
+    wm.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=new_pos, buttons=(1, 0, 0)))
+    assert (chart.x, chart.y) != (x0, y0)   # a suivi la souris pendant le glisser
+    moved_after_up = (chart.x, chart.y)
+    wm.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, button=1, pos=new_pos))
+    # une motion supplémentaire, sans nouveau clic, ne doit plus bouger le graphique
+    wm.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=(200, 200), buttons=(0, 0, 0)))
+    assert (chart.x, chart.y) == moved_after_up
+
+
 # ------------------------------------------------------------------- apps
 def test_trading_app_buys(app):
     tk = app.market.companies[0]["ticker"]
@@ -594,6 +725,80 @@ def test_terminal_internal_navigation_opens_desktop_window():
     term.app.scenes.go("shop", return_to="terminal")
     assert a.scenes.current_name == "desktop"          # jamais de bascule plein écran
     assert any(w.key == "scene:shop" for w in desk.wm.windows)
+
+
+def test_back_button_closes_own_window_instead_of_forcing_terminal_open(app):
+    """Régression : cliquer « retour »/« continuer » dans une scène hébergée
+    (ex. mission, dont return_to vaut "terminal" par défaut) doit FERMER la
+    fenêtre courante — pas ouvrir/focaliser en plus la fenêtre "terminal" en
+    laissant la fenêtre appelante ouverte derrière. Avant correctif,
+    self.app.scenes.go(self.return_to) ouvrait toujours une fenêtre
+    supplémentaire sans jamais fermer l'appelante."""
+    app.gs.player.grade_index = 3
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._open_scene_window("mission")
+    mission = w.app_obj.scene
+    assert mission.return_to == "terminal"
+    assert any(win.key == "scene:mission" for win in desk.wm.windows)
+
+    mission.app.scenes.back(mission.return_to)
+
+    assert not any(win.key == "scene:mission" for win in desk.wm.windows)
+    assert app.scenes.current_name == "desktop"   # jamais de bascule plein écran
+
+
+def test_back_does_not_force_open_a_window_that_was_not_already_open(app):
+    """Après le correctif, `back()` ne fait QUE fermer la fenêtre appelante —
+    il n'ouvre plus jamais la fenêtre cible (return_to) si elle n'était pas
+    déjà ouverte, contrairement à l'ancien comportement basé sur go()."""
+    app.gs.player.grade_index = 9
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.wm.close(next(w for w in desk.wm.windows if w.key == "scene:terminal"))
+    w = desk._open_scene_window("book")
+    book = w.app_obj.scene
+    book.app.scenes.back(book.return_to)
+    assert not any(win.key == "scene:book" for win in desk.wm.windows)
+    assert not any(win.key == "scene:terminal" for win in desk.wm.windows)
+
+
+def test_deliberate_forward_navigation_to_terminal_still_opens_it(app):
+    """Contrairement à un bouton retour, une navigation délibérée vers le
+    terminal (ex. « Acheter » depuis la fiche société, qui pré-remplit une
+    commande BUY) doit continuer à ouvrir/focaliser la fenêtre terminal SANS
+    fermer la fenêtre appelante — seul go(self.return_to) est requalifié en
+    back(), pas les go() explicites vers un autre nom de scène."""
+    app.gs.player.grade_index = 9
+    app.gs.player.cash = 5_000_000.0
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    tk = app.market.top_companies(n=1)[0]["ticker"]
+    w = desk._open_scene_window("company", ticker=tk, return_to="markethub")
+    comp = w.app_obj.scene
+    comp.update(0.016)
+    comp.draw(app.screen)
+    comp.handle_event(_click(comp.buy_btn.rect.centerx, comp.buy_btn.rect.centery))
+    assert any(win.key == "scene:company" for win in desk.wm.windows)
+    assert any(win.key == "scene:terminal" for win in desk.wm.windows)
+    term = desk._terminal_host.scene
+    assert term.cmd.startswith(f"BUY {tk}")
+
+
+def test_terminal_has_no_local_clickable_cheat_button(app):
+    """Le bouton CHEAT ne doit exister qu'à un seul endroit : la bande
+    d'onglets du bureau (ui/simclock_widget, cf. core/pages.py) — la scène
+    terminale ne doit plus en dessiner/exposer de copie locale cliquable
+    (double accès source de confusion, corrigé)."""
+    app.cheats = True
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk._launch("terminal")
+    term = desk._terminal_host.scene
+    term.update(0.016)
+    term.draw(app.screen)
+    assert not hasattr(term, "_cheat_btn_rect")
+    assert getattr(app, "cheat_panel", None) is None
 
 
 # --------------------------------------------------- scènes hébergées (étape 2)

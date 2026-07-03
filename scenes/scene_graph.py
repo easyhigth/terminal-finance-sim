@@ -178,7 +178,7 @@ class GraphScene(Scene, PopupMixin):
             if event.key == pygame.K_ESCAPE:
                 if self.popups_close_top():
                     return
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
             elif event.key == pygame.K_BACKSPACE:
                 self.input = self.input[:-1]
             elif event.key == pygame.K_RETURN:
@@ -248,7 +248,7 @@ class GraphScene(Scene, PopupMixin):
                 self.app.scenes.go("explorer", return_to=self.return_to, sub_filter=info["sector"])
                 return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
         if self.kind == "spread" and self.mode_btn.handle(event):
             self.spread_mode = "diff" if self.spread_mode == "ratio" else "ratio"
             self.mode_btn.label = f"SPREAD : {self.spread_mode.upper()}"

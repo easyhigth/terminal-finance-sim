@@ -85,6 +85,17 @@ class SceneManager:
     def register(self, name, scene):
         self.scenes[name] = scene
 
+    def back(self, name, **kwargs):
+        """« Retour » (bouton précédent/continuer) : distinct de `go()` pour
+        les scènes HÉBERGÉES en fenêtre (cf. apps/scene_host.py::_Router.back,
+        qui ferme la fenêtre appelante plutôt que d'en ouvrir une autre — sinon
+        cliquer « retour » vers ex. "terminal" ouvrait la fenêtre du terminal
+        SANS fermer la fenêtre courante, un bug visible). Sur le vrai
+        SceneManager (flux plein écran hors bureau, ou tests directs), il n'y
+        a pas de fenêtre à fermer : `back()` se comporte donc comme `go()`,
+        son comportement historique."""
+        self.go(name, **kwargs)
+
     def go(self, name, **kwargs):
         if name not in self.scenes:
             raise KeyError(f"Scène inconnue : {name}")

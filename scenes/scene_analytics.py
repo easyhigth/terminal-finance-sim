@@ -75,10 +75,10 @@ class AnalyticsScene(Scene, PopupMixin):
             return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             if not self.popups_close_top():
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
             return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.book_btn.handle(event):
             self.app.scenes.go("book", return_to="analytics")

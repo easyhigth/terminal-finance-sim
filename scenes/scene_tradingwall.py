@@ -33,9 +33,9 @@ class TradingWallScene(Scene, PopupMixin):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             if self.popups_close_top():
                 return
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for rr, kind, key in self._tile_rects:
                 if rr.collidepoint(event.pos):

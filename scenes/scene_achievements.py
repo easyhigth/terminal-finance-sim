@@ -64,10 +64,10 @@ class AchievementsScene(Scene):
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for cat_id, r in self._chip_rects.items():

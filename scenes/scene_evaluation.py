@@ -93,7 +93,7 @@ class EvaluationScene(Scene):
         if not p.hardcore:
             self.app.gs.save(config.AUTOSAVE_SLOT)
         self.app.notify(_L("Examen mis en pause — reprenez via EVAL","Exam paused — resume via EVAL"), "info")
-        self.app.scenes.go(self.return_to)
+        self.app.scenes.back(self.return_to)
 
     # ------------------------------------------------------------- helpers
     def _item(self):
@@ -120,10 +120,10 @@ class EvaluationScene(Scene):
                 self.calc = None
             return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.state in ("question", "feedback") and self.pause_btn.handle(event):
             self._pause()
@@ -151,7 +151,7 @@ class EvaluationScene(Scene):
             elif self.state == "feedback" and self.continue_btn.rect.collidepoint(event.pos):
                 self._next()
             elif self.state == "result" and self.continue_btn.rect.collidepoint(event.pos):
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
 
     def _type(self, it, ch):
         if not ch:
@@ -169,7 +169,7 @@ class EvaluationScene(Scene):
         elif self.state == "feedback":
             self._next()
         elif self.state == "result":
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
 
     def _answer_mcq(self, i, it):
         self.chosen = i

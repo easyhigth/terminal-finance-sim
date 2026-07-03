@@ -66,7 +66,7 @@ class NotificationsScene(Scene):
                 if self.search:
                     self.search = ""
                     return
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
                 return
             elif event.key == pygame.K_BACKSPACE:
                 self.search = self.search[:-1]
@@ -77,7 +77,7 @@ class NotificationsScene(Scene):
                 self.scroll = 0
                 return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
             if self._list_rect and self._list_rect.collidepoint(event.pos):

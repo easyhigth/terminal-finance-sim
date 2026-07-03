@@ -122,10 +122,10 @@ class SettingsScene(Scene):
                     self.shortcuts_panel = None
                 return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.shortcuts_btn.handle(event):
             self.shortcuts_panel = ShortcutsPanel()

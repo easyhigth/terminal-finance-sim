@@ -326,7 +326,7 @@ class ShopScene(Scene, PopupMixin):
                 if self.search:
                     self.search = ""
                     return
-                self.app.scenes.go(self.return_to)
+                self.app.scenes.back(self.return_to)
                 return
             elif event.key == pygame.K_BACKSPACE:
                 if self.text_focus == "qty":
@@ -363,7 +363,7 @@ class ShopScene(Scene, PopupMixin):
                 return
 
         if self.back_btn.handle(event):
-            self.app.scenes.go(self.return_to)
+            self.app.scenes.back(self.return_to)
             return
         if self.explorer_btn.handle(event):
             self.app.scenes.go("explorer", return_to="shop", search=self.search,

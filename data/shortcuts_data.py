@@ -81,17 +81,17 @@ SECTIONS = [
         ("CTRL+M / P / I / N / J", "Marché / Portefeuille / Inbox / News / Mission"),
         ("CTRL+A / D / F / E", "Mandats / Deals / M&A / Décider"),
         ("CTRL+X / B / T / L / G", "Exam-Certif / Boutique / Tableur / Académie / Glossaire"),
-        ("CTRL+O / S / H / K", "Plus (toutes les pages) / Sauvegarder / Aide / Palette de commandes"),
-        ("CTRL+MAJ+lettre", "Pages disponibles seulement depuis PLUS (ex. CTRL+MAJ+E "
+        ("CTRL+O / S / H / K", "Menu Démarrer (toutes les pages) / Sauvegarder / Aide / Palette de commandes"),
+        ("CTRL+MAJ+lettre", "Pages disponibles seulement depuis le menu Démarrer (ex. CTRL+MAJ+E "
             "Explorateur, +C Carrière, +B Portefeuille détaillé, +H Historique, +T Équipe, "
             "+R Risque/VaR, +A Calendrier macro, +V Revue annuelle, +L Rivaux, +S Stress test, "
-            "+W Sauvegardes, +O Voie/spécialisation) — voir le panneau PLUS (CTRL+O) pour "
+            "+W Sauvegardes, +O Voie/spécialisation) — voir le menu Démarrer (CTRL+O) pour "
             "la liste complète et la recherche par nom"),
         ("CTRL+1 / 2 / 3", "Sauvegarde rapide sur SLOT1/2/3, depuis n'importe quel écran "
             "du jeu (la commande SAVE ne sauvegarde toujours que sur SLOT1)"),
         ("CTRL+MAJ+1 / 2 / 3", "Chargement rapide depuis SLOT1/2/3, depuis n'importe quel "
             "écran du jeu (mêmes slots que la commande SAVE/scène Sauvegardes)"),
-        ("Autres pages", "Toujours accessibles via CTRL+O (MORE) puis flèches/recherche, "
+        ("Autres pages", "Toujours accessibles via CTRL+O (menu Démarrer) puis flèches/recherche, "
             "ou en tapant directement leur commande (ETF, BONDS, CMDTY, CRYPTO, STRUCT, "
             "CREDIT, SWAP, GOV, FX, OPTIONS, IPO, GP, PA, ATTR, ALERT, QUANT, FRONTIER, "
             "HEDGE, ALM, TUTO, CERT…)"),
@@ -104,7 +104,10 @@ SECTIONS = [
             "(mêmes mnémoniques que les raccourcis du terminal ci-dessus), sans avoir à "
             "cliquer — seulement si l'icône est visible au grade courant"),
         ("CTRL+M / P / I / N / J", "Marché / Portefeuille / Inbox / News / Mission"),
-        ("CTRL+A / D / X / B / O", "Mandats / Deals / Exam-Certif / Shop / Plus"),
+        ("CTRL+A / D / X / B", "Mandats / Deals / Exam-Certif / Shop"),
+        ("CTRL+O", "Bascule le menu Démarrer (toutes les pages, cherchables par nom) — "
+            "les pages verrouillées par le grade affichent un cadenas et une infobulle "
+            "explicative, les autres une courte description au survol/focus"),
         ("CTRL+S / H", "Sauvegarde rapide (slot 1) / Aide (commandes)"),
         ("CTRL+/", "Recherche globale — positions, watchlist, inbox, mandats, deals "
             "(à ne pas confondre avec CTRL+K, la palette de navigation générale)"),

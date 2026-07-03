@@ -78,7 +78,7 @@ _KNOWN_SCENES = [
     "spreadsheet", "saves", "gameover", "company", "commands", "mission",
     "career", "book", "inbox", "dilemma", "intro", "academy", "cert", "deal",
     "financials", "bonds", "governments", "commodities", "crypto", "etfs",
-    "news", "notifications", "more", "structured", "credit", "alm", "swaps", "hedge",
+    "news", "notifications", "structured", "credit", "alm", "swaps", "hedge",
     "options", "ipo", "fx", "review", "calendar", "graph", "rivals",
     "analytics", "performance", "explorer", "tutorials", "splash", "markethub", "wall",
     "settings", "shop",

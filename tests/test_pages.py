@@ -28,7 +28,7 @@ def test_open_page_appends_and_activates(app):
 
 
 def test_open_new_tab_always_lands_on_desktop(app):
-    app.pages.open_page("more")
+    app.pages.open_page("menu")
     page = app.pages.open_new_tab()
     assert page.scene_name == "desktop"
     assert app.scenes.current_name == "desktop"
@@ -36,7 +36,7 @@ def test_open_new_tab_always_lands_on_desktop(app):
 
 def test_close_page_adjusts_active_index(app):
     app.pages.open_page("desktop")
-    app.pages.open_page("more")
+    app.pages.open_page("menu")
     assert len(app.pages.pages) == 3
     app.pages.close_page(1)
     assert len(app.pages.pages) == 2
@@ -51,15 +51,15 @@ def test_close_page_is_noop_with_a_single_page(app):
 
 def test_close_other_pages_keeps_only_active(app):
     app.pages.open_page("desktop")
-    app.pages.open_page("more")
+    app.pages.open_page("menu")
     app.pages.close_other_pages()
     assert len(app.pages.pages) == 1
-    assert app.scenes.current_name == "more"
+    assert app.scenes.current_name == "menu"
 
 
 def test_next_prev_page_cycle(app):
     app.pages.open_page("desktop")
-    app.pages.open_page("more")
+    app.pages.open_page("menu")
     assert app.pages.active == 2
     app.pages.next_page()
     assert app.pages.active == 0   # boucle
@@ -102,7 +102,7 @@ def test_tab_metrics_full_width_when_few_tabs(app):
 def test_tab_metrics_compress_and_scroll_with_many_tabs(app):
     from core.pages import MIN_TAB_W
     for _ in range(25):
-        app.pages.open_page("more")
+        app.pages.open_page("menu")
     w, max_scroll = app.pages._tab_metrics()
     assert w == MIN_TAB_W
     assert max_scroll > 0

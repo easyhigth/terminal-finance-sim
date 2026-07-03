@@ -831,11 +831,12 @@ def test_scene_host_navigation_opens_window_not_switch(app):
 def test_desktop_launcher_lists_scenes(app):
     app.scenes.go("desktop")
     desk = app.scenes.current
-    desk.start_open = True
+    desk._open_start_menu()
     desk.draw(app.screen)
-    assert len(desk._launcher_rects) > 20      # toutes les scènes du hub PLUS
-    # ouvrir un item par clic
-    r, scene, kw = desk._launcher_rects[0]
+    assert len(desk._launcher_rects) > 20      # toutes les scènes du catalogue
+    # ouvrir un item par clic (le premier, "Marché", n'est jamais verrouillé)
+    r, scene, kw, locked, _label, _desc = desk._launcher_rects[0]
+    assert not locked
     desk.handle_event(_click(r.centerx, r.centery))
     assert any(win.key == f"scene:{scene}" for win in desk.wm.windows)
 
@@ -843,10 +844,10 @@ def test_desktop_launcher_lists_scenes(app):
 def test_every_launcher_scene_hosts_without_error(app):
     """Chaque scène du menu Démarrer doit pouvoir être hébergée en fenêtre
     (on_enter + update + draw + un clic) sans lever d'exception."""
-    from scenes.scene_more import SECTIONS
+    from core.app_catalog import SECTIONS
     app.scenes.go("desktop")
     desk = app.scenes.current
-    names = {scene for _t, items in SECTIONS for _l, scene, _kw in items}
+    names = {scene for _t, items in SECTIONS for _l, scene, _kw, _desc in items}
     for name in sorted(names):
         w = desk._open_scene_window(name)
         assert w is not None, name

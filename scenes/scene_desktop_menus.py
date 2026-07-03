@@ -7,10 +7,14 @@ mixé dans `DesktopScene` aux côtés de `DesktopWidgetsMixin`.
 """
 import pygame
 
-from core import config, desktop_onboarding, desktop_tutorial
+from core import app_catalog, config, desktop_onboarding, desktop_tutorial, fuzzy
 from scenes.scene_desktop_common import _L, TASKBAR_H, TOPBAR_H
-from scenes.scene_more import SECTIONS
-from ui import fonts, widgets
+from ui import fonts, keynav, widgets
+
+START_COLS = 4
+START_BTN_W = 280
+START_BTN_H = 40
+START_BTN_GAP = 12
 
 
 class DesktopMenusMixin:
@@ -188,7 +192,7 @@ class DesktopMenusMixin:
 
     def _desktop_menu_items(self):
         return [
-            (_L("Menu Applications", "Applications menu"), lambda: setattr(self, "start_open", True)),
+            (_L("Menu Applications", "Applications menu"), self._open_start_menu),
             (_L("Réglages", "Settings"), lambda: self.app.scenes.go("settings", return_to="desktop")),
             (_L("Fermer toutes les fenêtres", "Close all windows"), self._close_all_windows),
             (_L("Revoir l'accueil", "Show welcome again"), desktop_onboarding.reset),
@@ -245,8 +249,121 @@ class DesktopMenusMixin:
                               (r.x + 8, r.y + 4), fonts.small(), config.COL_TEXT)
             iy += ih
 
+    # ------------------------------------------------- menu Démarrer (« PLUS »)
+    def _open_start_menu(self):
+        self.start_open = True
+        self._start_search = ""
+        self._start_cursor = 0
+        self._start_scroll = 0
+
+    def _toggle_start_menu(self):
+        if self.start_open:
+            self.start_open = False
+        else:
+            self._open_start_menu()
+
+    def _start_filtered_sections(self):
+        if not self._start_search.strip():
+            return app_catalog.SECTIONS
+        out = []
+        for title, items in app_catalog.SECTIONS:
+            kept = fuzzy.filter_sorted(self._start_search, items, key=lambda e: e[0])
+            if kept:
+                out.append((title, kept))
+        return out
+
+    def _start_activate(self, scene, kw, locked, label):
+        """Ouvre l'entrée sélectionnée, sauf si verrouillée par le grade : dans
+        ce cas un toast explique le seuil requis, sans naviguer (même
+        comportement que l'ancien hub PLUS, cf. app_catalog.lock_message)."""
+        if locked:
+            self.app.notify("⊘ " + app_catalog.lock_message(self.app.gs.player, label, scene), "warn")
+            return
+        self._open_scene_window(scene, **kw)
+
+    def _start_layout(self, sections, area):
+        """Position de TOUS les items (visibles ou non), pour la navigation
+        clavier sur la liste complète et le calcul du scroll — même principe
+        que l'ancien hub PLUS plein écran."""
+        out = []  # [(Rect, scene, kw, locked, label, desc)]
+        p = self.app.gs.player
+        y = area.y - self._start_scroll
+        for title, items in sections:
+            y += 26
+            for i, (label, scene, kw, desc) in enumerate(items):
+                col = i % START_COLS
+                if col == 0 and i > 0:
+                    y += START_BTN_H + START_BTN_GAP
+                x = area.x + col * (START_BTN_W + START_BTN_GAP)
+                locked = app_catalog.is_locked(p, scene)
+                out.append((pygame.Rect(x, y, START_BTN_W, START_BTN_H), scene, kw, locked, label, desc))
+            y += START_BTN_H + START_BTN_GAP + 8
+        return out
+
+    def _start_scroll_to_cursor(self, list_rect):
+        if not list_rect or not self._start_all_rects:
+            return
+        rect, *_rest = self._start_all_rects[self._start_cursor]
+        row_top = rect.y - list_rect.y + self._start_scroll
+        row_bottom = row_top + rect.h
+        if row_top < self._start_scroll:
+            self._start_scroll = row_top
+        elif row_bottom > self._start_scroll + list_rect.h:
+            self._start_scroll = row_bottom - list_rect.h
+        self._start_scroll = max(0, min(self._start_max_scroll, self._start_scroll))
+
+    def _handle_start_menu_event(self, event):
+        """Capture tout (clavier + souris) tant que le menu Démarrer est
+        ouvert : recherche locale, navigation clavier en grille (même
+        primitive que l'ancien hub PLUS, cf. ui.keynav.grid_nav), clic."""
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                if self._start_search:
+                    self._start_search = ""
+                    self._start_scroll = 0
+                else:
+                    self.start_open = False
+                return
+            if event.key == pygame.K_BACKSPACE:
+                self._start_search = self._start_search[:-1]
+                self._start_scroll = 0
+                return
+            if event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT,
+                             pygame.K_RETURN, pygame.K_KP_ENTER):
+                rects = {i: r for i, (r, *_rest) in enumerate(self._start_all_rects)}
+                self._start_cursor, activate = keynav.grid_nav(event, rects, self._start_cursor)
+                self._start_scroll_to_cursor(self._launcher_list_rect)
+                if activate and self._start_all_rects:
+                    _r, scene, kw, locked, label, _desc = self._start_all_rects[self._start_cursor]
+                    self._start_activate(scene, kw, locked, label)
+                return
+            if event.key == pygame.K_TAB:
+                return
+            if event.unicode and event.unicode.isprintable():
+                self._start_search += event.unicode
+                self._start_scroll = 0
+                return
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            if self._launcher_list_rect and self._launcher_list_rect.collidepoint(event.pos):
+                self._start_scroll = max(0, min(self._start_max_scroll,
+                    self._start_scroll + (-48 if event.button == 4 else 48)))
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for r, scene, kw, locked, label, _desc in self._launcher_rects:
+                if r.collidepoint(event.pos):
+                    self._start_activate(scene, kw, locked, label)
+                    return
+            if not (self._start_rect and self._start_rect.collidepoint(event.pos)):
+                self.start_open = False
+            return
+
     def _draw_launcher(self, surf):
-        """Menu Démarrer : toutes les scènes du jeu, ouvrables en fenêtre."""
+        """Menu Démarrer : toutes les scènes du jeu, ouvrables en fenêtre —
+        recherche locale, verrous par grade (icône + infobulle explicative,
+        même patron que l'ancien hub PLUS) et description d'une ligne pour
+        chaque page débloquée, pour qu'un joueur perdu comprenne ce que fait
+        une page avant de cliquer dessus."""
         shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
         shade.fill((0, 0, 0, 120))
         surf.blit(shade, (0, 0))
@@ -254,39 +371,98 @@ class DesktopMenusMixin:
                            config.SCREEN_HEIGHT - TOPBAR_H - TASKBAR_H - 40)
         pygame.draw.rect(surf, config.COL_PANEL, panel)
         pygame.draw.rect(surf, config.COL_AMBER, panel, 2)
-        widgets.draw_text(surf, "APPLICATIONS — ouvrir en fenêtre", (panel.x + 16, panel.y + 10),
-                          fonts.head(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L("APPLICATIONS — ouvrir en fenêtre", "APPLICATIONS — open as a window"),
+                          (panel.x + 16, panel.y + 10), fonts.head(bold=True), config.COL_AMBER)
+
+        search_rect = pygame.Rect(panel.x + 16, panel.y + 34, 320, 24)
+        pygame.draw.rect(surf, config.COL_BG, search_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_AMBER, search_rect, 1, border_radius=4)
+        cur = "_" if pygame.time.get_ticks() % 1000 < 500 else ""
+        label = (self._start_search + cur) if self._start_search else (
+            cur + _L("Rechercher une page…", "Search a page…"))
+        widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 12),
+                          (search_rect.x + 6, search_rect.y + 4), fonts.small(),
+                          config.COL_TEXT if self._start_search else config.COL_TEXT_DIM)
+
+        sections = self._start_filtered_sections()
+        top = search_rect.bottom + 12
+        area = pygame.Rect(panel.x + 16, top, panel.w - 32, panel.bottom - 16 - top)
+        self._launcher_list_rect = area
+        mp = pygame.mouse.get_pos()
+        self._start_tooltip = None
         self._launcher_rects = []
-        col_w = 236
-        item_h = 22
-        x0 = panel.x + 16
-        y0 = panel.y + 44
-        x, y = x0, y0
-        max_y = panel.bottom - 16
+        self._start_all_rects = self._start_layout(sections, area)
+        if self._start_all_rects:
+            self._start_cursor = min(self._start_cursor, len(self._start_all_rects) - 1)
+        else:
+            self._start_cursor = 0
+
         prev_clip = surf.get_clip()
-        surf.set_clip(panel)
-        for title, items in SECTIONS:
-            # en-tête de section : force une nouvelle colonne si trop bas
-            if y + 18 + item_h > max_y:
-                x += col_w
-                y = y0
-            widgets.draw_text(surf, title.upper(), (x, y), fonts.tiny(bold=True), config.COL_CYAN)
-            y += 18
-            for label, scene, kw in items:
-                if y + item_h > max_y:
-                    x += col_w
-                    y = y0
-                    widgets.draw_text(surf, title.upper() + " (suite)", (x, y), fonts.tiny(bold=True), config.COL_CYAN)
-                    y += 18
-                r = pygame.Rect(x, y, col_w - 12, item_h - 2)
-                self._launcher_rects.append((r, scene, kw))
-                hov = r.collidepoint(pygame.mouse.get_pos())
-                if hov:
-                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, r, border_radius=3)
-                    pygame.draw.rect(surf, config.COL_AMBER, r, 1, border_radius=3)
-                widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), col_w - 24),
-                                  (r.x + 8, r.y + 3), fonts.small(),
-                                  config.COL_TEXT if hov else config.COL_TEXT_DIM)
-                y += item_h
-            y += 8
+        surf.set_clip(area)
+        y = area.y - self._start_scroll
+        if not sections:
+            widgets.draw_text(surf, _L("Aucune page ne correspond à cette recherche.",
+                                       "No page matches this search."),
+                              (area.x, area.y), fonts.small(), config.COL_TEXT_DIM)
+        p = self.app.gs.player
+        flat_i = 0
+        for title, items in sections:
+            if area.top - 20 < y < area.bottom:
+                widgets.draw_text(surf, f"— {title}", (area.x, y), fonts.small(bold=True), config.COL_PRESTIGE)
+            y += 26
+            for i, (label, scene, kw, desc) in enumerate(items):
+                col = i % START_COLS
+                if col == 0 and i > 0:
+                    y += START_BTN_H + START_BTN_GAP
+                x = area.x + col * (START_BTN_W + START_BTN_GAP)
+                rect = pygame.Rect(x, y, START_BTN_W, START_BTN_H)
+                is_cursor = (flat_i == self._start_cursor)
+                flat_i += 1
+                if area.top - START_BTN_H < rect.y < area.bottom:
+                    clipped = rect.clip(area)
+                    locked = app_catalog.is_locked(p, scene)
+                    self._launcher_rects.append((clipped, scene, kw, locked, label, desc))
+                    hover = rect.collidepoint(mp)
+                    acc = config.COL_BORDER if locked else widgets.hover_accent(hover)
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD if (hover and not locked) else config.COL_PANEL,
+                                     rect, border_radius=5)
+                    pygame.draw.rect(surf, acc, rect, 1, border_radius=5)
+                    keynav.draw_focus_ring(surf, rect, is_cursor)
+                    text_w = rect.w - 16
+                    if locked:
+                        self._draw_lock_glyph(surf, (rect.x + 12, rect.centery), config.COL_TEXT_DIM)
+                        text_w -= 20
+                    fitted = widgets.fit_text(label, fonts.small(bold=hover and not locked), text_w)
+                    text_x = rect.x + (28 if locked else 8)
+                    widgets.draw_text(surf, fitted, (text_x, rect.centery), fonts.small(bold=hover and not locked),
+                                      config.COL_TEXT_DIM if locked else (acc if hover else config.COL_TEXT),
+                                      align="left")
+                    if (hover or is_cursor) and locked:
+                        self._start_tooltip = (app_catalog.lock_message(p, label, scene), mp)
+                    elif hover or is_cursor:
+                        self._start_tooltip = (desc, mp if hover else (rect.right, rect.y))
+            y += START_BTN_H + START_BTN_GAP + 8
         surf.set_clip(prev_clip)
+
+        content_h = (y + self._start_scroll) - area.y
+        self._start_max_scroll = max(0, content_h - area.h)
+        self._start_scroll = min(self._start_scroll, self._start_max_scroll)
+        if self._start_max_scroll > 0:
+            track = pygame.Rect(area.right + 2, area.y, 6, area.h)
+            pygame.draw.rect(surf, config.COL_PANEL, track, border_radius=3)
+            frac = area.h / (content_h or 1)
+            bar_h = max(24, int(area.h * frac))
+            bar_y = area.y + int((area.h - bar_h) * (self._start_scroll / self._start_max_scroll))
+            pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 6, bar_h), border_radius=3)
+
+        if self._start_tooltip:
+            widgets.draw_tooltip(surf, *self._start_tooltip)
+
+    def _draw_lock_glyph(self, surf, center, color):
+        """Petit cadenas VECTORIEL (corps + anse) — pas de glyphe unicode, non
+        garanti par la police embarquée (même précaution que ui/desktop_icons.py
+        et la case à cocher de scene_runsetup.py)."""
+        cx, cy = center
+        body = pygame.Rect(cx - 6, cy - 1, 12, 9)
+        pygame.draw.rect(surf, color, body, border_radius=2)
+        pygame.draw.arc(surf, color, pygame.Rect(cx - 5, cy - 9, 10, 10), 0.15, 2.99, 2)

@@ -81,7 +81,14 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self._launch_rects = {}     # clé app -> Rect (barre des tâches quick-launch)
         self._task_rects = {}       # Window -> Rect (barre des tâches)
         self._start_rect = None     # bouton menu Démarrer
-        self._launcher_rects = []   # [(Rect, scene, kwargs)] items du menu Démarrer
+        self._launcher_rects = []   # [(Rect, scene, kwargs, locked, label, desc)] items VISIBLES
+        self._start_all_rects = []  # liste complète (navigation clavier), même format
+        self._start_search = ""     # recherche locale du menu Démarrer
+        self._start_cursor = 0      # curseur clavier (index dans _start_all_rects)
+        self._start_scroll = 0
+        self._start_max_scroll = 0
+        self._start_tooltip = None  # (texte, pos souris) affiché par _draw_launcher
+        self._launcher_list_rect = None
         self._menu_rect = None
         self._ambient_rect = None    # widget patrimoine (clic → portefeuille)
         self._todo_rects = []        # lignes du widget « À faire » (clic → scène)
@@ -178,21 +185,24 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 and (event.mod & pygame.KMOD_CTRL) and (event.mod & pygame.KMOD_SHIFT)):
             self._toggle_show_desktop()
             return
+        # CTRL+O : bascule le menu Démarrer (même mnémonique que le rail du
+        # terminal, RAIL_SHORTCUTS/commande MORE) — l'icône dédiée « Plus » a
+        # été retirée, le menu Démarrer couvrant déjà exactement le même
+        # besoin (toutes les pages, ouvrables en fenêtre).
+        if (event.type == pygame.KEYDOWN and event.key == pygame.K_o
+                and (event.mod & pygame.KMOD_CTRL) and not (event.mod & (pygame.KMOD_SHIFT | pygame.KMOD_ALT))):
+            self._toggle_start_menu()
+            return
         # clic droit : menu contextuel (icône, chrome de fenêtre, barre des
         # tâches ou fond du bureau) — avant le routage classique des fenêtres.
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
             if self._open_context_menu(event.pos):
                 return
-        # menu Démarrer ouvert : priorité à ses items / fermeture au clic dehors
-        if self.start_open and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            for r, name, kw in self._launcher_rects:
-                if r.collidepoint(event.pos):
-                    self._open_scene_window(name, **kw)
-                    return
-            if not (self._start_rect and self._start_rect.collidepoint(event.pos)):
-                self.start_open = False
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and self.start_open:
-            self.start_open = False
+        # menu Démarrer ouvert : capture tout (clavier + souris) en priorité —
+        # recherche locale, navigation clavier en grille, verrous par grade
+        # (cf. DesktopMenusMixin._handle_start_menu_event).
+        if self.start_open:
+            self._handle_start_menu_event(event)
             return
         # carte « Bilan du trimestre » (au-dessus des fenêtres) : ses boutons
         # sont prioritaires, un clic ailleurs sur la carte est absorbé.
@@ -253,7 +263,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             return
         pos = event.pos
         if self._start_rect and self._start_rect.collidepoint(pos):
-            self.start_open = not self.start_open
+            self._toggle_start_menu()
             return
         # icônes du bureau + quick-launch : ouvrir/ramener l'app
         for key, (r, _kind, _label) in self._icon_rects.items():

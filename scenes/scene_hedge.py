@@ -26,7 +26,7 @@ class HedgeScene(Scene):
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
                                         config.back_button_rect(160)[1], 150, 42),
-                                       "📘 TUTO", config.COL_CYAN)
+                                       "TUTO", config.COL_CYAN)
         self.buy_btn = None
         self.strike_rects = {}
         self.years_rects = {}

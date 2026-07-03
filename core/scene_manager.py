@@ -194,13 +194,13 @@ class SceneManager:
         lang = get_lang()
         gloss, _cats = glossary_data.localized(lang)
         hits = fuzzy.filter_sorted(query, list(gloss.keys()), key=lambda t: t)[:limit]
-        return [(f"📖 {glossary_data.display_name(t, lang)}", "glossary", {"term": t}) for t in hits]
+        return [(f"[GLOS] {glossary_data.display_name(t, lang)}", "glossary", {"term": t}) for t in hits]
 
     def _palette_lesson_matches(self, query, limit=4):
         """Suggestions de leçons de l'Académie correspondant à la saisie."""
         from data import lessons as L
         hits = fuzzy.filter_sorted(query, L.LESSONS, key=lambda l: l["title"])[:limit]
-        return [(f"🎓 {l['title']}", "academy", {"lesson_id": l["id"]}) for l in hits]
+        return [(f"[COURS] {l['title']}", "academy", {"lesson_id": l["id"]}) for l in hits]
 
     def _palette_action_matches(self, query, limit=6):
         """Actions rapides exécutables DIRECTEMENT depuis la palette, sans

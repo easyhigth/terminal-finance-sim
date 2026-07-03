@@ -88,7 +88,7 @@ class MarketExplorerScene(Scene, PopupMixin):
         self.add_btn = widgets.Button((220, config.SCREEN_HEIGHT - 50, 220, 42),
                                       "+ AJOUTER", config.COL_UP, enabled=False)
         self.shop_btn = widgets.Button((460, config.SCREEN_HEIGHT - 50, 180, 42),
-                                       "🛒 SHOP", config.COL_CYAN)
+                                       "SHOP", config.COL_CYAN)
 
     def refresh_data(self):
         """Reconstruit le catalogue (cours/positions à jour) sans toucher à

@@ -614,7 +614,7 @@ class MarketHubScene(Scene, PopupMixin):
             btn = pygame.Rect(inner.x, inner.y + 46, 160, 30)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, btn, border_radius=4)
             pygame.draw.rect(surf, config.COL_AMBER, btn, 1, border_radius=4)
-            widgets.draw_text(surf, "🛒 BOUTIQUE", btn.center, fonts.small(bold=True),
+            widgets.draw_text(surf, "BOUTIQUE", btn.center, fonts.small(bold=True),
                               config.COL_AMBER, align="center")
             self._watchlist_shop_rect = btn
             return

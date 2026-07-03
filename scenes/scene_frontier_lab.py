@@ -38,9 +38,9 @@ class FrontierLabScene(Scene):
         self.back_btn = widgets.Button(
             config.back_button_rect(180), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.reset_btn = widgets.Button(
-            (240, config.SCREEN_HEIGHT - 50, 220, 42), "↺ RÉINITIALISER", config.COL_TEXT_DIM)
+            (240, config.SCREEN_HEIGHT - 50, 220, 42), "RÉINITIALISER", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button(
-            (470, config.SCREEN_HEIGHT - 50, 150, 42), "📘 TUTO", config.COL_CYAN)
+            (470, config.SCREEN_HEIGHT - 50, 150, 42), "TUTO", config.COL_CYAN)
 
     def refresh_data(self):
         p = self.app.gs.player

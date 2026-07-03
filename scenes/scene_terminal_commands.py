@@ -101,30 +101,30 @@ class TerminalCommandsMixin:
             if novice:
                 if get_lang() == "en":
                     self._log(
-                        "  COMMANDS full catalogue · the clock runs live (▮▮/▶/▶▶/▶▶▶ top-right)",
+                        "  COMMANDS full catalogue · the clock runs live (||/▶/▶▶/▶▶▶ top-right)",
                         "  MARKET indices · COMPANY <tk> · SEARCH · WATCHLIST",
                         "  MISSION work · CAREER career · EVAL promotion",
                         "  LEARN academy · GLOSSARY · DEFINE <term>",
                         "  INBOX messages · STATUS · SAVE · MENU",
                         "  → more commands (trading, derivatives, M&A...) unlock as you "
                         "are promoted. Type COMMANDS to see everything.",
-                        "  ★ TIP: press Ctrl+K anywhere to jump to a page or asset by name.",
+                        "  ✶ TIP: press Ctrl+K anywhere to jump to a page or asset by name.",
                     )
                 else:
                     self._log(
-                        "  COMMANDS catalogue complet · le temps avance en direct (▮▮/▶/▶▶/▶▶▶ en haut à droite)",
+                        "  COMMANDS catalogue complet · le temps avance en direct (||/▶/▶▶/▶▶▶ en haut à droite)",
                         "  MARKET indices · COMPANY <tk> · SEARCH · WATCHLIST",
                         "  MISSION travailler · CAREER carrière · EVAL promotion",
                         "  LEARN académie · GLOSSARY · DEFINE <terme>",
                         "  INBOX messagerie · STATUS · SAVE · MENU",
                         "  → d'autres commandes (trading, dérivés, M&A...) se débloquent "
                         "en progressant. Tapez COMMANDS pour tout voir.",
-                        "  ★ ASTUCE : Ctrl+K ouvre n'importe où une recherche rapide (page, actif…).",
+                        "  ✶ ASTUCE : Ctrl+K ouvre n'importe où une recherche rapide (page, actif…).",
                     )
                 return
             if get_lang() == "en":
                 self._log(
-                    "  COMMANDS full catalogue · the clock runs live (▮▮/▶/▶▶/▶▶▶ top-right)",
+                    "  COMMANDS full catalogue · the clock runs live (||/▶/▶▶/▶▶▶ top-right)",
                     "  MARKET indices · TOP [region] · MOVERS · EXPLORE explorer",
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
                     "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC charts",
@@ -142,7 +142,7 @@ class TerminalCommandsMixin:
                 )
             else:
                 self._log(
-                    "  COMMANDS catalogue complet · le temps avance en direct (▮▮/▶/▶▶/▶▶▶ en haut à droite)",
+                    "  COMMANDS catalogue complet · le temps avance en direct (||/▶/▶▶/▶▶▶ en haut à droite)",
                     "  MARKET indices · TOP [region] · MOVERS · EXPLORE explorer",
                     "  COMPANY <tk> · SEARCH · WATCHLIST · COMPARE",
                     "  GP/GPC/GPCH <tk> · COMP · HS · HVOL · BETA · CORR · GC graphes",

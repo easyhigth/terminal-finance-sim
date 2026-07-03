@@ -35,11 +35,11 @@ class AnalyticsScene(Scene, PopupMixin):
         self.back_btn = widgets.Button(
             config.back_button_rect(180), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.book_btn = widgets.Button(
-            (240, config.SCREEN_HEIGHT - 50, 170, 42), "📒 PORTEFEUILLE", config.COL_AMBER)
+            (240, config.SCREEN_HEIGHT - 50, 170, 42), "PORTEFEUILLE", config.COL_AMBER)
         self.stress_btn = widgets.Button(
             (420, config.SCREEN_HEIGHT - 50, 170, 42), "⚠ STRESS TEST", config.COL_DOWN)
         self.shop_btn = widgets.Button(
-            (600, config.SCREEN_HEIGHT - 50, 160, 42), "🛒 SHOP", config.COL_AMBER)
+            (600, config.SCREEN_HEIGHT - 50, 160, 42), "SHOP", config.COL_AMBER)
         self._holding_rects = {}    # label -> Rect (clic → fiche flottante, toutes classes)
         self._chart_rects = {}      # ticker -> Rect (clic → graphe flottant, actions uniquement)
         self._row_cls = {}
@@ -372,7 +372,7 @@ class AnalyticsScene(Scene, PopupMixin):
         for r in (self._frontier_rect, self._corr_rect):
             if r.collidepoint(mp):
                 pygame.draw.rect(surf, config.COL_WHITE, r, 1)
-                widgets.draw_text(surf, "clic → agrandir ⤢", (r.right - 6, r.bottom - 14),
+                widgets.draw_text(surf, "clic → agrandir", (r.right - 6, r.bottom - 14),
                                   fonts.tiny(bold=True), config.COL_WHITE, align="right")
 
     def _draw_frontier(self, surf, rect, p, m):

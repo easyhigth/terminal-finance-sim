@@ -146,14 +146,16 @@ class NotificationsScene(Scene):
             cx += w + 6
 
         legend_y = chip_y + 26
-        widgets.draw_text(surf, "✉ message :", (x0, legend_y), fonts.tiny(), config.COL_TEXT_DIM)
-        lx = x0 + 76
+        msg_lbl = "MSG message :"
+        widgets.draw_text(surf, msg_lbl, (x0, legend_y), fonts.tiny(), config.COL_TEXT_DIM)
+        lx = x0 + fonts.tiny().size(msg_lbl)[0] + 8
         for kind, (tag, col) in _INBOX_KIND.items():
             w = fonts.tiny(bold=True).size(tag)[0]
             widgets.draw_text(surf, tag, (lx, legend_y), fonts.tiny(bold=True), col)
             lx += w + 10
-        widgets.draw_text(surf, "📰 actu :", (lx + 14, legend_y), fonts.tiny(), config.COL_TEXT_DIM)
-        lx2 = lx + 14 + 60
+        news_lbl = "NEWS actu :"
+        widgets.draw_text(surf, news_lbl, (lx + 14, legend_y), fonts.tiny(), config.COL_TEXT_DIM)
+        lx2 = lx + 14 + fonts.tiny().size(news_lbl)[0] + 8
         for kind_lbl, col in (("bonne", config.COL_UP), ("mauvaise", config.COL_DOWN),
                               ("neutre", config.COL_CYAN)):
             w = fonts.tiny(bold=True).size(kind_lbl)[0]
@@ -190,7 +192,7 @@ class NotificationsScene(Scene):
                 self.row_rects.append((row, (r["src"], r["ref"])))
                 if row.collidepoint(mp):
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
-                src_tag = "✉" if r["src"] == "inbox" else "📰"
+                src_tag = "M" if r["src"] == "inbox" else "N"
                 widgets.draw_text(surf, src_tag, (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
                 widgets.draw_text(surf, widgets.fit_text(r["tag"], fonts.tiny(bold=True), 100),
                                   (inner.x + 20, y), fonts.tiny(bold=True), r["col"])

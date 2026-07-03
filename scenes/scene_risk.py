@@ -78,7 +78,7 @@ class RiskScene(Scene):
         self.mode_btn = widgets.Button(
             (210, config.SCREEN_HEIGHT-66, 240, 44), "MODE : —", config.COL_CYAN)
         self.tuto_btn = widgets.Button(
-            (460, config.SCREEN_HEIGHT-66, 150, 44), "📘 TUTO", config.COL_WARN)
+            (460, config.SCREEN_HEIGHT-66, 150, 44), "TUTO", config.COL_WARN)
         self._exp_btns = {}
         self._scenario_btns = {}
         self._conf_btns = {}

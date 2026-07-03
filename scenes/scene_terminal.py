@@ -210,8 +210,8 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         # bancarisés par l'horloge pendant l'absence (cf. core/sim_clock.py) sont
         # joués ici, au retour sur le terminal.
         if getattr(self.app, "pending_market_steps", 0) and not p.game_over:
-            self._log(_L("  ⏱ Le temps a avancé pendant que vous travailliez…",
-                          "  ⏱ Time advanced while you were working…"))
+            self._log(_L("  » Le temps a avancé pendant que vous travailliez…",
+                          "  » Time advanced while you were working…"))
             self._drain_pending_steps()
         # tutoriel auto-déclenché à l'unlock d'une fonctionnalité (cf. scene_evaluation._finish)
         tid = p.flags.pop("pending_tutorial", None)
@@ -522,9 +522,9 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
                 was = self._session_open.get(s, True)
                 if is_open and not was:
                     audio.play("bell")
-                    self.app.notify(_L(f"🔔 Ouverture {labels[s]}", f"🔔 {labels[s]} open"), "good")
+                    self.app.notify(_L(f"» Ouverture {labels[s]}", f"» {labels[s]} open"), "good")
                 elif was and not is_open:
-                    self.app.notify(_L(f"🔔 Clôture {labels[s]}", f"🔔 {labels[s]} close"), "info")
+                    self.app.notify(_L(f"» Clôture {labels[s]}", f"» {labels[s]} close"), "info")
         self._session_open = cur
         # résumé de séance : émis une fois par changement de jour de jeu
         day = self.app.sim_clock.current_time(p.day)[0]

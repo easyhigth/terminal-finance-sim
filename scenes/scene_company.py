@@ -382,7 +382,7 @@ class CompanyScene(Scene):
                               (rect.x, y), fonts.small(bold=True), ecol)
             y += 20
         if mt.get("earnings_anticipation"):
-            widgets.draw_text(surf, f"⏳ Publication dans {mt['steps_to_earnings']} pas",
+            widgets.draw_text(surf, f"» Publication dans {mt['steps_to_earnings']} pas",
                               (rect.x, y), fonts.small(), config.COL_WARN)
             y += 20
         pead = mt.get("pead_drift_remaining") or 0.0
@@ -576,7 +576,7 @@ class CompanyScene(Scene):
                 rets = [abs(recent[k] / recent[k - 1] - 1) for k in range(1, len(recent))]
                 avg_ret = sum(rets) / len(rets)
                 if avg_ret > 0.0009 * vol_mult * 1.6:
-                    widgets.draw_text(surf, "🔥 forte variation", (badge_x, panel_rect.y + 4),
+                    widgets.draw_text(surf, "! forte variation", (badge_x, panel_rect.y + 4),
                                       fonts.tiny(bold=True), config.COL_DOWN)
         if self.chart_kind == "candles":
             widgets.draw_candles(surf, inner, hist, n_candles=32, sma_windows=(10, 30))

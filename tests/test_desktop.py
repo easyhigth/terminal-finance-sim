@@ -2823,3 +2823,79 @@ def test_financials_fiche_button_label_fits_inside_button(app):
     sc = app.scenes.current
     from ui import fonts as F
     assert F.body(bold=True).size(sc.fiche_btn.label)[0] <= sc.fiche_btn.rect.w - 8
+
+
+# ==================== audit V1.0 (3e passe) : glyphes non couverts ============
+# La police embarquée (JetBrains Mono) ne couvre pas tous les glyphes Unicode
+# utilisés par erreur (emoji, symboles rares) : ils s'affichaient en "tofu"
+# (glyphe .notdef). cf. ui/desktop_icons.py pour la même limite déjà
+# documentée sur les icônes. Ce test vérifie qu'aucun rendu produit un signal
+# identique à celui d'un caractère certainement absent (zone d'usage privé).
+
+_UNSUPPORTED_GLYPHS = [
+    "✉", "📰", "ℹ", "↺", "⇩", "⏱", "⏳", "⏸", "▦", "▮", "★", "⚑", "⚙",
+    "⤢", "⧉", "🎓", "💹", "📌", "📒", "📖", "📘", "🔍", "🔒", "🔔", "🔥",
+    "🖥", "🛒", "🛠", "🤝",
+]
+
+
+def test_font_glyph_coverage_still_missing_for_known_unsupported_set(app):
+    """Sanity check de la méthode de détection elle-même : ces glyphes sont
+    connus pour ne pas être couverts par la police embarquée (vérifié par
+    comparaison de signature avec un caractère de zone d'usage privé, garanti
+    absent). Si ce test échoue, la police a changé — revoir cette liste."""
+    from ui import fonts as F
+    f = F.tiny()
+    pua = pygame.image.tostring(f.render(chr(0xE000), True, (255, 255, 255)), "RGBA")
+    for ch in _UNSUPPORTED_GLYPHS:
+        sig = pygame.image.tostring(f.render(ch, True, (255, 255, 255)), "RGBA")
+        assert sig == pua, f"{ch!r} semble maintenant couvert — on peut le réutiliser"
+
+
+def test_no_rendered_ui_string_uses_unsupported_glyphs():
+    """Régression : plusieurs écrans (notifications, TUTO, lock badges, SHOP,
+    onboarding...) utilisaient des glyphes non couverts (✉ 📰 📘 🔒 🔥 ⏳ ▮
+    ★ ⚙ ⇩ ⤢ ⧉ 🎓 📖 🔍 🔔 🛒 🛠 ℹ ↺) qui s'affichaient en boîte vide. On
+    parcourt l'AST de chaque module pour n'examiner que les littéraux de
+    chaîne RÉELLEMENT utilisés (pas les docstrings de module/classe/fonction,
+    qui documentent légitimement la limite — cf. ui/desktop_icons.py)."""
+    import ast
+    import glob
+
+    def _string_constants(tree):
+        docstring_ids = set()
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                body = getattr(node, "body", None)
+                if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
+                        and isinstance(body[0].value.value, str):
+                    docstring_ids.add(id(body[0].value))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str) \
+                    and id(node) not in docstring_ids:
+                yield node
+
+    offenders = []
+    for fn in (glob.glob("scenes/*.py") + glob.glob("apps/*.py")
+               + glob.glob("ui/*.py") + glob.glob("core/*.py")):
+        with open(fn, encoding="utf-8") as fh:
+            src = fh.read()
+        tree = ast.parse(src, filename=fn)
+        for node in _string_constants(tree):
+            for ch in _UNSUPPORTED_GLYPHS:
+                if ch in node.value:
+                    offenders.append(f"{fn}:{node.lineno}: {ch!r} in {node.value!r}")
+    assert not offenders, "glyphes non couverts trouvés :\n" + "\n".join(offenders)
+
+
+def test_notifications_screen_renders_without_glyph_tofu(app):
+    """L'écran notifications utilisait ✉/📰 (non couverts) comme préfixes de
+    ligne et dans la légende — remplacés par des tags texte (MSG/NEWS/M/N)."""
+    p = app.gs.player
+    p.inbox.append({"kind": "manager", "subject": "Test", "body": "Corps.",
+                     "day": p.day, "read": False})
+    app.scenes.go("notifications", return_to="desktop")
+    sc = app.scenes.current
+    sc.update(0.016)
+    sc.draw(app.screen)
+    assert sc.row_rects

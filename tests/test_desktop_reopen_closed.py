@@ -61,9 +61,9 @@ def test_closing_terminal_is_never_tracked_for_reopen(desktop):
     desktop.wm.close(w)   # dernier fermé = "company"
 
     term = next(win for win in desktop.wm.windows if win.key == "scene:terminal")
-    desktop.wm.close(term)   # ne doit PAS écraser _last_closed
+    desktop.wm.close(term)   # ne doit PAS s'empiler sur _closed_stack
 
-    assert desktop._last_closed == ("scene", "company", {"ticker": tk})
+    assert desktop._closed_stack[-1] == ("scene", "company", {"ticker": tk})
 
 
 def test_reopen_is_a_noop_when_nothing_was_closed(desktop):
@@ -76,15 +76,61 @@ def test_reopen_consumes_the_record_only_once(desktop):
     w = desktop._launch("research")
     desktop.wm.close(w)
     desktop.handle_event(_reopen_key())
-    assert desktop._last_closed is None
+    assert desktop._closed_stack == []
     n_after_first = len(desktop.wm.windows)
     desktop.handle_event(_reopen_key())   # rien à rouvrir la 2e fois
     assert len(desktop.wm.windows) == n_after_first
 
 
-def test_only_the_most_recently_closed_window_is_remembered(desktop):
+# ============================== pile multi-niveaux (rang > 1) =================
+def test_closing_two_windows_stacks_both_entries(desktop):
     w1 = desktop._launch("research")
     w2 = desktop._launch("calculator")
     desktop.wm.close(w1)
     desktop.wm.close(w2)
-    assert desktop._last_closed == ("app", "calculator", {})
+    assert desktop._closed_stack == [("app", "research", {}), ("app", "calculator", {})]
+
+
+def test_ctrl_shift_z_reopens_most_recent_first_then_the_one_before(desktop):
+    w1 = desktop._launch("research")
+    w2 = desktop._launch("calculator")
+    desktop.wm.close(w1)
+    desktop.wm.close(w2)
+
+    desktop.handle_event(_reopen_key())
+    assert any(win.key == "calculator" for win in desktop.wm.windows)
+    assert desktop._closed_stack == [("app", "research", {})]
+
+    desktop.handle_event(_reopen_key())   # rang suivant : research
+    assert any(win.key == "research" for win in desktop.wm.windows)
+    assert desktop._closed_stack == []
+
+
+def test_closed_stack_is_capped(desktop):
+    from scenes.scene_desktop import _CLOSED_STACK_MAX
+    for _ in range(_CLOSED_STACK_MAX + 3):
+        w = desktop._launch("research")
+        desktop.wm.close(w)
+    assert len(desktop._closed_stack) == _CLOSED_STACK_MAX
+
+
+def test_context_menu_lists_recently_closed_windows_and_reopens_a_specific_one(desktop):
+    """Le menu contextuel du fond du bureau liste les dernières fenêtres
+    fermées (pas seulement la toute dernière comme CTRL+MAJ+Z) et permet
+    d'en rouvrir une PRÉCISE, même si ce n'est pas la plus récente."""
+    w1 = desktop._launch("research")
+    w2 = desktop._launch("calculator")
+    desktop.wm.close(w1)
+    desktop.wm.close(w2)
+
+    items = desktop._desktop_menu_items()
+    labels = [lbl for lbl, _cb in items]
+    assert any("Recherche" in lbl for lbl in labels)
+    assert any("Calculatrice" in lbl for lbl in labels)
+
+    # rouvre spécifiquement "Recherche", pas le plus récent (calculatrice)
+    _label, cb = next((lbl, cb) for lbl, cb in items if "Recherche" in lbl)
+    cb()
+    assert any(win.key == "research" for win in desktop.wm.windows)
+    assert ("app", "research", {}) not in desktop._closed_stack
+    assert ("app", "calculator", {}) in desktop._closed_stack

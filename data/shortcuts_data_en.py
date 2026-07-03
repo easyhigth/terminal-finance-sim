@@ -110,9 +110,12 @@ SECTIONS_EN = [
         ("CTRL+SHIFT+D", "Show desktop (Windows+D style): minimizes every open "
             "window ; a 2nd press restores exactly the ones that were open"),
         ("CTRL+SHIFT+Z", "Reopens the last closed window, with its original context "
-            "(ticker, filters…) — not the terminal, always reachable via its own icon"),
-        ("Right click", "Opens a context menu depending on the target: icon, a "
-            "window's title bar, taskbar entry, or the desktop background"),
+            "(ticker, filters…) — not the terminal, always reachable via its own icon. "
+            "Repeat to go further back in the history (up to 8 levels)"),
+        ("Right click (desktop background)", "Opens a context menu depending on the "
+            "target: icon, a window's title bar, taskbar entry, or the desktop background — "
+            "on the background, also lists the 5 most recently closed windows, each "
+            "individually reopenable (not just the most recent one)"),
         ("Right click → Pin", "On a title bar/taskbar entry: keeps this window ALWAYS "
             "on top (small pin in its title bar), even when another window is "
             "focused — handy to keep the watchlist or portfolio visible at all times"),

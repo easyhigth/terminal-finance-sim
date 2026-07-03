@@ -146,6 +146,14 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             self._terminal_host.bind_opener(self._open_scene_window)
             w = self.wm.open("scene:terminal", lambda: self._terminal_host)
             w.minimized = True   # bureau propre au démarrage ; icône Terminal pour l'ouvrir
+            # « espace de travail » : rouvre la disposition mémorisée à la
+            # dernière sauvegarde (player.flags["desktop_layout"], tenu à
+            # jour en continu par _sync_layout_flag) — seulement à la toute
+            # première arrivée sur le bureau de CETTE App() (nouvelle partie,
+            # reprise) ; un chargement ultérieur dans la même session ne
+            # ré-applique pas la disposition (éviterait de faire disparaître
+            # des fenêtres que le joueur vient d'organiser lui-même).
+            self._restore_layout()
 
     # ------------------------------------------------------ temps (marché)
     def _tick_market(self):
@@ -166,6 +174,90 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self.wm.update(dt)
         self._check_new_icons()
         self._check_tutorial()
+        self._sync_layout_flag()
+
+    # ------------------------------------------- espace de travail (layout)
+    def _sync_layout_flag(self):
+        """Tient `player.flags["desktop_layout"]` à jour à CHAQUE frame (coût
+        négligeable : quelques fenêtres tout au plus) — pour qu'une
+        sauvegarde, à quelque moment qu'elle survienne (auto ou manuelle,
+        cf. core/autosave_settings.py), capture toujours la disposition
+        COURANTE plutôt qu'un instantané figé à un point d'appel précis."""
+        self.app.gs.player.flags["desktop_layout"] = self._snapshot_layout()
+
+    def _snapshot_layout(self):
+        layout = []
+        for w in self.wm.windows:
+            entry = {"rect": [w.rect.x, w.rect.y, w.rect.w, w.rect.h],
+                     "minimized": w.minimized, "pinned": w.pinned}
+            if w.key == "scene:terminal":
+                entry["kind"] = "terminal"
+            elif w.key.startswith("scene:"):
+                entry["kind"] = "scene"
+                entry["name"] = w.key[len("scene:"):]
+                entry["kwargs"] = dict(getattr(w.app_obj, "_kwargs", None) or {})
+            else:
+                entry["kind"] = "app"
+                entry["key"] = w.key
+            layout.append(entry)
+        return layout
+
+    def _restore_layout(self):
+        """Rouvre les fenêtres mémorisées dans `player.flags["desktop_layout"]`
+        (tenu à jour en continu, cf. `_sync_layout_flag`) à leur position/
+        taille/état d'origine — appelé une seule fois, à la création de
+        l'instance TERMINAL persistante (cf. on_enter) : la disposition de
+        la DERNIÈRE session (nouvelle partie, reprise depuis le menu…)."""
+        self._apply_layout(self.app.gs.player.flags.get("desktop_layout"))
+
+    def _save_pinned_layout(self):
+        """« Enregistrer ma disposition » (menu contextuel) : fige un
+        instantané SÉPARÉ de la disposition courante (`desktop_layout_pinned`,
+        distinct de `desktop_layout` qui change à chaque frame) — pour y
+        revenir plus tard d'un clic sans dépendre de ce qui était ouvert à la
+        toute dernière sauvegarde."""
+        self.app.gs.player.flags["desktop_layout_pinned"] = self._snapshot_layout()
+        self.app.notify(_L("Disposition de fenêtres enregistrée.",
+                           "Window layout saved."), "good")
+
+    def _restore_pinned_layout(self):
+        """« Restaurer ma disposition » (menu contextuel) : rouvre
+        l'instantané figé par `_save_pinned_layout`, à tout moment de la
+        partie (pas seulement au lancement, contrairement à `_restore_layout`)."""
+        layout = self.app.gs.player.flags.get("desktop_layout_pinned")
+        if not layout:
+            self.app.notify(_L("Aucune disposition enregistrée pour l'instant.",
+                               "No saved layout yet."), "warn")
+            return
+        self._apply_layout(layout)
+
+    def _apply_layout(self, layout):
+        """Rouvre chaque fenêtre décrite par `layout` (liste de dicts, cf.
+        `_snapshot_layout`) à sa position/taille/état d'origine. Une entrée
+        dont la scène/l'app n'existe plus (retirée depuis) est simplement
+        ignorée, jamais une erreur bloquante."""
+        if not layout:
+            return
+        term_win = next((w for w in self.wm.windows if w.key == "scene:terminal"), None)
+        for entry in layout:
+            kind = entry.get("kind")
+            w = None
+            try:
+                if kind == "terminal":
+                    w = term_win
+                elif kind == "scene":
+                    w = self._open_scene_window(entry.get("name", ""), **entry.get("kwargs", {}))
+                elif kind == "app":
+                    w = self._launch(entry.get("key", ""))
+            except Exception:
+                w = None
+            if w is None:
+                continue
+            rect = entry.get("rect")
+            if rect and len(rect) == 4:
+                w.rect = pygame.Rect(*rect)
+            w.minimized = bool(entry.get("minimized", False))
+            w.pinned = bool(entry.get("pinned", False))
 
     # ------------------------------------------------------------- events
     def handle_event(self, event):

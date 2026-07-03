@@ -11,6 +11,7 @@ l'écran bureau, pas réutilisable ailleurs dans le jeu).
 import pygame
 
 from apps.app_calculator import CalculatorApp
+from apps.app_notifications import NotificationCenterApp
 from apps.app_research import ResearchApp
 from apps.app_sheet import SheetApp
 from apps.app_trading import TradingApp
@@ -32,6 +33,7 @@ APPS = [
     ("sheet", "Tableur", "sheet", SheetApp),
     ("watchlist", "Watchlist", "star", WatchlistApp),
     ("calculator", "Calculatrice", "calc", CalculatorApp),
+    ("notifcenter", "Notifications", "bell", NotificationCenterApp),
 ]
 
 # Application supplémentaire propre à la VOIE (track) choisie par le joueur

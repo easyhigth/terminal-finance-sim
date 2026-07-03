@@ -123,6 +123,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self._menu_rect = None
         self._ambient_rect = None    # widget patrimoine (clic → portefeuille)
         self._todo_rects = []        # lignes du widget « À faire » (clic → scène)
+        self._calendar_rect = None   # widget calendrier macro (clic → calendrier)
         self._ctx_menu = None        # menu contextuel (clic droit) : dict ou None
         self._onboard_card = None    # carte d'accueil (rect) — 1re visite
         self._onboard_btn = None
@@ -357,6 +358,10 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             if r.collidepoint(pos):
                 self._open_scene_window(scene)
                 return
+        # widget calendrier macro → ouvre l'écran Calendrier en fenêtre
+        if self._calendar_rect and self._calendar_rect.collidepoint(pos):
+            self._open_scene_window("calendar")
+            return
         if self._menu_rect and self._menu_rect.collidepoint(pos):
             self.app.scenes.go("menu")
             return
@@ -552,6 +557,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self._draw_desktop_icons(surf)
         self._draw_ambient(surf)
         self._draw_todo(surf)
+        self._draw_calendar_widget(surf)
         self.wm.draw(surf)
         self._draw_topbar(surf)
         self._draw_taskbar(surf)

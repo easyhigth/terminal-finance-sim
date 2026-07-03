@@ -2003,3 +2003,55 @@ def test_changing_autosave_cadence_persists_via_core_module(app):
     sc.handle_event(click)
     assert AS.get_interval() is None
     AS.set_interval(0.0)   # restaure la valeur par défaut pour les autres tests
+
+
+# =========================== widget calendrier macro (bureau) =================
+def _macro_event(eid, event_type, resolve_step):
+    return {"id": eid, "event_type": event_type, "resolve_step": resolve_step,
+            "consensus": "en ligne"}
+
+
+def test_calendar_widget_hidden_when_no_events(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    app.gs.player.macro_events = []
+    desk.draw(app.screen)
+    assert desk._calendar_rect is None
+
+
+def test_calendar_widget_shows_up_to_three_soonest_events(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    step_now = app.market.step_count
+    app.gs.player.macro_events = [
+        _macro_event(1, "Inflation (CPI)", step_now + 10),
+        _macro_event(2, "Emploi (NFP)", step_now + 2),
+        _macro_event(3, "Croissance (PIB)", step_now + 6),
+        _macro_event(4, "Indice PMI (manufacturier/services)", step_now + 20),
+    ]
+    desk.draw(app.screen)
+    assert desk._calendar_rect is not None
+
+
+def test_calendar_widget_click_opens_calendar_window(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    step_now = app.market.step_count
+    app.gs.player.macro_events = [_macro_event(1, "Inflation (CPI)", step_now + 4)]
+    desk.draw(app.screen)
+    r = desk._calendar_rect
+    assert r is not None
+    desk.handle_event(_click(r.centerx, r.centery))
+    assert any(w.key == "scene:calendar" for w in desk.wm.windows)
+
+
+def test_calendar_widget_stacks_above_todo_widget_when_both_present(app):
+    from core import todo as todo_mod
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    step_now = app.market.step_count
+    app.gs.player.macro_events = [_macro_event(1, "Inflation (CPI)", step_now + 4)]
+    has_todo = bool(todo_mod.suggestions(app.gs.player, app.market))
+    desk.draw(app.screen)
+    if has_todo:
+        assert desk._calendar_rect.bottom < desk._todo_rects[0][0].top

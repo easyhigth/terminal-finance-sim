@@ -248,6 +248,16 @@ class DesktopWidgetsMixin:
             pygame.draw.rect(surf, accent, r, 1, border_radius=5)
             widgets.draw_text(surf, label, r.center, fonts.small(bold=True), accent, align="center")
 
+    def _todo_widget_height(self):
+        """Hauteur du widget « À FAIRE » (0 si vide) — calculée à part pour
+        que `_draw_calendar_widget` puisse empiler sa propre carte juste
+        au-dessus sans dépendre de l'ordre de dessin."""
+        from core import todo as todo_mod
+        items = todo_mod.suggestions(self.app.gs.player, self.app.market)
+        if not items:
+            return 0
+        return 26 + 20 * len(items) + 6
+
     def _draw_todo(self, surf):
         """Widget « À FAIRE » (au-dessus du widget patrimoine, sous les
         fenêtres) : les actions en attente les plus prioritaires
@@ -283,4 +293,45 @@ class DesktopWidgetsMixin:
             pygame.draw.circle(surf, col, (row.x + 8, row.centery), 3)
             widgets.draw_text(surf, widgets.fit_text(it["label"], fonts.tiny(), W - 32),
                               (row.x + 18, row.y + 4), fonts.tiny(), config.COL_TEXT)
+            iy += row_h
+
+    def _draw_calendar_widget(self, surf):
+        """Widget « CALENDRIER » (au-dessus du widget « À FAIRE », sous les
+        fenêtres) : les 3 prochains évènements macro programmés
+        (core/macrocal.py, player.macro_events) avec un compte à rebours en
+        jours — rappel discret sans avoir à ouvrir la fenêtre Calendrier
+        dédiée. Cliquer l'ouvre (comme le widget patrimoine → portefeuille)."""
+        p = self.app.gs.player
+        m = self.app.market
+        self._calendar_rect = None
+        events = sorted(p.macro_events, key=lambda e: e["resolve_step"])[:3]
+        if not events:
+            return
+        W = 260
+        row_h = 20
+        H = 26 + row_h * len(events) + 6
+        x = config.SCREEN_WIDTH - W - 16
+        todo_h = self._todo_widget_height()
+        todo_gap = 8 if todo_h else 0
+        y = config.SCREEN_HEIGHT - TASKBAR_H - 96 - 12 - todo_h - todo_gap - H - 8
+        r = pygame.Rect(x, y, W, H)
+        self._calendar_rect = r
+        hov = r.collidepoint(pygame.mouse.get_pos())
+        panel = pygame.Surface((W, H), pygame.SRCALPHA)
+        panel.fill((*config.COL_PANEL, 232))
+        surf.blit(panel, (x, y))
+        pygame.draw.rect(surf, config.COL_AMBER if hov else config.COL_BORDER, r, 1, border_radius=6)
+        widgets.draw_text(surf, _L("CALENDRIER", "CALENDAR"), (x + 10, y + 6),
+                          fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        step_now = m.step_count if m else 0
+        iy = y + 24
+        for ev in events:
+            steps_left = max(0, ev["resolve_step"] - step_now)
+            days_left = steps_left * config.DAYS_PER_STEP
+            row = pygame.Rect(x + 4, iy, W - 8, row_h)
+            col = config.COL_WARN if days_left <= config.DAYS_PER_STEP else config.COL_TEXT_DIM
+            widgets.draw_text(surf, f"J-{days_left}", (row.x, row.y + 4),
+                              fonts.tiny(bold=True), col)
+            widgets.draw_text(surf, widgets.fit_text(ev["event_type"], fonts.tiny(), W - 60),
+                              (row.x + 42, row.y + 4), fonts.tiny(), config.COL_TEXT)
             iy += row_h

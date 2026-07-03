@@ -11,7 +11,7 @@ et le même verrou de déblocage (`core/unlocks`). Étape 1 : actions au comptan
 import pygame
 
 from apps.base import DesktopApp
-from core import audio, config, unlocks
+from core import audio, config, order_confirm, unlocks
 from core import conditional_orders as CO
 from core import portfolio as PF
 from core import portfolio_margin as PM
@@ -57,6 +57,11 @@ class TradingApp(DesktopApp):
         self._order_confirm_rect = None
         self._order_cancel_rect = None
         self._cond_cancel_rects = {}   # order_id -> Rect (× dans la liste des ordres en cours)
+        # confirmation des ordres à fort impact (>30% du patrimoine net) :
+        # {"side","ticker","qty","notional","ratio"} en attente, ou None
+        self._confirm_pending = None
+        self._confirm_yes_rect = None
+        self._confirm_no_rect = None
 
     def focus_ticker(self, ticker):
         """Pré-filtre la liste sur `ticker` — appelé par le lien « Trader »
@@ -94,12 +99,9 @@ class TradingApp(DesktopApp):
         if qty <= 0:
             self.msg = "Quantité invalide."
             return
-        r = PF.buy(self.app.gs.player, self.market, tk, qty)
-        if r["ok"]:
-            self.msg = ""
-            self._push_feed(f"ACHAT {qty:g}×{tk} @ {r['price']:.2f}", "up")
-        else:
-            self.msg = f"Achat refusé ({r['reason']})."
+        if self._maybe_ask_confirmation("buy", tk, qty):
+            return
+        self._execute_buy(tk, qty)
 
     def _do_sell(self, tk):
         if not self._can_trade():
@@ -111,6 +113,35 @@ class TradingApp(DesktopApp):
         if qty <= 0:
             self.msg = "Quantité invalide."
             return
+        if self._maybe_ask_confirmation("sell", tk, qty):
+            return
+        self._execute_sell(tk, qty)
+
+    def _maybe_ask_confirmation(self, side, tk, qty):
+        """Ordre au-delà du seuil d'impact (core/order_confirm.py, >30% du
+        patrimoine net) : suspend l'exécution et ouvre une boîte de
+        confirmation au lieu d'exécuter directement — retourne True si
+        l'ordre est bien mis en attente (donc PAS encore exécuté)."""
+        price = self.market.price_of(tk)
+        notional = (price or 0.0) * qty
+        p = self.app.gs.player
+        if not order_confirm.needs_confirmation(p, self.market, notional):
+            return False
+        self._confirm_pending = {
+            "side": side, "ticker": tk, "qty": qty, "notional": notional,
+            "ratio": order_confirm.impact_ratio(p, self.market, notional),
+        }
+        return True
+
+    def _execute_buy(self, tk, qty):
+        r = PF.buy(self.app.gs.player, self.market, tk, qty)
+        if r["ok"]:
+            self.msg = ""
+            self._push_feed(f"ACHAT {qty:g}×{tk} @ {r['price']:.2f}", "up")
+        else:
+            self.msg = f"Achat refusé ({r['reason']})."
+
+    def _execute_sell(self, tk, qty):
         r = PF.sell(self.app.gs.player, self.market, tk, qty)
         if r["ok"]:
             self.msg = ""
@@ -119,6 +150,19 @@ class TradingApp(DesktopApp):
                             "up" if r["realized"] >= 0 else "down")
         else:
             self.msg = f"Vente refusée ({r['reason']})."
+
+    def _confirm_pending_execute(self):
+        c = self._confirm_pending
+        self._confirm_pending = None
+        if c is None:
+            return
+        if c["side"] == "buy":
+            self._execute_buy(c["ticker"], c["qty"])
+        else:
+            self._execute_sell(c["ticker"], c["qty"])
+
+    def _confirm_pending_cancel(self):
+        self._confirm_pending = None
 
     def _push_feed(self, text, kind):
         """Empile un ordre exécuté dans le fil de confirmation (flash + son)
@@ -163,6 +207,8 @@ class TradingApp(DesktopApp):
 
     # --------------------------------------------------------------- events
     def handle_event(self, event, rect):
+        if self._confirm_pending is not None:
+            return self._handle_confirm_event(event)
         if self._order_prompt is not None:
             return self._handle_order_prompt_event(event)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
@@ -207,6 +253,27 @@ class TradingApp(DesktopApp):
                 self.search += event.unicode
                 self.scroll = 0
                 return True
+        return False
+
+    def _handle_confirm_event(self, event):
+        """Boîte « ordre à fort impact » : ÉCHAP/clic sur « Annuler » abandonne
+        SANS exécuter l'ordre (comportement volontairement le plus sûr,
+        cohérent avec ÉCHAP = annuler ailleurs dans le jeu) ; ENTRÉE/clic sur
+        « Confirmer » exécute l'ordre resté en attente."""
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self._confirm_pending_cancel()
+            return True
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            self._confirm_pending_execute()
+            return True
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._confirm_yes_rect and self._confirm_yes_rect.collidepoint(event.pos):
+                self._confirm_pending_execute()
+                return True
+            if self._confirm_no_rect and self._confirm_no_rect.collidepoint(event.pos):
+                self._confirm_pending_cancel()
+                return True
+            return True
         return False
 
     def _handle_order_prompt_event(self, event):
@@ -357,6 +424,41 @@ class TradingApp(DesktopApp):
 
         if self._order_prompt is not None:
             self._draw_order_prompt(surf, rect)
+        if self._confirm_pending is not None:
+            self._draw_confirm_dialog(surf, rect)
+
+    def _draw_confirm_dialog(self, surf, rect):
+        """Boîte de confirmation modale pour un ordre à fort impact (>30% du
+        patrimoine net, cf. core/order_confirm.py) — même style que la boîte
+        d'ordre conditionnel, couleur ambre pour marquer l'avertissement."""
+        c = self._confirm_pending
+        overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 160))
+        surf.blit(overlay, rect.topleft)
+        box = pygame.Rect(0, 0, min(340, rect.w - 40), 150)
+        box.center = rect.center
+        pygame.draw.rect(surf, config.COL_PANEL, box)
+        pygame.draw.rect(surf, config.COL_AMBER, box, 2)
+        side_label = "ACHAT" if c["side"] == "buy" else "VENTE"
+        widgets.draw_text(surf, f"⚠ ORDRE À FORT IMPACT — {side_label} {c['ticker']}",
+                          (box.x + 12, box.y + 8), fonts.small(bold=True), config.COL_AMBER)
+        cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
+        widgets.draw_text(surf, f"{c['qty']:g} titres — {widgets.format_money(c['notional'], cur)}",
+                          (box.x + 12, box.y + 32), fonts.small(), config.COL_TEXT)
+        widgets.draw_text(surf, f"Soit {c['ratio']*100:.0f}% de votre patrimoine net en un seul ordre.",
+                          (box.x + 12, box.y + 54), fonts.tiny(), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, "Confirmer ?", (box.x + 12, box.y + 76),
+                          fonts.tiny(), config.COL_TEXT_DIM)
+        self._confirm_yes_rect = pygame.Rect(box.x + 12, box.bottom - 32, box.w - 88, 24)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._confirm_yes_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_AMBER, self._confirm_yes_rect, 1, border_radius=4)
+        widgets.draw_text(surf, "CONFIRMER", self._confirm_yes_rect.center,
+                          fonts.tiny(bold=True), config.COL_AMBER, align="center")
+        self._confirm_no_rect = pygame.Rect(self._confirm_yes_rect.right + 6, box.bottom - 32, 60, 24)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._confirm_no_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_TEXT_DIM, self._confirm_no_rect, 1, border_radius=4)
+        widgets.draw_text(surf, "Annuler", self._confirm_no_rect.center,
+                          fonts.tiny(), config.COL_TEXT_DIM, align="center")
 
     def _draw_feed(self, surf, rect, y, pad):
         """Fil des derniers ordres exécutés : le plus récent en couleur avec un

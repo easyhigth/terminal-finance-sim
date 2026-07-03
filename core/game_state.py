@@ -7,7 +7,7 @@ import os
 import time
 from dataclasses import asdict, dataclass, field
 
-from core import config
+from core import autosave_settings, config
 from core.applog import logger
 
 
@@ -258,6 +258,19 @@ class GameState:
             # réelles. Chokepoint unique plutôt que de patcher chaque call site.
             logger.info("save: ignoré (mode sandbox, slot=%s)", slot)
             return None
+        if slot == config.AUTOSAVE_SLOT:
+            # cadence de la sauvegarde AUTO (core/autosave_settings.py) :
+            # même chokepoint unique que le mode sandbox ci-dessus, plutôt
+            # que de patcher les dizaines de call sites `save(AUTOSAVE_SLOT)`
+            # dispersés dans scenes/*.py. N'affecte JAMAIS un slot manuel
+            # (SAVE, SLOT1/2/3) : ceux-ci écrivent toujours immédiatement.
+            interval = autosave_settings.get_interval()
+            if interval is None:
+                logger.info("save: ignoré (sauvegarde auto désactivée, slot=%s)", slot)
+                return None
+            if interval > 0 and (time.time() - self.last_saved) < interval:
+                logger.info("save: ignoré (cadence auto non atteinte, slot=%s)", slot)
+                return None
         logger.info("save: début (slot=%s)", slot)
         os.makedirs(config.SAVE_DIR, exist_ok=True)
         self.last_saved = time.time()

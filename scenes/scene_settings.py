@@ -14,7 +14,7 @@ requise pour ouvrir les réglages.
 """
 import pygame
 
-from core import anim_settings, audio, colorblind_settings, config, display_settings
+from core import anim_settings, audio, autosave_settings, colorblind_settings, config, display_settings
 from core.i18n import get_lang, set_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
@@ -72,6 +72,12 @@ class SettingsScene(Scene):
                                       not colorblind_settings.is_enabled()),
                                      (("colorblind", True), _L("Daltonien (bleu/orange)", "Colorblind (blue/orange)"),
                                       colorblind_settings.is_enabled())])))
+        # SAUVEGARDE AUTOMATIQUE — cadence (0 = à chaque action, historique)
+        cur_interval = autosave_settings.get_interval()
+        self.rows.append((_L("Sauvegarde auto", "Autosave"),
+                          self._seg([(("autosave", v), autosave_settings.preset_label(v, lang),
+                                      cur_interval == v)
+                                     for v, _label in autosave_settings.PRESETS])))
         # VITESSE DE JEU (live ; l'horloge n'avance qu'au terminal)
         cur_speed = getattr(self.app.sim_clock, "speed", 1)
         self.rows.append((_L("Vitesse du jeu", "Game speed"),
@@ -156,6 +162,8 @@ class SettingsScene(Scene):
             colorblind_settings.set_enabled(val)
         elif kind == "speed":
             self.app.sim_clock.set_speed(val)
+        elif kind == "autosave":
+            autosave_settings.set_interval(val)
         self._build()   # reconstruit libellés + états actifs
 
     def update(self, dt):

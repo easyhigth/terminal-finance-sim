@@ -321,6 +321,15 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             w.pinned = bool(entry.get("pinned", False))
 
     # ------------------------------------------------------------- events
+    def _blocking_card_pending(self):
+        """True si une carte modale déclenchée PAR LE JEU (pas par un clic
+        joueur) attend d'être vue — bilan du trimestre, résumé d'absence.
+        Empêche l'Assistant (F1) ou la recherche globale (Ctrl+/) de
+        s'ouvrir par-dessus, ce qui superposerait deux cartes au même
+        endroit de l'écran et rendrait celle du dessous injoignable tant que
+        celle du dessus n'est pas refermée."""
+        return self._quarter_card_pending() is not None or self._absence_digest_pending() is not None
+
     def handle_event(self, event):
         # carte Assistant ouverte : capture tout en priorité (même règle que
         # les autres cartes modales du bureau — bilan trimestre, recherche…)
@@ -329,19 +338,30 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             return
         # F1 : ouvre l'Assistant « que faire maintenant ? » — LA suggestion la
         # plus prioritaire (core/todo.py), en langage simple, pour le joueur
-        # qui ne sait pas par où commencer parmi les nombreuses icônes.
+        # qui ne sait pas par où commencer parmi les nombreuses icônes. Ne
+        # s'ouvre PAS par-dessus une carte modale déjà affichée par le jeu
+        # (bilan trimestre, résumé d'absence) : sinon les deux cartes se
+        # superposent au même endroit de l'écran et celle du dessous devient
+        # injoignable tant que l'Assistant n'est pas refermé (bug corrigé —
+        # jamais deux cartes modales à la fois).
         if event.type == pygame.KEYDOWN and event.key == pygame.K_F1:
-            self._assistant_open = True
+            if not self._blocking_card_pending():
+                self._assistant_open = True
             return
         # recherche globale ouverte : capture tout en priorité
         if self._search_open:
             self._handle_search_event(event)
             return
         # Ctrl+/ : ouvre la recherche globale (positions/watchlist/inbox/
-        # mandats/deals) — prioritaire sur tout le reste.
+        # mandats/deals) — prioritaire sur tout le reste. Même garde que F1
+        # ci-dessus : ne s'ouvre pas par-dessus une carte modale déjà
+        # affichée (bilan trimestre, résumé d'absence) — bug pré-existant
+        # (recherche superposée à la carte, injoignable tant que la
+        # recherche n'est pas refermée) corrigé au passage.
         if (event.type == pygame.KEYDOWN and event.key == pygame.K_SLASH
                 and (event.mod & pygame.KMOD_CTRL)):
-            self._open_search()
+            if not self._blocking_card_pending():
+                self._open_search()
             return
         # Ctrl+<lettre> : lance l'icône correspondante (mêmes mnémoniques que
         # les raccourcis du terminal) — seulement si l'icône est visible au
@@ -755,11 +775,12 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             self._draw_tutorial(surf)
         else:
             self._tuto_skip_rect = None
-        if self._quarter_card_pending() is not None:
+        _card_suppressed = self._assistant_open or self._search_open
+        if self._quarter_card_pending() is not None and not _card_suppressed:
             self._draw_quarter_card(surf)
         else:
             self._qcard_rects = {}
-            if self._absence_digest_pending() is not None:
+            if self._absence_digest_pending() is not None and not _card_suppressed:
                 self._draw_absence_digest(surf)
             else:
                 self._digest_rects = {}

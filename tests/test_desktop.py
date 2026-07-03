@@ -2125,6 +2125,7 @@ def _ctrl_slash():
 def test_ctrl_slash_opens_global_search(app):
     app.scenes.go("desktop")
     desk = app.scenes.current
+    desk._ack_absence_digest()   # ignore les notifications du setup (badges…)
     desk.handle_event(_ctrl_slash())
     assert desk._search_open is True
     assert desk._search_query == ""
@@ -2560,9 +2561,76 @@ def test_layout_auto_restores_on_first_desktop_entry_of_a_fresh_app():
 def test_f1_opens_assistant_card(app):
     app.scenes.go("desktop")
     scene = app.scenes.current
+    scene._ack_absence_digest()   # ignore les notifications du setup (badges…)
     assert scene._assistant_open is False
     scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F1, mod=0))
     assert scene._assistant_open is True
+
+
+def test_f1_does_not_open_over_pending_quarter_card(app):
+    """Régression : F1 ouvrait l'Assistant PAR-DESSUS la carte « Bilan du
+    trimestre » déjà affichée — deux cartes modales superposées au même
+    endroit de l'écran, celle du dessous devenant injoignable."""
+    app.scenes.go("desktop")
+    scene = app.scenes.current
+    app.gs.player.flags["last_quarter_report"] = {"quarter": 1, "total": 3, "done": 2}
+    assert scene._quarter_card_pending() is not None
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F1, mod=0))
+    assert scene._assistant_open is False
+    del app.gs.player.flags["last_quarter_report"]
+
+
+def test_f1_does_not_open_over_pending_absence_digest(app):
+    """Régression : même bug que ci-dessus avec la carte « En votre absence »."""
+    scene = _empty_desktop(app)
+    app.notify("Ordre exécuté", "good")
+    assert scene._absence_digest_pending() is not None
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F1, mod=0))
+    assert scene._assistant_open is False
+
+
+def test_f1_opens_normally_once_digest_dismissed(app):
+    scene = _empty_desktop(app)
+    app.notify("Ordre exécuté", "good")
+    scene._ack_absence_digest()
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F1, mod=0))
+    assert scene._assistant_open is True
+
+
+def test_ctrl_slash_does_not_open_search_over_pending_quarter_card(app):
+    """Régression (bug pré-existant, même famille que F1) : Ctrl+/ ouvrait la
+    recherche globale PAR-DESSUS la carte « Bilan du trimestre »."""
+    app.scenes.go("desktop")
+    scene = app.scenes.current
+    app.gs.player.flags["last_quarter_report"] = {"quarter": 1, "total": 3, "done": 2}
+    ev = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SLASH, mod=pygame.KMOD_CTRL)
+    scene.handle_event(ev)
+    assert scene._search_open is False
+    del app.gs.player.flags["last_quarter_report"]
+
+
+def test_quarter_card_suppressed_while_search_open(app):
+    app.scenes.go("desktop")
+    scene = app.scenes.current
+    scene._open_search()
+    app.gs.player.flags["last_quarter_report"] = {"quarter": 1, "total": 3, "done": 2}
+    scene.draw(app.screen)
+    assert scene._qcard_rects == {}
+    del app.gs.player.flags["last_quarter_report"]
+
+
+def test_assistant_and_digest_never_both_drawn(app):
+    """Même si l'Assistant est ouvert AVANT que le résumé d'absence ne
+    devienne éligible (notification arrivée pendant que l'Assistant est
+    déjà affiché), draw() ne doit jamais peupler les deux jeux de rects en
+    même temps."""
+    scene = _empty_desktop(app)
+    scene._ack_absence_digest()
+    scene._assistant_open = True
+    app.notify("Ordre exécuté", "good")   # devient éligible pendant que l'Assistant est ouvert
+    assert scene._absence_digest_pending() is not None
+    scene.draw(app.screen)
+    assert scene._assistant_rects and not scene._digest_rects
 
 
 def test_assistant_escape_closes(app):

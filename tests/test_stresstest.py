@@ -4,6 +4,7 @@ import random
 import pytest
 
 from core import portfolio as pf
+from core import risk as RISK
 from core import stresstest as ST
 from core.game_state import PlayerState
 from core.market import Market
@@ -48,8 +49,12 @@ def test_maybe_trigger_fires_after_period_elapsed():
     assert test is not None
     assert p.pending_stresstest == test
     assert test["quarter"] == 2
-    assert test["scenario"] in ("Krach actions", "Choc de taux +200bps",
-                                 "Choc de volatilité", "Récession")
+    # tiré parmi TOUS les scénarios connus (core/risk.py::STRESS), pas
+    # seulement les 4 génériques historiques — la liste s'est étoffée depuis
+    # (inflation, Europe, énergie, crédit, liquidité) sans que ce test le
+    # sache ; comparer à la source plutôt qu'à une liste recopiée évite que
+    # ça se reproduise.
+    assert test["scenario"] in RISK.STRESS
     assert "impact_total" in test
     assert "loss_ratio" in test
     assert test["fail_ratio"] == ST.FAIL_RATIO

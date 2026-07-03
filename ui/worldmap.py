@@ -19,14 +19,18 @@ from core import config
 from data.worldmap_geo import WORLD as CONTINENTS  # côtes détaillées (normalisées)
 from ui import fonts, widgets
 
+# positions seulement : la couleur se lit dynamiquement (cf. config.continent_color)
+# plutôt que d'être figée ici à l'import — sinon le mode contraste élevé
+# (core/colorblind_settings.py, qui réassigne config.COL_EUROPE etc. à
+# l'exécution) ne rafraîchirait jamais ces teintes.
 REGION_HUBS = {
-    "USA":     {"pos": (0.16, 0.31), "color": config.COL_USA},
-    "Am.Nord": {"pos": (0.21, 0.15), "color": config.COL_NORTHAM},
-    "Europe":  {"pos": (0.50, 0.20), "color": config.COL_EUROPE},
-    "Afrique": {"pos": (0.53, 0.55), "color": config.COL_AFRICA},
-    "Am.Sud":  {"pos": (0.29, 0.66), "color": config.COL_SOUTHAM},
-    "Asia":    {"pos": (0.77, 0.27), "color": config.COL_ASIA},
-    "Océanie": {"pos": (0.87, 0.74), "color": config.COL_OCEANIA},
+    "USA":     {"pos": (0.16, 0.31)},
+    "Am.Nord": {"pos": (0.21, 0.15)},
+    "Europe":  {"pos": (0.50, 0.20)},
+    "Afrique": {"pos": (0.53, 0.55)},
+    "Am.Sud":  {"pos": (0.29, 0.66)},
+    "Asia":    {"pos": (0.77, 0.27)},
+    "Océanie": {"pos": (0.87, 0.74)},
 }
 
 OCEAN = (10, 16, 26)
@@ -209,7 +213,7 @@ class WorldMap:
                 ring = pygame.Surface((radius * 2 + 2, radius * 2 + 2), pygame.SRCALPHA)
                 pygame.draw.circle(ring, (*halo[:3], alpha), (radius + 1, radius + 1), radius)
                 surf.blit(ring, (cx - radius - 1, cy - radius - 1))
-            color = hub["color"]
+            color = config.continent_color(region)
             pulse = self.hub_pulse[region]
             r = int(4 + 3 * (0.5 + 0.5 * math.sin(self.t * 2)) + pulse * 6)
             is_hover = (mp[0] - cx) ** 2 + (mp[1] - cy) ** 2 <= 16 ** 2
@@ -264,7 +268,7 @@ class WorldMap:
     def _draw_hub_box(self, surf, rect, region, market):
         """Petite fiche de l'indice phare d'une région (affichée au survol)."""
         cx, cy = self._hub_rects[region]
-        color = REGION_HUBS[region]["color"]
+        color = config.continent_color(region)
         idxs = self._region_indices(market, region)
         main = idxs[0] if idxs else None
         bw, bh = 138, 38
@@ -287,7 +291,7 @@ class WorldMap:
 
     def _draw_region(self, surf, rect, market):
         region = self.zoom
-        accent = REGION_HUBS.get(region, {}).get("color", config.COL_AMBER)
+        accent = config.continent_color(region) if region in REGION_HUBS else config.COL_AMBER
         pygame.draw.rect(surf, OCEAN, rect)
         pygame.draw.rect(surf, accent, rect, 1)
         # en-tête + bouton retour monde

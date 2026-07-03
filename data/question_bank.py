@@ -554,6 +554,34 @@ QUESTIONS = [
                  "Garantir l'alpha"],
      "answer": 1,
      "expl": "Le rebalancing ramène aux poids cibles : il allège mécaniquement ce qui a surperformé et renforce ce qui a baissé."},
+
+    # ===================== ordres conditionnels & structure de marché ====
+    {"id": "q59", "grade": 1, "track": "General", "diff": 2,
+     "q": "Un ordre stop-loss posé sur une position longue se déclenche quand le cours :",
+     "choices": ["Descend jusqu'au seuil fixé, déclenchant une vente automatique",
+                 "Monte jusqu'au seuil fixé, déclenchant un achat automatique",
+                 "Ne bouge plus pendant une séance entière",
+                 "Franchit sa moyenne mobile à 200 jours"],
+     "answer": 0,
+     "expl": "Le stop-loss vend automatiquement dès que le cours tombe au niveau de déclenchement, pour limiter une perte sans surveiller le marché en continu."},
+
+    {"id": "q60", "grade": 1, "track": "General", "diff": 2,
+     "q": "Contrairement à un stop-loss, un ordre take-profit (objectif de gain) :",
+     "choices": ["Se déclenche quand le cours monte jusqu'au seuil fixé, pour sécuriser un gain",
+                 "Se déclenche quand le cours baisse, pour limiter une perte",
+                 "Annule automatiquement toute autre position ouverte",
+                 "Ne peut être posé que sur une position courte"],
+     "answer": 0,
+     "expl": "Le take-profit vend dès que le cours atteint l'objectif haut fixé, verrouillant un gain sans devoir surveiller le marché en continu — symétrique du stop-loss côté hausse."},
+
+    {"id": "q61", "grade": 0, "track": "General", "diff": 1,
+     "q": "Sur les marchés actions mondiaux, les séances de cotation d'Asie, d'Europe et des Amériques :",
+     "choices": ["Se chevauchent partiellement au fil de la journée, une place ouvrant avant la fermeture d'une autre",
+                 "Sont toutes ouvertes exactement aux mêmes heures dans le monde entier",
+                 "N'ouvrent jamais le même jour calendaire",
+                 "Sont fermées en permanence sauf le vendredi"],
+     "answer": 0,
+     "expl": "Les fuseaux horaires décalent les séances : quand l'Asie ferme, l'Europe est déjà ouverte, puis les Amériques prennent le relais — la liquidité mondiale ne s'arrête jamais totalement."},
 ]
 
 

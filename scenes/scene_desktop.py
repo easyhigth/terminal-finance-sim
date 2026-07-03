@@ -61,7 +61,7 @@ from scenes.scene_desktop_common import (
 )
 from scenes.scene_desktop_menus import DesktopMenusMixin
 from scenes.scene_desktop_widgets import DesktopWidgetsMixin
-from ui import desktop_icons, fonts, widgets
+from ui import desktop_icons, fonts, keynav, widgets
 from ui.window_manager import WindowManager
 
 
@@ -76,6 +76,8 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                                         config.SCREEN_HEIGHT - TOPBAR_H - TASKBAR_H)
         self.start_open = False
         self._icon_rects = {}       # clé -> (Rect, icon_kind, label) — icônes du bureau
+        self._icon_focus = None     # clé de l'icône ayant le focus clavier (ou None)
+        self._show_desktop_restore = []  # clés des fenêtres à restaurer (CTRL+MAJ+D)
         self._launch_rects = {}     # clé app -> Rect (barre des tâches quick-launch)
         self._task_rects = {}       # Window -> Rect (barre des tâches)
         self._start_rect = None     # bouton menu Démarrer
@@ -168,6 +170,14 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_TAB and (event.mod & pygame.KMOD_ALT):
             self.wm.cycle_focus(reverse=bool(event.mod & pygame.KMOD_SHIFT))
             return
+        # « Afficher le bureau » (façon Windows+D — CTRL+MAJ+D pour éviter tout
+        # conflit avec le raccourci OS Windows+D lui-même ET avec CTRL+D
+        # ci-dessus, réservé à l'icône Deals) : réduit toutes les fenêtres
+        # ouvertes ; un 2ᵉ appui restaure exactement celles qui l'étaient.
+        if (event.type == pygame.KEYDOWN and event.key == pygame.K_d
+                and (event.mod & pygame.KMOD_CTRL) and (event.mod & pygame.KMOD_SHIFT)):
+            self._toggle_show_desktop()
+            return
         # clic droit : menu contextuel (icône, chrome de fenêtre, barre des
         # tâches ou fond du bureau) — avant le routage classique des fenêtres.
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
@@ -203,6 +213,40 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             desktop_tutorial.skip()
             self._tuto_skip_rect = None
             return
+        # navigation clavier des icônes du bureau : seulement quand aucune
+        # fenêtre n'a le focus (une fenêtre ouverte capte normalement le
+        # clavier, cf. wm.handle_event ci-dessous — cohérent avec le
+        # comportement d'un vrai bureau). TAB/MAJ+TAB parcourt les icônes
+        # dans l'ordre d'affichage (grille) ; les flèches naviguent selon la
+        # position réelle (cf. ui/keynav.nearest_in_direction, même primitive
+        # que le terminal) ; ENTRÉE lance l'icône focalisée ; ÉCHAP efface le
+        # focus (liseré blanc, cf. ui/keynav.draw_focus_ring).
+        if (event.type == pygame.KEYDOWN and self.wm.focused is None
+                and not self.start_open and self._ctx_menu is None):
+            if event.key == pygame.K_TAB and not (event.mod & pygame.KMOD_ALT):
+                keys = list(self._icon_rects)
+                if keys:
+                    if self._icon_focus not in keys:
+                        self._icon_focus = keys[0]
+                    else:
+                        step = -1 if (event.mod & pygame.KMOD_SHIFT) else 1
+                        self._icon_focus = keys[(keys.index(self._icon_focus) + step) % len(keys)]
+                return
+            if event.key in keynav.DIRECTIONS:
+                rects = {k: r for k, (r, _kind, _label) in self._icon_rects.items()}
+                if rects:
+                    if self._icon_focus not in rects:
+                        self._icon_focus = next(iter(rects))
+                    else:
+                        self._icon_focus = keynav.nearest_in_direction(
+                            rects, self._icon_focus, keynav.DIRECTIONS[event.key])
+                return
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and self._icon_focus in self._icon_rects:
+                self._launch(self._icon_focus)
+                return
+            if event.key == pygame.K_ESCAPE and self._icon_focus is not None:
+                self._icon_focus = None
+                return
         if self.wm.handle_event(event):
             return
         if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
@@ -214,6 +258,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         # icônes du bureau + quick-launch : ouvrir/ramener l'app
         for key, (r, _kind, _label) in self._icon_rects.items():
             if r.collidepoint(pos):
+                self._icon_focus = key
                 self._launch(key)
                 return
         for key, r in self._launch_rects.items():
@@ -241,6 +286,23 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             return
         # pause/vitesse/⚙ : gérés par la bande d'onglets (simclock_widget), plus
         # de doublon dans la topbar du bureau.
+
+    def _toggle_show_desktop(self):
+        """CTRL+MAJ+D : réduit toutes les fenêtres ouvertes (bureau dégagé),
+        ou restaure exactement celles qui viennent d'être réduites par ce
+        raccourci si aucune fenêtre n'est ouverte — comme Afficher le bureau
+        sous Windows/macOS. Ne touche pas aux fenêtres déjà minimisées avant
+        l'appel (le terminal, minimisé par défaut, reste tel quel)."""
+        open_wins = [w for w in self.wm.windows if not w.minimized]
+        if open_wins:
+            self._show_desktop_restore = [w.key for w in open_wins]
+            for w in open_wins:
+                w.minimized = True
+        else:
+            for w in self.wm.windows:
+                if w.key in self._show_desktop_restore:
+                    w.minimized = False
+            self._show_desktop_restore = []
 
     def _launch(self, key):
         if key == "terminal":
@@ -486,6 +548,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             if hov:
                 pygame.draw.rect(surf, config.COL_PANEL, r, border_radius=8)
                 pygame.draw.rect(surf, accent, r, 1, border_radius=8)
+            keynav.draw_focus_ring(surf, r, key == self._icon_focus)
             desktop_icons.draw(surf, (r.centerx, r.y + 28), kind, accent)
             widgets.draw_text(surf, widgets.fit_text(label, fonts.small(bold=True), ICON_W - 6),
                               (r.centerx, r.bottom - 18), fonts.small(bold=True),

@@ -28,6 +28,8 @@ class AchievementsScene(Scene):
         self.scroll = 0
         self._max_scroll = 0
         self._list_rect = None
+        self._cat_filter = None    # None = tous les thèmes ; sinon un id de badges_mod.CATEGORIES
+        self._chip_rects = {}      # id catégorie (ou None pour "Tous") -> Rect
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self._rebuild()
@@ -43,15 +45,22 @@ class AchievementsScene(Scene):
             obtained = b["id"] in p.badges
             prog = None if obtained else badges_mod.progress_for(b, p, m)
             rows.append({"name": badges_mod.badge_name(b), "desc": badges_mod.badge_desc(b),
-                        "obtained": obtained, "progress": prog, "streak": False})
+                        "obtained": obtained, "progress": prog, "streak": False,
+                        "cat": b.get("cat")})
         for b in badges_mod.all_streak_badges():
             held = b["id"] in getattr(p, "streak_badges", [])
             streak = p.flags.get(b["streak_flag"], 0)
             prog = None if held else (float(streak), float(b["target"]))
             rows.append({"name": badges_mod.streak_badge_name(b), "desc": badges_mod.streak_badge_desc(b),
-                        "obtained": held, "progress": prog, "streak": True})
+                        "obtained": held, "progress": prog, "streak": True,
+                        "cat": b.get("cat")})
         rows.sort(key=lambda r: (not r["obtained"], r["name"]))
         self.rows = rows
+
+    def _visible_rows(self):
+        if self._cat_filter is None:
+            return self.rows
+        return [r for r in self.rows if r["cat"] == self._cat_filter]
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -60,6 +69,12 @@ class AchievementsScene(Scene):
         if self.back_btn.handle(event):
             self.app.scenes.go(self.return_to)
             return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for cat_id, r in self._chip_rects.items():
+                if r.collidepoint(event.pos):
+                    self._cat_filter = cat_id
+                    self.scroll = 0
+                    return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
             if self._list_rect and self._list_rect.collidepoint(event.pos):
                 self.scroll = max(0, min(self._max_scroll,
@@ -68,6 +83,29 @@ class AchievementsScene(Scene):
     def update(self, dt):
         self.back_btn.update(pygame.mouse.get_pos(), dt)
 
+    def _draw_chips(self, surf, y):
+        """Filtre par thème : chips cliquables (« Tous » + un par catégorie
+        effectivement présente dans les badges). Le compte affiché tient
+        compte du filtre actif."""
+        self._chip_rects = {}
+        present = {r["cat"] for r in self.rows if r["cat"]}
+        cats = [(None, _L("Tous", "All"))] + [
+            (cid, badges_mod.category_label(cid))
+            for cid, _fr, _en in badges_mod.CATEGORIES if cid in present]
+        x = 40
+        for cat_id, label in cats:
+            active = cat_id == self._cat_filter
+            n = len(self.rows) if cat_id is None else sum(1 for r in self.rows if r["cat"] == cat_id)
+            text = f"{label} ({n})"
+            w = fonts.small(bold=True).size(text)[0] + 20
+            r = pygame.Rect(x, y, w, 26)
+            pygame.draw.rect(surf, config.COL_PRESTIGE if active else config.COL_PANEL, r, border_radius=13)
+            pygame.draw.rect(surf, config.COL_PRESTIGE, r, 1, border_radius=13)
+            widgets.draw_text(surf, text, r.center, fonts.small(bold=True),
+                              config.COL_BG if active else config.COL_TEXT, align="center")
+            self._chip_rects[cat_id] = r
+            x += w + 8
+
     def draw(self, surf):
         surf.fill(config.COL_BG)
         n_obtained = sum(1 for r in self.rows if r["obtained"])
@@ -75,8 +113,10 @@ class AchievementsScene(Scene):
                           fonts.title(bold=True), config.COL_PRESTIGE)
         widgets.draw_text(surf, f"{n_obtained} / {len(self.rows)}", (42, 76),
                           fonts.small(bold=True), config.COL_TEXT_DIM)
+        self._draw_chips(surf, 100)
 
-        panel = pygame.Rect(40, 110, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - 110)
+        rows = self._visible_rows()
+        panel = pygame.Rect(40, 136, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - 136)
         list_area = pygame.Rect(panel.x, panel.y, panel.w, panel.h)
         self._list_rect = list_area
         pygame.draw.rect(surf, config.COL_PANEL, list_area)
@@ -85,13 +125,13 @@ class AchievementsScene(Scene):
         prev_clip = surf.get_clip()
         surf.set_clip(list_area)
         y = list_area.y - self.scroll
-        for r in self.rows:
+        for r in rows:
             visible = (list_area.top - ROW_H) < y < list_area.bottom
             if visible:
                 self._draw_row(surf, r, list_area, y)
             y += ROW_H
         surf.set_clip(prev_clip)
-        content_h = len(self.rows) * ROW_H
+        content_h = len(rows) * ROW_H
         self._max_scroll = max(0, content_h - list_area.h)
         self.scroll = min(self.scroll, self._max_scroll)
         self.scroll = widgets.draw_scrollbar(surf, panel, list_area, self.scroll, self._max_scroll, content_h)

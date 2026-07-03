@@ -6,15 +6,18 @@ Trois presets choisis à la création de partie (scene_runsetup), stockés dans
 sauvegardes antérieures) :
 
   - Détendu  : capital de départ +50 %, salaire +25 %, marge de maintenance
-               plus clémente — pour explorer sans pression.
+               plus clémente, crises plus rares/légères, rivaux plus passifs
+               — pour explorer sans pression.
   - Normal   : l'équilibre actuel du jeu, inchangé (tous multiplicateurs à 1).
   - Exigeant : capital -25 %, salaire -20 %, marge de maintenance plus
-               stricte — chaque levier compte.
+               stricte, crises plus fréquentes/sévères, rivaux plus mordants
+               — chaque levier compte.
 
-Consommé par `PlayerState.salary_per_step` (salaire) et
-`core/portfolio_margin._maint_margin` (marge), sur le même modèle que les
-perks de voie/firme. Le capital de départ est ajusté une fois, à la création
-(`apply`), APRÈS le scénario de départ (qui fixe le cash de base).
+Consommé par `PlayerState.salary_per_step` (salaire),
+`core/portfolio_margin._maint_margin` (marge), `core/scenarios.maybe_trigger`
+(crises) et `core/rivals.act` (agressivité des rivaux), sur le même modèle
+que les perks de voie/firme. Le capital de départ est ajusté une fois, à la
+création (`apply`), APRÈS le scénario de départ (qui fixe le cash de base).
 
 « Défi du jour » : `daily_seed()` dérive une graine de marché de la DATE du
 jour — tous les joueurs qui cochent l'option le même jour affrontent
@@ -35,22 +38,22 @@ DEFAULT = "normal"
 PRESETS = [
     {"id": "relaxed",
      "name": ("Détendu", "Relaxed"),
-     "desc": ("Capital +50 %, salaire +25 %, marge clémente, crises plus rares — pour explorer sans pression.",
-              "Capital +50%, salary +25%, lenient margin, rarer crises — explore without pressure."),
+     "desc": ("Capital +50 %, salaire +25 %, marge clémente, crises plus rares, rivaux plus passifs.",
+              "Capital +50%, salary +25%, lenient margin, rarer crises, more passive rivals."),
      "cash_mult": 1.5, "salary_mult": 1.25, "maint_margin_mult": 0.8,
-     "crisis_bad_mult": 0.7, "crisis_sev_mult": 0.9},
+     "crisis_bad_mult": 0.7, "crisis_sev_mult": 0.9, "rival_aggro_mult": 0.7},
     {"id": "normal",
      "name": ("Normal", "Normal"),
      "desc": ("L'équilibre de référence du jeu.",
               "The game's reference balance."),
      "cash_mult": 1.0, "salary_mult": 1.0, "maint_margin_mult": 1.0,
-     "crisis_bad_mult": 1.0, "crisis_sev_mult": 1.0},
+     "crisis_bad_mult": 1.0, "crisis_sev_mult": 1.0, "rival_aggro_mult": 1.0},
     {"id": "demanding",
      "name": ("Exigeant", "Demanding"),
-     "desc": ("Capital -25 %, salaire -20 %, marge stricte, crises plus dures — chaque levier compte.",
-              "Capital -25%, salary -20%, strict margin, harsher crises — every lever counts."),
+     "desc": ("Capital -25 %, salaire -20 %, marge stricte, crises plus dures, rivaux plus mordants.",
+              "Capital -25%, salary -20%, strict margin, harsher crises, more aggressive rivals."),
      "cash_mult": 0.75, "salary_mult": 0.8, "maint_margin_mult": 1.25,
-     "crisis_bad_mult": 1.35, "crisis_sev_mult": 1.15},
+     "crisis_bad_mult": 1.35, "crisis_sev_mult": 1.15, "rival_aggro_mult": 1.4},
 ]
 
 _BY_ID = {p["id"]: p for p in PRESETS}
@@ -89,6 +92,12 @@ def crisis_bad_mult(player):
 def crisis_sev_mult(player):
     """Multiplicateur de la sévérité tirée pour un scénario néfaste."""
     return preset(get_id(player))["crisis_sev_mult"]
+
+
+def rival_aggro_mult(player):
+    """Multiplicateur des probabilités d'action des rivaux (core/rivals.py::act) —
+    Exigeant les rend plus mordants, Détendu plus passifs."""
+    return preset(get_id(player))["rival_aggro_mult"]
 
 
 def apply(player, preset_id):

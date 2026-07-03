@@ -87,3 +87,36 @@ def test_scenarios_severity_scales_with_difficulty():
     hard = crisis_with(hard_p)
     assert normal is not None and hard is not None
     assert hard["severity"] >= normal["severity"]
+
+
+def test_rival_aggro_multipliers_by_preset():
+    p = PlayerState()
+    assert difficulty.rival_aggro_mult(p) == 1.0
+    p.flags["difficulty"] = "relaxed"
+    assert difficulty.rival_aggro_mult(p) < 1.0
+    p.flags["difficulty"] = "demanding"
+    assert difficulty.rival_aggro_mult(p) > 1.0
+
+
+def test_rivals_act_more_often_on_demanding_difficulty():
+    """Même tirage rng : les rivaux déclenchent plus d'évènements sur de
+    nombreux tours en Exigeant qu'en Détendu (probabilités mises à l'échelle)."""
+    import random
+
+    from core import rivals
+    from core.market import Market
+
+    def events_count(difficulty_id, seed=7):
+        p = PlayerState()
+        p.flags["difficulty"] = difficulty_id
+        m = Market(seed=seed)
+        m.sync_to(30)
+        rng = random.Random(42)
+        total = 0
+        for _ in range(80):
+            total += len(rivals.act(p, m, rng))
+        return total
+
+    relaxed = events_count("relaxed")
+    demanding = events_count("demanding")
+    assert demanding > relaxed

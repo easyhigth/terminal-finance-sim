@@ -131,7 +131,7 @@ class Globe:
             sx, sy, z = self._project(math.radians(lat), math.radians(lon))
             if z <= 0:
                 continue
-            color = config.CONTINENTS[name]["color"]
+            color = config.continent_color(name)
             hovered = (self.hover_region == name)
             rad = 9 if hovered else 6
             pygame.draw.circle(surf, color, (int(sx), int(sy)), rad)

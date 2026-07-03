@@ -34,6 +34,16 @@ def test_apply_veteran_starts_higher_grade():
     assert p.cash == 500_000.0
 
 
+def test_apply_veteran_rush_starts_at_senior_vp_with_high_capital():
+    p = PlayerState()
+    scen.apply(p, "veteran_rush")
+    assert p.grade_index == 7
+    assert p.grade == "Senior VP"
+    assert p.cash == 2_000_000.0
+    assert p.flags.get("can_choose_track") is True
+    assert not p.flags.get("start_crisis")
+
+
 def test_unknown_scenario_falls_back_to_standard():
     p = PlayerState()
     sc = scen.apply(p, "does_not_exist")

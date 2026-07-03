@@ -59,25 +59,25 @@ SECTIONS = [
         ("PAGE PRÉC. / PAGE SUIV.", "Faire défiler l'historique de la console"),
         ("ÉCHAP (focus console)", "Remonte au niveau bloc (la console reste sélectionnée, "
             "liseré blanc visible) — un 2ᵉ usage d'ÉCHAP au niveau bloc ouvre le menu"),
-        ("TAB (niveau bloc)", "Passe au bloc suivant : CONSOLE → RAIL → INDICES → "
+        ("TAB (niveau bloc)", "Passe au bloc suivant : CONSOLE → INDICES → "
             "SANTÉ → SOCIÉTÉS → CARRIÈRE → FLUX (MAJ+TAB pour reculer)"),
         ("↑ / ↓ / ← / → (niveau bloc)", "Déplace le focus vers le bloc le plus proche "
             "dans cette direction, selon sa position réelle à l'écran"),
-        ("ENTRÉE (bloc RAIL/INDICES/SOCIÉTÉS)", "Entre dans le bloc : les flèches "
-            "naviguent alors ses lignes internes (commandes, indices, sociétés suivies)"),
+        ("ENTRÉE (bloc INDICES/SOCIÉTÉS)", "Entre dans le bloc : les flèches "
+            "naviguent alors ses lignes internes (indices, sociétés suivies)"),
         ("ENTRÉE (bloc SANTÉ/CARRIÈRE/FLUX)", "Ouvre directement la scène associée "
             "(ces blocs n'ont pas de contenu interne navigable)"),
-        ("ENTRÉE (item interne)", "Active l'élément : lance la commande du rail, ouvre "
-            "le graphe d'un indice, ouvre la fiche d'une société suivie"),
+        ("ENTRÉE (item interne)", "Active l'élément : ouvre le graphe d'un indice, "
+            "ouvre la fiche d'une société suivie"),
         ("ÉCHAP (niveau bloc, dans un bloc)", "Remonte du contenu interne au niveau "
-            "bloc (ex. sort de la liste du rail sans quitter le terminal)"),
+            "bloc (ex. sort de la liste des indices sans quitter le terminal)"),
         ("Exemple concret", "Focus sur le bloc CONSOLE (vide) → ÉCHAP pour remonter au "
-            "niveau bloc → ↓ pour aller au bloc situé en dessous (RAIL) → ENTRÉE pour "
-            "y entrer → ↑/↓ pour choisir une commande → ENTRÉE pour la lancer"),
+            "niveau bloc → ↓ pour aller au bloc situé en dessous (INDICES) → ENTRÉE pour "
+            "y entrer → ↑/↓ pour choisir un indice → ENTRÉE pour ouvrir son graphe"),
     ]),
     ("Raccourcis directs CTRL+lettre (terminal)", [
-        ("Clic rail / NOM_COMMANDE", "Chaque bouton du rail correspond à une commande tapable "
-                                     "(ex. SHOP, INBOX, NEWS, MORE, SHORTCUTS…)"),
+        ("NOM_COMMANDE", "Chaque raccourci ci-dessous correspond à une commande tapable "
+                         "dans la console (ex. SHOP, INBOX, NEWS, MORE, SHORTCUTS…)"),
         ("CTRL+M / P / I / N / J", "Marché / Portefeuille / Inbox / News / Mission"),
         ("CTRL+A / D / F / E", "Mandats / Deals / M&A / Décider"),
         ("CTRL+X / B / T / L / G", "Exam-Certif / Boutique / Tableur / Académie / Glossaire"),
@@ -95,6 +95,25 @@ SECTIONS = [
             "ou en tapant directement leur commande (ETF, BONDS, CMDTY, CRYPTO, STRUCT, "
             "CREDIT, SWAP, GOV, FX, OPTIONS, IPO, GP, PA, ATTR, ALERT, QUANT, FRONTIER, "
             "HEDGE, ALM, TUTO, CERT…)"),
+    ]),
+    ("Bureau — icônes en fenêtre", [
+        ("TAB / MAJ+TAB / ↑↓←→", "Focalise une icône du bureau au clavier (liseré blanc, "
+            "aucune fenêtre ouverte au premier plan) — TAB parcourt la grille dans l'ordre, "
+            "les flèches selon la position réelle ; ENTRÉE lance l'icône, ÉCHAP efface le focus"),
+        ("CTRL+lettre", "Ouvre directement l'icône du bureau correspondante en fenêtre "
+            "(mêmes mnémoniques que les raccourcis du terminal ci-dessus), sans avoir à "
+            "cliquer — seulement si l'icône est visible au grade courant"),
+        ("CTRL+M / P / I / N / J", "Marché / Portefeuille / Inbox / News / Mission"),
+        ("CTRL+A / D / X / B / O", "Mandats / Deals / Exam-Certif / Shop / Plus"),
+        ("CTRL+S / H", "Sauvegarde rapide (slot 1) / Aide (commandes)"),
+        ("CTRL+/", "Recherche globale — positions, watchlist, inbox, mandats, deals "
+            "(à ne pas confondre avec CTRL+K, la palette de navigation générale)"),
+        ("ALT+TAB / ALT+MAJ+TAB", "Passe à la fenêtre suivante/précédente (façon "
+            "système d'exploitation), quel que soit l'écran affiché au premier plan"),
+        ("CTRL+MAJ+D", "Afficher le bureau (façon Windows+D) : réduit toutes les "
+            "fenêtres ouvertes ; un 2ᵉ appui restaure exactement celles qui l'étaient"),
+        ("Clic droit", "Ouvre un menu contextuel selon la cible : icône, barre de "
+            "titre d'une fenêtre, entrée de la barre des tâches, ou fond du bureau"),
     ]),
     ("Fenêtres flottantes et ce panneau", [
         ("ÉCHAP", "Ferme la fenêtre flottante la plus récente, ou ce panneau s'il est ouvert"),

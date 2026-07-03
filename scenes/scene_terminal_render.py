@@ -206,8 +206,6 @@ class TerminalRenderMixin:
         # ce bandeau d'info du terminal n'en dessine plus de copie locale
         # (l'ancien bouton local dupliquait un accès déjà disponible partout
         # ailleurs, source de confusion sur où se trouve le "vrai" bouton).
-        self._shortcuts_btn_rect = None
-        self._settings_btn_rect = None
 
     def _draw_ticker(self, surf):
         y = config.TOPBAR_H + 4

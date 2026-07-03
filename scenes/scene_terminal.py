@@ -154,8 +154,6 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             self.datawins = []        # fenêtres de données déplaçables (overlay)
             self._restore_workspace()
         self.shortcuts_panel = None   # panneau des raccourcis clavier (overlay)
-        self._shortcuts_btn_rect = None
-        self._settings_btn_rect = None   # bouton ⚙ RÉGLAGES (topbar)
         # navigation hiérarchique au clavier : pile de focus bloc → contenu
         # interne (cf. ui/keynav.ZoneStack). Par défaut le focus reste « dans »
         # la console comme avant (saisie immédiate), Échap permet de remonter

@@ -149,6 +149,65 @@ def test_internal_calculator_drag_releases_on_mouseup(app):
     assert calc.dragging is False
 
 
+def test_internal_shortcuts_panel_drag_releases_on_mouseup(app):
+    """Même régression, pour le panneau de raccourcis clavier (ui/shortcutspanel
+    .py) ouvert DEPUIS le terminal hébergé — même mécanisme de glisser interne."""
+    from apps.scene_host import SceneHostApp
+    app.scenes.go("terminal")
+    wm = WindowManager(app)
+    host = SceneHostApp(app, "terminal", "Terminal", {})
+    w = wm.open("scene:terminal", lambda: host)
+    w.rect = pygame.Rect(0, 40, 1180, 620)
+    host.on_open()
+    term = host.scene
+    term._toggle_shortcuts_panel()
+    panel = term.shortcuts_panel
+
+    def to_screen(logical_pos):
+        lx, ly = logical_pos
+        r = w.content_rect
+        return (int(r.x + lx * r.w / 1280), int(r.y + ly * r.h / 720))
+
+    title_screen = to_screen((panel.rect.x + 10, panel.rect.y + 5))
+    wm.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=title_screen))
+    assert panel.dragging is True
+
+    moved_screen = to_screen((panel.rect.x + 40, panel.rect.y + 30))
+    wm.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=moved_screen))
+    wm.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, button=1, pos=moved_screen))
+    assert panel.dragging is False
+
+
+def test_internal_sheet_chart_drag_releases_on_mouseup_via_window_manager(app):
+    """Même régression, pour un graphique inséré dans le Tableur (app native,
+    pas une scène hébergée) — passe par le VRAI WindowManager cette fois
+    (les autres tests sheet_app_drag_chart_* appellent handle_event directement
+    sur l'app, sans passer par le routage du WindowManager)."""
+    wm = WindowManager(app)
+    w = wm.open("sheet", lambda: SheetApp(app))
+    w.rect = pygame.Rect(0, 40, 940, 560)
+    sa = w.app_obj
+    sa.on_open()
+    for i, v in enumerate((1, 2, 3), start=1):
+        sa.sheet.set(f"A{i}", str(v))
+    sa.range_anchor, sa.range_end = "A1", "A3"
+    sa._add_chart("line")
+    sa.draw(app.screen, w.content_rect)
+    chart = sa.workbook.active.charts[0]
+    title_r = sa._chart_title_rects[chart.id]
+    x0, y0 = chart.x, chart.y
+
+    wm.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=title_r.center))
+    new_pos = (title_r.centerx + 40, title_r.centery + 30)
+    wm.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=new_pos, buttons=(1, 0, 0)))
+    assert (chart.x, chart.y) != (x0, y0)   # a suivi la souris pendant le glisser
+    moved_after_up = (chart.x, chart.y)
+    wm.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, button=1, pos=new_pos))
+    # une motion supplémentaire, sans nouveau clic, ne doit plus bouger le graphique
+    wm.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=(200, 200), buttons=(0, 0, 0)))
+    assert (chart.x, chart.y) == moved_after_up
+
+
 # ------------------------------------------------------------------- apps
 def test_trading_app_buys(app):
     tk = app.market.companies[0]["ticker"]

@@ -200,21 +200,12 @@ class TerminalRenderMixin:
         if getattr(p, "sandbox", False):
             r = widgets.draw_badge(surf, _t("sandbox.badge"), (x, y - 2), config.COL_NEUTRAL)
             x = r.right + 14
-        # bouton triche (mode test uniquement, jamais en jeu normal)
-        self._cheat_btn_rect = None
-        if getattr(self.app, "cheats", False):
-            btn = pygame.Rect(x, 6, 96, 22)
-            hover = btn.collidepoint(pygame.mouse.get_pos())
-            pygame.draw.rect(surf, config.COL_PANEL_HEAD if hover else config.COL_PANEL,
-                             btn, border_radius=4)
-            pygame.draw.rect(surf, config.COL_DOWN, btn, 1, border_radius=4)
-            widgets.draw_text(surf, "🛠 CHEAT", btn.center, fonts.tiny(bold=True),
-                              config.COL_DOWN, align="center")
-            self._cheat_btn_rect = btn
-        # Les contrôles d'horloge (pause/vitesse) et l'icône ⚙ RÉGLAGES vivent
-        # désormais dans la bande d'onglets (cf. core/pages.py + ui/simclock_widget),
-        # sur leur propre ligne au-dessus de la scène — ils ne chevauchent donc
-        # plus jamais ce bandeau d'info. Plus aucun bouton ici.
+        # Le bouton CHEAT (mode test) et les contrôles d'horloge (pause/
+        # vitesse) et l'icône ⚙ RÉGLAGES vivent désormais UNIQUEMENT dans la
+        # bande d'onglets du bureau (cf. core/pages.py + ui/simclock_widget) —
+        # ce bandeau d'info du terminal n'en dessine plus de copie locale
+        # (l'ancien bouton local dupliquait un accès déjà disponible partout
+        # ailleurs, source de confusion sur où se trouve le "vrai" bouton).
         self._shortcuts_btn_rect = None
         self._settings_btn_rect = None
 

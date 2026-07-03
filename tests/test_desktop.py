@@ -77,6 +77,78 @@ def test_close_button_click_closes(app):
     assert w not in wm.windows
 
 
+def test_internal_popup_drag_releases_on_mouseup_not_stuck_to_cursor(app):
+    """Régression : un popup (DataWindow) glissé À L'INTÉRIEUR d'une scène
+    hébergée (ex. fiche société ouverte depuis le terminal) doit se détacher
+    du curseur au relâchement de la souris. Avant correctif, WindowManager ne
+    transmettait MOUSEBUTTONUP à l'appli focalisée QUE si le WindowManager
+    lui-même draguait la fenêtre OS — un drag interne à l'appli ne recevait
+    donc jamais le relâchement et restait collé au curseur indéfiniment."""
+    from apps.scene_host import SceneHostApp
+    app.scenes.go("terminal")
+    wm = WindowManager(app)
+    host = SceneHostApp(app, "terminal", "Terminal", {})
+    w = wm.open("scene:terminal", lambda: host)
+    w.rect = pygame.Rect(0, 40, 1180, 620)
+    host.on_open()
+    term = host.scene
+    tk = app.market.top_companies(n=1)[0]["ticker"]
+    term._open_company_popup(tk)
+    popup = term.datawins[0]
+
+    def to_screen(logical_pos):
+        lx, ly = logical_pos
+        r = w.content_rect
+        return (int(r.x + lx * r.w / 1280), int(r.y + ly * r.h / 720))
+
+    title_screen = to_screen((popup.rect.x + 10, popup.rect.y + 5))
+    wm.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=title_screen))
+    assert popup.dragging is True
+
+    moved_screen = to_screen((popup.rect.x + 80, popup.rect.y + 60))
+    wm.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=moved_screen))
+    assert popup.dragging is True   # toujours en cours de glisser
+
+    wm.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, button=1, pos=moved_screen))
+    assert popup.dragging is False   # relâché : ne doit plus suivre la souris
+
+    # une nouvelle motion, sans nouveau clic, ne doit plus bouger le popup
+    rect_after_release = popup.rect.copy()
+    wm.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=to_screen((200, 200))))
+    assert popup.rect == rect_after_release
+
+
+def test_internal_calculator_drag_releases_on_mouseup(app):
+    """Même régression que ci-dessus, pour la calculatrice flottante des
+    scènes mission/évaluation (ui/calculator.py, même patron de glisser)."""
+    from apps.scene_host import SceneHostApp
+    from ui.calculator import Calculator
+    app.gs.player.grade_index = 3
+    app.scenes.go("terminal")
+    wm = WindowManager(app)
+    host = SceneHostApp(app, "mission", "Mission", {})
+    w = wm.open("scene:mission", lambda: host)
+    w.rect = pygame.Rect(0, 40, 1180, 620)
+    host.on_open()
+    mission = host.scene
+    mission.calc = Calculator(pos=(500, 110))
+    calc = mission.calc
+
+    def to_screen(logical_pos):
+        lx, ly = logical_pos
+        r = w.content_rect
+        return (int(r.x + lx * r.w / 1280), int(r.y + ly * r.h / 720))
+
+    title_screen = to_screen((calc.rect.x + 10, calc.rect.y + 5))
+    wm.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=title_screen))
+    assert calc.dragging is True
+
+    moved_screen = to_screen((calc.rect.x + 50, calc.rect.y + 40))
+    wm.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=moved_screen))
+    wm.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP, button=1, pos=moved_screen))
+    assert calc.dragging is False
+
+
 # ------------------------------------------------------------------- apps
 def test_trading_app_buys(app):
     tk = app.market.companies[0]["ticker"]

@@ -129,7 +129,7 @@ def _draw_series_plot(surf, rect, s, kind):
     # ligne (défaut)
     col = config.COL_UP if s[-1] >= s[0] else config.COL_DOWN
     widgets.draw_series(surf, inner, s, col, mouse_pos=mp, y_fmt=lambda v: f"{v:,.2f}", show_pct=True,
-                        extrema_label=False)
+                        extrema_label=False, show_current_line=True)
     _x_labels(surf, rect, len(s))
     chg = (s[-1] / s[0] - 1) * 100 if s[0] else 0.0
     return (f"{s[-1]:,.2f}  ({'+' if chg>=0 else ''}{chg:.1f}%)  ·  "

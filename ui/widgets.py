@@ -399,8 +399,71 @@ class Sparkline:
                    show_pct=show_pct, show_extrema=show_extrema)
 
 
+# ---------------------------------------------------------------------------
+# STYLE « APPLI DE TRADING » (remplissage en dégradé + ligne de cours actuel)
+# ---------------------------------------------------------------------------
+_GRADIENT_MASK_CACHE = {}   # hauteur (px) -> Surface 1×h SRCALPHA (dégradé vertical)
+
+
+def _gradient_mask(height):
+    """Masque de dégradé vertical 1px de large (plein en haut, nul en bas),
+    mis en cache par hauteur — appelé à CHAQUE frame pour chaque graphe visible
+    (sparklines comprises), le recalculer pixel par pixel à chaque appel serait
+    sensiblement plus lent ; le nombre de hauteurs distinctes utilisées dans le
+    jeu est petit et borné (tailles de rects fixes par écran), donc pas de
+    risque de croissance illimitée du cache."""
+    mask = _GRADIENT_MASK_CACHE.get(height)
+    if mask is None:
+        mask = pygame.Surface((1, height), pygame.SRCALPHA)
+        for y in range(height):
+            a = max(0, 255 - int(255 * y / max(1, height - 1)))
+            mask.set_at((0, y), (255, 255, 255, a))
+        _GRADIENT_MASK_CACHE[height] = mask
+    return mask
+
+
+def fill_gradient_area(surf, rect, pts, color, top_alpha=90):
+    """Remplissage en dégradé vertical sous une polyligne de prix, façon
+    appli de trading (eToro et consorts) : plein près de la courbe,
+    transparent vers le bas du graphe — remplace l'ancien style « ligne nue »
+    pour donner un rendu de marché vivant plutôt qu'un tracé technique plat.
+    `pts` : liste de (x, y) DÉJÀ projetés en pixels, mêmes coordonnées que la
+    ligne dessinée par-dessus (donc appelé AVANT `pygame.draw.aalines`)."""
+    rect = pygame.Rect(rect)
+    if len(pts) < 2 or rect.w <= 0 or rect.h <= 0:
+        return
+    poly = list(pts) + [(pts[-1][0], rect.bottom), (pts[0][0], rect.bottom)]
+    local_poly = [(x - rect.x, y - rect.y) for x, y in poly]
+    fill_surf = pygame.Surface((rect.w, rect.h), pygame.SRCALPHA)
+    pygame.draw.polygon(fill_surf, (*color[:3], top_alpha), local_poly)
+    # masque en dégradé (plein en haut du rectangle, nul en bas) appliqué par
+    # multiplication d'alpha — 1px de large étiré, moins cher qu'un dégradé
+    # calculé pixel par pixel sur toute la largeur du graphe (et mis en cache
+    # par hauteur, cf. `_gradient_mask`).
+    grad = pygame.transform.smoothscale(_gradient_mask(rect.h), (rect.w, rect.h))
+    fill_surf.blit(grad, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+    surf.blit(fill_surf, rect.topleft)
+
+
+def draw_current_price_line(surf, rect, y, label, color, font=None):
+    """Ligne horizontale de cours actuel traversant tout le graphe + pastille
+    de valeur sur le bord droit — façon appli de trading (ligne fine qui
+    « accroche » le dernier prix, immédiatement lisible sans survoler)."""
+    y = max(rect.y, min(rect.bottom, int(y)))
+    pygame.draw.line(surf, color, (rect.x, y), (rect.right, y), 1)
+    font = font or fonts.tiny(bold=True)
+    tw, th = font.size(label)
+    pad = 4
+    box = pygame.Rect(0, 0, tw + 2 * pad, th + 4)
+    box.right = rect.right
+    box.centery = y
+    pygame.draw.rect(surf, color, box, border_radius=3)
+    draw_text(surf, label, box.center, font, config.COL_BG, align="center")
+
+
 def draw_series(surf, rect, vals, color=None, baseline=True, mouse_pos=None, y_fmt=None,
-                show_pct=False, show_extrema=True, extrema_label=True, band_frac=None):
+                show_pct=False, show_extrema=True, extrema_label=True, band_frac=None,
+                area_fill=True, show_current_line=False):
     """Trace une polyligne à partir d'une liste de valeurs, dans `rect`.
 
     Si `mouse_pos` est fourni et survole `rect`, affiche un curseur (ligne
@@ -415,7 +478,13 @@ def draw_series(surf, rect, vals, color=None, baseline=True, mouse_pos=None, y_f
     `band_frac` (fraction, p. ex. 0.0008 = 0.08%) dessine une bande
     translucide bid/ask "respirant" autour du dernier prix — purement
     visuelle (profondeur de marché simulée), sans rapport avec le prix
-    d'exécution réel des ordres."""
+    d'exécution réel des ordres.
+    `area_fill` (défaut True) : remplissage en dégradé sous la courbe, façon
+    appli de trading (cf. `fill_gradient_area`) — désactivable pour les
+    contextes très compacts où le dégradé n'apporterait rien de lisible.
+    `show_current_line` : ligne + pastille de cours actuel sur le bord droit
+    (cf. `draw_current_price_line`) — hors par défaut (surchargerait les
+    petites vignettes type watchlist), à activer pour un graphe dédié."""
     rect = pygame.Rect(rect)
     if not vals or len(vals) < 2:
         return
@@ -441,7 +510,12 @@ def draw_series(surf, rect, vals, color=None, baseline=True, mouse_pos=None, y_f
         y = rect.bottom - int((v - lo) / span * rect.h)
         pts.append((x, y))
     if len(pts) >= 2:
+        if area_fill:
+            fill_gradient_area(surf, rect, pts, col)
         pygame.draw.aalines(surf, col, False, pts)
+        if show_current_line:
+            draw_current_price_line(surf, rect, pts[-1][1],
+                                    y_fmt(vals[-1]) if y_fmt else f"{vals[-1]:,.2f}", col)
     pygame.draw.circle(surf, col, pts[-1], 2)
     if show_extrema:
         draw_chart_extrema(surf, rect, vals, lo, span, y_fmt=y_fmt, color=config.COL_TEXT_DIM,

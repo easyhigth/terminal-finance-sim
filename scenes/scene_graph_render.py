@@ -43,13 +43,19 @@ class GraphRenderMixin:
         ])
 
     def _polyline(self, surf, rect, series, lo, span, color, y_fmt=None, cursor=None,
-                  show_pct=False):
+                  show_pct=False, area_fill=False, show_current_line=False):
         n = len(series)
         if n < 2:
             return
         pts = [(rect.x + int(i / (n - 1) * rect.w),
                 rect.bottom - int((v - lo) / span * rect.h)) for i, v in enumerate(series)]
+        if area_fill:
+            widgets.fill_gradient_area(surf, rect, pts, color)
         pygame.draw.aalines(surf, color, False, pts)
+        if show_current_line:
+            widgets.draw_current_price_line(surf, rect, pts[-1][1],
+                                            y_fmt(series[-1]) if y_fmt else f"{series[-1]:,.2f}",
+                                            color)
         if cursor is not None:
             cursor.draw(surf, rect, series, lo, span, mouse_pos=pygame.mouse.get_pos(),
                        y_fmt=y_fmt, color=color, show_pct=show_pct)
@@ -88,7 +94,7 @@ class GraphRenderMixin:
             self._overlay_aligned(surf, rect, upper, lo, span, (150, 150, 160), width=1)
             legend.append(("Bollinger 20·2σ", (150, 150, 160)))
         self._polyline(surf, rect, s, lo, span, config.COL_AMBER, y_fmt=lambda v: f"{v:,.2f}",
-                       cursor=self._cursor, show_pct=True)
+                       cursor=self._cursor, show_pct=True, area_fill=True, show_current_line=True)
         for ma, col in ((ma20, config.COL_CYAN), (ma50, config.COL_TEXT_DIM)):
             seg = [v for v in ma if v is not None]
             if len(seg) >= 2:

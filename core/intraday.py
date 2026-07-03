@@ -10,7 +10,8 @@ jamais sérialisée — qui anime le prix entre la clôture précédente et la
 clôture courante avec un bruit déterministe multi-octaves, épinglé à zéro
 aux deux bornes du pas (le point affiché vaut exactement `prev_close` au
 début du pas et `cur_close` à la fin). Ça permet aux graphes de bouger
-visiblement (mini-variations ~0.05-0.1%) même à l'échelle « 5 minutes »,
+visiblement (variations de l'ordre du ‰ à quelques % selon la volatilité de
+l'actif, cf. `_NOISE_PCT`/`_VOL_MULT_RANGE`) même à l'échelle « 5 minutes »,
 sans jamais affecter le prix d'exécution des ordres : BUY/SELL/SHORT/COVER
 continuent d'utiliser `market.price`/`market.index_value`, inchangés.
 
@@ -23,20 +24,28 @@ MINUTES_PER_DAY = 24 * 60
 
 # Résolutions des octaves de bruit (minutes), du plus grossier au plus fin —
 # la plus fine (5 min) garantit de la texture même sur la fenêtre la plus
-# zoomée (« 5 dernières minutes »).
+# zoomée (« 5 dernières minutes »). Poids de l'octave fine relevé (0.2 → 0.3)
+# pour un tracé plus dense/dentelé, façon appli de trading grand public
+# (retour joueur : les graphes "de vraie appli" zigzaguent beaucoup plus que
+# notre courbe lissée précédente, cf. captures eToro fournies).
 _RESOLUTIONS = (720, 60, 5)
-_AMPLITUDES = (1.0, 0.45, 0.2)
-# Amplitude relative max du bruit affiché (~0.22%) : purement visuel (n'affecte
+_AMPLITUDES = (1.0, 0.5, 0.3)
+# Amplitude relative max du bruit affiché (~0.45%) : purement visuel (n'affecte
 # jamais market.price/index_value, donc jamais le prix d'exécution des ordres)
-# — poussé au-delà de la "vraie vie" (0.09% à l'origine) pour que le marché
-# semble vivant à l'écran même entre deux pas du moteur, sur retour joueur.
-_NOISE_PCT = 0.0022
+# — poussé une 2e fois au-delà de la valeur précédente (0.22%, elle-même déjà
+# au-delà de la "vraie vie" à 0.09% à l'origine) : à 0.22%, l'intraday restait
+# visuellement trop plat comparé à une vraie appli de trading (retour joueur,
+# captures eToro à l'appui) — viser une variation intrajournalière de l'ordre
+# de quelques % plutôt que quelques dixièmes de %.
+_NOISE_PCT = 0.0045
 
 # Sigma "moyen" du roster (cf. data/companies.py, profils sectoriels ~0.018-0.055) ;
 # sert de référence pour que les sociétés volatiles (tech/semicon...) bougent
-# visiblement plus que les défensives (utilities...) à l'écran.
+# visiblement plus que les défensives (utilities...) à l'écran. Plancher
+# relevé (0.6 → 0.8) pour que même les valeurs défensives restent lisiblement
+# animées plutôt que quasi plates.
 _TYPICAL_SIGMA = 0.035
-_VOL_MULT_RANGE = (0.6, 2.8)
+_VOL_MULT_RANGE = (0.8, 3.2)
 
 
 def minutes_per_step():

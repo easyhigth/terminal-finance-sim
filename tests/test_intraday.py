@@ -123,3 +123,15 @@ def test_intraday_series_reaches_back_across_step_boundary():
                                        window_minutes=10, n_points=5)
     assert len(series) == 5
     assert all(isinstance(v, float) for v in series)
+
+
+def test_noise_amplitude_tuned_for_a_lively_looking_market():
+    """Retour joueur (captures d'appli de trading grand public à l'appui) :
+    l'intraday paraissait trop plat comparé à une vraie appli — verrouille
+    que l'amplitude affichée reste dans un ordre de grandeur "vivant" (pas
+    dérivé accidentellement vers une valeur ridiculement plate ou explosive
+    lors d'un futur retouché)."""
+    assert 0.003 <= intraday._NOISE_PCT <= 0.01
+    lo, hi = intraday._VOL_MULT_RANGE
+    assert lo >= 0.5
+    assert hi <= 5.0

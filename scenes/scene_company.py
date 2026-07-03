@@ -575,7 +575,7 @@ class CompanyScene(Scene):
             half_spread = liquidity.params(tier)[0]
             widgets.draw_series(surf, inner, hist, col, mouse_pos=pygame.mouse.get_pos(),
                                 y_fmt=lambda v: f"{v:,.2f} {self.cur}", show_pct=True,
-                                band_frac=half_spread)
+                                band_frac=half_spread, show_current_line=True)
             self._draw_orderbook(surf, inner, hist[-1], tier, half_spread)
         elif self.chart_kind == "vol":
             vol = [v for v in charts.rolling_vol(hist, 20) if v is not None]

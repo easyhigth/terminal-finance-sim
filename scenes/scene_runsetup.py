@@ -280,6 +280,9 @@ class RunSetupScene(Scene):
             pygame.draw.rect(surf, config.COL_PRESTIGE, box.inflate(-6, -6))
         label = ("Défi du jour : marché partagé" if not en
                  else "Daily challenge: shared market")
+        # borné à la puce (le libellé complet débordait de la puce ET du bord
+        # droit de l'écran en FR)
+        label = widgets.fit_text(label, fonts.small(bold=self.daily), dr.right - (box.right + 8) - 8)
         widgets.draw_text(surf, label, (box.right + 8, dr.y + 5), fonts.small(bold=self.daily),
                           config.COL_PRESTIGE if self.daily else config.COL_TEXT_DIM)
 

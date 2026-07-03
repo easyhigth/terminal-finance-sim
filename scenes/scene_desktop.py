@@ -316,7 +316,18 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 continue
             rect = entry.get("rect")
             if rect and len(rect) == 4:
-                w.rect = pygame.Rect(*rect)
+                # borne le rect restauré (il vient TEL QUEL du JSON de
+                # sauvegarde) : une valeur dégénérée/hors écran (fichier
+                # édité à la main, future résolution différente…) rendrait la
+                # fenêtre invisible ou ferait planter le rendu (smoothscale
+                # sur taille négative) à CHAQUE frame — sauvegarde briquée.
+                min_w, min_h = getattr(w.app_obj, "min_size", (300, 200))
+                r = pygame.Rect(*rect)
+                r.w = max(min_w, min(r.w, config.SCREEN_WIDTH))
+                r.h = max(min_h, min(r.h, config.SCREEN_HEIGHT - TOPBAR_H - TASKBAR_H))
+                r.x = max(0, min(r.x, config.SCREEN_WIDTH - 60))
+                r.y = max(TOPBAR_H, min(r.y, config.SCREEN_HEIGHT - TASKBAR_H - 40))
+                w.rect = r
             w.minimized = bool(entry.get("minimized", False))
             w.pinned = bool(entry.get("pinned", False))
 
@@ -1028,10 +1039,17 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             x += 30
         pygame.draw.line(surf, config.COL_BORDER, (x + 2, bar.y + 4), (x + 2, bar.bottom - 4), 1)
         x += 10
-        # fenêtres ouvertes
+        # fenêtres ouvertes — largeur d'entrée ADAPTATIVE (façon barre des
+        # tâches d'un vrai OS) : avec beaucoup de fenêtres, des entrées à
+        # largeur fixe débordaient du bord droit de l'écran et les fenêtres
+        # correspondantes devenaient infocalisables/irrestaurables depuis la
+        # barre (bug V1.0) ; on rétrécit jusqu'à l'icône seule s'il le faut.
         self._task_rects = {}
+        n_win = len(self.wm.windows)
+        avail = config.SCREEN_WIDTH - x - 10
+        entry_w = 150 if n_win == 0 else max(28, min(150, avail // n_win - 6))
         for w in self.wm.windows:
-            r = pygame.Rect(x, bar.y + 4, 150, TASKBAR_H - 8)
+            r = pygame.Rect(x, bar.y + 4, entry_w, TASKBAR_H - 8)
             self._task_rects[w] = r
             focused = (w is self.wm.focused)
             # fenêtre qui réclame l'attention (popup FORCÉ non encore regardé) :
@@ -1046,6 +1064,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             col = config.COL_WHITE if flash else config.COL_TEXT_DIM if w.minimized else config.COL_TEXT
             kind = getattr(w.app_obj, "icon_kind", "generic")
             desktop_icons.draw(surf, (r.x + 12, r.centery), kind, col)
-            widgets.draw_text(surf, widgets.fit_text(w.app_obj.title, fonts.tiny(), r.w - 26),
-                              (r.x + 22, r.y + 5), fonts.tiny(bold=True), col)
-            x += 156
+            if r.w > 48:   # trop étroit : icône seule, pas de texte tronqué illisible
+                widgets.draw_text(surf, widgets.fit_text(w.app_obj.title, fonts.tiny(), r.w - 26),
+                                  (r.x + 22, r.y + 5), fonts.tiny(bold=True), col)
+            x += entry_w + 6

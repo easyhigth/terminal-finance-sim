@@ -134,9 +134,14 @@ class StatsScene(Scene):
             ("survie", "Survie"),
         ):
             v = fs.breakdown[key]
-            widgets.draw_text(surf, label, (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
-            bw = inner.w - 130
+            # libellé borné à sa colonne (« Qualité d'exécution » passait sous
+            # la barre) ; barre raccourcie pour réserver une gouttière au
+            # chiffre (un « 100 » plein débordait SUR la barre et semblait
+            # tronqué en « 00 »).
+            widgets.draw_text(surf, widgets.fit_text(label, fonts.tiny(), 114),
+                              (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
             bx = inner.x + 120
+            bw = inner.w - 120 - 34
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, (bx, y, bw, 10))
             col = config.COL_UP if v >= 60 else (config.COL_WARN if v >= 30 else config.COL_DOWN)
             pygame.draw.rect(surf, col, (bx, y, int(bw * v / 100.0), 10))

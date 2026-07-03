@@ -39,15 +39,18 @@ class MenuScene(Scene):
             "sandbox":  widgets.Button((cx-bw//2, y0+(bh+gap)*3,   bw, bh), t("menu.sandbox"), config.COL_NEUTRAL),
             "quit":     widgets.Button((cx-bw//2, y0+(bh+gap)*4,   bw, bh), t("menu.quit"), config.COL_DOWN),
         }
-        # bouton de langue (en haut à droite)
-        self.lang_btn = widgets.Button((config.SCREEN_WIDTH-150, 40, 110, 34),
+        # boutons du coin haut-droit — assez larges pour le plus long libellé
+        # (« ANIM : RÉDUITE » débordait d'une puce de 110 px)
+        self.lang_btn = widgets.Button((config.SCREEN_WIDTH-200, 40, 160, 34),
                                        f"LANG : {get_lang().upper()}", config.COL_CYAN)
         # bouton "réduire les animations" (accessibilité/perf — sous LANG)
-        self.anim_btn = widgets.Button((config.SCREEN_WIDTH-150, 80, 110, 34),
+        self.anim_btn = widgets.Button((config.SCREEN_WIDTH-200, 80, 160, 34),
                                        self._anim_label(), config.COL_NEUTRAL)
         # bouton réglages complets (affichage, son, langue… — sous ANIM)
-        self.settings_btn = widgets.Button((config.SCREEN_WIDTH-150, 120, 110, 34),
-                                           "⚙ RÉGLAGES", config.COL_AMBER)
+        # pas de glyphe « ⚙ » : la police embarquée ne le couvre pas et le
+        # rendait comme « Ø » (même limite que les emoji, cf. ui/desktop_icons.py)
+        self.settings_btn = widgets.Button((config.SCREEN_WIDTH-200, 120, 160, 34),
+                                           "RÉGLAGES", config.COL_AMBER)
         self.buttons["continue"].enabled = self.auto is not None
         self.buttons["load"].enabled = len(GameState.list_saves()) > 0
         self.t = 0.0

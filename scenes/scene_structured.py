@@ -174,7 +174,7 @@ class StructuredScene(Scene):
         cur = self._cur()
         widgets.draw_text(surf, "PRODUITS STRUCTURÉS", (40, 22), fonts.title(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, "Payoff non linéaire sur l'indice régional, évalué à l'échéance. "
-                                f"Risque émetteur. Régime : {m.regime_label()} (★ = recommandé par le desk). "
+                                f"Risque émetteur. Régime : {m.regime_label()} (✶ = recommandé par le desk). "
                                 + self.msg,
                           (42, 74), fonts.small(), config.COL_TEXT_DIM)
 
@@ -234,7 +234,7 @@ class StructuredScene(Scene):
             row_y0 = y
             visible = (list_area.top - 100) < y < list_area.bottom
             self._row_offsets[tpl["id"]] = row_y0 - inner.y + self.scroll
-            name = ("★ " + tpl["name"]) if tpl["featured"] else tpl["name"]
+            name = ("✶ " + tpl["name"]) if tpl["featured"] else tpl["name"]
             widgets.draw_text(surf, name, (inner.x, y), fonts.small(bold=True),
                               config.COL_UP if tpl["featured"] else config.COL_AMBER)
             widgets.draw_text(surf, f"{tpl['family']} · {tpl['years']} ans", (inner.right - 160, y),

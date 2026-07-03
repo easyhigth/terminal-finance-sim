@@ -344,7 +344,7 @@ class TerminalCareerMixin:
         (toast renforcé + journal) : ce sont les ambitions de carrière, pas de
         simples jalons."""
         for g in legacy_mod.check_new(self.app.gs.player, self.market):
-            self.app.notify(f"★ OBJECTIF DE LÉGENDE : {g['name']}", "prestige")
+            self.app.notify(f"✶ OBJECTIF DE LÉGENDE : {g['name']}", "prestige")
             career_mod.log(self.app.gs.player, "info", f"Objectif de légende atteint : {g['name']}")
 
     def _cmd_pitch(self):

@@ -223,7 +223,7 @@ class GovernmentsScene(Scene):
             sign = "+" if bump > 0 else ""
             bcol = config.COL_DOWN if bump > 0 else config.COL_UP
             y += 4
-            widgets.draw_text(surf, f"⚑ Tension politique régionale : spread {sign}{bump*10000:.0f} bps "
+            widgets.draw_text(surf, f"» Tension politique régionale : spread {sign}{bump*10000:.0f} bps "
                               "(les prix obligataires de la zone réagissent).",
                               (x, y), fonts.tiny(bold=True), bcol)
             y += 20

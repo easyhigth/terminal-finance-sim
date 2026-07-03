@@ -243,7 +243,7 @@ class DealsScene(Scene):
                 widgets.draw_text(surf, f"#{d['id']} {d['title']}", (row.x + 12, row.y + 6),
                                   fonts.small(bold=True), config.COL_AMBER)
                 widgets.draw_badge(surf, d["kind"], (row.x + 12, row.y + 26), accent=config.COL_PRESTIGE)
-                diff_lbl = "★" * d["difficulty"]
+                diff_lbl = "✶" * d["difficulty"]
                 widgets.draw_text(surf, diff_lbl, (row.x + 120, row.y + 28), fonts.tiny(), config.COL_TEXT_DIM)
                 if d.get("gov"):
                     widgets.draw_badge(surf, f"SOUVERAIN · {d['gov']}", (row.x + 170, row.y + 26), accent=config.COL_CYAN)

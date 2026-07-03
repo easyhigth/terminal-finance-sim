@@ -2,7 +2,7 @@
 app_watchlist.py — Application « Watchlist » du bureau.
 
 Mini-Bloomberg des valeurs suivies (`player.watchlist`, alimentée depuis la
-commande WATCHLIST du terminal ET l'étoile ★ de l'app Recherche) : cours et
+commande WATCHLIST du terminal ET l'étoile ✶ de l'app Recherche) : cours et
 variation du dernier pas EN DIRECT, sans ouvrir chaque fiche. Cliquer une
 ligne ouvre l'app Trading pré-filtrée (lien inter-apps, cf. app_research) ;
 « × » retire la valeur de la watchlist. Surveillance ambiante pendant que le
@@ -97,7 +97,7 @@ class WatchlistApp(DesktopApp):
         if not wl:
             widgets.draw_text(surf, "Aucune valeur suivie.", (area.x + 10, area.y + 12),
                               fonts.small(), config.COL_TEXT_DIM)
-            widgets.draw_text(surf, "Ajoutez-en avec l'étoile ★ de l'app Recherche,",
+            widgets.draw_text(surf, "Ajoutez-en avec l'étoile ✶ de l'app Recherche,",
                               (area.x + 10, area.y + 34), fonts.tiny(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, "ou la commande WATCHLIST du terminal.",
                               (area.x + 10, area.y + 48), fonts.tiny(), config.COL_TEXT_DIM)

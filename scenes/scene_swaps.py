@@ -135,13 +135,13 @@ class SwapsScene(Scene):
         if not self._can_trade():
             g = unlocks.effective_required_grade(self.app.gs.player, "trade")
             widgets.draw_text(surf, f"⊘ Swaps débloqués au grade {config.GRADES[g]}.",
-                              (42, 56), fonts.small(), config.COL_TEXT_DIM)
+                              (42, 64), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             self.tuto_btn.draw(surf)
             return
         widgets.draw_text(surf, "Échange le différentiel de taux entre votre devise et une devise "
                                 f"étrangère, sans échange de principal. {self.msg}",
-                          (42, 56), fonts.small(), config.COL_TEXT_DIM)
+                          (42, 64), fonts.small(), config.COL_TEXT_DIM)
 
         p, m = self.app.gs.player, self.app.market
         ph = config.footer_y() - 8 - 96

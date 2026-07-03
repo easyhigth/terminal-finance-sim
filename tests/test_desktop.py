@@ -2794,3 +2794,32 @@ def test_settings_all_rows_and_shortcuts_button_fit_on_screen(app):
     sc = app.scenes.current
     assert sc.rows[-1][1][0].rect.bottom <= config.footer_y()
     assert sc.shortcuts_btn.rect.bottom <= config.footer_y()
+
+
+# ==================== audit V1.0 (2e passe) : collisions/débordements =========
+def test_achievements_chips_wrap_and_stay_on_screen(app):
+    app.scenes.go("achievements")
+    sc = app.scenes.current
+    sc.update(0.016)
+    sc.draw(app.screen)
+    assert sc._chip_rects
+    assert all(r.right <= config.SCREEN_WIDTH - 20 for r in sc._chip_rects.values())
+
+
+def test_trading_app_min_width_leaves_room_for_row_buttons():
+    """Sous ~640 px, les colonnes COURS/POSSÉDÉ passaient sous le bloc de
+    boutons ORD/VENDRE/ACHETER — la largeur mini de l'app l'empêche désormais."""
+    assert TradingApp.min_size[0] >= 640
+
+
+def test_watchlist_app_min_width_prevents_row_collisions():
+    from apps.app_watchlist import WatchlistApp
+    assert WatchlistApp.min_size[0] >= 360
+
+
+def test_financials_fiche_button_label_fits_inside_button(app):
+    tk = app.market.companies[0]["ticker"]
+    app.scenes.go("financials", ticker=tk)
+    sc = app.scenes.current
+    from ui import fonts as F
+    assert F.body(bold=True).size(sc.fiche_btn.label)[0] <= sc.fiche_btn.rect.w - 8

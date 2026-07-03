@@ -30,7 +30,9 @@ class TradingApp(DesktopApp):
     title = "Trading — Ordres"
     icon_kind = "trading"
     default_size = (840, 520)
-    min_size = (560, 340)
+    # largeur mini 640 (pas 560) : sous ~640 px, les colonnes COURS/POSSÉDÉ
+    # passaient sous le bloc de boutons ORD/VENDRE/ACHETER des lignes détenues
+    min_size = (640, 340)
 
     def on_open(self):
         self.market = self.app.ensure_market()
@@ -352,12 +354,19 @@ class TradingApp(DesktopApp):
         widgets.draw_text(surf, widgets.fit_text(lbl, fonts.small(), sr.w - 16),
                           (sr.x + 8, sr.y + 4), fonts.small(),
                           config.COL_TEXT if self.search else config.COL_TEXT_DIM)
-        # pouvoir d'achat
+        # pouvoir d'achat — version compacte si la fenêtre est étroite (le
+        # libellé complet passait SUR la barre de recherche à la taille mini)
         st = PM.margin_status(p, self.market)
-        widgets.draw_text(surf, f"Pouvoir d'achat {widgets.format_money(st['buying_power'], cur)} · "
-                                f"levier {st['leverage']:.2f}x",
-                          (rect.right - pad, rect.y + pad + 4), fonts.small(bold=True),
-                          config.COL_DOWN if st["margin_call"] else config.COL_TEXT_DIM, align="right")
+        bp_full = (f"Pouvoir d'achat {widgets.format_money(st['buying_power'], cur)} · "
+                   f"levier {st['leverage']:.2f}x")
+        bp_short = f"PA {widgets.format_money(st['buying_power'], cur)}"
+        bp_avail = rect.right - pad - (sr.right + 12)
+        bp_font = fonts.small(bold=True)
+        bp_txt = bp_full if bp_font.size(bp_full)[0] <= bp_avail else bp_short
+        if bp_font.size(bp_txt)[0] <= bp_avail:
+            widgets.draw_text(surf, bp_txt,
+                              (rect.right - pad, rect.y + pad + 4), bp_font,
+                              config.COL_DOWN if st["margin_call"] else config.COL_TEXT_DIM, align="right")
         # quantité — bascule "Titres" (nombre d'actions) / "€" (montant investi,
         # le jeu calcule la quantité correspondante au moment de l'ordre) :
         # évite au joueur de calculer lui-même "combien d'actions pour 5000€".
@@ -547,8 +556,11 @@ class TradingApp(DesktopApp):
                           (r.x + 66, r.y + 5), fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, f"{price:,.2f}", (area.x + int(area.w * 0.52), r.y + 4),
                           fonts.small(), config.COL_WHITE)
-        widgets.draw_text(surf, f"{held:g}" if held else "—",
-                          (area.x + int(area.w * 0.66), r.y + 4), fonts.small(bold=held > 0),
+        held_x = area.x + int(area.w * 0.66)
+        held_avail = max(20, (r.right - 174) - held_x)   # jamais sous les boutons ORD/VENDRE/ACHETER
+        widgets.draw_text(surf, widgets.fit_text(f"{held:g}" if held else "—",
+                                                 fonts.small(bold=held > 0), held_avail),
+                          (held_x, r.y + 4), fonts.small(bold=held > 0),
                           config.COL_AMBER if held > 0 else config.COL_TEXT_DIM)
         if self._can_trade():
             br = pygame.Rect(r.right - 66, r.y, 64, ROW_H - 4)

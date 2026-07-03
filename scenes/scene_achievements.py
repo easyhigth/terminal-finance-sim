@@ -98,6 +98,11 @@ class AchievementsScene(Scene):
             n = len(self.rows) if cat_id is None else sum(1 for r in self.rows if r["cat"] == cat_id)
             text = f"{label} ({n})"
             w = fonts.small(bold=True).size(text)[0] + 20
+            # retour à la ligne : la rangée débordait du bord droit de l'écran
+            # (les dernières catégories devenaient injoignables)
+            if x + w > config.SCREEN_WIDTH - 40 and x > 40:
+                x = 40
+                y += 32
             r = pygame.Rect(x, y, w, 26)
             pygame.draw.rect(surf, config.COL_PRESTIGE if active else config.COL_PANEL, r, border_radius=13)
             pygame.draw.rect(surf, config.COL_PRESTIGE, r, 1, border_radius=13)
@@ -105,6 +110,7 @@ class AchievementsScene(Scene):
                               config.COL_BG if active else config.COL_TEXT, align="center")
             self._chip_rects[cat_id] = r
             x += w + 8
+        return y + 32
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -113,10 +119,11 @@ class AchievementsScene(Scene):
                           fonts.title(bold=True), config.COL_PRESTIGE)
         widgets.draw_text(surf, f"{n_obtained} / {len(self.rows)}", (42, 76),
                           fonts.small(bold=True), config.COL_TEXT_DIM)
-        self._draw_chips(surf, 100)
+        chips_bottom = self._draw_chips(surf, 100)
 
         rows = self._visible_rows()
-        panel = pygame.Rect(40, 136, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - 136)
+        top = max(136, chips_bottom + 6)
+        panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - top)
         list_area = pygame.Rect(panel.x, panel.y, panel.w, panel.h)
         self._list_rect = list_area
         pygame.draw.rect(surf, config.COL_PANEL, list_area)

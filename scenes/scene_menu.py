@@ -50,7 +50,7 @@ class MenuScene(Scene):
         # pas de glyphe « ⚙ » : la police embarquée ne le couvre pas et le
         # rendait comme « Ø » (même limite que les emoji, cf. ui/desktop_icons.py)
         self.settings_btn = widgets.Button((config.SCREEN_WIDTH-200, 120, 160, 34),
-                                           "RÉGLAGES", config.COL_AMBER)
+                                           _L("RÉGLAGES", "SETTINGS"), config.COL_AMBER)
         self.buttons["continue"].enabled = self.auto is not None
         self.buttons["load"].enabled = len(GameState.list_saves()) > 0
         self.t = 0.0
@@ -77,6 +77,8 @@ class MenuScene(Scene):
             "prestige")
 
     def _anim_label(self):
+        if get_lang() == "en":
+            return "ANIM: REDUCED" if anim_settings.reduce_motion() else "ANIM: NORMAL"
         return "ANIM : RÉDUITE" if anim_settings.reduce_motion() else "ANIM : NORMALE"
 
     def _continue(self):

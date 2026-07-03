@@ -225,15 +225,17 @@ class MandatesScene(Scene):
         if not self._can():
             g = unlocks.effective_required_grade(p, "mandates")
             widgets.draw_text(surf, f"⊘ Mandats débloqués au grade {config.GRADES[g]}.",
-                              (42, 56), fonts.small(), config.COL_TEXT_DIM)
+                              (42, 64), fonts.small(), config.COL_TEXT_DIM)
             note = unlocks.track_lock_note(p, "mandates")
             if note:
                 widgets.draw_text(surf, note.strip(), (42, 76), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             self._draw_postmortem(surf)
             return
+        # y=64 (pas 56) : à 56, le sous-titre était barré par le bas du grand
+        # titre (même interligne que les autres écrans : titre 22 → sous-titre 64)
         widgets.draw_text(surf, "Gérez l'argent de clients sous objectif de rendement et limite de risque (bêta).",
-                          (42, 56), fonts.small(), config.COL_TEXT_DIM)
+                          (42, 64), fonts.small(), config.COL_TEXT_DIM)
 
         market = self.app.ensure_market()
         mp = pygame.mouse.get_pos()

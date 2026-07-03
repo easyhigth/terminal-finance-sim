@@ -235,6 +235,10 @@ class DesktopMenusMixin:
             (_L("Revoir le tutoriel", "Replay the tutorial"), desktop_tutorial.reset),
             (_L("Tutoriels (leçons guidées)", "Tutorials (guided lessons)"),
              lambda: self._open_scene_window("tutorials")),
+            (_L("Enregistrer ma disposition de fenêtres", "Save my window layout"),
+             self._save_pinned_layout),
+            (_L("Restaurer ma disposition de fenêtres", "Restore my window layout"),
+             self._restore_pinned_layout),
         ]
         # dernières fenêtres fermées (pile, la plus récente d'abord) : chaque
         # entrée rouvre PRÉCISÉMENT celle-là avec son contexte d'origine —

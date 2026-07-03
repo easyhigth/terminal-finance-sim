@@ -2055,3 +2055,106 @@ def test_calendar_widget_stacks_above_todo_widget_when_both_present(app):
     desk.draw(app.screen)
     if has_todo:
         assert desk._calendar_rect.bottom < desk._todo_rects[0][0].top
+
+
+# ============================== espace de travail (disposition sauvegardée) ===
+def test_layout_flag_is_synced_continuously(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk._launch("research")
+    desk.update(0.016)
+    layout = app.gs.player.flags.get("desktop_layout")
+    assert layout is not None
+    assert any(e.get("kind") == "app" and e.get("key") == "research" for e in layout)
+    assert any(e.get("kind") == "terminal" for e in layout)
+
+
+def test_layout_snapshot_captures_rect_minimized_pinned(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("watchlist")
+    w.rect = pygame.Rect(50, 60, 300, 200)
+    w.pinned = True
+    desk.update(0.016)
+    layout = app.gs.player.flags["desktop_layout"]
+    entry = next(e for e in layout if e.get("key") == "watchlist")
+    assert entry["rect"] == [50, 60, 300, 200]
+    assert entry["pinned"] is True
+    assert entry["minimized"] is False
+
+
+def test_layout_snapshot_captures_scene_window_kwargs(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    tk = app.market.top_companies(n=1)[0]["ticker"]
+    desk._open_scene_window("company", ticker=tk, return_to="markethub")
+    desk.update(0.016)
+    layout = app.gs.player.flags["desktop_layout"]
+    entry = next(e for e in layout if e.get("kind") == "scene" and e.get("name") == "company")
+    assert entry["kwargs"].get("ticker") == tk
+
+
+def test_pinned_layout_save_and_restore_reopens_windows(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk._launch("research")
+    desk._launch("calculator")
+    desk.update(0.016)
+    desk._save_pinned_layout()
+    assert app.gs.player.flags.get("desktop_layout_pinned")
+
+    desk._close_all_windows()
+    assert not any(w.key == "research" for w in desk.wm.windows)
+    assert not any(w.key == "calculator" for w in desk.wm.windows)
+
+    desk._restore_pinned_layout()
+    assert any(w.key == "research" for w in desk.wm.windows)
+    assert any(w.key == "calculator" for w in desk.wm.windows)
+
+
+def test_restore_pinned_layout_is_a_noop_without_a_saved_snapshot(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    app.gs.player.flags.pop("desktop_layout_pinned", None)
+    n_before = len(desk.wm.windows)
+    desk._restore_pinned_layout()
+    assert len(desk.wm.windows) == n_before
+
+
+def test_pinned_layout_restores_position_and_pin_state(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._launch("sheet")
+    w.rect = pygame.Rect(80, 90, 500, 400)
+    w.pinned = True
+    desk.update(0.016)
+    desk._save_pinned_layout()
+    w.rect = pygame.Rect(0, 0, 100, 100)
+    w.pinned = False
+
+    desk._restore_pinned_layout()
+    restored = next(win for win in desk.wm.windows if win.key == "sheet")
+    assert restored.rect == pygame.Rect(80, 90, 500, 400)
+    assert restored.pinned is True
+
+
+def test_layout_auto_restores_on_first_desktop_entry_of_a_fresh_app():
+    """Une NOUVELLE instance App() (donc une nouvelle DesktopScene) doit
+    rouvrir automatiquement la disposition mémorisée dans le player chargé —
+    contrairement au réglage manuel figé (`desktop_layout_pinned`), celui-ci
+    reflète la dernière disposition en cours au moment de la sauvegarde."""
+    a1 = main.App()
+    a1.ensure_market()
+    a1.gs.player.grade_index = 9
+    a1.scenes.go("desktop")
+    desk1 = a1.scenes.current
+    desk1._launch("research")
+    desk1.update(0.016)
+    saved_layout = a1.gs.player.flags["desktop_layout"]
+
+    a2 = main.App()
+    a2.ensure_market()
+    a2.gs.player.flags["desktop_layout"] = saved_layout
+    a2.scenes.go("desktop")
+    desk2 = a2.scenes.current
+    assert any(w.key == "research" for w in desk2.wm.windows)

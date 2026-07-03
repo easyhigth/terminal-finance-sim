@@ -881,6 +881,7 @@ def test_track_icon_appears_after_choosing_a_track_and_opens_scene(app):
     rect, kind, _label = desk._icon_rects["track"]
     assert kind == "ma"
     desk.handle_event(_click(rect.centerx, rect.centery))
+    desk.handle_event(_up(rect.centerx, rect.centery))
     assert any(w.key == "scene:ma" for w in desk.wm.windows)
 
 
@@ -1031,6 +1032,7 @@ def test_watchlist_desktop_icon_opens_app(app):
     rect, kind, _label = desk._icon_rects["watchlist"]
     assert kind == "star"
     desk.handle_event(_click(rect.centerx, rect.centery))
+    desk.handle_event(_up(rect.centerx, rect.centery))
     assert any(win.key == "watchlist" for win in desk.wm.windows)
 
 
@@ -1108,6 +1110,7 @@ def test_onboarding_click_outside_card_dismisses_and_passes_through():
     # clic sur une icône du bureau (hors carte) : referme l'accueil ET ouvre l'app
     r, _kind, _label = desk._icon_rects["research"]
     desk.handle_event(_click(r.centerx, r.centery))
+    desk.handle_event(_up(r.centerx, r.centery))
     assert desktop_onboarding.seen() is True
     assert any(w.key == "research" for w in desk.wm.windows)
     desktop_onboarding.mark_seen()
@@ -1265,6 +1268,70 @@ def test_unpinned_windows_unaffected_when_none_pinned(app):
     wm.open("a", lambda: ResearchApp(app))
     wm.open("b", lambda: SheetApp(app))
     assert wm._z_order() == wm.windows
+
+
+# ==================================== réorganisation des icônes (glisser) =====
+def test_small_click_on_icon_still_launches_without_moving(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)
+    r, _kind, _label = desk._icon_rects["research"]
+    desk.handle_event(_click(r.centerx, r.centery))
+    assert desk._icon_drag is not None
+    desk.handle_event(_up(r.centerx, r.centery))
+    assert desk._icon_drag is None
+    assert any(w.key == "research" for w in desk.wm.windows)
+
+
+def test_dragging_an_icon_past_threshold_does_not_launch(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)
+    r, _kind, _label = desk._icon_rects["research"]
+    other_key = next(k for k in desk._icon_rects if k != "research")
+    other_r, _k2, _l2 = desk._icon_rects[other_key]
+    desk.handle_event(_down(r.centerx, r.centery))
+    desk.handle_event(_motion(other_r.centerx, other_r.centery))
+    desk.handle_event(_up(other_r.centerx, other_r.centery))
+    assert not any(w.key == "research" for w in desk.wm.windows)
+
+
+def test_dragging_an_icon_persists_custom_order(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)
+    default_order = list(desk._icon_rects.keys())
+    first_key = default_order[0]
+    last_key = default_order[-1]
+    first_r, _k, _l = desk._icon_rects[first_key]
+    last_r, _k2, _l2 = desk._icon_rects[last_key]
+    desk.handle_event(_down(first_r.centerx, first_r.centery))
+    desk.handle_event(_motion(last_r.centerx, last_r.centery))
+    desk.handle_event(_up(last_r.centerx, last_r.centery))
+    order = app.gs.player.flags.get("desktop_icon_order")
+    assert order is not None
+    # déposée près de la dernière icône : plus du tout en tête, et voisine
+    # de sa cible (insérée juste avant, cf. _reorder_icon).
+    assert order.index(first_key) != 0
+    assert abs(order.index(first_key) - order.index(last_key)) == 1
+    # persisté : un nouveau dessin applique bien le nouvel ordre
+    desk.draw(app.screen)
+    assert list(desk._icon_rects.keys())[0] != first_key
+
+
+def test_newly_unlocked_icon_appends_to_end_of_custom_order(app):
+    """Une icône jamais vue (pas encore dans l'ordre sauvegardé) ne doit ni
+    planter ni écraser silencieusement l'ordre choisi par le joueur — elle
+    se glisse à la fin."""
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)
+    keys_before = list(desk._icon_rects.keys())
+    app.gs.player.flags["desktop_icon_order"] = keys_before[:3]   # ordre partiel
+    desk.draw(app.screen)
+    shown = list(desk._icon_rects.keys())
+    assert shown[:3] == keys_before[:3]
+    assert set(shown) == set(keys_before)   # rien perdu
 
 
 # ==================================== feedback son/visuel de docking ==========

@@ -64,6 +64,8 @@ from scenes.scene_desktop_widgets import DesktopWidgetsMixin
 from ui import desktop_icons, fonts, keynav, widgets
 from ui.window_manager import WindowManager
 
+_ICON_DRAG_THRESHOLD = 6   # px : sous ce seuil un glisser d'icône reste un simple clic
+
 
 class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
     def on_enter(self, **kwargs):
@@ -80,6 +82,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self.start_open = False
         self._icon_rects = {}       # clé -> (Rect, icon_kind, label) — icônes du bureau
         self._icon_focus = None     # clé de l'icône ayant le focus clavier (ou None)
+        self._icon_drag = None      # {"key","start","pos"} pendant un glisser d'icône (réorganisation)
         self._show_desktop_restore = []  # clés des fenêtres à restaurer (CTRL+MAJ+D)
         self._launch_rects = {}     # clé app -> Rect (barre des tâches quick-launch)
         self._task_rects = {}       # Window -> Rect (barre des tâches)
@@ -277,17 +280,36 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 return
         if self.wm.handle_event(event):
             return
+        # glisser une icône du bureau : le clic (MOUSEBUTTONDOWN) sur une icône
+        # ne lance PAS immédiatement — il amorce un glisser candidat (cf. plus
+        # bas). MOUSEMOTION met à jour sa position ; MOUSEBUTTONUP tranche :
+        # peu/pas de mouvement = un simple clic (lance l'app, comportement
+        # historique), mouvement net = dépose pour réorganiser (persisté dans
+        # `player.flags["desktop_icon_order"]`, relu par `_icon_list()`).
+        if event.type == pygame.MOUSEMOTION and self._icon_drag is not None:
+            self._icon_drag["pos"] = event.pos
+            return
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self._icon_drag is not None:
+            drag = self._icon_drag
+            self._icon_drag = None
+            sx, sy = drag["start"]
+            ex, ey = event.pos
+            if (ex - sx) ** 2 + (ey - sy) ** 2 < _ICON_DRAG_THRESHOLD ** 2:
+                self._launch(drag["key"])
+            else:
+                self._reorder_icon(drag["key"], event.pos)
+            return
         if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
             return
         pos = event.pos
         if self._start_rect and self._start_rect.collidepoint(pos):
             self._toggle_start_menu()
             return
-        # icônes du bureau + quick-launch : ouvrir/ramener l'app
+        # icônes du bureau + quick-launch : amorce un glisser (voir plus haut)
         for key, (r, _kind, _label) in self._icon_rects.items():
             if r.collidepoint(pos):
                 self._icon_focus = key
-                self._launch(key)
+                self._icon_drag = {"key": key, "start": pos, "pos": pos}
                 return
         for key, r in self._launch_rects.items():
             if r.collidepoint(pos):
@@ -567,7 +589,42 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         # anciens boutons du rail latéral du terminal : icônes du bureau
         items += [(k, lbl, kind, config.COL_CYAN) for k, lbl, kind, _scene in QUICK_APPS
                   if self._icon_visible(k)]
-        return items
+        return self._apply_icon_order(items)
+
+    def _apply_icon_order(self, items):
+        """Réordonne `items` selon `player.flags["desktop_icon_order"]`, une
+        disposition libre choisie par le joueur (glisser-déposer, cf.
+        `_reorder_icon`). Les clés jamais vues (nouvelle icône débloquée,
+        1re partie) gardent l'ordre par défaut et se glissent à la fin — pas
+        de trou ni de crash si le joueur n'a jamais réorganisé son bureau."""
+        order = self.app.gs.player.flags.get("desktop_icon_order")
+        if not order:
+            return items
+        rank = {k: i for i, k in enumerate(order)}
+        ranked = sorted(enumerate(items),
+                        key=lambda pair: rank.get(pair[1][0], len(order) + pair[0]))
+        return [it for _i, it in ranked]
+
+    def _reorder_icon(self, key, pos):
+        """Dépose l'icône `key` près de `pos` (position souris au relâcher) :
+        retrouve la case la plus proche parmi les icônes actuellement
+        affichées (`self._icon_rects`, peuplé par le dernier dessin) et
+        insère `key` à cet emplacement. Persisté dans `player.flags` (comme
+        la difficulté ou les apps déjà vues) — survit à une sauvegarde."""
+        order = list(self._icon_rects.keys())
+        if key not in order:
+            return
+        order.remove(key)
+        target, best_d = None, None
+        for k, (r, _kind, _label) in self._icon_rects.items():
+            if k == key:
+                continue
+            d = (r.centerx - pos[0]) ** 2 + (r.centery - pos[1]) ** 2
+            if best_d is None or d < best_d:
+                best_d, target = d, k
+        insert_at = order.index(target) if target in order else len(order)
+        order.insert(insert_at, key)
+        self.app.gs.player.flags["desktop_icon_order"] = order
 
     def _check_new_icons(self):
         """Toast « nouvelle app installée » quand une icône verrouillée vient
@@ -590,11 +647,24 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         if new:
             p.flags["desktop_seen_apps"] = keys
 
+    def _dragging_icon(self):
+        """True si un glisser d'icône a dépassé le seuil de clic (donc en
+        train de réorganiser, pas juste un clic qui n'a pas encore bougé)."""
+        d = self._icon_drag
+        if d is None:
+            return None
+        sx, sy = d["start"]
+        px, py = d["pos"]
+        if (px - sx) ** 2 + (py - sy) ** 2 < _ICON_DRAG_THRESHOLD ** 2:
+            return None
+        return d["key"]
+
     def _draw_desktop_icons(self, surf):
         self._icon_rects = {}
         area_h = config.SCREEN_HEIGHT - TOPBAR_H - TASKBAR_H
         max_rows = max(1, (area_h - 16) // (ICON_H + ICON_GAP))
         mp = pygame.mouse.get_pos()
+        dragging_key = self._dragging_icon()
         for i, (key, label, kind, accent) in enumerate(self._icon_list()):
             col, row = divmod(i, max_rows)
             x = 16 + col * (ICON_W + ICON_GAP)
@@ -606,15 +676,29 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 pygame.draw.rect(surf, config.COL_PANEL, r, border_radius=8)
                 pygame.draw.rect(surf, accent, r, 1, border_radius=8)
             keynav.draw_focus_ring(surf, r, key == self._icon_focus)
-            desktop_icons.draw(surf, (r.centerx, r.y + 28), kind, accent)
+            ghost = dragging_key is not None and key == dragging_key
+            icon_col = config.COL_TEXT_DIM if ghost else accent
+            desktop_icons.draw(surf, (r.centerx, r.y + 28), kind, icon_col)
             widgets.draw_text(surf, widgets.fit_text(label, fonts.small(bold=True), ICON_W - 6),
                               (r.centerx, r.bottom - 18), fonts.small(bold=True),
-                              config.COL_TEXT, align="center")
+                              config.COL_TEXT_DIM if ghost else config.COL_TEXT, align="center")
             # tooltip raccourci clavier (seulement si aucune fenêtre ne
             # recouvre l'icône — sinon le survol appartient à la fenêtre)
             sc_label = _ICON_SHORTCUT.get(key)
             if hov and sc_label and self.wm._topmost_at(mp) is None:
                 widgets.draw_tooltip(surf, f"{label} · {sc_label}", (r.x, r.bottom + 2))
+        # dépôt en cours : liseré pointillé (façon) sur la case cible la plus
+        # proche du curseur, pour prévisualiser où l'icône va atterrir.
+        if dragging_key is not None:
+            best_d, target_r = None, None
+            for k, (r, _kind, _label) in self._icon_rects.items():
+                if k == dragging_key:
+                    continue
+                d = (r.centerx - mp[0]) ** 2 + (r.centery - mp[1]) ** 2
+                if best_d is None or d < best_d:
+                    best_d, target_r = d, r
+            if target_r is not None:
+                pygame.draw.rect(surf, config.COL_AMBER, target_r, 2, border_radius=8)
 
     def _draw_topbar(self, surf):
         bar = pygame.Rect(0, 0, config.SCREEN_WIDTH, TOPBAR_H)

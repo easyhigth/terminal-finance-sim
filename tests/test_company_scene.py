@@ -115,3 +115,38 @@ def test_company_news_tab_filters_by_ticker_or_name(app):
     filtered = [e for e in items if any(nd and nd in e["text"].lower() for nd in needles)]
     assert len(filtered) == 1
     assert "résultats record" in filtered[0]["text"]
+
+
+# ------------------------------------- lexique contextuel (glossary_hint)
+def test_overview_tab_registers_glossary_terms_for_jargon_labels(app):
+    tk = app.market.companies[0]["ticker"]
+    app.scenes.go("company", ticker=tk)
+    scene = app.scenes.current
+    scene.tab = "overview"
+    scene.draw(app.screen)
+    terms = {t for _r, t in scene._gloss._rects}
+    assert {"EBITDA", "P/E", "EV", "EV/EBITDA", "P/S", "Beta", "FCF"} <= terms
+
+
+def test_clicking_a_glossary_term_opens_definition_popup(app):
+    tk = app.market.companies[0]["ticker"]
+    app.scenes.go("company", ticker=tk)
+    scene = app.scenes.current
+    scene.tab = "overview"
+    scene.draw(app.screen)
+    rect, term = next((r, t) for r, t in scene._gloss._rects if t == "Beta")
+    import pygame
+    ev = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=rect.center)
+    scene.handle_event(ev)
+    assert scene._gloss.active_term == "Beta"
+    scene.draw(app.screen)   # popup drawn on top : ne doit pas lever
+
+
+def test_valuation_tab_registers_glossary_terms(app):
+    tk = app.market.companies[0]["ticker"]
+    app.scenes.go("company", ticker=tk)
+    scene = app.scenes.current
+    scene.tab = "valuation"
+    scene.draw(app.screen)
+    terms = {t for _r, t in scene._gloss._rects}
+    assert {"P/E", "EV/EBITDA", "P/S", "Beta", "FCF"} <= terms

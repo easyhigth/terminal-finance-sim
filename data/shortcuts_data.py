@@ -101,6 +101,10 @@ SECTIONS = [
             "HEDGE, ALM, TUTO, CERT…)"),
     ]),
     ("Bureau — icônes en fenêtre", [
+        ("F1", "Ouvre l'ASSISTANT : affiche en grand LA suggestion la plus prioritaire "
+            "du moment (core/todo.py — dilemme, marge sous tension, mandat, deal proche "
+            "de l'échéance…) avec un bouton pour y aller directement, sans avoir à "
+            "deviner quelle icône ouvrir"),
         ("TAB / MAJ+TAB / ↑↓←→", "Focalise une icône du bureau au clavier (liseré blanc, "
             "aucune fenêtre ouverte au premier plan) — TAB parcourt la grille dans l'ordre, "
             "les flèches selon la position réelle ; ENTRÉE lance l'icône, ÉCHAP efface le focus"),

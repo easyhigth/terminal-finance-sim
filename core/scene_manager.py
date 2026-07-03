@@ -169,8 +169,12 @@ class SceneManager:
 
     # --- palette de navigation globale (Ctrl+K) ---------------------------
     def _palette_entries(self):
+        from core import experience_mode
         from core.app_catalog import SECTIONS
-        return [(label, scene, kw) for _, items in SECTIONS for (label, scene, kw, _desc) in items]
+        gs = getattr(self.app, "gs", None)
+        player = getattr(gs, "player", None) if gs else None
+        return [(label, scene, kw) for _, items in SECTIONS for (label, scene, kw, _desc) in items
+                if player is None or not experience_mode.scene_hidden(scene, player)]
 
     def _palette_ticker_matches(self, query, limit=6):
         """Suggestions d'actifs (ticker/nom) correspondant à la saisie, pour
@@ -198,6 +202,28 @@ class SceneManager:
         hits = fuzzy.filter_sorted(query, L.LESSONS, key=lambda l: l["title"])[:limit]
         return [(f"🎓 {l['title']}", "academy", {"lesson_id": l["id"]}) for l in hits]
 
+    def _palette_action_matches(self, query, limit=6):
+        """Actions rapides exécutables DIRECTEMENT depuis la palette, sans
+        ouvrir de fenêtre — "vendre tout TICKER" pour chaque position tenue,
+        cherchable par ticker OU par le mot "vendre"/"sell". Le libellé
+        "→ Action" (préfixe ⚡) distingue visuellement une exécution
+        immédiate d'une simple navigation. Un ordre à fort impact
+        (`core.order_confirm`) retombe sur l'ouverture de Trading plutôt que
+        de vendre en silence — même garde-fou que l'app Trading."""
+        gs = getattr(self.app, "gs", None)
+        player = getattr(gs, "player", None) if gs else None
+        if player is None or not player.portfolio:
+            return []
+        tickers = list(player.portfolio.keys())
+        haystack = [f"vendre {tk} sell {tk}" for tk in tickers]
+        idx = fuzzy.filter_sorted(query, list(range(len(haystack))), key=lambda i: haystack[i])
+        out = []
+        for i in idx[:limit]:
+            tk = tickers[i]
+            qty = player.portfolio[tk]["shares"]
+            out.append((f"⚡ Vendre tout : {tk} ({qty:g} titres)", "__sell_all__", {"ticker": tk}))
+        return out
+
     def _palette_remember(self, label, scene, kw):
         """Mémorise un choix de palette (favoris récents, session courante) :
         plus récent en tête, sans doublon, plafonné à 5."""
@@ -215,7 +241,8 @@ class SceneManager:
         ticker_hits = self._palette_ticker_matches(q)
         gloss_hits = self._palette_glossary_matches(q)
         lesson_hits = self._palette_lesson_matches(q)
-        return ticker_hits + gloss_hits + lesson_hits + scene_hits
+        action_hits = self._palette_action_matches(q)
+        return action_hits + ticker_hits + gloss_hits + lesson_hits + scene_hits
 
     def open_palette(self):
         self.palette_open = True
@@ -228,11 +255,49 @@ class SceneManager:
     def _palette_navigate(self, scene, kw):
         """Ouvre une entrée de palette : sur le BUREAU, en FENÊTRE (via
         App.route_scene, cohérent avec « tout se passe sur le bureau ») ;
-        ailleurs, bascule plein écran classique."""
+        ailleurs, bascule plein écran classique. `scene == "__sell_all__"`
+        est une ACTION exécutée directement (cf. `_palette_action_matches`),
+        pas une navigation — jamais un simple `go()`."""
+        if scene == "__sell_all__":
+            self._palette_execute_sell_all(kw.get("ticker"))
+            return
         if self.current_name == "desktop" and hasattr(self.app, "route_scene"):
             self.app.route_scene(scene, **kw)
         else:
             self.go(scene, return_to=self.current_name or "terminal", **kw)
+
+    def _palette_execute_sell_all(self, ticker):
+        """Vend l'intégralité d'une position depuis la palette — même
+        garde-fou « ordre à fort impact » que l'app Trading
+        (core.order_confirm) : au-delà du seuil, on ouvre Trading sur ce
+        titre (pré-filtré) pour confirmation explicite plutôt que de vendre
+        en silence."""
+        from core import order_confirm
+        from core import portfolio as pf_mod
+        gs = getattr(self.app, "gs", None)
+        market = getattr(self.app, "market", None)
+        player = getattr(gs, "player", None) if gs else None
+        if player is None or market is None or ticker not in player.portfolio:
+            return
+        pos = player.portfolio[ticker]
+        price = market.price_of(ticker)
+        notional = (price or 0) * pos["shares"]
+        if order_confirm.needs_confirmation(player, market, notional):
+            opener = getattr(self.current, "open_trading", None) if self.current_name == "desktop" else None
+            if opener:
+                opener(ticker)
+            if hasattr(self.app, "notify"):
+                self.app.notify(_L("Ordre important : confirmez dans Trading",
+                                   "High-impact order: confirm in Trading"), "warn")
+            return
+        res = pf_mod.sell(player, market, ticker, "ALL")
+        if hasattr(self.app, "notify"):
+            if res.get("ok"):
+                self.app.notify(_L(f"Vendu : {ticker} ({res['qty']:g} titres)",
+                                   f"Sold: {ticker} ({res['qty']:g} shares)"), "good")
+            else:
+                self.app.notify(_L(f"Échec de la vente : {ticker}",
+                                   f"Sell failed: {ticker}"), "bad")
 
     def _handle_palette_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:

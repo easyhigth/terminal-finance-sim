@@ -27,6 +27,10 @@ def app():
     p.grade_index = 9
     p.cash = 5_000_000.0
     p.reputation = 80
+    # neutralise la disposition de bureau par défaut (cf. DesktopScene._seed_default_layout) :
+    # la plupart des tests ci-dessous veulent un bureau "déjà en cours de partie"
+    # (icônes cliquables sans fenêtre par-dessus), pas un tout premier atterrissage.
+    p.flags["desktop_seeded"] = True
     return a
 
 
@@ -267,6 +271,62 @@ def test_sheet_app_fx_picker_appends_to_existing_formula(app):
     sa.edit_buf = "=ROUND("
     sa._insert_function("AVERAGE")
     assert sa.edit_buf == "=ROUND(AVERAGE("
+
+
+# ----------------------------------------------- modèles de tableur prêts à l'emploi
+def test_sheet_app_insert_template_fills_blank_sheet(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    sa._insert_template("returns")
+    assert sa.tpl_open is False
+    assert sa.sheet.get_raw("A1") == "RENDEMENT D'UN INVESTISSEMENT"
+    assert "Modèle inséré" in sa.msg
+
+
+def test_sheet_app_insert_template_cancels_pending_edit(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    sa.editing = True
+    sa.edit_buf = "=SUM(A1:A2"
+    sa._insert_template("networth")
+    assert sa.editing is False
+    assert sa.edit_buf == ""
+
+
+def test_sheet_app_tpl_button_click_toggles_panel(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    rect = pygame.Rect(0, 0, 400, 300)
+    sa.draw(app.screen, rect)
+    assert sa._tpl_rect is not None
+    ev = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=sa._tpl_rect.center)
+    sa.handle_event(ev, rect)
+    assert sa.tpl_open is True
+
+
+def test_sheet_app_tpl_panel_click_inserts_and_closes(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    rect = pygame.Rect(0, 0, 400, 300)
+    sa.tpl_open = True
+    sa.draw(app.screen, rect)
+    r = sa._tpl_item_rects["loan"]
+    ev = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=r.center)
+    sa.handle_event(ev, rect)
+    assert sa.tpl_open is False
+    assert sa.sheet.get_raw("A1") == "MENSUALITÉ D'EMPRUNT"
+
+
+def test_sheet_app_tpl_panel_click_outside_closes_without_inserting(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    rect = pygame.Rect(0, 0, 400, 300)
+    sa.tpl_open = True
+    sa.draw(app.screen, rect)
+    ev = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(2, 2))
+    sa.handle_event(ev, rect)
+    assert sa.tpl_open is False
+    assert sa.sheet.get_raw("A1") == ""
 
 
 def test_sheet_app_range_drag_selection(app):
@@ -546,6 +606,198 @@ def test_palette_navigate_fullscreen_outside_desktop():
     a.scenes.go("terminal")
     a.scenes._palette_navigate("markethub", {})
     assert a.scenes.current_name == "markethub"
+
+
+# ------------------------------------- palette Ctrl+K : actions rapides (⚡)
+def test_palette_action_matches_lists_held_positions(app):
+    tk = app.market.companies[0]["ticker"]
+    app.gs.player.portfolio[tk] = {"shares": 10.0, "avg": 100.0}
+    hits = app.scenes._palette_action_matches("vendre")
+    assert any(scene == "__sell_all__" and kw["ticker"] == tk
+              for _label, scene, kw in hits)
+
+
+def test_palette_action_matches_empty_without_position():
+    a = main.App()
+    a.ensure_market()
+    assert a.scenes._palette_action_matches("vendre") == []
+
+
+def test_palette_filtered_includes_action_hits_before_scene_hits(app):
+    tk = app.market.companies[0]["ticker"]
+    app.gs.player.portfolio[tk] = {"shares": 5.0, "avg": 50.0}
+    app.scenes.palette_query = tk
+    filtered = app.scenes._palette_filtered()
+    assert filtered and filtered[0][1] == "__sell_all__"
+
+
+def test_palette_sell_all_executes_and_clears_position(app):
+    tk = app.market.companies[0]["ticker"]
+    app.gs.player.cash = 0.0
+    app.gs.player.portfolio[tk] = {"shares": 5.0, "avg": 10.0}
+    app.scenes.go("desktop")
+    app.scenes._palette_execute_sell_all(tk)
+    assert tk not in app.gs.player.portfolio
+    assert app.gs.player.cash > 0.0
+
+
+def test_palette_sell_all_high_impact_opens_trading_instead_of_selling(app):
+    tk = app.market.companies[0]["ticker"]
+    price = app.market.price_of(tk)
+    # position qui pèse largement > 30% du patrimoine net -> confirmation requise
+    huge_qty = (app.gs.player.cash * 5) / price
+    app.gs.player.portfolio[tk] = {"shares": huge_qty, "avg": price}
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    app.scenes._palette_execute_sell_all(tk)
+    assert tk in app.gs.player.portfolio      # pas vendu silencieusement
+    assert any(w.key == "trading" for w in desk.wm.windows)
+
+
+def test_palette_sell_all_noop_on_unknown_ticker(app):
+    app.scenes.go("desktop")
+    app.scenes._palette_execute_sell_all("NOPE")   # ne doit pas lever
+
+
+# --------------------------------------- mode débutant/expert (menu Démarrer)
+def test_start_menu_beginner_mode_hides_advanced_sections(app, monkeypatch):
+    from core import experience_mode as XP
+    monkeypatch.setattr(XP, "_mode", "expert")
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    all_scenes = {it[1] for _title, items in desk._start_visible_sections() for it in items}
+    assert "structured" in all_scenes
+
+    XP.set_mode("beginner")
+    try:
+        beginner_scenes = {it[1] for _title, items in desk._start_visible_sections() for it in items}
+        assert "structured" not in beginner_scenes
+        assert "markethub" in beginner_scenes   # jamais masquée (pas "avancée")
+    finally:
+        XP.set_mode("expert")
+
+
+def test_palette_entries_respect_beginner_mode(app):
+    from core import experience_mode as XP
+    XP.set_mode("beginner")
+    try:
+        scenes = {scene for _label, scene, _kw in app.scenes._palette_entries()}
+        assert "structured" not in scenes
+    finally:
+        XP.set_mode("expert")
+
+
+# --------------------------------------------- routine quotidienne (checklist)
+def test_checklist_widget_lists_items_when_enabled(app):
+    app.scenes.go("desktop")
+    scene = app.scenes.current
+    scene.draw(app.screen)
+    ids = {i for _r, i in scene._checklist_rects}
+    from core import daily_checklist as DC
+    assert ids == {it["id"] for it in DC.ITEMS}
+
+
+def test_checklist_click_toggles_item(app):
+    scene = _empty_desktop(app)
+    scene.draw(app.screen)
+    row, item_id = scene._checklist_rects[0]
+    scene.handle_event(_click(*row.center))
+    from core import daily_checklist as DC
+    items = {it["id"]: it["done"] for it in DC.items_for_today(app.gs.player)}
+    assert items[item_id] is True
+
+
+def test_checklist_hidden_when_all_items_done(app):
+    app.scenes.go("desktop")
+    scene = app.scenes.current
+    from core import daily_checklist as DC
+    for it in DC.ITEMS:
+        DC.toggle(app.gs.player, it["id"])
+    scene.draw(app.screen)
+    assert scene._checklist_rects == []
+
+
+def test_checklist_hidden_when_disabled_in_settings(app):
+    from core import daily_checklist as DC
+    DC.set_enabled(app.gs.player, False)
+    try:
+        app.scenes.go("desktop")
+        scene = app.scenes.current
+        scene.draw(app.screen)
+        assert scene._checklist_rects == []
+    finally:
+        DC.set_enabled(app.gs.player, True)
+
+
+def test_settings_screen_has_daily_routine_row(app):
+    app.scenes.go("settings", return_to="desktop")
+    sc = app.scenes.current
+    labels = [label for label, _btns in sc.rows]
+    assert any("routine" in lbl.lower() for lbl in labels)
+
+
+def test_changing_daily_routine_setting_persists_via_core_module(app):
+    from core import daily_checklist as DC
+    DC.set_enabled(app.gs.player, True)
+    app.scenes.go("settings", return_to="desktop")
+    sc = app.scenes.current
+    row = next(btns for label, btns in sc.rows if "routine" in label.lower())
+    hide_btn = next(b for b in row if b.action == ("checklist", False))
+    click = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=hide_btn.rect.center)
+    sc.handle_event(click)
+    assert DC.is_enabled(app.gs.player) is False
+    DC.set_enabled(app.gs.player, True)   # restaure pour les autres tests
+
+
+# --------------------------------------------- indicateur de risque unifié
+def test_risk_badge_shows_ok_by_default(app):
+    app.scenes.go("desktop")
+    scene = app.scenes.current
+    scene.draw(app.screen)
+    assert scene._risk_badge_rect is not None
+    assert "contrôle" in scene._risk_badge_reasons or "signaler" in scene._risk_badge_reasons
+
+
+def test_risk_badge_shows_danger_on_heavy_concentration(app):
+    tk = app.market.companies[0]["ticker"]
+    app.market.price[app.market.ticker_idx[tk]] = 100.0
+    app.gs.player.cash = 5_000.0
+    app.gs.player.portfolio[tk] = {"shares": 950.0, "avg": 100.0}
+    app.scenes.go("desktop")
+    scene = app.scenes.current
+    scene.draw(app.screen)
+    assert "concentr" in scene._risk_badge_reasons.lower()
+
+
+def test_risk_badge_click_opens_portfolio(app):
+    app.scenes.go("desktop")
+    scene = app.scenes.current
+    scene.draw(app.screen)
+    r = scene._risk_badge_rect
+    scene.handle_event(_click(r.centerx, r.centery))
+    assert any(w.key == "scene:book" for w in scene.wm.windows)
+
+
+def test_settings_screen_has_experience_mode_row(app):
+    from core import experience_mode as XP
+    XP.set_mode("expert")
+    app.scenes.go("settings", return_to="desktop")
+    sc = app.scenes.current
+    labels = [label for label, _btns in sc.rows]
+    assert any("page" in lbl.lower() for lbl in labels)
+
+
+def test_changing_experience_mode_persists_via_core_module(app):
+    from core import experience_mode as XP
+    XP.set_mode("expert")
+    app.scenes.go("settings", return_to="desktop")
+    sc = app.scenes.current
+    row = next(btns for label, btns in sc.rows if "page" in label.lower())
+    beginner_btn = next(b for b in row if b.action == ("xpmode", "beginner"))
+    click = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=beginner_btn.rect.center)
+    sc.handle_event(click)
+    assert XP.get_mode() == "beginner"
+    XP.set_mode("expert")   # restaure pour les autres tests
 
 
 # ------------------------------------------------------------ calculatrice
@@ -1151,6 +1403,7 @@ def test_onboarding_click_outside_card_dismisses_and_passes_through():
     a = main.App()
     a.ensure_market()
     a.gs.player.grade_index = 9
+    a.gs.player.flags["desktop_seeded"] = True   # pas de disposition de départ pour ce test
     a.scenes.go("desktop")
     desk = a.scenes.current
     desk.draw(a.screen)
@@ -1664,6 +1917,85 @@ def test_sheet_app_export_csv_empty_sheet_shows_message(app):
     assert "vide" in sa.msg.lower()
 
 
+# ============================== mode "j'investis X€" (app Trading) ============
+def test_trading_app_defaults_to_shares_mode(app):
+    ta = TradingApp(app)
+    ta.on_open()
+    assert ta.qty_mode == "shares"
+    tk = app.market.companies[0]["ticker"]
+    ta.qty_text = "7"
+    assert ta._qty_for_ticker(tk) == 7.0
+
+
+def test_trading_app_amount_mode_converts_to_shares(app):
+    tk = app.market.companies[0]["ticker"]
+    price = app.market.price_of(tk)
+    ta = TradingApp(app)
+    ta.on_open()
+    ta.qty_mode = "amount"
+    ta.qty_text = f"{price * 3:g}"
+    assert ta._qty_for_ticker(tk) == pytest.approx(3.0)
+
+
+def test_trading_app_amount_mode_rounds_down_to_whole_shares(app):
+    tk = app.market.companies[0]["ticker"]
+    price = app.market.price_of(tk)
+    ta = TradingApp(app)
+    ta.on_open()
+    ta.qty_mode = "amount"
+    ta.qty_text = f"{price * 3.9:g}"
+    assert ta._qty_for_ticker(tk) == 3.0
+
+
+def test_trading_app_mode_toggle_click_switches_mode_and_default_amount(app):
+    ta = TradingApp(app)
+    ta.on_open()
+    rect = pygame.Rect(0, 0, 840, 520)
+    ta.draw(app.screen, rect)
+    r = ta._qty_mode_rects["amount"]
+    ta.handle_event(_click(r.centerx, r.centery), rect)
+    assert ta.qty_mode == "amount"
+    assert ta.qty_text == "1000"
+    ta.draw(app.screen, rect)
+    r2 = ta._qty_mode_rects["shares"]
+    ta.handle_event(_click(r2.centerx, r2.centery), rect)
+    assert ta.qty_mode == "shares"
+    assert ta.qty_text == "10"
+
+
+def test_trading_app_buy_in_amount_mode_buys_correct_share_count(app):
+    tk = app.market.companies[0]["ticker"]
+    price = app.market.price_of(tk)
+    app.gs.player.cash = 1_000_000.0
+    ta = TradingApp(app)
+    ta.on_open()
+    ta.qty_mode = "amount"
+    ta.qty_text = f"{price * 4:g}"
+    ta._do_buy(tk)
+    assert app.gs.player.portfolio[tk]["shares"] == pytest.approx(4.0)
+
+
+def test_trading_app_amount_presets_differ_from_share_presets(app):
+    from apps.app_trading import AMOUNT_PRESETS, QTY_PRESETS
+    assert AMOUNT_PRESETS != QTY_PRESETS
+    ta = TradingApp(app)
+    ta.on_open()
+    ta.qty_mode = "amount"
+    rect = pygame.Rect(0, 0, 840, 520)
+    ta.draw(app.screen, rect)
+    assert set(ta._preset_rects) == set(AMOUNT_PRESETS)
+
+
+def test_trading_app_amount_mode_zero_price_yields_zero_qty(app, monkeypatch):
+    tk = app.market.companies[0]["ticker"]
+    ta = TradingApp(app)
+    ta.on_open()
+    ta.qty_mode = "amount"
+    ta.qty_text = "1000"
+    monkeypatch.setattr(ta.market, "price_of", lambda _tk: None)
+    assert ta._qty_for_ticker(tk) == 0.0
+
+
 # ================================= Ordres conditionnels (stop-loss/take-profit) ==
 def test_trading_app_order_button_appears_only_for_held_positions(app):
     tk = app.market.companies[0]["ticker"]
@@ -2138,6 +2470,70 @@ def test_pinned_layout_restores_position_and_pin_state(app):
     assert restored.pinned is True
 
 
+def test_seeded_default_layout_opens_market_and_portfolio_for_general_track():
+    a = main.App()
+    a.ensure_market()
+    a.gs.player.grade_index = 9
+    a.scenes.go("desktop")
+    desk = a.scenes.current
+    keys = {w.key for w in desk.wm.windows}
+    assert "scene:markethub" in keys
+    assert "scene:book" in keys
+
+
+def test_seeded_default_layout_includes_track_scene():
+    a = main.App()
+    a.ensure_market()
+    a.gs.player.grade_index = 9
+    a.gs.player.track = "Risk"
+    a.scenes.go("desktop")
+    desk = a.scenes.current
+    keys = {w.key for w in desk.wm.windows}
+    assert "scene:risk" in keys
+
+
+def test_seeded_default_layout_only_happens_once_per_career():
+    """Une fois `desktop_seeded` posé, fermer toutes les fenêtres et revenir
+    au bureau (même App()) ne doit PAS rouvrir la disposition de départ."""
+    a = main.App()
+    a.ensure_market()
+    a.gs.player.grade_index = 9
+    a.scenes.go("desktop")
+    desk = a.scenes.current
+    assert a.gs.player.flags.get("desktop_seeded") is True
+    for w in list(desk.wm.windows):
+        if w.key != "scene:terminal":
+            desk.wm.close(w)
+    desk._restore_layout()   # simule un 2e appel (ne devrait rien rouvrir)
+    keys = {w.key for w in desk.wm.windows}
+    assert "scene:markethub" not in keys
+
+
+def test_seeded_default_layout_skipped_when_saved_layout_exists():
+    """Une carrière REPRISE (disposition déjà sauvegardée) ne doit jamais
+    déclencher une 2e disposition de départ par-dessus celle sauvegardée."""
+    a1 = main.App()
+    a1.ensure_market()
+    a1.gs.player.grade_index = 9
+    a1.scenes.go("desktop")
+    for w in list(a1.scenes.current.wm.windows):
+        if w.key != "scene:terminal":
+            a1.scenes.current.wm.close(w)
+    a1.scenes.current._launch("research")
+    a1.scenes.current.update(0.016)
+    saved_layout = a1.gs.player.flags["desktop_layout"]
+    assert "scene:book" not in {e.get("name") for e in saved_layout if e.get("kind") == "scene"}
+
+    a2 = main.App()
+    a2.ensure_market()
+    a2.gs.player.flags["desktop_layout"] = saved_layout
+    a2.scenes.go("desktop")
+    desk2 = a2.scenes.current
+    keys = {w.key for w in desk2.wm.windows}
+    assert "research" in keys
+    assert "scene:book" not in keys   # pas de disposition de départ en plus
+
+
 def test_layout_auto_restores_on_first_desktop_entry_of_a_fresh_app():
     """Une NOUVELLE instance App() (donc une nouvelle DesktopScene) doit
     rouvrir automatiquement la disposition mémorisée dans le player chargé —
@@ -2158,3 +2554,124 @@ def test_layout_auto_restores_on_first_desktop_entry_of_a_fresh_app():
     a2.scenes.go("desktop")
     desk2 = a2.scenes.current
     assert any(w.key == "research" for w in desk2.wm.windows)
+
+
+# --------------------------------------------- assistant « que faire ? » (F1)
+def test_f1_opens_assistant_card(app):
+    app.scenes.go("desktop")
+    scene = app.scenes.current
+    assert scene._assistant_open is False
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F1, mod=0))
+    assert scene._assistant_open is True
+
+
+def test_assistant_escape_closes(app):
+    app.scenes.go("desktop")
+    scene = app.scenes.current
+    scene._assistant_open = True
+    scene.update(0.016)
+    scene.draw(app.screen)
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=0))
+    assert scene._assistant_open is False
+
+
+def test_assistant_shows_top_suggestion_and_go_button(app):
+    app.scenes.go("desktop")
+    scene = app.scenes.current
+    scene.app.gs.player.pending_review = True
+    scene._assistant_open = True
+    scene.draw(app.screen)
+    btn, target_scene = scene._assistant_rects["go"]
+    assert target_scene == "review"
+    assert btn is not None
+
+
+def test_assistant_go_button_opens_target_scene_and_closes_card(app):
+    app.scenes.go("desktop")
+    scene = app.scenes.current
+    scene.app.gs.player.pending_review = True
+    scene._assistant_open = True
+    scene.draw(app.screen)
+    btn, _target = scene._assistant_rects["go"]
+    scene.handle_event(_click(*btn.center))
+    assert scene._assistant_open is False
+    assert any(w.key == "scene:review" for w in scene.wm.windows)
+
+
+def test_assistant_reassures_when_nothing_pending(app):
+    app.scenes.go("desktop")
+    scene = app.scenes.current
+    scene._assistant_open = True
+    scene.draw(app.screen)
+    assert "go" not in scene._assistant_rects
+
+
+def test_assistant_click_outside_card_closes_it(app):
+    app.scenes.go("desktop")
+    scene = app.scenes.current
+    scene._assistant_open = True
+    scene.draw(app.screen)
+    scene.handle_event(_click(2, 2))
+    assert scene._assistant_open is False
+
+
+# ------------------------------------------- résumé « en votre absence »
+def _empty_desktop(app):
+    app.scenes.go("desktop")
+    scene = app.scenes.current
+    for w in list(scene.wm.windows):
+        if w.key != "scene:terminal":
+            scene.wm.close(w)
+    scene._ack_absence_digest()   # ignore les notifications déjà générées par le fixture (badges…)
+    return scene
+
+
+def test_absence_digest_hidden_when_no_new_notifications(app):
+    scene = _empty_desktop(app)
+    assert scene._absence_digest_pending() is None
+
+
+def test_absence_digest_lists_new_notifications(app):
+    scene = _empty_desktop(app)
+    app.notify("Ordre exécuté : achat MVC", "good")
+    pending = scene._absence_digest_pending()
+    assert pending is not None
+    assert any(e["text"] == "Ordre exécuté : achat MVC" for e in pending)
+
+
+def test_absence_digest_hidden_when_a_window_is_open(app):
+    scene = _empty_desktop(app)
+    app.notify("Ordre exécuté : achat MVC", "good")
+    scene._launch("research")
+    assert scene._absence_digest_pending() is None
+
+
+def test_absence_digest_ok_dismisses_and_advances_checkpoint(app):
+    scene = _empty_desktop(app)
+    app.notify("Ordre exécuté : achat MVC", "good")
+    scene.draw(app.screen)
+    ok = scene._digest_rects["ok"]
+    scene.handle_event(_click(*ok.center))
+    assert scene._absence_digest_pending() is None
+    assert app.gs.player.flags["absence_digest_seen"] == len(app.notes.history)
+
+
+def test_absence_digest_see_all_opens_notifications_and_dismisses(app):
+    scene = _empty_desktop(app)
+    app.notify("Ordre exécuté : achat MVC", "good")
+    scene.draw(app.screen)
+    more = scene._digest_rects["more"]
+    scene.handle_event(_click(*more.center))
+    assert scene._absence_digest_pending() is None
+    assert any(w.key == "scene:notifications" for w in scene.wm.windows)
+
+
+def test_absence_digest_does_not_reappear_for_already_seen_notifications(app):
+    scene = _empty_desktop(app)
+    app.notify("Premier message", "info")
+    scene._ack_absence_digest()
+    assert scene._absence_digest_pending() is None
+    app.notify("Second message", "info")
+    pending = scene._absence_digest_pending()
+    assert pending is not None and len(pending) == 1
+    assert pending[0]["text"] == "Second message"

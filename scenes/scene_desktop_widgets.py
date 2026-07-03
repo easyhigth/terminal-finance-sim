@@ -14,6 +14,7 @@ import pygame
 
 from core import config, desktop_onboarding, desktop_tutorial
 from core import portfolio_margin as pm_mod
+from core.i18n import get_lang
 from scenes.scene_desktop_common import _L, TASKBAR_H, TOPBAR_H
 from ui import fonts, widgets
 
@@ -295,6 +296,220 @@ class DesktopWidgetsMixin:
                               (row.x + 18, row.y + 4), fonts.tiny(), config.COL_TEXT)
             iy += row_h
 
+    # -------------------------------------- résumé condensé « en votre absence »
+    def _absence_digest_pending(self):
+        """Résumé condensé des notifications reçues depuis la dernière
+        consultation (`app.notes.history`, cf. ui/notifications.py) — ne se
+        propose que quand le bureau est "vide" (aucune fenêtre hormis le
+        Terminal, ouvert ou non) : le joueur revient d'une absence plutôt que
+        d'être en train de travailler activement dans une fenêtre. Renvoie
+        None si rien de nouveau ou si le bureau n'est pas vide."""
+        others = [w for w in self.wm.windows if w.key != "scene:terminal"]
+        if others:
+            return None
+        history = self.app.notes.history
+        seen = self.app.gs.player.flags.get("absence_digest_seen", 0)
+        if len(history) <= seen:
+            return None
+        return history[seen:]
+
+    def _ack_absence_digest(self):
+        self.app.gs.player.flags["absence_digest_seen"] = len(self.app.notes.history)
+
+    def _draw_absence_digest(self, surf):
+        """Carte « EN VOTRE ABSENCE » : les notifications reçues depuis la
+        dernière fois que le bureau était vide, groupées par catégorie
+        (bonne/mauvaise nouvelle/alerte/info) + les 5 plus récentes en clair —
+        pour ne pas avoir à rouvrir plusieurs fenêtres pour reconstituer ce
+        qui s'est passé pendant que rien n'était ouvert."""
+        entries = self._absence_digest_pending() or []
+        shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
+        shade.fill((0, 0, 0, 130))
+        surf.blit(shade, (0, 0))
+        W, H = 460, 320
+        x = (config.SCREEN_WIDTH - W) // 2
+        y = (config.SCREEN_HEIGHT - H) // 2
+        card = pygame.Rect(x, y, W, H)
+        self._digest_rects = {"card": card}
+        pygame.draw.rect(surf, config.COL_PANEL, card, border_radius=8)
+        pygame.draw.rect(surf, config.COL_PRESTIGE, card, 2, border_radius=8)
+        widgets.draw_text(surf, _L("EN VOTRE ABSENCE", "WHILE YOU WERE AWAY"),
+                          (x + 20, y + 16), fonts.head(bold=True), config.COL_PRESTIGE)
+        counts = {}
+        for e in entries:
+            counts[e["kind"]] = counts.get(e["kind"], 0) + 1
+        colors = {"good": config.COL_UP, "bad": config.COL_DOWN, "warn": config.COL_AMBER,
+                  "info": config.COL_CYAN, "prestige": config.COL_PRESTIGE}
+        labels = {"good": _L("bonnes nouvelles", "good news"),
+                  "bad": _L("mauvaises nouvelles", "bad news"),
+                  "warn": _L("alertes", "warnings"),
+                  "info": _L("infos", "info"),
+                  "prestige": _L("évènements notables", "notable events")}
+        ly = y + 54
+        widgets.draw_text(surf, _L(f"{len(entries)} notification(s) reçue(s)",
+                                   f"{len(entries)} notification(s) received"),
+                          (x + 20, ly), fonts.small(bold=True), config.COL_TEXT)
+        ly += 26
+        for kind in ("bad", "warn", "good", "prestige", "info"):
+            n = counts.get(kind, 0)
+            if not n:
+                continue
+            col = colors.get(kind, config.COL_TEXT)
+            pygame.draw.circle(surf, col, (x + 26, ly + 6), 4)
+            widgets.draw_text(surf, f"{n} {labels[kind]}", (x + 38, ly),
+                              fonts.tiny(bold=True), col)
+            ly += 20
+        ly += 8
+        widgets.draw_text(surf, _L("DERNIERS MESSAGES", "LATEST MESSAGES"),
+                          (x + 20, ly), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        ly += 20
+        for e in entries[-5:]:
+            widgets.draw_text(surf, widgets.fit_text(e["text"], fonts.tiny(), W - 40),
+                              (x + 20, ly), fonts.tiny(),
+                              colors.get(e["kind"], config.COL_TEXT))
+            ly += 18
+        ok_btn = pygame.Rect(x + W - 110, y + H - 44, 90, 30)
+        more_btn = pygame.Rect(x + W - 250, y + H - 44, 130, 30)
+        self._digest_rects["ok"] = ok_btn
+        self._digest_rects["more"] = more_btn
+        mp = pygame.mouse.get_pos()
+        for r, label, accent in ((more_btn, _L("Tout voir →", "See all →"), config.COL_TEXT_DIM),
+                                 (ok_btn, "OK", config.COL_PRESTIGE)):
+            hov = r.collidepoint(mp)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL, r, border_radius=5)
+            pygame.draw.rect(surf, accent, r, 1, border_radius=5)
+            widgets.draw_text(surf, label, r.center, fonts.small(bold=True), accent, align="center")
+
+    # --------------------------------------------------- indicateur de risque
+    def _draw_risk_badge(self, surf, bar):
+        """Pastille de risque unifiée (levier/marge/concentration, cf.
+        core/risk_indicator.py) — TOUJOURS dans la barre supérieure, donc
+        jamais recouverte par une fenêtre. Cliquer ouvre le portefeuille ;
+        survoler détaille les raisons dans une bulle. Renvoie le bord GAUCHE
+        de la zone dessinée (pour que le badge difficulté voisin s'y cale)."""
+        from core import risk_indicator as RI
+        p = self.app.gs.player
+        m = self.app.market
+        if m is None:
+            self._risk_badge_rect = None
+            return bar.right - 12
+        info = RI.assess(p, m)
+        colors = {RI.LEVEL_OK: config.COL_UP, RI.LEVEL_WARN: config.COL_AMBER,
+                  RI.LEVEL_DANGER: config.COL_DOWN}
+        labels = {RI.LEVEL_OK: _L("OK", "OK"), RI.LEVEL_WARN: _L("ATTENTION", "CAUTION"),
+                  RI.LEVEL_DANGER: _L("DANGER", "DANGER")}
+        col = colors[info["level"]]
+        label = labels[info["level"]]
+        font = fonts.tiny(bold=True)
+        w = font.size(label)[0] + 22
+        r = pygame.Rect(bar.right - 12 - w, 6, w, 20)
+        self._risk_badge_rect = r
+        self._risk_badge_reasons = " · ".join(info["reasons"])
+        hov = r.collidepoint(pygame.mouse.get_pos())
+        pygame.draw.rect(surf, config.COL_PANEL if hov else config.COL_PANEL_HEAD, r, border_radius=4)
+        pygame.draw.rect(surf, col, r, 1, border_radius=4)
+        pygame.draw.circle(surf, col, (r.x + 10, r.centery), 4)
+        widgets.draw_text(surf, label, (r.x + 18, r.y + 4), font, col)
+        if hov:
+            widgets.draw_tooltip(surf, self._risk_badge_reasons, pygame.mouse.get_pos())
+        return r.x
+
+    # --------------------------------------------- assistant « que faire ? »
+    def _draw_assistant_card(self, surf):
+        """Carte « ASSISTANT » (F1) : au lieu de laisser le joueur deviner
+        quoi faire parmi les nombreuses icônes du bureau, affiche EN GRAND la
+        seule action la plus prioritaire (`core/todo.py::suggestions`, déjà
+        triée), en langage simple, avec un bouton pour y aller directement —
+        le widget « À FAIRE » (compact, coin bas-droit) reste la vue
+        d'ensemble ; cette carte est le raccourci "je ne sais pas quoi faire,
+        dis-moi juste LA prochaine étape"."""
+        from core import todo as todo_mod
+        p = self.app.gs.player
+        items = todo_mod.suggestions(p, self.app.market)
+        shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
+        shade.fill((0, 0, 0, 130))
+        surf.blit(shade, (0, 0))
+        W, H = 460, 200
+        x = (config.SCREEN_WIDTH - W) // 2
+        y = (config.SCREEN_HEIGHT - H) // 2
+        card = pygame.Rect(x, y, W, H)
+        self._assistant_rects = {"card": card}
+        pygame.draw.rect(surf, config.COL_PANEL, card, border_radius=8)
+        pygame.draw.rect(surf, config.COL_CYAN, card, 2, border_radius=8)
+        widgets.draw_text(surf, _L("ASSISTANT — QUE FAIRE ?", "ASSISTANT — WHAT NOW?"),
+                          (x + 20, y + 16), fonts.head(bold=True), config.COL_CYAN)
+        close = pygame.Rect(card.right - 34, y + 14, 20, 20)
+        self._assistant_rects["close"] = close
+        hov_c = close.collidepoint(pygame.mouse.get_pos())
+        widgets.draw_text(surf, "×", close.center, fonts.head(bold=True),
+                          config.COL_TEXT if hov_c else config.COL_TEXT_DIM, align="center")
+        ly = y + 60
+        if items:
+            top = items[0]
+            colors = {"warn": config.COL_AMBER, "bad": config.COL_DOWN, "info": config.COL_CYAN}
+            col = colors.get(top["kind"], config.COL_TEXT)
+            for ln in widgets.wrap_text_lines(top["label"], fonts.small(bold=True), W - 40):
+                widgets.draw_text(surf, ln, (x + 20, ly), fonts.small(bold=True), col)
+                ly += 24
+            ly += 8
+            n_more = len(items) - 1
+            if n_more:
+                widgets.draw_text(surf, _L(f"+ {n_more} autre(s) action(s) en attente",
+                                           f"+ {n_more} more pending action(s)"),
+                                  (x + 20, ly), fonts.tiny(), config.COL_TEXT_DIM)
+            btn = pygame.Rect(x + 20, y + H - 46, 160, 32)
+            self._assistant_rects["go"] = (btn, top["scene"])
+            hov = btn.collidepoint(pygame.mouse.get_pos())
+            pygame.draw.rect(surf, config.COL_AMBER if hov else config.COL_PANEL_HEAD, btn, border_radius=5)
+            pygame.draw.rect(surf, config.COL_AMBER, btn, 1, border_radius=5)
+            widgets.draw_text(surf, _L("Y aller →", "Go there →"), btn.center,
+                              fonts.small(bold=True), config.COL_BG if hov else config.COL_AMBER,
+                              align="center")
+        else:
+            widgets.draw_text(surf, _L("Rien d'urgent : tout est sous contrôle.",
+                                       "Nothing urgent: everything's under control."),
+                              (x + 20, ly), fonts.small(bold=True), config.COL_UP)
+            ly += 28
+            widgets.draw_text(surf, _L("Vous pouvez surveiller le marché ou passer",
+                                       "You can watch the market or move on"),
+                              (x + 20, ly), fonts.tiny(), config.COL_TEXT_DIM)
+            ly += 18
+            widgets.draw_text(surf, _L("à autre chose en attendant.", "to something else meanwhile."),
+                              (x + 20, ly), fonts.tiny(), config.COL_TEXT_DIM)
+
+    def _handle_assistant_event(self, event):
+        """Gère les clics/touches de la carte Assistant — appelé par
+        `handle_event` tant que `self._assistant_open` est vrai (capture tout
+        en priorité, comme les autres cartes modales du bureau)."""
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_F1):
+            self._assistant_open = False
+            return True
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            close = self._assistant_rects.get("close")
+            if close and close.collidepoint(event.pos):
+                self._assistant_open = False
+                return True
+            go = self._assistant_rects.get("go")
+            if go:
+                btn, scene = go
+                if btn.collidepoint(event.pos):
+                    self._assistant_open = False
+                    self._open_scene_window(scene)
+                    return True
+            card = self._assistant_rects.get("card")
+            if card and not card.collidepoint(event.pos):
+                self._assistant_open = False
+            return True
+        return False
+
+    def _calendar_widget_height(self):
+        """Hauteur du widget « CALENDRIER » (0 si vide) — cf. `_todo_widget_height`,
+        même besoin pour que `_draw_checklist_widget` empile sa carte au-dessus."""
+        events = sorted(self.app.gs.player.macro_events, key=lambda e: e["resolve_step"])[:3]
+        if not events:
+            return 0
+        return 26 + 20 * len(events) + 6
+
     def _draw_calendar_widget(self, surf):
         """Widget « CALENDRIER » (au-dessus du widget « À FAIRE », sous les
         fenêtres) : les 3 prochains évènements macro programmés
@@ -335,3 +550,62 @@ class DesktopWidgetsMixin:
             widgets.draw_text(surf, widgets.fit_text(ev["event_type"], fonts.tiny(), W - 60),
                               (row.x + 42, row.y + 4), fonts.tiny(), config.COL_TEXT)
             iy += row_h
+
+    # -------------------------------------------- checklist de routine (pense-bête)
+    def _draw_checklist_widget(self, surf):
+        """Widget « ROUTINE DU JOUR » (au-dessus du widget CALENDRIER, sous
+        les fenêtres) : quelques actions de base à cocher soi-même
+        (core/daily_checklist.py) — un pense-bête pour un joueur qui débute,
+        pas une contrainte (rien n'empêche de jouer sans les cocher). Se
+        réduit tout seul une fois tout coché pour la journée, désactivable
+        définitivement dans les Réglages une fois maîtrisée."""
+        from core import daily_checklist as DC
+        p = self.app.gs.player
+        self._checklist_rects = []
+        if not DC.is_enabled(p) or DC.all_done_today(p):
+            return
+        lang = get_lang()
+        items = DC.items_for_today(p, lang)
+        W = 260
+        row_h = 20
+        H = 26 + row_h * len(items) + 6
+        x = config.SCREEN_WIDTH - W - 16
+        todo_h = self._todo_widget_height()
+        todo_gap = 8 if todo_h else 0
+        cal_h = self._calendar_widget_height()
+        cal_gap = 8 if cal_h else 0
+        y = (config.SCREEN_HEIGHT - TASKBAR_H - 96 - 12 - todo_h - todo_gap
+             - cal_h - cal_gap - H - 8)
+        r = pygame.Rect(x, y, W, H)
+        panel = pygame.Surface((W, H), pygame.SRCALPHA)
+        panel.fill((*config.COL_PANEL, 232))
+        surf.blit(panel, (x, y))
+        pygame.draw.rect(surf, config.COL_BORDER, r, 1, border_radius=6)
+        widgets.draw_text(surf, _L("ROUTINE DU JOUR", "DAILY ROUTINE"), (x + 10, y + 6),
+                          fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        mp = pygame.mouse.get_pos()
+        iy = y + 24
+        for it in items:
+            row = pygame.Rect(x + 4, iy, W - 8, row_h)
+            self._checklist_rects.append((row, it["id"]))
+            if row.collidepoint(mp):
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, row, border_radius=3)
+            box = pygame.Rect(row.x + 4, row.centery - 6, 12, 12)
+            pygame.draw.rect(surf, config.COL_UP if it["done"] else config.COL_TEXT_DIM, box, 1)
+            if it["done"]:
+                pygame.draw.line(surf, config.COL_UP, (box.x + 2, box.centery),
+                                 (box.centerx, box.bottom - 2), 2)
+                pygame.draw.line(surf, config.COL_UP, (box.centerx, box.bottom - 2),
+                                 (box.right - 1, box.y + 1), 2)
+            col = config.COL_TEXT_DIM if it["done"] else config.COL_TEXT
+            widgets.draw_text(surf, widgets.fit_text(it["label"], fonts.tiny(), W - 40),
+                              (row.x + 22, row.y + 4), fonts.tiny(), col)
+            iy += row_h
+
+    def _handle_checklist_click(self, pos):
+        for row, item_id in getattr(self, "_checklist_rects", []):
+            if row.collidepoint(pos):
+                from core import daily_checklist as DC
+                DC.toggle(self.app.gs.player, item_id)
+                return True
+        return False

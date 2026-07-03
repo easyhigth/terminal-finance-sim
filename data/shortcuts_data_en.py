@@ -112,6 +112,9 @@ SECTIONS_EN = [
         ("Right click → Pin", "On a title bar/taskbar entry: keeps this window ALWAYS "
             "on top (small pin in its title bar), even when another window is "
             "focused — handy to keep the watchlist or portfolio visible at all times"),
+        ("↑ / ↓ / ENTER / ESC (context menu)", "The context menu (right click) can also "
+            "be navigated by keyboard — white outline on the highlighted item, ENTER "
+            "activates it, ESC closes without doing anything"),
     ]),
     ("Floating windows and this panel", [
         ("ESC", "Closes the most recent floating window, or this panel if it's open"),

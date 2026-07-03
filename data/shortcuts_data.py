@@ -123,6 +123,9 @@ SECTIONS = [
             "garde cette fenêtre TOUJOURS au premier plan (petite épingle dans sa barre "
             "de titre), même quand une autre fenêtre est focalisée — utile pour garder "
             "la watchlist ou le portefeuille visibles en permanence"),
+        ("↑ / ↓ / ENTRÉE / ÉCHAP (menu contextuel)", "Le menu contextuel (clic droit) se "
+            "navigue aussi au clavier — liseré blanc sur l'item survolé, ENTRÉE l'active, "
+            "ÉCHAP referme sans rien faire"),
     ]),
     ("Fenêtres flottantes et ce panneau", [
         ("ÉCHAP", "Ferme la fenêtre flottante la plus récente, ou ce panneau s'il est ouvert"),

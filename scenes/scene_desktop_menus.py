@@ -163,7 +163,7 @@ class DesktopMenusMixin:
                 items = self._desktop_menu_items()
         if not items:
             return False
-        self._ctx_menu = {"pos": pos, "items": items, "rects": []}
+        self._ctx_menu = {"pos": pos, "items": items, "rects": [], "cursor": 0}
         self.start_open = False
         return True
 
@@ -212,10 +212,26 @@ class DesktopMenusMixin:
 
     def _handle_ctx_event(self, event):
         """Le menu contextuel capture le clic sur un item (exécute son action),
-        et se referme à tout autre clic ou sur Échap."""
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self._ctx_menu = None
-            return True
+        se referme à tout autre clic ou sur Échap, et se navigue aux flèches
+        + Entrée (même primitive de focus clavier que le menu Démarrer/les
+        icônes du bureau — liseré blanc, cf. ui.keynav.draw_focus_ring)."""
+        items = self._ctx_menu["items"]
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self._ctx_menu = None
+                return True
+            if event.key == pygame.K_DOWN:
+                self._ctx_menu["cursor"] = (self._ctx_menu["cursor"] + 1) % len(items)
+                return True
+            if event.key == pygame.K_UP:
+                self._ctx_menu["cursor"] = (self._ctx_menu["cursor"] - 1) % len(items)
+                return True
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                _label, cb = items[self._ctx_menu["cursor"]]
+                self._ctx_menu = None
+                cb()
+                return True
+            return False
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (1, 3):
             for r, cb in self._ctx_menu["rects"]:
                 if r.collidepoint(event.pos):
@@ -243,11 +259,12 @@ class DesktopMenusMixin:
         mp = pygame.mouse.get_pos()
         menu["rects"] = []
         iy = y + pad
-        for label, cb in items:
+        for i, (label, cb) in enumerate(items):
             r = pygame.Rect(x + 3, iy, w - 6, ih - 2)
             menu["rects"].append((r, cb))
             if r.collidepoint(mp):
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, r, border_radius=3)
+            keynav.draw_focus_ring(surf, r, i == menu["cursor"])
             widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), w - 20),
                               (r.x + 8, r.y + 4), fonts.small(), config.COL_TEXT)
             iy += ih

@@ -1173,6 +1173,48 @@ def test_context_menu_dismissed_by_outside_click(app):
     assert len(desk.wm.windows) == n_before
 
 
+def test_context_menu_keyboard_navigation_wraps_and_activates(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)
+    r, _kind, _label = desk._icon_rects["research"]
+    desk.handle_event(_rclick(r.centerx, r.centery))
+    n_items = len(desk._ctx_menu["items"])
+    assert desk._ctx_menu["cursor"] == 0
+
+    down = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_DOWN, mod=0, unicode="")
+    desk.handle_event(down)
+    assert desk._ctx_menu["cursor"] == 1
+
+    up = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_UP, mod=0, unicode="")
+    desk.handle_event(up)
+    desk.handle_event(up)
+    assert desk._ctx_menu["cursor"] == n_items - 1   # remonte en haut -> boucle en bas
+
+    # ENTRÉE sur "Ouvrir" (1er item) active l'action et referme le menu
+    up_to_open = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_UP, mod=0, unicode="")
+    for _ in range(n_items - 1):
+        desk.handle_event(up_to_open)
+    assert desk._ctx_menu["cursor"] == 0
+    enter = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, mod=0, unicode="")
+    desk.handle_event(enter)
+    assert desk._ctx_menu is None
+    assert any(w.key == "research" for w in desk.wm.windows)
+
+
+def test_context_menu_escape_closes_without_action(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.draw(app.screen)
+    r, _kind, _label = desk._icon_rects["trading"]
+    desk.handle_event(_rclick(r.centerx, r.centery))
+    n_before = len(desk.wm.windows)
+    esc = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=0, unicode="")
+    desk.handle_event(esc)
+    assert desk._ctx_menu is None
+    assert len(desk.wm.windows) == n_before
+
+
 def test_context_menu_snap_left_positions_window(app):
     app.scenes.go("desktop")
     desk = app.scenes.current

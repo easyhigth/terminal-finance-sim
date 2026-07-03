@@ -66,8 +66,10 @@ class FinancialsScene(Scene):
             m.track_company(self.ticker)
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
+        # « FICHE (DES) » et pas « FICHE COMPLÈTE (DES) » : le libellé long
+        # débordait du bouton de 220 px (tronqué en « FICHE COMPLÈTE (DES »)
         self.fiche_btn = widgets.Button((210, config.SCREEN_HEIGHT - 70, 220, 46),
-                                        "FICHE COMPLÈTE (DES)", config.COL_CYAN)
+                                        "FICHE (DES)", config.COL_CYAN)
         self.graph_btn = widgets.Button((440, config.SCREEN_HEIGHT - 70, 160, 46),
                                         "GRAPHE (GP)", config.COL_AMBER)
         self.sheet_inc_btn = widgets.Button((610, config.SCREEN_HEIGHT - 70, 200, 46),

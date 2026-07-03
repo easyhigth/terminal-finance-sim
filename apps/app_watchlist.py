@@ -27,7 +27,9 @@ class WatchlistApp(DesktopApp):
     title = "Watchlist"
     icon_kind = "star"
     default_size = (420, 460)
-    min_size = (300, 260)
+    # largeur mini 360 (pas 300) : sous ~360 px, nom / cours / variation / ×
+    # d'une ligne se chevauchaient (offsets fixes depuis les deux bords)
+    min_size = (360, 260)
 
     def on_open(self):
         self.market = self.app.ensure_market()
@@ -71,7 +73,10 @@ class WatchlistApp(DesktopApp):
         surf.fill(config.COL_PANEL, rect)
         pad = 10
         wl = list(self.app.gs.player.watchlist)
-        widgets.draw_text(surf, f"VALEURS SUIVIES ({len(wl)}/10)", (rect.x + pad, rect.y + pad),
+        title = f"VALEURS SUIVIES ({len(wl)}/10)"
+        widgets.draw_text(surf, widgets.fit_text(title, fonts.small(bold=True),
+                                                 max(60, rect.w - 2 * pad - 134)),
+                          (rect.x + pad, rect.y + pad),
                           fonts.small(bold=True), config.COL_AMBER)
         # bascule LISTE / GRILLE (la grille reprend l'ex-« Tableau de bord »)
         self._view_rects = {}
@@ -121,7 +126,10 @@ class WatchlistApp(DesktopApp):
             flash_col = self._flash.tick(tk, price, config.COL_UP, config.COL_DOWN, config.COL_WHITE)
             widgets.draw_text(surf, tk, (r.x + 6, r.y + 4), fonts.small(bold=True), config.COL_AMBER)
             name = self.market.companies[i]["name"]
-            widgets.draw_text(surf, widgets.fit_text(name, fonts.tiny(), r.w - 210),
+            # largeur du nom : espace réel entre la colonne ticker (x+68) et le
+            # début du cours (r.right-118 moins ~60 px de chiffres) — l'ancien
+            # « r.w - 210 » ignorait l'offset gauche et passait sous le cours
+            widgets.draw_text(surf, widgets.fit_text(name, fonts.tiny(), max(30, r.w - 250)),
                               (r.x + 68, r.y + 5), fonts.tiny(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, f"{price:,.2f}", (r.right - 118, r.y + 4), fonts.small(),
                               flash_col, align="right")

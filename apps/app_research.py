@@ -156,7 +156,7 @@ class ResearchApp(DesktopApp):
         elif r.collidepoint(mp):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, r)
         widgets.draw_text(surf, tk, (r.x + 6, r.y + 3), fonts.small(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, widgets.fit_text(c["name"], fonts.tiny(), r.w - 130),
+        widgets.draw_text(surf, widgets.fit_text(c["name"], fonts.tiny(), max(30, r.w - 138)),
                           (r.x + 70, r.y + 4), fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, f"{price:,.2f}", (r.right - 6, r.y + 3), fonts.small(),
                           config.COL_WHITE, align="right")
@@ -175,7 +175,8 @@ class ResearchApp(DesktopApp):
             return
         x, y = rect.x + 14, rect.y + 12
         widgets.draw_text(surf, mt["ticker"], (x, y), fonts.head(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, widgets.fit_text(mt["name"], fonts.small(), rect.w - 28),
+        # réserve la largeur de « +x.x% (1 an) » (droite, même ligne) au nom
+        widgets.draw_text(surf, widgets.fit_text(mt["name"], fonts.small(), max(60, rect.w - 170)),
                           (x, y + 30), fonts.small(), config.COL_TEXT)
         widgets.draw_text(surf, f"{mt['sector']} · {mt['region']}", (x, y + 50),
                           fonts.tiny(), config.COL_TEXT_DIM)
@@ -208,14 +209,20 @@ class ResearchApp(DesktopApp):
             ("Notation", mt["credit_rating"]),
             ("BPA", f"{mt['eps']:.2f}"),
         ]
-        col_w = (rect.w - 28) // 2
+        # 2 colonnes si la place le permet, 1 seule en fenêtre étroite (les
+        # libellés passaient sous les valeurs à la taille minimale) ; libellé
+        # borné à l'espace restant à gauche de la valeur dans tous les cas.
+        ncols = 2 if (rect.w - 28) // 2 >= 190 else 1
+        col_w = (rect.w - 28) // ncols
         actions_top = rect.bottom - 34   # barre d'actions réservée en bas
         for k, (lbl, val) in enumerate(fields):
-            fx = x + (k % 2) * col_w
-            fyy = fy + (k // 2) * 24
+            fx = x + (k % ncols) * col_w
+            fyy = fy + (k // ncols) * 24
             if fyy + 20 > actions_top:
                 break
-            widgets.draw_text(surf, lbl, (fx, fyy), fonts.tiny(), config.COL_TEXT_DIM)
+            val_w = fonts.small(bold=True).size(val)[0]
+            widgets.draw_text(surf, widgets.fit_text(lbl, fonts.tiny(), max(30, col_w - val_w - 20)),
+                              (fx, fyy), fonts.tiny(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, val, (fx + col_w - 12, fyy), fonts.small(bold=True),
                               config.COL_TEXT, align="right")
         # barre d'actions (liens inter-apps) — seulement si hébergée sur le bureau

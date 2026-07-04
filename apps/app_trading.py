@@ -71,6 +71,19 @@ class TradingApp(DesktopApp):
         self._confirm_pending = None
         self._confirm_yes_rect = None
         self._confirm_no_rect = None
+        self._flash = widgets.TickFlash()   # flash vert/rouge du cours en direct (COURS)
+
+    def _live_price(self, tk):
+        """Cours EN DIRECT (chemin de prix canonique, cf. core/intraday.py) —
+        gelé automatiquement si la place de cotation de `tk` est fermée. La
+        liste de valeurs affichait jusqu'ici le cours STATIQUE du pas
+        (`market.price_of`), figé entre deux pas de marché (~80 s réelles à
+        x1) : rien ne semblait bouger à l'écran tant qu'un nouveau pas
+        n'arrivait pas. L'exécution reste sur `market.price_of` (fill_price)
+        — seul l'AFFICHAGE devient vivant."""
+        hist = self.market.history_of(tk, 1, sim_clock=self.app.sim_clock,
+                                      day=self.app.gs.player.day)
+        return hist[-1] if hist else self.market.price_of(tk)
 
     def focus_ticker(self, ticker):
         """Pré-filtre la liste sur `ticker` — appelé par le lien « Trader »
@@ -545,7 +558,8 @@ class TradingApp(DesktopApp):
         if i is None:
             return
         c = m.companies[i]
-        price = m.price_of(tk)
+        price = self._live_price(tk)
+        flash_col = self._flash.tick(tk, price, config.COL_UP, config.COL_DOWN, config.COL_WHITE)
         held = self._held(tk)
         r = pygame.Rect(area.x + 2, y, area.w - 4, ROW_H - 2)
         mp = pygame.mouse.get_pos()
@@ -555,7 +569,7 @@ class TradingApp(DesktopApp):
         widgets.draw_text(surf, widgets.fit_text(c["name"], fonts.tiny(), int(area.w * 0.40)),
                           (r.x + 66, r.y + 5), fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, f"{price:,.2f}", (area.x + int(area.w * 0.52), r.y + 4),
-                          fonts.small(), config.COL_WHITE)
+                          fonts.small(), flash_col)
         held_x = area.x + int(area.w * 0.66)
         held_avail = max(20, (r.right - 174) - held_x)   # jamais sous les boutons ORD/VENDRE/ACHETER
         widgets.draw_text(surf, widgets.fit_text(f"{held:g}" if held else "—",

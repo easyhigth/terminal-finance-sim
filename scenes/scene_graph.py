@@ -37,6 +37,7 @@ from scenes.scene_graph_common import (
     TYPES,
     _asset_exists,
     _asset_kind,
+    stock_series,
 )
 from scenes.scene_graph_render import GraphRenderMixin
 from ui import fonts, widgets
@@ -328,30 +329,16 @@ class GraphScene(GraphRenderMixin, Scene, PopupMixin):
 
     def _series(self, tk):
         kind = _asset_kind(tk)
-        i = self.market.ticker_idx.get(tk)
-        vol_mult = intraday.vol_mult_for_sigma(float(self.market.sigma[i])) if i is not None else 1.0
-        if self.period is not None and self.period < 0:
-            # fenêtre intraday animée (Round 11 Phase 3) : uniquement pour les
-            # actions (seule classe avec un historique par pas exploitable
-            # tel quel + une région de cotation pour le gel hors session) ;
-            # les autres classes d'actifs retombent sur la vue "MAX".
-            if kind == "stock":
-                # historique couvrant la fenêtre demandée (+ marge : le point
-                # le plus ancien de la fenêtre peut tomber dans le pas d'avant)
-                window_days = -self.period / (24 * 60)
-                steps_needed = max(2, int(window_days / config.DAYS_PER_STEP) + 2)
-                hist = self.market.history_of(tk, steps_needed)
-                # target = clôture suivante déterministe : le pont du pas
-                # COURANT (révélé au fil des minutes de jeu) est le même que
-                # celui de live_point — le dernier point du graphe 1J/1W et le
-                # prix « en direct » affiché partout ailleurs coïncident.
-                return intraday.intraday_series(
-                    self.market, self.app.sim_clock, self.app.gs.player.day, tk, hist,
-                    window_minutes=-self.period, n_points=60, region=self._region_of(tk),
-                    vol_mult=vol_mult, target=self.market.next_price_of(tk))
-            n = None
-        else:
-            n = self.period
+        if kind == "stock":
+            # échantillonne le CHEMIN DE PRIX CANONIQUE (cf. core/intraday.py),
+            # factorisé avec scene_company.py pour que la fiche société et cet
+            # atelier de graphes montrent EXACTEMENT la même série.
+            return stock_series(self.market, self.app.sim_clock, self.app.gs.player.day,
+                                tk, self.period, region=self._region_of(tk))
+        # fenêtre intraday (1J/1W) : uniquement pour les actions (seule classe
+        # avec une région de cotation pour le gel hors session) ; les autres
+        # classes d'actifs retombent sur la vue "MAX" pour une période intraday.
+        n = None if (self.period is not None and self.period < 0) else self.period
         pps = intraday.points_per_segment_for_n_steps(n)
         if kind == "bond":
             hist = BND.price_history(self.market, tk, n)
@@ -362,24 +349,8 @@ class GraphScene(GraphRenderMixin, Scene, PopupMixin):
         if kind == "crypto":
             hist = CRY.history(self.market, tk, n)
             return intraday.densify_step_series(self.market, tk, hist, pps)
-        if kind == "etf":
-            hist = ETF.nav_history(self.market, tk, n)
-            return intraday.densify_step_series(self.market, tk, hist, pps)
-        # action, période « par pas » (1M/3M/1A/…) : la courbe entre deux
-        # clôtures réelles est "densifiée" par du bruit épinglé (pont
-        # brownien déterministe, jamais une droite nue), plus dense pour les
-        # fenêtres courtes/zoomées que pour les longues (cf.
-        # `points_per_segment_for_n_steps`) — puis on ajoute un point « en
-        # direct » animé en bout de courbe pour qu'elle respire entre deux pas
-        # (sinon le graphe ne bougeait qu'au changement de pas).
-        hist = self.market.history_of(tk, n)
-        region = self._region_of(tk)
-        dense = intraday.densify_step_series(self.market, tk, hist, pps,
-                                             region=region, vol_mult=vol_mult)
-        return intraday.append_live(self.market, self.app.sim_clock,
-                                    self.app.gs.player.day, tk, dense,
-                                    region=region, vol_mult=vol_mult,
-                                    target=self.market.next_price_of(tk))
+        hist = ETF.nav_history(self.market, tk, n)
+        return intraday.densify_step_series(self.market, tk, hist, pps)
 
     # -------------------------------------------------------------- draw
     def draw(self, surf):

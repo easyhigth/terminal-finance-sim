@@ -15,6 +15,7 @@ from core import financials as F
 from core import market_hours as mh_mod
 from core import news as N
 from core.scene_manager import Scene
+from scenes.scene_graph_common import PERIODS, stock_series, x_label_positions
 from ui import fonts, widgets
 from ui.glossary_hint import GlossaryHint
 
@@ -57,6 +58,8 @@ class CompanyScene(Scene):
         self.return_kwargs = kwargs.get("return_kwargs") or {}
         self.tab = "overview"
         self.chart_kind = "line"
+        self.chart_period = 18   # 3M par défaut (cf. STEP_PERIODS, même défaut que GraphScene)
+        self._chart_period_rects = {}
         self.news_scroll = 0
         self._news_max_scroll = 0
         self._news_list_rect = None
@@ -162,6 +165,10 @@ class CompanyScene(Scene):
             for kind, rect in self._chart_kind_rects.items():
                 if rect.collidepoint(event.pos):
                     self.chart_kind = kind
+                    return
+            for period, rect in self._chart_period_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.chart_period = period
                     return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
             delta = -36 if event.button == 4 else 36
@@ -547,28 +554,52 @@ class CompanyScene(Scene):
                               config.COL_AMBER if sel else config.COL_TEXT_DIM, align="center")
             x += w + 4
 
-        panel_rect = pygame.Rect(rect.x, y + h + 10, rect.w, rect.bottom - (y + h + 10))
-        inner = widgets.draw_panel(surf, panel_rect, "Graphique", self.accent)
+        # sélecteur de PÉRIODE (1J/1W/1M/3M/1A/3A/5A/MAX) — même liste que
+        # l'atelier de graphes (scene_graph.py), pour naviguer d'un coup d'œil
+        # entre l'échelle intraday et l'historique long sans changer d'écran.
+        py, ph = y + h + 6, 24
+        self._chart_period_rects = {}
+        pw = (rect.w - (len(PERIODS) - 1) * 4) // len(PERIODS)
+        px = rect.x
+        for label, period in PERIODS:
+            pr = pygame.Rect(px, py, pw, ph)
+            self._chart_period_rects[period] = pr
+            sel = (period == self.chart_period)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, pr)
+            pygame.draw.rect(surf, config.COL_CYAN if sel else config.COL_BORDER, pr, 1)
+            widgets.draw_text(surf, label, pr.center, fonts.tiny(bold=sel),
+                              config.COL_CYAN if sel else config.COL_TEXT_DIM, align="center")
+            px += pw + 4
+
+        top = py + ph + 8
+        panel_rect = pygame.Rect(rect.x, top, rect.w, rect.bottom - top)
+        header = widgets.draw_panel(surf, panel_rect, "Graphique", self.accent)
         m = self.app.market
-        hist = m.track_company(self.ticker, self.app.sim_clock, self.app.gs.player.day) if m else []
+        hist = stock_series(m, self.app.sim_clock, self.app.gs.player.day, self.ticker,
+                            self.chart_period) if m else []
         if not hist or len(hist) < 2:
             widgets.draw_text(surf, "Historique en cours de constitution.",
-                              (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
+                              (header.x, header.y), fonts.small(), config.COL_TEXT_DIM)
             return
+        # bande de badges (prix, volatilité, ouverture du marché) sous l'en-tête
+        # « Graphique » — RÉSERVÉE à part (inner de draw_panel colle sinon au
+        # titre : le texte s'y superposait).
+        badge_y = header.y
+        inner = pygame.Rect(header.x, header.y + 18, header.w, header.h - 18)
         flash_col = self._chart_flash.tick(self.ticker, hist[-1], config.COL_UP, config.COL_DOWN,
                                             config.COL_WHITE)
-        widgets.draw_text(surf, f"{hist[-1]:,.2f} {self.cur}", (panel_rect.right - 12, panel_rect.y + 4),
+        widgets.draw_text(surf, f"{hist[-1]:,.2f} {self.cur}", (panel_rect.right - 12, badge_y),
                           fonts.small(bold=True), flash_col, align="right")
         i = m.ticker_idx.get(self.ticker)
         badge_x = panel_rect.x
         if i is not None:
             vol_mult = intraday.vol_mult_for_sigma(float(m.sigma[i]))
             widgets.draw_text(surf, f"Volatilité relative ×{vol_mult:.1f}",
-                              (badge_x, panel_rect.y + 4), fonts.tiny(), config.COL_TEXT_DIM)
+                              (badge_x, badge_y), fonts.tiny(), config.COL_TEXT_DIM)
             badge_x += 170
             region = m.companies[i].get("region")
             if region and not mh_mod.is_region_open(region, m.step_count):
-                widgets.draw_text(surf, "MARCHÉ FERMÉ — prix gelé", (badge_x, panel_rect.y + 4),
+                widgets.draw_text(surf, "MARCHÉ FERMÉ — prix gelé", (badge_x, badge_y),
                                   fonts.tiny(bold=True), config.COL_WARN)
                 badge_x += 180
             recent = hist[-12:]
@@ -576,10 +607,11 @@ class CompanyScene(Scene):
                 rets = [abs(recent[k] / recent[k - 1] - 1) for k in range(1, len(recent))]
                 avg_ret = sum(rets) / len(rets)
                 if avg_ret > 0.0009 * vol_mult * 1.6:
-                    widgets.draw_text(surf, "! forte variation", (badge_x, panel_rect.y + 4),
+                    widgets.draw_text(surf, "! forte variation", (badge_x, badge_y),
                                       fonts.tiny(bold=True), config.COL_DOWN)
         if self.chart_kind == "candles":
             widgets.draw_candles(surf, inner, hist, n_candles=32, sma_windows=(10, 30))
+            self._x_labels(surf, inner, len(hist))
         elif self.chart_kind == "line":
             col = config.COL_UP if hist[-1] >= hist[0] else config.COL_DOWN
             tier = liquidity.equity_tier(m, self.ticker)
@@ -588,6 +620,7 @@ class CompanyScene(Scene):
                                 y_fmt=lambda v: f"{v:,.2f} {self.cur}", show_pct=True,
                                 band_frac=half_spread, show_current_line=True)
             self._draw_orderbook(surf, inner, hist[-1], tier, half_spread)
+            self._x_labels(surf, inner, len(hist))
         elif self.chart_kind == "vol":
             vol = [v for v in charts.rolling_vol(hist, 20) if v is not None]
             if len(vol) < 2:
@@ -599,8 +632,16 @@ class CompanyScene(Scene):
                                     y_fmt=lambda v: f"{v:.1f}%")
                 widgets.draw_text(surf, f"Vol. annualisée (20 pas) = {vol[-1]:.1f}%",
                                   (inner.x, inner.y), fonts.tiny(bold=True), config.COL_WARN)
+                self._x_labels(surf, inner, len(vol))
         elif self.chart_kind == "beta":
             self._draw_beta(surf, inner, m, hist)
+
+    def _x_labels(self, surf, rect, n):
+        """Libellés d'axe X à échelle humaine — même échelle adaptative que
+        l'atelier de graphes (scene_graph_common.x_label_positions)."""
+        labels = x_label_positions(self.chart_period, n, self.app.gs.player.day)
+        if labels:
+            widgets.draw_chart_x_labels(surf, rect, labels)
 
     # Tailles indicatives (en lots) du carnet simulé par tier de liquidité :
     # un carnet liquide est profond, un carnet illiquide est mince — cohérent

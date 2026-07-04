@@ -435,7 +435,21 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   du Tableur, cf. `apps/app_sheet._LIVE_FN_NAMES`) vit dans `ui/widgets.py::TickFlash` — reste
   à PLEINE saturation pendant `HOLD_MS` avant de s'éteindre sur `DECAY_MS` (horloge murale
   `pygame.time.get_ticks()`, pas de dépendance à `dt`), pour un tick bien visible plutôt
-  qu'une simple teinte.
+  qu'une simple teinte. `apps/app_trading.py::TradingApp._live_price` réutilise désormais ce
+  même chemin (`market.history_of(tk, 1, sim_clock=..., day=...)`) pour la colonne COURS de la
+  liste de valeurs — elle affichait jusqu'ici le cours STATIQUE du pas (`market.price_of`),
+  figé entre deux pas de marché (~80 s réelles à x1) : rien ne semblait bouger à l'écran tant
+  que le pas suivant n'arrivait pas. L'EXÉCUTION reste sur `market.price_of`/`fill_price`
+  (inchangée, microstructure spread+impact) — seul l'AFFICHAGE devient vivant, cohérent avec
+  le reste du jeu (marché fermé ⇒ pas de bruit, cf. `region_open_factor`).
+  **Sélecteur de PÉRIODE sur la fiche société** (`scenes/scene_company.py`, onglet
+  « GRAPHIQUE AVANCÉ ») : mêmes fenêtres que l'atelier de graphes (`PERIODS` — 1J/1W/1M/3M/1A/
+  3A/5A/MAX, défaut 3M), via `scene_graph_common.stock_series` — logique de sélection de série
+  factorisée entre `GraphScene._series` et la fiche société (deux calculs indépendants avaient
+  déjà dérivé une fois, cf. audit V1.0) pour qu'ils montrent EXACTEMENT la même chose sur la
+  même société. Les libellés d'axe X (`scene_graph_common.x_label_positions`, échelle
+  adaptative minutes/heures/jours/dates/années) sont de même factorisés et réutilisés par les
+  deux écrans.
 - **`core/anim_settings.py`** : réglage persisté « réduire les animations » (fichier JSON
   séparé sous `config.SAVE_DIR`, distinct de `core/i18n.py`/`settings.json`). Unique point de
   gating dans `core/intraday.py::wiggle()` : si actif, toutes les courbes intraday retombent

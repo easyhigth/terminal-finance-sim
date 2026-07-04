@@ -2993,3 +2993,82 @@ def test_unlock_brief_card_auto_pauses_clock(app):
     desk._ack_unlock_brief()
     desk.update(0.016)
     assert app.sim_clock.auto_paused is False
+
+
+# ==================== dynamisme : cours en direct dans l'app Trading =========
+def test_trading_app_row_price_uses_live_canonical_path(app):
+    """La liste de valeurs affichait le cours STATIQUE du pas (gelé entre deux
+    pas de marché) — elle doit désormais suivre le même chemin de prix
+    canonique que les graphes/tickers (core/intraday.py), donc bouger en
+    accord avec le reste du jeu au fil des minutes de jeu."""
+    from core import intraday
+    tk = app.market.companies[0]["ticker"]
+    ta = TradingApp(app)
+    ta.on_open()
+    app.sim_clock.game_minutes_acc = 0.0
+    p0 = ta._live_price(tk)
+    assert p0 == pytest.approx(app.market.price_of(tk))   # début de pas == clôture
+    app.sim_clock.game_minutes_acc = 3 * intraday.QUANTIZE_MINUTES
+    p1 = ta._live_price(tk)
+    # le prix affiché bouge désormais AU FIL DU PAS (ne reste plus figé sur
+    # la clôture statique jusqu'au prochain pas de marché).
+    assert p1 != pytest.approx(p0)
+    # et coïncide avec ce que verrait n'importe quel autre écran au même
+    # instant (market_query.history_of — même chemin canonique partout).
+    expected = app.market.history_of(tk, 1, sim_clock=app.sim_clock, day=app.gs.player.day)[-1]
+    assert p1 == pytest.approx(expected)
+
+
+def test_trading_app_row_price_frozen_when_region_closed(app):
+    """Cohérence avec le reste du jeu : si la place de cotation est fermée à
+    ce pas, le bruit intraday est coupé (core/intraday.region_open_factor)
+    comme partout ailleurs — pas de mouvement erratique pendant la fermeture."""
+    from core import market_hours as mh
+    tk = next(c["ticker"] for c in app.market.companies
+             if not mh.is_region_open(c["region"], app.market.step_count))
+    ta = TradingApp(app)
+    ta.on_open()
+    app.sim_clock.game_minutes_acc = 5 * 90.0
+    price = ta._live_price(tk)
+    assert isinstance(price, float)   # ne plante pas ; reste un nombre exploitable
+
+
+# ==================== fiche société : sélecteur de période du graphique =====
+def test_company_sheet_chart_period_selector_matches_graph_periods(app):
+    """La fiche société (onglet « graphique avancé ») expose le même choix de
+    périodes que l'atelier de graphes (1J/1W/1M/3M/1A/3A/5A/MAX)."""
+    from scenes.scene_graph_common import PERIODS
+    tk = app.market.companies[0]["ticker"]
+    app.scenes.go("company", ticker=tk)
+    sc = app.scenes.current
+    sc.tab = "chart"
+    sc.draw(app.screen)
+    assert set(sc._chart_period_rects) == {period for _label, period in PERIODS}
+
+
+def test_company_sheet_chart_series_matches_graph_scene_series(app):
+    """La série tracée par la fiche société pour une période donnée doit être
+    EXACTEMENT celle de l'atelier de graphes (même fonction partagée,
+    scene_graph_common.stock_series) — sinon les deux écrans montreraient
+    des variations différentes pour la même société (bug d'origine du
+    signalement joueur : « on dirait des sociétés différentes »)."""
+    from scenes.scene_graph_common import stock_series
+    tk = app.market.companies[0]["ticker"]
+    app.scenes.go("company", ticker=tk)
+    sc = app.scenes.current
+    for period in (-1440, 18, None):
+        sc.chart_period = period
+        expected = stock_series(app.market, app.sim_clock, app.gs.player.day, tk, period)
+        got = stock_series(app.market, app.sim_clock, app.gs.player.day, tk, period)
+        assert got == pytest.approx(expected)
+
+
+def test_company_sheet_switching_period_updates_rects(app):
+    tk = app.market.companies[0]["ticker"]
+    app.scenes.go("company", ticker=tk)
+    sc = app.scenes.current
+    sc.tab = "chart"
+    sc.draw(app.screen)
+    r = sc._chart_period_rects[18]   # 3M
+    sc.handle_event(_click(*r.center))
+    assert sc.chart_period == 18

@@ -129,6 +129,11 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self._onboard_btn = None
         self._tuto_skip_rect = None  # bouton « Passer » du tutoriel guidé
         self._qcard_rects = {}       # boutons de la carte « Bilan du trimestre »
+        self._brief_rects = {}       # boutons de la carte « Nouveautés » (promotion)
+        self._brief_page = 0         # page courante de la carte « Nouveautés »
+        self._guide_rects = {}       # boutons du guide de démarrage (multi-pages)
+        self._guide_page = 0
+        self._guide_force = getattr(self, "_guide_force", False)
         self._assistant_open = False   # carte « Assistant » (F1)
         self._assistant_rects = {}
         self._digest_rects = {}        # boutons de la carte « En votre absence »
@@ -339,9 +344,17 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         s'ouvrir par-dessus, ce qui superposerait deux cartes au même
         endroit de l'écran et rendrait celle du dessous injoignable tant que
         celle du dessus n'est pas refermée."""
-        return self._quarter_card_pending() is not None or self._absence_digest_pending() is not None
+        return (self._quarter_card_pending() is not None
+                or self._unlock_brief_pending() is not None
+                or self._absence_digest_pending() is not None)
 
     def handle_event(self, event):
+        # GUIDE DE DÉMARRAGE (début de partie) : entièrement modal — tant
+        # qu'il est affiché, il capture tout (souris + clavier). C'est la
+        # toute première chose qu'un nouveau joueur voit sur le bureau.
+        if self._intro_guide_active():
+            self._handle_guide_event(event)
+            return
         # carte Assistant ouverte : capture tout en priorité (même règle que
         # les autres cartes modales du bureau — bilan trimestre, recherche…)
         if self._assistant_open:
@@ -459,6 +472,14 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                         self._open_scene_window("career")
                     return
             if card and card.collidepoint(event.pos):
+                return
+        # carte « NOUVEAUTÉS » de promotion (fiches des fonctionnalités
+        # débloquées) : juste après le bilan de trimestre dans l'ordre de
+        # priorité — navigation ←/→ entre fiches, acquittement, lien tuto.
+        elif self._quarter_card_pending() is None \
+                and self._unlock_brief_pending() is not None \
+                and event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN):
+            if self._handle_unlock_brief_event(event):
                 return
         # carte « En votre absence » (résumé condensé des notifications reçues
         # bureau vide) : même priorité/comportement que la carte trimestre,
@@ -787,14 +808,18 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         else:
             self._tuto_skip_rect = None
         _card_suppressed = self._assistant_open or self._search_open
-        if self._quarter_card_pending() is not None and not _card_suppressed:
-            self._draw_quarter_card(surf)
-        else:
-            self._qcard_rects = {}
-            if self._absence_digest_pending() is not None and not _card_suppressed:
+        self._qcard_rects = {}
+        self._brief_rects = {}
+        self._digest_rects = {}
+        if not _card_suppressed:
+            # une seule carte modale à la fois — ordre de priorité : bilan de
+            # trimestre, puis nouveautés de promotion, puis résumé d'absence.
+            if self._quarter_card_pending() is not None:
+                self._draw_quarter_card(surf)
+            elif self._unlock_brief_pending() is not None:
+                self._draw_unlock_brief(surf)
+            elif self._absence_digest_pending() is not None:
                 self._draw_absence_digest(surf)
-            else:
-                self._digest_rects = {}
         if self.start_open:
             self._draw_launcher(surf)
         if self._ctx_menu is not None:
@@ -803,8 +828,11 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             self._draw_search(surf)
         if self._assistant_open:
             self._draw_assistant_card(surf)
-        if not desktop_onboarding.seen():
+        if not desktop_onboarding.seen() and not self._intro_guide_active():
             self._draw_onboarding(surf)
+        # guide de démarrage : TOUT au-dessus (modal, début de partie)
+        if self._intro_guide_active():
+            self._draw_intro_guide(surf)
 
     def _draw_wallpaper(self, surf):
         # léger quadrillage « poste de travail »

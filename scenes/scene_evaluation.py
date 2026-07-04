@@ -223,6 +223,7 @@ class EvaluationScene(Scene):
             self.state = "result"
             return
         if self.passed and p.can_promote():
+            old_grade_index = p.grade_index
             p.promote()
             audio.play("promotion")
             from core import profile
@@ -238,26 +239,34 @@ class EvaluationScene(Scene):
             self.app.notify(_L(f"Promotion : {p.grade}", f"Promotion: {p.grade}"), "good")
             if self.new_title:
                 self.app.notify(_L(f"Titre : {self.new_title}", f"Title: {self.new_title}"), "prestige")
-            from core import unlocks
-            for feat, grade in unlocks.UNLOCKS.items():
-                if grade == p.grade_index:
-                    self.app.notify(_L(f"⊘→✓ Débloqué : {unlocks.feature_label(feat)}",
-                                        f"⊘→✓ Unlocked: {unlocks.feature_label(feat)}"), "good")
-                    tid = unlocks.FEATURE_TUTORIAL.get(feat)
-                    if tid and not p.flags.get("pending_tutorial"):
-                        p.flags["pending_tutorial"] = tid
-                    # trace persistante (le toast est éphémère) : un mot du
-                    # manager dans l'inbox explique le nouveau périmètre et
-                    # renvoie vers le tutoriel dédié s'il existe.
-                    label = unlocks.feature_label(feat)
-                    body = (f"Votre promotion au grade {p.grade} ouvre un nouveau "
-                            f"périmètre : {label}. Prenez le temps de vous y faire "
-                            "la main avant d'engager du capital.")
-                    if tid:
-                        body += (" Un tutoriel dédié vous attend (écran TUTORIELS, "
-                                 "ou l'icône Aide du bureau).")
-                    inbox.push(p, "manager", "Votre manager",
-                               f"Nouveau périmètre : {label}", body)
+            from core import unlock_briefs, unlocks
+            # fonctionnalités devenues accessibles avec CE grade — via le grade
+            # EFFECTIF (raccourci vétéran, verrous de voie), pas le palier brut
+            new_feats = unlock_briefs.newly_unlocked(p, old_grade_index)
+            if new_feats:
+                # carte « NOUVEAUTÉS » du bureau : une page détaillée par
+                # fonctionnalité (quoi / comment / avantages / premiers pas),
+                # affichée au retour sur le bureau et acquittée d'un clic.
+                p.flags["pending_unlock_briefs"] = {"grade": p.grade,
+                                                    "features": list(new_feats)}
+            for feat in new_feats:
+                self.app.notify(_L(f"⊘→✓ Débloqué : {unlocks.feature_label(feat)}",
+                                    f"⊘→✓ Unlocked: {unlocks.feature_label(feat)}"), "good")
+                tid = unlocks.FEATURE_TUTORIAL.get(feat)
+                if tid and not p.flags.get("pending_tutorial"):
+                    p.flags["pending_tutorial"] = tid
+                # trace persistante (le toast est éphémère) : un mot du
+                # manager dans l'inbox explique le nouveau périmètre et
+                # renvoie vers le tutoriel dédié s'il existe.
+                label = unlocks.feature_label(feat)
+                body = (f"Votre promotion au grade {p.grade} ouvre un nouveau "
+                        f"périmètre : {label}. Prenez le temps de vous y faire "
+                        "la main avant d'engager du capital.")
+                if tid:
+                    body += (" Un tutoriel dédié vous attend (écran TUTORIELS, "
+                             "ou l'icône Aide du bureau).")
+                inbox.push(p, "manager", "Votre manager",
+                           f"Nouveau périmètre : {label}", body)
         else:
             p.reputation = max(0, p.reputation - 5)
             pct = int(ratio * 100)

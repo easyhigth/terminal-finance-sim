@@ -1388,6 +1388,9 @@ def test_desktop_shows_onboarding_until_dismissed():
     desktop_onboarding.reset()
     a = main.App()
     a.ensure_market()
+    # guide de démarrage déjà lu (sinon il REMPLACE la carte d'accueil au
+    # tout début d'une carrière — cf. DesktopScene._intro_guide_active)
+    a.gs.player.flags["intro_guide_done"] = True
     a.scenes.go("desktop")
     desk = a.scenes.current
     desk.draw(a.screen)
@@ -2899,3 +2902,123 @@ def test_notifications_screen_renders_without_glyph_tofu(app):
     sc.update(0.016)
     sc.draw(app.screen)
     assert sc.row_rects
+
+
+# ==================== guide de démarrage + nouveautés de promotion ===========
+def _fresh_career_desktop(app):
+    """Bureau d'un DÉBUT de carrière (grade 0, jour 1) — le guide de
+    démarrage doit s'y afficher."""
+    p = app.gs.player
+    p.grade_index = 0
+    p.day = 1
+    p.flags.pop("intro_guide_done", None)
+    p.flags.pop("veteran", None)
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk.update(0.016)
+    desk.draw(app.screen)
+    return desk
+
+
+def test_intro_guide_active_only_for_fresh_careers(app):
+    desk = _fresh_career_desktop(app)
+    assert desk._intro_guide_active()
+    # plus affiché une fois lu
+    app.gs.player.flags["intro_guide_done"] = True
+    assert not desk._intro_guide_active()
+    # jamais pour un vétéran (il connaît la boucle)
+    app.gs.player.flags.pop("intro_guide_done")
+    app.gs.player.flags["veteran"] = True
+    assert not desk._intro_guide_active()
+    # jamais après le tout début de carrière (vieille sauvegarde d'avant le guide)
+    app.gs.player.flags.pop("veteran")
+    app.gs.player.grade_index = 3
+    assert not desk._intro_guide_active()
+
+
+def test_intro_guide_is_modal_and_completes_via_next_clicks(app):
+    from core import unlock_briefs
+    desk = _fresh_career_desktop(app)
+    # modal : un clic sur une icône du bureau est absorbé (aucune fenêtre ouverte)
+    n_win = len(desk.wm.windows)
+    any_icon = next(iter(desk._icon_rects.values()))[0]
+    desk.handle_event(_click(*any_icon.center))
+    assert len(desk.wm.windows) == n_win
+    # cliquer « Suivant » sur chaque page jusqu'à « Commencer » referme et persiste
+    for _ in range(unlock_briefs.intro_page_count()):
+        desk.draw(app.screen)
+        assert desk._guide_rects.get("next")
+        desk.handle_event(_click(*desk._guide_rects["next"].center))
+    assert app.gs.player.flags.get("intro_guide_done") is True
+    assert not desk._intro_guide_active()
+
+
+def test_intro_guide_escape_skips_and_marks_done(app):
+    desk = _fresh_career_desktop(app)
+    desk.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=0))
+    assert app.gs.player.flags.get("intro_guide_done") is True
+
+
+def test_every_unlockable_feature_has_a_brief():
+    from core import unlock_briefs, unlocks
+    missing = [f for f in unlocks.UNLOCKS if f not in unlock_briefs.FEATURE_BRIEFS]
+    assert not missing, f"fiches manquantes : {missing}"
+
+
+def test_newly_unlocked_diff_between_grades(app):
+    from core import unlock_briefs
+    p = app.gs.player
+    p.flags.pop("veteran", None)
+    p.track = "General"
+    p.grade_index = 4
+    feats = unlock_briefs.newly_unlocked(p, 3)
+    assert set(feats) == {"trade", "pitch", "ma", "ipo"}
+    p.grade_index = 2
+    assert set(unlock_briefs.newly_unlocked(p, 1)) == {"track", "deals", "calendar"}
+
+
+def test_promotion_records_pending_unlock_briefs(app):
+    """Le _finish d'un examen réussi pose flags['pending_unlock_briefs'] avec
+    les fonctionnalités du nouveau grade (diff par grade EFFECTIF)."""
+    p = app.gs.player
+    p.grade_index = 3
+    p.flags.pop("veteran", None)
+    p.flags.pop("pending_unlock_briefs", None)
+    app.scenes.go("evaluation")
+    ev = app.scenes.current
+    ev.score = len(ev.items)          # sans-faute
+    ev.idx = len(ev.items)
+    ev._finish()
+    briefs = p.flags.get("pending_unlock_briefs")
+    assert briefs and set(briefs["features"]) == {"trade", "pitch", "ma", "ipo"}
+    assert briefs["grade"] == p.grade
+
+
+def test_unlock_brief_card_pages_then_ack(app):
+    desk = _empty_desktop(app)
+    p = app.gs.player
+    p.flags["pending_unlock_briefs"] = {"grade": p.grade,
+                                        "features": ["hedge", "mandates"]}
+    desk._brief_page = 0
+    desk.draw(app.screen)
+    assert desk._brief_rects.get("card")
+    # page 1 → « Suivant » avance sans acquitter
+    desk.handle_event(_click(*desk._brief_rects["ok"].center))
+    assert p.flags.get("pending_unlock_briefs")
+    assert desk._brief_page == 1
+    # dernière page → « C'est parti » acquitte
+    desk.draw(app.screen)
+    desk.handle_event(_click(*desk._brief_rects["ok"].center))
+    assert p.flags.get("pending_unlock_briefs") is None
+
+
+def test_unlock_brief_tuto_button_opens_tutorials_window(app):
+    desk = _empty_desktop(app)
+    p = app.gs.player
+    p.flags["pending_unlock_briefs"] = {"grade": p.grade, "features": ["trade"]}
+    desk._brief_page = 0
+    desk.draw(app.screen)
+    assert desk._brief_rects.get("tuto")
+    desk.handle_event(_click(*desk._brief_rects["tuto"].center))
+    assert p.flags.get("pending_unlock_briefs") is None
+    assert any(w.key == "scene:tutorials" for w in desk.wm.windows)

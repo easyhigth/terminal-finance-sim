@@ -396,16 +396,25 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   **L'état est reconstruit via (seed, nb de pas)** : le save ne stocke que
   `market_seed`/`market_step`, jamais les prix. Ne pas sérialiser les prix.
 - **`core/intraday.py`** : animation intraday **déterministe et display-only** des prix,
-  **forward-looking** : la courbe simule le chemin de la clôture COURANTE vers la clôture du
-  **prochain pas** (déterministe, `Market.next_step_snapshot()`/`next_price_of`/`next_index_value`
-  — clone + un step, jeté, caché par pas), passé en `target` à `live_point`/`append_live`.
+  organisée autour d'un **CHEMIN DE PRIX CANONIQUE** : toutes les vues (fenêtres 1J/1W du
+  graphe, point « en direct » des tickers/sparklines via `live_point`, densification des vues
+  par pas via `densify_step_series`) échantillonnent LE MÊME chemin déterministe — comme dans
+  une vraie app de trading, chaque période n'est qu'une fenêtre différente sur la même série.
+  Convention **forward** : le pont du pas s va de close(s) vers close(s+1) (bruit fBm épinglé
+  à 0 aux deux bornes, seedé par `(market_seed, s, clé)` — `canonical_point`/`close_at`) ;
+  pendant le pas courant, le pont vers la clôture SUIVANTE (déterministe,
+  `Market.next_step_snapshot()`/`next_price_of`/`next_index_value` — clone + un step, jeté,
+  caché par pas, passé en `target`) se révèle au fil des minutes de jeu. Invariants garantis
+  par construction et verrouillés par `tests/test_graph_canonical.py` : le 1J est exactement
+  la QUEUE du 1W ; la courbe passe EXACTEMENT par chaque clôture du moteur (recoupe donc les
+  vues 1M/3M/1A…) ; le dernier point de toute fenêtre == le point « en direct » du ticker ;
+  un point du PASSÉ ne change JAMAIS quand le temps avance ni selon la vitesse de jeu
+  (`speed_factor` déprécié → 1.0 : moduler le bruit par la vitesse réécrivait le passé).
   La progression dans le pas est **quantifiée par paliers** (`quantize_to_day()`,
-  `QUANTIZE_MINUTES = 360`, soit 4 rafraîchissements par jour de jeu — ≈4 s réelles à x1) :
-  la valeur animée se met à jour par petits sauts vers la destination du prochain pas, plus
-  réactif qu'un unique saut par jour tout en restant lisible (pas un glissement continu à
-  chaque frame). Amplitude du bruit affiché (`_NOISE_PCT`, `_VOL_MULT_RANGE`) relevée pour
-  que le marché semble vivant à l'écran entre deux pas, sans jamais toucher au prix
-  d'exécution réel (`market.price`/`index_value`, inchangés). Deux mesures de variation :
+  `QUANTIZE_MINUTES = 90`, ~1 rafraîchissement/s réelle à x1) : la fenêtre GLISSE sur le
+  chemin figé, les points sortent par la gauche sans changer de valeur. Amplitude du bruit
+  affiché (`_NOISE_PCT = 0.0035`, `_VOL_MULT_RANGE`) purement visuelle : ne touche jamais au
+  prix d'exécution réel (`market.price`/`index_value`, inchangés). Deux mesures de variation :
   `window_pct(series, lookback=18)` = variation CUMULÉE « depuis la durée affichée » (~3 mois,
   ne repart PAS de 0 % à chaque pas — utilisée par les bandeaux d'indices du terminal et du
   hub Marché) ; `live_pct(series)` = variation vs la clôture du pas courant (repart de ~0 %,

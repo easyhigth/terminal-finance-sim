@@ -132,15 +132,14 @@ def _pinned_noise(seed, step, key, minute):
 
 
 def speed_factor(sim_clock):
-    """Intensité de bruit relative à la vitesse de jeu (x1/x2/x3) : plus le temps
-    défile vite, plus le marché doit sembler "vivant" à l'écran (sans toucher au
-    pas du moteur ni au prix d'exécution). Ajusté pour des mouvements contrôlés
-    avec rafraîchissement une fois par seconde."""
-    speed = getattr(sim_clock, "speed", 1)
-    # Base speed factor for controlled movement
-    base_factor = 1.0 + 0.10 * (speed - 1)  # Reduced speed factor for calmer movement
-    # Minimal responsiveness for controlled, readable animation
-    return base_factor * 1.05  # 5% boost for subtle liveliness
+    """DÉPRÉCIÉ — plus appliqué au chemin canonique : moduler l'amplitude du
+    bruit par la vitesse de jeu faisait qu'un même instant du passé changeait
+    de valeur selon la vitesse courante, cassant le recoupement entre vues
+    (le 1J ne retombait pas sur le 1W après un changement de vitesse). La
+    « vivacité » vient désormais du glissement réel de la fenêtre sur le
+    chemin figé, à chaque palier de QUANTIZE_MINUTES. Conservé pour
+    compatibilité (renvoie 1.0)."""
+    return 1.0
 
 
 def region_open_factor(region, step):
@@ -170,35 +169,69 @@ def wiggle(seed, step_count, key, prev_close, cur_close, progress_minutes, damp=
     return base * (1 + _NOISE_PCT * factor * pinned)
 
 
+# ---------------------------------------------------------------------------
+# CHEMIN DE PRIX CANONIQUE
+# ---------------------------------------------------------------------------
+# Toutes les vues (fenêtres 1J/1W, point « en direct » des tickers/sparklines,
+# densification des graphes par pas) échantillonnent LE MÊME chemin de prix
+# déterministe — comme dans une vraie app de trading, où chaque période n'est
+# qu'une fenêtre différente sur la même série. Convention FORWARD : le pont du
+# pas s va de close(s) vers close(s+1) (bruit épinglé à 0 aux deux bornes,
+# seedé par (market_seed, s, clé)) ; pendant le pas courant, le pont vers la
+# clôture suivante (déterministe, `Market.next_price_of`) se révèle au fil des
+# minutes de jeu. Conséquences garanties par construction :
+#   - le 1J est exactement la QUEUE du 1W (mêmes valeurs aux mêmes instants) ;
+#   - la courbe passe EXACTEMENT par chaque clôture du moteur (bornes des
+#     ponts), donc recoupe les vues 1M/3M/1A… ;
+#   - le dernier point de toute fenêtre == le point « en direct » du ticker ;
+#   - un point du PASSÉ ne change JAMAIS quand le temps avance (le bruit d'un
+#     pas ne dépend que de (seed, pas, clé), pas de « maintenant »).
+
+def close_at(market, history, step_index, target=None):
+    """Clôture du pas `step_index`, lue depuis la fin de `history`
+    (`history[-1]` = clôture du pas courant `market.step_count`). Au-delà du
+    pas courant, renvoie `target` (clôture suivante déterministe) ; avant le
+    début de l'historique, la plus ancienne clôture disponible."""
+    j = market.step_count - int(step_index)
+    idx = len(history) - 1 - j
+    if idx < 0:
+        return history[0]
+    if idx >= len(history):
+        return float(target) if target is not None else history[-1]
+    return history[idx]
+
+
+def canonical_point(market, key, history, step_index, minute, region=None,
+                    vol_mult=1.0, target=None):
+    """Valeur du chemin canonique au pas `step_index`, minute `minute` du pas
+    (0..minutes_per_step()) — pont close(step_index) → close(step_index+1)."""
+    start = close_at(market, history, step_index, target)
+    end = close_at(market, history, step_index + 1, target)
+    damp = region_open_factor(region, step_index) if region else 1.0
+    return wiggle(market.seed, int(step_index), key, start, end, minute,
+                  damp=damp, vol_mult=vol_mult)
+
+
 def live_point(market, sim_clock, day, key, history, region=None, vol_mult=1.0, target=None):
     """Point "en direct" à ajouter en fin d'une série historique par pas.
 
-    Modèle **forward-looking** : si `target` (clôture DÉTERMINISTE du prochain
-    pas, cf. `Market.next_price_of/next_index_value`) est fourni, la valeur
-    animée simule le chemin de la clôture COURANTE (`history[-1]`) vers cette
-    destination au fil du pas — la courbe « se dirige » réellement vers le
-    prochain pas et le % bouge en continu. Sans `target` (classes d'actifs sans
-    anticipation), on retombe sur l'ancien pont `history[-2] → history[-1]`.
-
-    Ensures consistency with intraday movements by using the same noise characteristics
-    across all time scales."""
+    Avec `target` (clôture DÉTERMINISTE du prochain pas, cf.
+    `Market.next_price_of/next_index_value`) : point du CHEMIN CANONIQUE au
+    pas courant — identique, à l'instant près, au dernier point des fenêtres
+    1J/1W du graphe (cohérence ticker ↔ graphes). Sans `target` (classes
+    d'actifs sans anticipation), on retombe sur l'ancien pont
+    `history[-2] → history[-1]`."""
     if not history:
         return None
-    cur = history[-1]
-    if target is not None:
-        start, end = cur, float(target)
-    else:
-        start, end = (history[-2] if len(history) >= 2 else cur), cur
     progress = quantize_to_day(sim_clock.game_minutes_acc)
+    if target is not None:
+        return canonical_point(market, key, history, market.step_count, progress,
+                               region=region, vol_mult=vol_mult, target=target)
+    cur = history[-1]
+    start = history[-2] if len(history) >= 2 else cur
     damp = region_open_factor(region, market.step_count) if region else 1.0
-
-    # Ensure the live point movement is consistent with the overall trend
-    # but still shows realistic intraday volatility
-    base_movement = start + (end - start) * (progress / minutes_per_step())
-
-    # Add noise that's consistent with the asset's volatility
-    return wiggle(market.seed, market.step_count, key, start, end, progress, damp=damp,
-                  vol_mult=vol_mult * speed_factor(sim_clock))
+    return wiggle(market.seed, market.step_count, key, start, cur, progress,
+                  damp=damp, vol_mult=vol_mult)
 
 
 def live_pct(series):
@@ -244,101 +277,28 @@ def append_live(market, sim_clock, day, key, history, region=None, vol_mult=1.0,
 
 
 def intraday_series(market, sim_clock, day, key, history, window_minutes, n_points=60,
-                     region=None, vol_mult=1.0):
-    """`n_points` valeurs animées régulièrement espacées sur les
-    `window_minutes` dernières minutes de jeu écoulées jusqu'à "maintenant"
-    (remonte dans le(s) pas précédent(s) de `history` si la fenêtre dépasse
-    les minutes déjà écoulées dans le pas courant — cas rare juste après un
-    changement de pas).
+                     region=None, vol_mult=1.0, target=None):
+    """FENÊTRE GLISSANTE sur le chemin canonique : `n_points` valeurs
+    régulièrement espacées sur les `window_minutes` dernières minutes de jeu
+    jusqu'à « maintenant » (progression quantifiée dans le pas courant).
 
-    Ensures consistency with step-based data by using a representative sample
-    of the longer-term trend while adding realistic intraday movements."""
+    Comme dans une vraie app de trading : 1J est la queue de 1W, la courbe
+    passe exactement par les clôtures du moteur (bornes des ponts), le
+    dernier point coïncide avec `live_point` (ticker/sparkline), et quand le
+    temps avance la fenêtre GLISSE sur un chemin figé — les points du passé
+    sortent par la gauche sans jamais changer de valeur."""
     if not history or n_points < 2:
         return []
-    total_minutes = minutes_per_step()
+    total = minutes_per_step()
+    progress = quantize_to_day(sim_clock.game_minutes_acc)
+    now_abs = market.step_count * total + progress   # minute absolue « maintenant »
     out = []
-
-    # For intraday periods, we want to reflect the recent trend but not be
-    # completely disconnected from longer-term movements. Use a reasonable
-    # window that captures recent movement but aligns with longer trends.
-
-    # Use at least 5 steps to establish a trend, but not more than we have
-    steps_for_trend = min(5, len(history) - 1)
-    if steps_for_trend < 1:
-        # Very limited history, just repeat the available point
-        return [history[-1]] * n_points
-
-    # Get recent history to establish trend
-    trend_start_idx = len(history) - 1 - steps_for_trend
-    trend_end_idx = len(history) - 1
-    trend_history = history[trend_start_idx:trend_end_idx + 1]
-
-    # Calculate the overall trend direction from this history
-    if trend_history[0] != 0:
-        overall_trend = (trend_history[-1] - trend_history[0]) / trend_history[0]
-    else:
-        overall_trend = 0
-
-    # Get current simulation progress for dynamic updates
-    current_progress = getattr(sim_clock, 'game_minutes_acc', 0)
-
-    # For 1W and shorter periods, we want to show intraday movements that
-    # are consistent with the recent trend but still show realistic volatility
     for k in range(n_points):
-        # Position within the overall series (0 to 1)
-        series_frac = k / (n_points - 1) if n_points > 1 else 0
-
-        # Map to position within our trend history
-        trend_position = series_frac * (len(trend_history) - 1)
-        trend_idx = int(trend_position)
-        intra_trend_frac = trend_position - trend_idx
-
-        # Handle edge cases
-        if trend_idx >= len(trend_history) - 1:
-            trend_idx = len(trend_history) - 2
-            intra_trend_frac = 1.0
-        if trend_idx < 0:
-            trend_idx = 0
-            intra_trend_frac = 0.0
-
-        # Get the two prices we're interpolating between
-        price_prev = trend_history[trend_idx]
-        price_cur = trend_history[trend_idx + 1]
-
-        # Calculate step for this position (for noise generation)
-        step_for_noise = market.step_count - (len(history) - 1 - (trend_start_idx + trend_idx))
-
-        # Calculate base interpolated value
-        base_value = price_prev + (price_cur - price_prev) * intra_trend_frac
-
-        # Add realistic intraday noise that respects the overall trend direction
-        damp = region_open_factor(region, step_for_noise) if region else 1.0
-
-        # Position within the current step (for intraday animation)
-        # Mix static interpolation with time-based movement for dynamic updates
-        static_minute = intra_trend_frac * total_minutes
-        time_factor = (current_progress % total_minutes) / total_minutes
-        # Blend static position with time-based variation
-        dynamic_minute = (static_minute + time_factor * total_minutes * 0.1) % total_minutes
-        minute_in_step = int(dynamic_minute)
-
-        # Adjust volatility based on trend consistency - if the overall trend
-        # is strong, allow more movement in that direction
-        trend_aligned_vol_mult = vol_mult
-        if abs(overall_trend) > 0.01:  # 1% trend threshold
-            # If we're moving in the same direction as the trend, allow normal volatility
-            # If we're moving against the trend, reduce volatility
-            expected_direction = 1 if overall_trend > 0 else -1
-            current_direction = 1 if (price_cur - price_prev) > 0 else -1
-            if expected_direction == current_direction:
-                trend_aligned_vol_mult = vol_mult
-            else:
-                trend_aligned_vol_mult = vol_mult * 0.5  # Reduce volatility when moving against trend
-
-        val = wiggle(market.seed, step_for_noise, key, price_prev, price_cur, minute_in_step,
-                     damp=damp, vol_mult=trend_aligned_vol_mult * speed_factor(sim_clock))
-        out.append(val)
-
+        m_abs = now_abs - window_minutes * (n_points - 1 - k) / (n_points - 1)
+        m_abs = max(0.0, m_abs)
+        s = int(m_abs // total)
+        out.append(canonical_point(market, key, history, s, m_abs - s * total,
+                                   region=region, vol_mult=vol_mult, target=target))
     return out
 
 
@@ -365,61 +325,28 @@ def points_per_segment_for_n_steps(n_steps):
 
 def densify_step_series(market, key, closes, points_per_segment=4, region=None, vol_mult=1.0):
     """Remplace les segments de droite nus entre clôtures "par pas" consécutives
-    par un tracé organique (pont brownien déterministe, réutilise `wiggle`) —
-    chaque clôture réelle reste un point EXACT de la série retournée (le bruit
-    est épinglé à 0 aux deux bornes de chaque segment), seuls des points
-    intermédiaires sont ajoutés. `closes[-1]` doit correspondre au pas courant
-    (`market.step_count`).
-
-    Ensures consistency with intraday data by using the same volatility scaling
-    and noise characteristics, while maintaining trend alignment across periods."""
+    par le CHEMIN CANONIQUE sous-échantillonné (même pont brownien que les
+    fenêtres 1J/1W, même convention forward : le segment closes[i]→closes[i+1]
+    est le pont du pas `base_step + i`) — chaque clôture réelle reste un point
+    EXACT de la série retournée (bruit épinglé à 0 aux bornes), et la texture
+    entre deux clôtures d'une vue 1M/3M est EXACTEMENT celle qu'on voit en
+    zoomant sur la même période en 1W. `closes[-1]` doit correspondre au pas
+    courant (`market.step_count`)."""
     n = len(closes)
     if n < 2 or points_per_segment < 1:
         return list(closes)
     total = minutes_per_step()
     base_step = market.step_count - (n - 1)
-
-    # Calculate overall trend to ensure consistency
-    if len(closes) > 1 and closes[0] != 0:
-        overall_trend = (closes[-1] - closes[0]) / closes[0]
-    else:
-        overall_trend = 0
-
     out = [closes[0]]
     for i in range(n - 1):
         prev, cur = closes[i], closes[i + 1]
-        step_k = base_step + i + 1
+        step_k = base_step + i
         damp = region_open_factor(region, step_k) if region else 1.0
-
-        # Calculate local trend between these two points
-        if prev != 0:
-            local_trend = (cur - prev) / prev
-        else:
-            local_trend = 0
-
-        # Adjust volatility based on trend consistency
-        # If local trend matches overall trend, use normal volatility
-        # If they oppose each other, reduce volatility for more realistic movements
-        trend_alignment = 1.0
-        if overall_trend != 0 and local_trend != 0:
-            # Same direction trends
-            if (overall_trend > 0 and local_trend > 0) or (overall_trend < 0 and local_trend < 0):
-                trend_alignment = 1.0
-            else:
-                # Opposing trends - reduce volatility
-                trend_alignment = 0.7
-
-        # Add intermediate points for smooth animation
         for j in range(1, points_per_segment + 1):
-            frac = j / (points_per_segment + 1)
-            pm = total * frac
-            adjusted_vol_mult = vol_mult * trend_alignment
+            pm = total * j / (points_per_segment + 1)
             out.append(wiggle(market.seed, step_k, key, prev, cur, pm, damp=damp,
-                              vol_mult=adjusted_vol_mult))
-
-        # Add the end point
+                              vol_mult=vol_mult))
         out.append(cur)
-
     return out
 
 

@@ -3022,3 +3022,54 @@ def test_unlock_brief_tuto_button_opens_tutorials_window(app):
     desk.handle_event(_click(*desk._brief_rects["tuto"].center))
     assert p.flags.get("pending_unlock_briefs") is None
     assert any(w.key == "scene:tutorials" for w in desk.wm.windows)
+
+
+# ==================== auto-pause pendant les activités de carrière ===========
+def test_focus_window_auto_pauses_clock(app):
+    """Une fenêtre « de travail » (mission, examen…) ouverte gèle le temps ;
+    la minimiser ou la fermer le relance — le marché ne bouge pas dans le
+    dos du joueur pendant une activité nécessaire à sa carrière."""
+    desk = _empty_desktop(app)
+    desk.update(0.016)
+    assert app.sim_clock.auto_paused is False
+    w = desk._open_scene_window("mission")
+    desk.update(0.016)
+    assert app.sim_clock.auto_paused is True
+    desk.wm.toggle_minimize(w)          # mise de côté explicite → le temps reprend
+    desk.update(0.016)
+    assert app.sim_clock.auto_paused is False
+    desk.wm.toggle_minimize(w)
+    desk.update(0.016)
+    assert app.sim_clock.auto_paused is True
+    desk.wm.close(w)
+    desk.update(0.016)
+    assert app.sim_clock.auto_paused is False
+
+
+def test_non_focus_window_does_not_pause_clock(app):
+    desk = _empty_desktop(app)
+    w = desk._open_scene_window("markethub")
+    desk.update(0.016)
+    assert app.sim_clock.auto_paused is False
+    desk.wm.close(w)
+
+
+def test_intro_guide_auto_pauses_clock(app):
+    desk = _fresh_career_desktop(app)
+    desk.update(0.016)
+    assert app.sim_clock.auto_paused is True
+    desk._close_intro_guide()
+    desk._ack_absence_digest()   # la carte suivante (résumé d'absence) gèle aussi — normal
+    desk.update(0.016)
+    assert app.sim_clock.auto_paused is False
+
+
+def test_unlock_brief_card_auto_pauses_clock(app):
+    desk = _empty_desktop(app)
+    p = app.gs.player
+    p.flags["pending_unlock_briefs"] = {"grade": p.grade, "features": ["trade"]}
+    desk.update(0.016)
+    assert app.sim_clock.auto_paused is True
+    desk._ack_unlock_brief()
+    desk.update(0.016)
+    assert app.sim_clock.auto_paused is False

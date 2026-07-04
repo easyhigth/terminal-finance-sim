@@ -271,10 +271,6 @@ class GraphScene(GraphRenderMixin, Scene, PopupMixin):
         # restituer à la prochaine ouverture (instance de scène réutilisée).
         self._mem_kind, self._mem_period = self.kind, self.period
 
-        # Force refresh for real-time updates - mark scene as dirty to trigger redraw
-        # This ensures graphs update more frequently for live market feel
-        self._dirty = True
-
     # -------------------------------------------------------------- data
     def _info_for(self, tk):
         """Infos clés de l'actif `tk` pour la barre au-dessus des onglets de
@@ -340,15 +336,19 @@ class GraphScene(GraphRenderMixin, Scene, PopupMixin):
             # tel quel + une région de cotation pour le gel hors session) ;
             # les autres classes d'actifs retombent sur la vue "MAX".
             if kind == "stock":
-                # Use consistent history for intraday - get enough history to cover the window
-                window_days = -self.period / (24 * 60)  # Convert minutes to days
-                # Calculate how many steps we need to cover this window
-                steps_needed = max(1, int(window_days / config.DAYS_PER_STEP) + 2)
+                # historique couvrant la fenêtre demandée (+ marge : le point
+                # le plus ancien de la fenêtre peut tomber dans le pas d'avant)
+                window_days = -self.period / (24 * 60)
+                steps_needed = max(2, int(window_days / config.DAYS_PER_STEP) + 2)
                 hist = self.market.history_of(tk, steps_needed)
+                # target = clôture suivante déterministe : le pont du pas
+                # COURANT (révélé au fil des minutes de jeu) est le même que
+                # celui de live_point — le dernier point du graphe 1J/1W et le
+                # prix « en direct » affiché partout ailleurs coïncident.
                 return intraday.intraday_series(
                     self.market, self.app.sim_clock, self.app.gs.player.day, tk, hist,
                     window_minutes=-self.period, n_points=60, region=self._region_of(tk),
-                    vol_mult=vol_mult)
+                    vol_mult=vol_mult, target=self.market.next_price_of(tk))
             n = None
         else:
             n = self.period

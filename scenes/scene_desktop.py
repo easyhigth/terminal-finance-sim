@@ -136,7 +136,6 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self._guide_force = getattr(self, "_guide_force", False)
         self._assistant_open = False   # carte « Assistant » (F1)
         self._assistant_rects = {}
-        self._digest_rects = {}        # boutons de la carte « En votre absence »
         self._checklist_rects = []     # lignes du widget « Routine du jour » (clic → coche)
         self._risk_badge_rect = None   # pastille de risque unifiée (barre supérieure)
         self._risk_badge_reasons = ""
@@ -376,7 +375,6 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         celle du dessus n'est pas refermée."""
         return (self._quarter_card_pending() is not None
                 or self._unlock_brief_pending() is not None)
-                # or self._absence_digest_pending() is not None)  # Désactivé
 
     def handle_event(self, event):
         # GUIDE DE DÉMARRAGE (début de partie) : entièrement modal — tant
@@ -506,28 +504,12 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         # carte « NOUVEAUTÉS » de promotion (fiches des fonctionnalités
         # débloquées) : juste après le bilan de trimestre dans l'ordre de
         # priorité — navigation ←/→ entre fiches, acquittement, lien tuto.
+        # (La carte « En votre absence » a été RETIRÉE — jugée envahissante :
+        # le Centre de notifications couvre déjà l'historique à la demande.)
         elif self._quarter_card_pending() is None \
                 and self._unlock_brief_pending() is not None \
                 and event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN):
             if self._handle_unlock_brief_event(event):
-                return
-        # carte « En votre absence » (résumé condensé des notifications reçues
-        # bureau vide) : même priorité/comportement que la carte trimestre,
-        # sauf si celle-ci est déjà affichée (jamais deux cartes modales
-        # empilées — le trimestre passe d'abord).
-        # elif self._absence_digest_pending() is not None \  # Désactivé
-        #         and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-        #     card = self._digest_rects.get("card")
-        #     ok = self._digest_rects.get("ok")
-        #     more = self._digest_rects.get("more")
-        #     if ok and ok.collidepoint(event.pos):
-        #         self._ack_absence_digest()
-        #         return
-        #     if more and more.collidepoint(event.pos):
-        #         self._ack_absence_digest()
-        #         self._open_scene_window("notifications")
-        #         return
-            if card and card.collidepoint(event.pos):
                 return
         # bouton « Passer » du tutoriel guidé (dessiné au-dessus des fenêtres)
         if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
@@ -840,16 +822,13 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         _card_suppressed = self._assistant_open or self._search_open
         self._qcard_rects = {}
         self._brief_rects = {}
-        self._digest_rects = {}
         if not _card_suppressed:
             # une seule carte modale à la fois — ordre de priorité : bilan de
-            # trimestre, puis nouveautés de promotion, puis résumé d'absence.
+            # trimestre, puis nouveautés de promotion.
             if self._quarter_card_pending() is not None:
                 self._draw_quarter_card(surf)
             elif self._unlock_brief_pending() is not None:
                 self._draw_unlock_brief(surf)
-            # elif self._absence_digest_pending() is not None:  # Désactivé
-            #     self._draw_absence_digest(surf)
         if self.start_open:
             self._draw_launcher(surf)
         if self._ctx_menu is not None:

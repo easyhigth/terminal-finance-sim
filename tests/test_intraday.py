@@ -8,6 +8,15 @@ from core import intraday
 from core.sim_clock import SimClock
 
 
+@pytest.fixture(autouse=True)
+def _force_animations_on(monkeypatch):
+    """Neutralise le réglage machine « réduire les animations » (persisté en
+    JSON sous saves/) : s'il traîne à True sur la machine de test, tout le
+    bruit intraday devient linéaire pur et ces tests échouent faussement."""
+    from core import anim_settings
+    monkeypatch.setattr(anim_settings, "reduce_motion", lambda: False)
+
+
 class _FakeMarket:
     def __init__(self, seed=42, step_count=7):
         self.seed = seed
@@ -103,14 +112,19 @@ def test_region_closed_freezes_noise_to_linear_base():
 
 
 def test_intraday_series_ends_at_live_point():
+    """Le dernier point d'une fenêtre intraday == le point « en direct »
+    (même chemin canonique, cf. tests/test_graph_canonical.py). `target` =
+    clôture suivante déterministe, comme le passe scene_graph."""
     m = _FakeMarket()
     clock = SimClock()
     clock.game_minutes_acc = 3600.0
     history = [90.0, 95.0, 100.0]
+    target = 104.0
     series = intraday.intraday_series(m, clock, day=1, key="AAA", history=history,
-                                       window_minutes=5, n_points=10)
+                                       window_minutes=5, n_points=10, target=target)
     assert len(series) == 10
-    expected_last = intraday.live_point(m, clock, day=1, key="AAA", history=history)
+    expected_last = intraday.live_point(m, clock, day=1, key="AAA", history=history,
+                                        target=target)
     assert series[-1] == expected_last
 
 
@@ -163,7 +177,9 @@ def test_densify_step_series_preserves_real_closes_exactly():
         assert c in dense
     assert dense[0] == closes[0]
     assert dense[-1] == closes[-1]
-    assert len(dense) == 1 + (len(closes) - 1) * 4
+    # pps points intermédiaires + la clôture de fin, par segment
+    assert len(dense) == 1 + (len(closes) - 1) * 5
+    assert dense[::5] == closes
 
 
 def test_densify_step_series_noop_when_disabled_or_too_short():
@@ -186,12 +202,15 @@ def test_densify_step_series_deterministic_and_bounded():
 
 
 def test_densify_step_series_respects_region_freeze():
-    # place fermée au pas d'arrivée -> damp=0 -> tracé linéaire pur (pas de bruit)
-    m_closed = _FakeMarket(step_count=0)   # USA fermé au pas 0 (cf. market_hours)
+    # place fermée au pas DU SEGMENT -> damp=0 -> tracé linéaire pur (pas de
+    # bruit). Convention forward : le segment closes[0]→closes[1] est le pont
+    # du pas base_step = step_count - 1 ; step_count=1 -> pont du pas 0, où
+    # les USA sont fermés (cf. core/market_hours, rotation par pas).
+    m_closed = _FakeMarket(step_count=1)
     closes = [90.0, 100.0]
     dense_closed = intraday.densify_step_series(m_closed, "AAA", closes,
                                                  points_per_segment=4, region="USA")
     total = intraday.minutes_per_step()
     for j in range(1, 5):
-        expected = 90.0 + (100.0 - 90.0) * (total * j / 4) / total
+        expected = 90.0 + (100.0 - 90.0) * (total * j / 5) / total
         assert dense_closed[j] == pytest.approx(expected)

@@ -2129,7 +2129,6 @@ def _ctrl_slash():
 def test_ctrl_slash_opens_global_search(app):
     app.scenes.go("desktop")
     desk = app.scenes.current
-    desk._ack_absence_digest()   # ignore les notifications du setup (badges…)
     desk.handle_event(_ctrl_slash())
     assert desk._search_open is True
     assert desk._search_query == ""
@@ -2565,7 +2564,6 @@ def test_layout_auto_restores_on_first_desktop_entry_of_a_fresh_app():
 def test_f1_opens_assistant_card(app):
     app.scenes.go("desktop")
     scene = app.scenes.current
-    scene._ack_absence_digest()   # ignore les notifications du setup (badges…)
     assert scene._assistant_open is False
     scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F1, mod=0))
     assert scene._assistant_open is True
@@ -2584,21 +2582,6 @@ def test_f1_does_not_open_over_pending_quarter_card(app):
     del app.gs.player.flags["last_quarter_report"]
 
 
-def test_f1_does_not_open_over_pending_absence_digest(app):
-    """Régression : même bug que ci-dessus avec la carte « En votre absence »."""
-    scene = _empty_desktop(app)
-    app.notify("Ordre exécuté", "good")
-    assert scene._absence_digest_pending() is not None
-    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F1, mod=0))
-    assert scene._assistant_open is False
-
-
-def test_f1_opens_normally_once_digest_dismissed(app):
-    scene = _empty_desktop(app)
-    app.notify("Ordre exécuté", "good")
-    scene._ack_absence_digest()
-    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F1, mod=0))
-    assert scene._assistant_open is True
 
 
 def test_ctrl_slash_does_not_open_search_over_pending_quarter_card(app):
@@ -2622,19 +2605,6 @@ def test_quarter_card_suppressed_while_search_open(app):
     assert scene._qcard_rects == {}
     del app.gs.player.flags["last_quarter_report"]
 
-
-def test_assistant_and_digest_never_both_drawn(app):
-    """Même si l'Assistant est ouvert AVANT que le résumé d'absence ne
-    devienne éligible (notification arrivée pendant que l'Assistant est
-    déjà affiché), draw() ne doit jamais peupler les deux jeux de rects en
-    même temps."""
-    scene = _empty_desktop(app)
-    scene._ack_absence_digest()
-    scene._assistant_open = True
-    app.notify("Ordre exécuté", "good")   # devient éligible pendant que l'Assistant est ouvert
-    assert scene._absence_digest_pending() is not None
-    scene.draw(app.screen)
-    assert scene._assistant_rects and not scene._digest_rects
 
 
 def test_assistant_escape_closes(app):
@@ -2694,59 +2664,10 @@ def _empty_desktop(app):
     for w in list(scene.wm.windows):
         if w.key != "scene:terminal":
             scene.wm.close(w)
-    scene._ack_absence_digest()   # ignore les notifications déjà générées par le fixture (badges…)
     return scene
 
 
-def test_absence_digest_hidden_when_no_new_notifications(app):
-    scene = _empty_desktop(app)
-    assert scene._absence_digest_pending() is None
 
-
-def test_absence_digest_lists_new_notifications(app):
-    scene = _empty_desktop(app)
-    app.notify("Ordre exécuté : achat MVC", "good")
-    pending = scene._absence_digest_pending()
-    assert pending is not None
-    assert any(e["text"] == "Ordre exécuté : achat MVC" for e in pending)
-
-
-def test_absence_digest_hidden_when_a_window_is_open(app):
-    scene = _empty_desktop(app)
-    app.notify("Ordre exécuté : achat MVC", "good")
-    scene._launch("research")
-    assert scene._absence_digest_pending() is None
-
-
-def test_absence_digest_ok_dismisses_and_advances_checkpoint(app):
-    scene = _empty_desktop(app)
-    app.notify("Ordre exécuté : achat MVC", "good")
-    scene.draw(app.screen)
-    ok = scene._digest_rects["ok"]
-    scene.handle_event(_click(*ok.center))
-    assert scene._absence_digest_pending() is None
-    assert app.gs.player.flags["absence_digest_seen"] == len(app.notes.history)
-
-
-def test_absence_digest_see_all_opens_notifications_and_dismisses(app):
-    scene = _empty_desktop(app)
-    app.notify("Ordre exécuté : achat MVC", "good")
-    scene.draw(app.screen)
-    more = scene._digest_rects["more"]
-    scene.handle_event(_click(*more.center))
-    assert scene._absence_digest_pending() is None
-    assert any(w.key == "scene:notifications" for w in scene.wm.windows)
-
-
-def test_absence_digest_does_not_reappear_for_already_seen_notifications(app):
-    scene = _empty_desktop(app)
-    app.notify("Premier message", "info")
-    scene._ack_absence_digest()
-    assert scene._absence_digest_pending() is None
-    app.notify("Second message", "info")
-    pending = scene._absence_digest_pending()
-    assert pending is not None and len(pending) == 1
-    assert pending[0]["text"] == "Second message"
 
 
 # =========================== audit V1.0 : robustesse & débordements UI ========
@@ -3059,7 +2980,6 @@ def test_intro_guide_auto_pauses_clock(app):
     desk.update(0.016)
     assert app.sim_clock.auto_paused is True
     desk._close_intro_guide()
-    desk._ack_absence_digest()   # la carte suivante (résumé d'absence) gèle aussi — normal
     desk.update(0.016)
     assert app.sim_clock.auto_paused is False
 

@@ -561,20 +561,10 @@ class DesktopWidgetsMixin:
                               (row.x + 18, row.y + 4), fonts.tiny(), config.COL_TEXT)
             iy += row_h
 
-    # -------------------------------------- résumé condensé « en votre absence » [SUPPRIMÉ]
-    # Fonctionnalité retirée selon demande utilisateur - la carte "EN VOTRE ABSENCE"
-    # n'est plus affichée automatiquement
-    def _absence_digest_pending(self):
-        """Fonctionnalité désactivée - ne s'affiche plus"""
-        return None
-
-    def _ack_absence_digest(self):
-        """Fonctionnalité désactivée - pas de marquage des notifications"""
-        pass
-
-    def _draw_absence_digest(self, surf):
-        """Fonctionnalité désactivée - pas d'affichage de la carte"""
-        pass
+    # NB : la carte « EN VOTRE ABSENCE » (résumé condensé des notifications au
+    # retour sur un bureau vide) a été RETIRÉE — jugée envahissante et
+    # redondante : le Centre de notifications (scène "notifications") couvre
+    # déjà l'historique complet, à la demande du joueur plutôt qu'imposé.
 
     # --------------------------------------------------- indicateur de risque
     def _draw_risk_badge(self, surf, bar):

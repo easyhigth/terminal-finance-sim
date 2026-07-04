@@ -9,7 +9,8 @@ chrome).
 """
 import pygame
 
-from core import charts, config, indicators
+from core import charts, config, game_calendar, indicators
+from core.i18n import get_lang
 from scenes.scene_graph_common import SERIES_COLS
 from ui import fonts, widgets
 
@@ -21,26 +22,46 @@ class GraphRenderMixin:
         return widgets.draw_chart_axes(surf, rect, lo, hi, y_fmt, rows)
 
     def _x_labels(self, surf, rect, n):
-        """Libellés d'axe X (début / milieu / aujourd'hui) sous une série
-        temporelle de `n` points, le point le plus à droite étant le plus
-        récent — comble l'absence d'axe des X signalée sur tous les types
-        de graphes basés sur une série temporelle."""
+        """Libellés d'axe X sous une série temporelle de `n` points (le plus à
+        droite = le plus récent), à ÉCHELLE HUMAINE (demande joueur — les
+        « -10080min »/« -385j » n'étaient pas lisibles) :
+        - fenêtres intraday : minutes → heures → jours (« -12h », « -3.5j ») ;
+        - fenêtres par pas courtes (≤ ~1 mois) : jours relatifs (« -15j ») ;
+        - fenêtres moyennes : dates calendaires (« 12 mars », « mars 2026 ») ;
+        - fenêtres longues (3A/5A/MAX) : années (« 2027 »).
+        Calendrier fictif ancré au jour 1 = 1er janv. (core/game_calendar.py)."""
         if n < 2:
             return
+        today_lbl = "today" if get_lang() == "en" else "aujourd'hui"
         if self.period is not None and self.period < 0:
             window = -self.period
             widgets.draw_chart_x_labels(surf, rect, [
-                (0.0, f"-{window}min"),
-                (0.5, f"-{window // 2}min"),
-                (1.0, "maintenant"),
+                (f, game_calendar.rel_minutes_label(window * (1 - f)))
+                for f in (0.0, 0.5, 1.0)
             ])
             return
-        d = config.DAYS_PER_STEP
-        widgets.draw_chart_x_labels(surf, rect, [
-            (0.0, f"-{(n - 1) * d}j"),
-            (0.5, f"-{(n - 1) // 2 * d}j"),
-            (1.0, "aujourd'hui"),
-        ])
+        # étendue RÉELLE affichée : depuis la période choisie (en pas), PAS
+        # depuis len(série) — la densification (points intermédiaires entre
+        # clôtures, cf. intraday.points_per_segment_for_n_steps) gonflait n
+        # et faisait afficher « -180j » sur la vue 1M (30 jours réels).
+        if self.period is not None:
+            span = self.period * config.DAYS_PER_STEP
+        else:
+            span = (n - 1) * config.DAYS_PER_STEP   # MAX : pas de densification
+        if span <= 35:
+            widgets.draw_chart_x_labels(surf, rect, [
+                (0.0, f"-{span}j"), (0.5, f"-{span // 2}j"), (1.0, today_lbl)])
+            return
+        today = self.app.gs.player.day
+        labels = []
+        prev_text = None
+        for f in (0.0, 0.25, 0.5, 0.75):
+            text = game_calendar.axis_label(today - round(span * (1 - f)), span)
+            if text != prev_text:     # évite « 2026  2026 » sur les fenêtres longues
+                labels.append((f, text))
+                prev_text = text
+        labels.append((1.0, today_lbl))
+        widgets.draw_chart_x_labels(surf, rect, labels)
 
     def _polyline(self, surf, rect, series, lo, span, color, y_fmt=None, cursor=None,
                   show_pct=False, area_fill=False, show_current_line=False):

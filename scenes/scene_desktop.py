@@ -180,7 +180,37 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         if getattr(self.app, "pending_market_steps", 0) and not self.app.gs.player.game_over:
             term._drain_pending_steps()
 
+    def _engaged_in_focus_work(self):
+        """Vrai si le joueur est occupé à une activité de carrière qui doit
+        GELER le temps : carte modale du bureau (guide de démarrage, bilan de
+        trimestre, nouveautés de promotion, résumé d'absence) ou fenêtre
+        « de travail » (mission, examen, dilemme, deal, revue, stress test,
+        tutoriels — cf. core/sim_clock.FOCUS_SCENE_NAMES) ouverte et non
+        minimisée. Évite qu'un examen se paie en intérêts de levier, en
+        crise ou en game over pendant que le joueur fait ce que le jeu lui
+        demande de faire."""
+        if self._intro_guide_active() or self._blocking_card_pending():
+            return True
+        from core.sim_clock import FOCUS_SCENE_NAMES
+        for w in self.wm.windows:
+            if w.minimized or not w.key.startswith("scene:"):
+                continue
+            if w.key[len("scene:"):] in FOCUS_SCENE_NAMES:
+                return True
+        return False
+
+    def _sync_auto_pause(self):
+        """Recalcule la pause automatique à chaque frame tant que le bureau
+        est la scène courante (en plein écran, c'est SceneManager.go qui
+        pose/lève le même drapeau) : pause dès qu'une activité de carrière
+        est en cours, reprise exacte dès qu'elle se termine — aucune minute
+        de jeu comptée entre-temps."""
+        clock = getattr(self.app, "sim_clock", None)
+        if clock is not None:
+            clock.set_auto_paused(self._engaged_in_focus_work())
+
     def update(self, dt):
+        self._sync_auto_pause()
         self._tick_market()
         self.wm.update(dt)
         self._check_new_icons()

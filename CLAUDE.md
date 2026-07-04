@@ -359,7 +359,15 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   bouton « Tuto détaillé » vers `scene_tutorials` quand `FEATURE_TUTORIAL` en a un.
   Priorité des cartes modales du bureau : bilan de trimestre → nouveautés → résumé d'absence
   (une seule à la fois) ; le guide, lui, passe au-dessus de tout et capture tous les
-  évènements tant qu'il est affiché.
+  évènements tant qu'il est affiché. (3) **auto-pause pendant les activités de carrière** :
+  `DesktopScene._sync_auto_pause()` (appelé à chaque `update`) gèle l'horloge
+  (`SimClock.set_auto_paused`) tant qu'une carte modale du bureau est affichée OU qu'une
+  fenêtre hébergeant une scène « de travail » (`core/sim_clock.FOCUS_SCENE_NAMES` : mission,
+  evaluation, dilemma, deal, review, stresstest, examcert, cert, tutorials) est ouverte NON
+  minimisée — pas d'intérêts de levier, de crise ni de game over pendant un examen ; minimiser
+  la fenêtre relance le temps (geste explicite « je mets ce travail de côté »). En plein
+  écran, la même garantie vient déjà de `SceneManager.go` (auto-pause hors
+  `LIVE_SCENE_NAMES`).
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, un jour de jeu dure ~16 s réelles
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 90`), soit un nouveau pas de marché (5 jours) toutes

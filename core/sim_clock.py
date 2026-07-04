@@ -31,6 +31,19 @@ MINUTES_PER_DAY = 24 * 60
 # Les scènes de trading rejoindront cet ensemble en Phase 3.
 LIVE_SCENE_NAMES = {"terminal", "desktop"}
 
+# Scènes « de travail » : activités NÉCESSAIRES à la carrière qui demandent
+# du temps de lecture/réflexion (mission, examen de promotion ou de
+# certification, dilemme, résolution de deal, revue du manager, stress test
+# réglementaire, tutoriels). Quand l'une d'elles est ouverte en FENÊTRE sur
+# le bureau (non minimisée), l'horloge se met automatiquement en pause — le
+# marché ne doit pas bouger dans le dos du joueur (pas d'intérêts de levier
+# qui courent, pas de crise ni de game over pendant un examen). En plein
+# écran, la même garantie vient de SceneManager.go (toute scène hors
+# LIVE_SCENE_NAMES est auto-pausée). MINIMISER la fenêtre relance le temps :
+# c'est le geste explicite « je mets ce travail de côté ».
+FOCUS_SCENE_NAMES = {"mission", "evaluation", "dilemma", "deal", "review",
+                     "stresstest", "examcert", "cert", "tutorials"}
+
 SPEEDS = (1, 2, 3)
 
 

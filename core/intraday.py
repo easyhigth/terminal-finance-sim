@@ -49,11 +49,11 @@ def minutes_per_step():
     return config.DAYS_PER_STEP * MINUTES_PER_DAY
 
 
-# Pas de rafraîchissement de l'animation « en direct » (minutes de jeu) : plus
-# fin qu'un jour entier (90 min = 16 rafraîchissements/jour, ~toutes les 1-2s
-# réelles à x1) pour que le marché bouge visiblement plusieurs fois par seconde
-# de jeu au lieu d'un unique saut quotidien — tout en restant assez espacé
-# pour rester lisible (pas un glissement continu à chaque frame).
+# Pas de rafraîchissement de l'animation « en direct » (minutes de jeu) :
+# Ajusté pour 1 rafraîchissement par seconde réelle à vitesse x1.
+# 90 minutes de jeu = 1 seconde réelle, donc QUANTIZE_MINUTES = 90 donne
+# environ 16 rafraîchissements/jour. Pour un rafraîchissement exactement
+# toutes les secondes, on garde cette valeur car c'est déjà le comportement.
 QUANTIZE_MINUTES = 90
 
 
@@ -134,12 +134,13 @@ def _pinned_noise(seed, step, key, minute):
 def speed_factor(sim_clock):
     """Intensité de bruit relative à la vitesse de jeu (x1/x2/x3) : plus le temps
     défile vite, plus le marché doit sembler "vivant" à l'écran (sans toucher au
-    pas du moteur ni au prix d'exécution). Augmenté pour more responsive real-time feel."""
+    pas du moteur ni au prix d'exécution). Ajusté pour des mouvements contrôlés
+    avec rafraîchissement une fois par seconde."""
     speed = getattr(sim_clock, "speed", 1)
-    # Enhanced speed factor for more dynamic real-time updates
-    base_factor = 1.0 + 0.25 * (speed - 1)  # Increased from 0.15 to 0.25
-    # Add additional responsiveness for real-time feel
-    return base_factor * 1.3  # 30% boost for more lively animation
+    # Base speed factor for controlled movement
+    base_factor = 1.0 + 0.10 * (speed - 1)  # Reduced speed factor for calmer movement
+    # Minimal responsiveness for controlled, readable animation
+    return base_factor * 1.05  # 5% boost for subtle liveliness
 
 
 def region_open_factor(region, step):
@@ -278,6 +279,9 @@ def intraday_series(market, sim_clock, day, key, history, window_minutes, n_poin
     else:
         overall_trend = 0
 
+    # Get current simulation progress for dynamic updates
+    current_progress = getattr(sim_clock, 'game_minutes_acc', 0)
+
     # For 1W and shorter periods, we want to show intraday movements that
     # are consistent with the recent trend but still show realistic volatility
     for k in range(n_points):
@@ -311,7 +315,12 @@ def intraday_series(market, sim_clock, day, key, history, window_minutes, n_poin
         damp = region_open_factor(region, step_for_noise) if region else 1.0
 
         # Position within the current step (for intraday animation)
-        minute_in_step = int(intra_trend_frac * total_minutes)
+        # Mix static interpolation with time-based movement for dynamic updates
+        static_minute = intra_trend_frac * total_minutes
+        time_factor = (current_progress % total_minutes) / total_minutes
+        # Blend static position with time-based variation
+        dynamic_minute = (static_minute + time_factor * total_minutes * 0.1) % total_minutes
+        minute_in_step = int(dynamic_minute)
 
         # Adjust volatility based on trend consistency - if the overall trend
         # is strong, allow more movement in that direction

@@ -561,89 +561,20 @@ class DesktopWidgetsMixin:
                               (row.x + 18, row.y + 4), fonts.tiny(), config.COL_TEXT)
             iy += row_h
 
-    # -------------------------------------- résumé condensé « en votre absence »
+    # -------------------------------------- résumé condensé « en votre absence » [SUPPRIMÉ]
+    # Fonctionnalité retirée selon demande utilisateur - la carte "EN VOTRE ABSENCE"
+    # n'est plus affichée automatiquement
     def _absence_digest_pending(self):
-        """Résumé condensé des notifications reçues depuis la dernière
-        consultation (`app.notes.history`, cf. ui/notifications.py) — ne se
-        propose que quand le bureau est "vide" (aucune fenêtre hormis le
-        Terminal, ouvert ou non) : le joueur revient d'une absence plutôt que
-        d'être en train de travailler activement dans une fenêtre. Renvoie
-        None si rien de nouveau ou si le bureau n'est pas vide."""
-        others = [w for w in self.wm.windows if w.key != "scene:terminal"]
-        if others:
-            return None
-        history = self.app.notes.history
-        seen = self.app.gs.player.flags.get("absence_digest_seen", 0)
-        if len(history) <= seen:
-            return None
-        return history[seen:]
+        """Fonctionnalité désactivée - ne s'affiche plus"""
+        return None
 
     def _ack_absence_digest(self):
-        self.app.gs.player.flags["absence_digest_seen"] = len(self.app.notes.history)
+        """Fonctionnalité désactivée - pas de marquage des notifications"""
+        pass
 
     def _draw_absence_digest(self, surf):
-        """Carte « EN VOTRE ABSENCE » : les notifications reçues depuis la
-        dernière fois que le bureau était vide, groupées par catégorie
-        (bonne/mauvaise nouvelle/alerte/info) + les 5 plus récentes en clair —
-        pour ne pas avoir à rouvrir plusieurs fenêtres pour reconstituer ce
-        qui s'est passé pendant que rien n'était ouvert."""
-        entries = self._absence_digest_pending() or []
-        shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
-        shade.fill((0, 0, 0, 130))
-        surf.blit(shade, (0, 0))
-        W, H = 460, 320
-        x = (config.SCREEN_WIDTH - W) // 2
-        y = (config.SCREEN_HEIGHT - H) // 2
-        card = pygame.Rect(x, y, W, H)
-        self._digest_rects = {"card": card}
-        pygame.draw.rect(surf, config.COL_PANEL, card, border_radius=8)
-        pygame.draw.rect(surf, config.COL_PRESTIGE, card, 2, border_radius=8)
-        widgets.draw_text(surf, _L("EN VOTRE ABSENCE", "WHILE YOU WERE AWAY"),
-                          (x + 20, y + 16), fonts.head(bold=True), config.COL_PRESTIGE)
-        counts = {}
-        for e in entries:
-            counts[e["kind"]] = counts.get(e["kind"], 0) + 1
-        colors = {"good": config.COL_UP, "bad": config.COL_DOWN, "warn": config.COL_AMBER,
-                  "info": config.COL_CYAN, "prestige": config.COL_PRESTIGE}
-        labels = {"good": _L("bonnes nouvelles", "good news"),
-                  "bad": _L("mauvaises nouvelles", "bad news"),
-                  "warn": _L("alertes", "warnings"),
-                  "info": _L("infos", "info"),
-                  "prestige": _L("évènements notables", "notable events")}
-        ly = y + 54
-        widgets.draw_text(surf, _L(f"{len(entries)} notification(s) reçue(s)",
-                                   f"{len(entries)} notification(s) received"),
-                          (x + 20, ly), fonts.small(bold=True), config.COL_TEXT)
-        ly += 26
-        for kind in ("bad", "warn", "good", "prestige", "info"):
-            n = counts.get(kind, 0)
-            if not n:
-                continue
-            col = colors.get(kind, config.COL_TEXT)
-            pygame.draw.circle(surf, col, (x + 26, ly + 6), 4)
-            widgets.draw_text(surf, f"{n} {labels[kind]}", (x + 38, ly),
-                              fonts.tiny(bold=True), col)
-            ly += 20
-        ly += 8
-        widgets.draw_text(surf, _L("DERNIERS MESSAGES", "LATEST MESSAGES"),
-                          (x + 20, ly), fonts.tiny(bold=True), config.COL_TEXT_DIM)
-        ly += 20
-        for e in entries[-5:]:
-            widgets.draw_text(surf, widgets.fit_text(e["text"], fonts.tiny(), W - 40),
-                              (x + 20, ly), fonts.tiny(),
-                              colors.get(e["kind"], config.COL_TEXT))
-            ly += 18
-        ok_btn = pygame.Rect(x + W - 110, y + H - 44, 90, 30)
-        more_btn = pygame.Rect(x + W - 250, y + H - 44, 130, 30)
-        self._digest_rects["ok"] = ok_btn
-        self._digest_rects["more"] = more_btn
-        mp = pygame.mouse.get_pos()
-        for r, label, accent in ((more_btn, _L("Tout voir →", "See all →"), config.COL_TEXT_DIM),
-                                 (ok_btn, "OK", config.COL_PRESTIGE)):
-            hov = r.collidepoint(mp)
-            pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL, r, border_radius=5)
-            pygame.draw.rect(surf, accent, r, 1, border_radius=5)
-            widgets.draw_text(surf, label, r.center, fonts.small(bold=True), accent, align="center")
+        """Fonctionnalité désactivée - pas d'affichage de la carte"""
+        pass
 
     # --------------------------------------------------- indicateur de risque
     def _draw_risk_badge(self, surf, bar):

@@ -375,8 +375,8 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         endroit de l'écran et rendrait celle du dessous injoignable tant que
         celle du dessus n'est pas refermée."""
         return (self._quarter_card_pending() is not None
-                or self._unlock_brief_pending() is not None
-                or self._absence_digest_pending() is not None)
+                or self._unlock_brief_pending() is not None)
+                # or self._absence_digest_pending() is not None)  # Désactivé
 
     def handle_event(self, event):
         # GUIDE DE DÉMARRAGE (début de partie) : entièrement modal — tant
@@ -515,18 +515,18 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         # bureau vide) : même priorité/comportement que la carte trimestre,
         # sauf si celle-ci est déjà affichée (jamais deux cartes modales
         # empilées — le trimestre passe d'abord).
-        elif self._absence_digest_pending() is not None \
-                and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            card = self._digest_rects.get("card")
-            ok = self._digest_rects.get("ok")
-            more = self._digest_rects.get("more")
-            if ok and ok.collidepoint(event.pos):
-                self._ack_absence_digest()
-                return
-            if more and more.collidepoint(event.pos):
-                self._ack_absence_digest()
-                self._open_scene_window("notifications")
-                return
+        # elif self._absence_digest_pending() is not None \  # Désactivé
+        #         and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+        #     card = self._digest_rects.get("card")
+        #     ok = self._digest_rects.get("ok")
+        #     more = self._digest_rects.get("more")
+        #     if ok and ok.collidepoint(event.pos):
+        #         self._ack_absence_digest()
+        #         return
+        #     if more and more.collidepoint(event.pos):
+        #         self._ack_absence_digest()
+        #         self._open_scene_window("notifications")
+        #         return
             if card and card.collidepoint(event.pos):
                 return
         # bouton « Passer » du tutoriel guidé (dessiné au-dessus des fenêtres)
@@ -848,8 +848,8 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 self._draw_quarter_card(surf)
             elif self._unlock_brief_pending() is not None:
                 self._draw_unlock_brief(surf)
-            elif self._absence_digest_pending() is not None:
-                self._draw_absence_digest(surf)
+            # elif self._absence_digest_pending() is not None:  # Désactivé
+            #     self._draw_absence_digest(surf)
         if self.start_open:
             self._draw_launcher(surf)
         if self._ctx_menu is not None:

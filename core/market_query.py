@@ -219,12 +219,24 @@ class MarketQueryMixin:
     def history_of(self, ticker, n=None, sim_clock=None, day=None):
         """Historique de prix complet d'une société (depuis la préhistoire de 5 ans).
         `n` borne au dernier n points si fourni. Retourne une liste de floats.
-        Cf. `index_history` pour `sim_clock`/`day` (animation intraday)."""
+        Cf. `index_history` pour `sim_clock`/`day` (animation intraday).
+
+        Ensures consistent data that can be used for both step-based and intraday
+        visualization with proper alignment."""
         i = self.ticker_idx.get(ticker)
         if i is None:
             return []
         snaps = self.price_hist_all[-n:] if n else self.price_hist_all
         hist = [float(s[i]) for s in snaps]
+
+        # Ensure we have enough history points for intraday calculations
+        # by extending with the earliest available point if needed
+        if n and len(hist) < n:
+            needed = n - len(hist)
+            if hist:
+                # Extend with the first point to maintain consistency
+                hist = [hist[0]] * needed + hist
+
         if sim_clock is not None and day is not None and hist:
             from core import intraday
             region = self.companies[i].get("region")

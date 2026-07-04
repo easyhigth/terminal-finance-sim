@@ -336,7 +336,11 @@ class GraphScene(GraphRenderMixin, Scene, PopupMixin):
             # tel quel + une région de cotation pour le gel hors session) ;
             # les autres classes d'actifs retombent sur la vue "MAX".
             if kind == "stock":
-                hist = self.market.history_of(tk)
+                # Use consistent history for intraday - get enough history to cover the window
+                window_days = -self.period / (24 * 60)  # Convert minutes to days
+                # Calculate how many steps we need to cover this window
+                steps_needed = max(1, int(window_days / config.DAYS_PER_STEP) + 2)
+                hist = self.market.history_of(tk, steps_needed)
                 return intraday.intraday_series(
                     self.market, self.app.sim_clock, self.app.gs.player.day, tk, hist,
                     window_minutes=-self.period, n_points=60, region=self._region_of(tk),

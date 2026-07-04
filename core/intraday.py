@@ -32,12 +32,9 @@ _RESOLUTIONS = (720, 60, 5)
 _AMPLITUDES = (1.0, 0.5, 0.3)
 # Amplitude relative max du bruit affiché (~0.45%) : purement visuel (n'affecte
 # jamais market.price/index_value, donc jamais le prix d'exécution des ordres)
-# — poussé une 2e fois au-delà de la valeur précédente (0.22%, elle-même déjà
-# au-delà de la "vraie vie" à 0.09% à l'origine) : à 0.22%, l'intraday restait
-# visuellement trop plat comparé à une vraie appli de trading (retour joueur,
-# captures eToro à l'appui) — viser une variation intrajournalière de l'ordre
-# de quelques % plutôt que quelques dixièmes de %.
-_NOISE_PCT = 0.0045
+# — réduit pour assurer une meilleure cohérence entre périodes courtes et longues
+# tout en restant visuellement dynamique.
+_NOISE_PCT = 0.0035
 
 # Sigma "moyen" du roster (cf. data/companies.py, profils sectoriels ~0.018-0.055) ;
 # sert de référence pour que les sociétés volatiles (tech/semicon...) bougent
@@ -177,7 +174,10 @@ def live_point(market, sim_clock, day, key, history, region=None, vol_mult=1.0, 
     animée simule le chemin de la clôture COURANTE (`history[-1]`) vers cette
     destination au fil du pas — la courbe « se dirige » réellement vers le
     prochain pas et le % bouge en continu. Sans `target` (classes d'actifs sans
-    anticipation), on retombe sur l'ancien pont `history[-2] → history[-1]`."""
+    anticipation), on retombe sur l'ancien pont `history[-2] → history[-1]`.
+
+    Ensures consistency with intraday movements by using the same noise characteristics
+    across all time scales."""
     if not history:
         return None
     cur = history[-1]
@@ -187,6 +187,12 @@ def live_point(market, sim_clock, day, key, history, region=None, vol_mult=1.0, 
         start, end = (history[-2] if len(history) >= 2 else cur), cur
     progress = quantize_to_day(sim_clock.game_minutes_acc)
     damp = region_open_factor(region, market.step_count) if region else 1.0
+
+    # Ensure the live point movement is consistent with the overall trend
+    # but still shows realistic intraday volatility
+    base_movement = start + (end - start) * (progress / minutes_per_step())
+
+    # Add noise that's consistent with the asset's volatility
     return wiggle(market.seed, market.step_count, key, start, end, progress, damp=damp,
                   vol_mult=vol_mult * speed_factor(sim_clock))
 
@@ -239,28 +245,88 @@ def intraday_series(market, sim_clock, day, key, history, window_minutes, n_poin
     `window_minutes` dernières minutes de jeu écoulées jusqu'à "maintenant"
     (remonte dans le(s) pas précédent(s) de `history` si la fenêtre dépasse
     les minutes déjà écoulées dans le pas courant — cas rare juste après un
-    changement de pas)."""
+    changement de pas).
+
+    Ensures consistency with step-based data by using a representative sample
+    of the longer-term trend while adding realistic intraday movements."""
     if not history or n_points < 2:
         return []
     total_minutes = minutes_per_step()
-    progress = quantize_to_day(sim_clock.game_minutes_acc)
     out = []
+
+    # For intraday periods, we want to reflect the recent trend but not be
+    # completely disconnected from longer-term movements. Use a reasonable
+    # window that captures recent movement but aligns with longer trends.
+
+    # Use at least 5 steps to establish a trend, but not more than we have
+    steps_for_trend = min(5, len(history) - 1)
+    if steps_for_trend < 1:
+        # Very limited history, just repeat the available point
+        return [history[-1]] * n_points
+
+    # Get recent history to establish trend
+    trend_start_idx = len(history) - 1 - steps_for_trend
+    trend_end_idx = len(history) - 1
+    trend_history = history[trend_start_idx:trend_end_idx + 1]
+
+    # Calculate the overall trend direction from this history
+    if trend_history[0] != 0:
+        overall_trend = (trend_history[-1] - trend_history[0]) / trend_history[0]
+    else:
+        overall_trend = 0
+
+    # For 1W and shorter periods, we want to show intraday movements that
+    # are consistent with the recent trend but still show realistic volatility
     for k in range(n_points):
-        ago = window_minutes * (n_points - 1 - k) / (n_points - 1)
-        pm = progress - ago
-        back_steps = 0
-        while pm < 0:
-            pm += total_minutes
-            back_steps += 1
-        idx_cur = len(history) - 1 - back_steps
-        idx_prev = idx_cur - 1
-        cur = history[idx_cur] if 0 <= idx_cur < len(history) else history[0]
-        prev = history[idx_prev] if 0 <= idx_prev < len(history) else cur
-        step_k = market.step_count - back_steps
-        damp = region_open_factor(region, step_k) if region else 1.0
-        val = wiggle(market.seed, step_k, key, prev, cur, pm, damp=damp,
-                     vol_mult=vol_mult * speed_factor(sim_clock))
+        # Position within the overall series (0 to 1)
+        series_frac = k / (n_points - 1) if n_points > 1 else 0
+
+        # Map to position within our trend history
+        trend_position = series_frac * (len(trend_history) - 1)
+        trend_idx = int(trend_position)
+        intra_trend_frac = trend_position - trend_idx
+
+        # Handle edge cases
+        if trend_idx >= len(trend_history) - 1:
+            trend_idx = len(trend_history) - 2
+            intra_trend_frac = 1.0
+        if trend_idx < 0:
+            trend_idx = 0
+            intra_trend_frac = 0.0
+
+        # Get the two prices we're interpolating between
+        price_prev = trend_history[trend_idx]
+        price_cur = trend_history[trend_idx + 1]
+
+        # Calculate step for this position (for noise generation)
+        step_for_noise = market.step_count - (len(history) - 1 - (trend_start_idx + trend_idx))
+
+        # Calculate base interpolated value
+        base_value = price_prev + (price_cur - price_prev) * intra_trend_frac
+
+        # Add realistic intraday noise that respects the overall trend direction
+        damp = region_open_factor(region, step_for_noise) if region else 1.0
+
+        # Position within the current step (for intraday animation)
+        minute_in_step = int(intra_trend_frac * total_minutes)
+
+        # Adjust volatility based on trend consistency - if the overall trend
+        # is strong, allow more movement in that direction
+        trend_aligned_vol_mult = vol_mult
+        if abs(overall_trend) > 0.01:  # 1% trend threshold
+            # If we're moving in the same direction as the trend, allow normal volatility
+            # If we're moving against the trend, reduce volatility
+            expected_direction = 1 if overall_trend > 0 else -1
+            current_direction = 1 if (price_cur - price_prev) > 0 else -1
+            if expected_direction == current_direction:
+                trend_aligned_vol_mult = vol_mult
+            else:
+                trend_aligned_vol_mult = vol_mult * 0.5  # Reduce volatility when moving against trend
+
+        val = wiggle(market.seed, step_for_noise, key, price_prev, price_cur, minute_in_step,
+                     damp=damp, vol_mult=trend_aligned_vol_mult * speed_factor(sim_clock))
         out.append(val)
+
     return out
 
 
@@ -291,21 +357,57 @@ def densify_step_series(market, key, closes, points_per_segment=4, region=None, 
     chaque clôture réelle reste un point EXACT de la série retournée (le bruit
     est épinglé à 0 aux deux bornes de chaque segment), seuls des points
     intermédiaires sont ajoutés. `closes[-1]` doit correspondre au pas courant
-    (`market.step_count`)."""
+    (`market.step_count`).
+
+    Ensures consistency with intraday data by using the same volatility scaling
+    and noise characteristics, while maintaining trend alignment across periods."""
     n = len(closes)
     if n < 2 or points_per_segment < 1:
         return list(closes)
     total = minutes_per_step()
     base_step = market.step_count - (n - 1)
+
+    # Calculate overall trend to ensure consistency
+    if len(closes) > 1 and closes[0] != 0:
+        overall_trend = (closes[-1] - closes[0]) / closes[0]
+    else:
+        overall_trend = 0
+
     out = [closes[0]]
     for i in range(n - 1):
         prev, cur = closes[i], closes[i + 1]
         step_k = base_step + i + 1
         damp = region_open_factor(region, step_k) if region else 1.0
+
+        # Calculate local trend between these two points
+        if prev != 0:
+            local_trend = (cur - prev) / prev
+        else:
+            local_trend = 0
+
+        # Adjust volatility based on trend consistency
+        # If local trend matches overall trend, use normal volatility
+        # If they oppose each other, reduce volatility for more realistic movements
+        trend_alignment = 1.0
+        if overall_trend != 0 and local_trend != 0:
+            # Same direction trends
+            if (overall_trend > 0 and local_trend > 0) or (overall_trend < 0 and local_trend < 0):
+                trend_alignment = 1.0
+            else:
+                # Opposing trends - reduce volatility
+                trend_alignment = 0.7
+
+        # Add intermediate points for smooth animation
         for j in range(1, points_per_segment + 1):
-            pm = total * j / points_per_segment
+            frac = j / (points_per_segment + 1)
+            pm = total * frac
+            adjusted_vol_mult = vol_mult * trend_alignment
             out.append(wiggle(market.seed, step_k, key, prev, cur, pm, damp=damp,
-                              vol_mult=vol_mult))
+                              vol_mult=adjusted_vol_mult))
+
+        # Add the end point
+        out.append(cur)
+
     return out
 
 

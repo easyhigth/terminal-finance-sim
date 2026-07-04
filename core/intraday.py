@@ -50,11 +50,11 @@ def minutes_per_step():
 
 
 # Pas de rafraîchissement de l'animation « en direct » (minutes de jeu) : plus
-# fin qu'un jour entier (360 min = 4 rafraîchissements/jour, ~toutes les 4s
-# réelles à x1) pour que le marché bouge visiblement plusieurs fois par jour
+# fin qu'un jour entier (90 min = 16 rafraîchissements/jour, ~toutes les 1-2s
+# réelles à x1) pour que le marché bouge visiblement plusieurs fois par seconde
 # de jeu au lieu d'un unique saut quotidien — tout en restant assez espacé
 # pour rester lisible (pas un glissement continu à chaque frame).
-QUANTIZE_MINUTES = 360
+QUANTIZE_MINUTES = 90
 
 
 def quantize_to_day(minutes):
@@ -134,9 +134,12 @@ def _pinned_noise(seed, step, key, minute):
 def speed_factor(sim_clock):
     """Intensité de bruit relative à la vitesse de jeu (x1/x2/x3) : plus le temps
     défile vite, plus le marché doit sembler "vivant" à l'écran (sans toucher au
-    pas du moteur ni au prix d'exécution)."""
+    pas du moteur ni au prix d'exécution). Augmenté pour more responsive real-time feel."""
     speed = getattr(sim_clock, "speed", 1)
-    return 1.0 + 0.15 * (speed - 1)
+    # Enhanced speed factor for more dynamic real-time updates
+    base_factor = 1.0 + 0.25 * (speed - 1)  # Increased from 0.15 to 0.25
+    # Add additional responsiveness for real-time feel
+    return base_factor * 1.3  # 30% boost for more lively animation
 
 
 def region_open_factor(region, step):

@@ -271,6 +271,10 @@ class GraphScene(GraphRenderMixin, Scene, PopupMixin):
         # restituer à la prochaine ouverture (instance de scène réutilisée).
         self._mem_kind, self._mem_period = self.kind, self.period
 
+        # Force refresh for real-time updates - mark scene as dirty to trigger redraw
+        # This ensures graphs update more frequently for live market feel
+        self._dirty = True
+
     # -------------------------------------------------------------- data
     def _info_for(self, tk):
         """Infos clés de l'actif `tk` pour la barre au-dessus des onglets de

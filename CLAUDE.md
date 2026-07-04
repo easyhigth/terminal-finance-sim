@@ -341,6 +341,25 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   uniquement) : bande d'onglets, à gauche du bouton pause (`ui/simclock_widget.py`), ouvre le
   `CheatPanel` porté par l'app (`app.cheat_panel`) et dessiné/routé par `core/pages.py`
   par-dessus n'importe quelle scène (bureau compris).
+  **Étape 19 (tutoriel approfondi)** : contenu dans `core/unlock_briefs.py` (pur, FR/EN).
+  (1) **Guide de démarrage multi-pages** (6 pages : but du jeu, boucle
+  missions→réputation→examen→promotion, temps/marché, outils du grade 0, poste de travail) :
+  carte MODALE du bureau au tout début d'une carrière (`DesktopScene._intro_guide_active` —
+  grade 0 et `day <= 3`, jamais en sandbox ni vétéran), état par SAUVEGARDE
+  (`flags['intro_guide_done']`, pas par machine) ; « Guide de démarrage » au menu contextuel
+  du fond pour le relire. Le refermer marque aussi `desktop_onboarding` vu (sa page 6 couvre
+  la carte d'accueil machine). (2) **carte « NOUVEAU PÉRIMÈTRE » à chaque promotion** :
+  `scene_evaluation._finish` calcule les fonctionnalités nouvellement débloquées par grade
+  EFFECTIF (`unlock_briefs.newly_unlocked` — respecte le raccourci vétéran et les verrous de
+  voie, remplace l'ancien test `grade == palier brut`) et pose
+  `flags['pending_unlock_briefs']` ; le bureau affiche alors une fiche PAR fonctionnalité
+  (ce que c'est / comment y accéder / ce que ça apporte / premiers pas — `FEATURE_BRIEFS`,
+  une entrée par clé de `core/unlocks.UNLOCKS`, invariant gardé par
+  `tests/test_desktop.py::test_every_unlockable_feature_has_a_brief`), navigable ←/→, avec
+  bouton « Tuto détaillé » vers `scene_tutorials` quand `FEATURE_TUTORIAL` en a un.
+  Priorité des cartes modales du bureau : bilan de trimestre → nouveautés → résumé d'absence
+  (une seule à la fois) ; le guide, lui, passe au-dessus de tout et capture tous les
+  évènements tant qu'il est affiché.
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, un jour de jeu dure ~16 s réelles
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 90`), soit un nouveau pas de marché (5 jours) toutes

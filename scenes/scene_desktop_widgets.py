@@ -12,7 +12,7 @@ fenêtres, informent en un coup d'œil (patrimoine, trimestre, prochaine
 """
 import pygame
 
-from core import config, desktop_onboarding, desktop_tutorial
+from core import config, desktop_onboarding, desktop_tutorial, unlock_briefs
 from core import portfolio_margin as pm_mod
 from core.i18n import get_lang
 from scenes.scene_desktop_common import _L, TASKBAR_H, TOPBAR_H
@@ -20,6 +20,271 @@ from ui import fonts, widgets
 
 
 class DesktopWidgetsMixin:
+    # ------------------------------------------------ guide de démarrage
+    def _intro_guide_active(self):
+        """Vrai si le GUIDE DE DÉMARRAGE multi-pages doit être affiché :
+        début de carrière (grade 0, tout premiers jours) et pas encore lu —
+        ou réouverture explicite depuis le menu contextuel. Jamais en
+        sandbox ni pour un profil vétéran (il connaît déjà la boucle)."""
+        if getattr(self, "_guide_force", False):
+            return True
+        p = self.app.gs.player
+        if p.flags.get("intro_guide_done") or getattr(p, "sandbox", False) \
+                or p.flags.get("veteran"):
+            return False
+        return p.grade_index == 0 and p.day <= 3
+
+    def _open_intro_guide(self):
+        """Réouverture volontaire (menu contextuel « Guide de démarrage »)."""
+        self._guide_force = True
+        self._guide_page = 0
+
+    def _close_intro_guide(self):
+        p = self.app.gs.player
+        p.flags["intro_guide_done"] = True
+        self._guide_force = False
+        self._guide_page = 0
+        # le guide couvre (page 6) le contenu de la carte d'accueil machine :
+        # inutile de la ré-afficher juste derrière.
+        desktop_onboarding.mark_seen()
+
+    def _handle_guide_event(self, event):
+        """Le guide est MODAL : il capture tout tant qu'il est affiché.
+        ←/→ tournent les pages, Entrée avance (et referme à la fin),
+        Échap referme (équivaut à « Passer »)."""
+        last = unlock_briefs.intro_page_count() - 1
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self._close_intro_guide()
+            elif event.key in (pygame.K_LEFT, pygame.K_UP):
+                self._guide_page = max(0, self._guide_page - 1)
+            elif event.key in (pygame.K_RIGHT, pygame.K_DOWN, pygame.K_SPACE):
+                self._guide_page = min(last, self._guide_page + 1)
+            elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                if self._guide_page >= last:
+                    self._close_intro_guide()
+                else:
+                    self._guide_page += 1
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            step = -1 if event.button == 4 else 1
+            self._guide_page = max(0, min(last, self._guide_page + step))
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            r = self._guide_rects
+            if r.get("skip") and r["skip"].collidepoint(event.pos):
+                self._close_intro_guide()
+            elif r.get("prev") and r["prev"].collidepoint(event.pos):
+                self._guide_page = max(0, self._guide_page - 1)
+            elif r.get("next") and r["next"].collidepoint(event.pos):
+                if self._guide_page >= last:
+                    self._close_intro_guide()
+                else:
+                    self._guide_page += 1
+            # tout autre clic est absorbé (modal)
+
+    def _draw_intro_guide(self, surf):
+        """Carte modale multi-pages du guide de démarrage : titre, paragraphes
+        (retour à la ligne automatique), points de pagination, Précédent /
+        Suivant / Passer. Contenu : core/unlock_briefs.INTRO_PAGES."""
+        shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
+        shade.fill((0, 0, 0, 175))
+        surf.blit(shade, (0, 0))
+        total = unlock_briefs.intro_page_count()
+        self._guide_page = max(0, min(self._guide_page, total - 1))
+        title, paras = unlock_briefs.intro_page(self._guide_page)
+        W, H = 720, 470
+        x = (config.SCREEN_WIDTH - W) // 2
+        y = (config.SCREEN_HEIGHT - H) // 2
+        card = pygame.Rect(x, y, W, H)
+        self._guide_rects = {"card": card}
+        pygame.draw.rect(surf, config.COL_PANEL, card, border_radius=8)
+        pygame.draw.rect(surf, config.COL_AMBER, card, 2, border_radius=8)
+        widgets.draw_text(surf, _L("GUIDE DE DÉMARRAGE", "GETTING-STARTED GUIDE"),
+                          (x + 24, y + 16), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L(f"page {self._guide_page + 1}/{total}",
+                                   f"page {self._guide_page + 1}/{total}"),
+                          (x + W - 24, y + 16), fonts.tiny(bold=True),
+                          config.COL_TEXT_DIM, align="right")
+        widgets.draw_text(surf, title, (x + 24, y + 38), fonts.head(bold=True),
+                          config.COL_AMBER)
+        ly = y + 80
+        for para in paras:
+            h = widgets.draw_text_wrapped(surf, para, (x + 24, ly), fonts.small(),
+                                          config.COL_TEXT, W - 48, line_gap=5)
+            ly += h + 14
+        # pagination (points) au centre du pied de carte
+        dot_y = y + H - 30
+        cx0 = x + W // 2 - (total - 1) * 9
+        for i in range(total):
+            col = config.COL_AMBER if i == self._guide_page else config.COL_BORDER
+            pygame.draw.circle(surf, col, (cx0 + i * 18, dot_y), 4)
+        mp = pygame.mouse.get_pos()
+        skip = pygame.Rect(x + 24, y + H - 44, 130, 30)
+        prev = pygame.Rect(x + W - 300, y + H - 44, 120, 30)
+        last = self._guide_page >= total - 1
+        nxt = pygame.Rect(x + W - 170, y + H - 44, 146, 30)
+        self._guide_rects.update({"skip": skip, "prev": prev, "next": nxt})
+        for r, label, accent, enabled in (
+                (skip, _L("Passer le guide", "Skip the guide"), config.COL_TEXT_DIM, True),
+                (prev, _L("← Précédent", "← Previous"), config.COL_TEXT_DIM, self._guide_page > 0),
+                (nxt, _L("Commencer !", "Start!") if last else _L("Suivant →", "Next →"),
+                 config.COL_UP if last else config.COL_AMBER, True)):
+            hov = enabled and r.collidepoint(mp)
+            col = accent if enabled else config.COL_BORDER
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL,
+                             r, border_radius=5)
+            pygame.draw.rect(surf, col, r, 1, border_radius=5)
+            widgets.draw_text(surf, label, r.center, fonts.small(bold=True), col,
+                              align="center")
+
+    # ------------------------------------------- nouveautés de promotion
+    def _unlock_brief_pending(self):
+        """Fiches « NOUVEAUTÉS » non encore acquittées (dict {grade,
+        features}), posées par scene_evaluation à la promotion — ou None."""
+        info = self.app.gs.player.flags.get("pending_unlock_briefs")
+        if not info or not info.get("features"):
+            return None
+        return info
+
+    def _ack_unlock_brief(self):
+        self.app.gs.player.flags.pop("pending_unlock_briefs", None)
+        self._brief_page = 0
+
+    def _handle_unlock_brief_event(self, event):
+        """Navigation de la carte « NOUVEAUTÉS » (une page par fonctionnalité
+        débloquée). Renvoie True si l'évènement est consommé."""
+        info = self._unlock_brief_pending()
+        feats = info["features"]
+        last = len(feats) - 1
+        if event.type == pygame.KEYDOWN:
+            if event.key in (pygame.K_LEFT, pygame.K_UP):
+                self._brief_page = max(0, self._brief_page - 1)
+                return True
+            if event.key in (pygame.K_RIGHT, pygame.K_DOWN):
+                self._brief_page = min(last, self._brief_page + 1)
+                return True
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_ESCAPE):
+                if self._brief_page >= last or event.key == pygame.K_ESCAPE:
+                    self._ack_unlock_brief()
+                else:
+                    self._brief_page += 1
+                return True
+            return False
+        if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
+            return False
+        r = self._brief_rects
+        if r.get("prev") and r["prev"].collidepoint(event.pos):
+            self._brief_page = max(0, self._brief_page - 1)
+            return True
+        if r.get("next") and r["next"].collidepoint(event.pos):
+            self._brief_page = min(last, self._brief_page + 1)
+            return True
+        if r.get("tuto") and r["tuto"].collidepoint(event.pos):
+            from core import unlocks
+            feat = feats[min(self._brief_page, last)]
+            tid = unlocks.FEATURE_TUTORIAL.get(feat)
+            self._ack_unlock_brief()
+            if tid:
+                self._open_scene_window("tutorials", tid=tid)
+            return True
+        if r.get("ok") and r["ok"].collidepoint(event.pos):
+            if self._brief_page >= last:
+                self._ack_unlock_brief()
+            else:
+                self._brief_page += 1
+            return True
+        if r.get("card") and r["card"].collidepoint(event.pos):
+            return True   # clic sur la carte absorbé
+        return False
+
+    def _draw_unlock_brief(self, surf):
+        """Carte « NOUVEAU PÉRIMÈTRE » après une promotion : une page par
+        fonctionnalité débloquée — ce que c'est, comment y accéder, ce que ça
+        apporte, premiers pas (core/unlock_briefs.FEATURE_BRIEFS) — avec un
+        lien direct vers le tutoriel dédié quand il existe."""
+        from core import unlocks
+        info = self._unlock_brief_pending()
+        feats = info["features"]
+        self._brief_page = max(0, min(self._brief_page, len(feats) - 1))
+        feat = feats[self._brief_page]
+        brief = unlock_briefs.brief_for(feat) or {
+            "title": unlocks.feature_label(feat),
+            "what": unlocks.feature_label(feat), "how": "", "why": "", "first": ""}
+        shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
+        shade.fill((0, 0, 0, 150))
+        surf.blit(shade, (0, 0))
+        W, H = 680, 510
+        x = (config.SCREEN_WIDTH - W) // 2
+        y = (config.SCREEN_HEIGHT - H) // 2
+        card = pygame.Rect(x, y, W, H)
+        self._brief_rects = {"card": card}
+        pygame.draw.rect(surf, config.COL_PANEL, card, border_radius=8)
+        pygame.draw.rect(surf, config.COL_UP, card, 2, border_radius=8)
+        widgets.draw_text(surf, _L(f"NOUVEAU PÉRIMÈTRE — {info.get('grade', '')}",
+                                   f"NEW SCOPE — {info.get('grade', '')}"),
+                          (x + 24, y + 16), fonts.tiny(bold=True), config.COL_UP)
+        if len(feats) > 1:
+            widgets.draw_text(surf, f"{self._brief_page + 1}/{len(feats)}",
+                              (x + W - 24, y + 16), fonts.tiny(bold=True),
+                              config.COL_TEXT_DIM, align="right")
+        widgets.draw_text(surf, brief["title"], (x + 24, y + 36),
+                          fonts.head(bold=True), config.COL_AMBER)
+        sections = [
+            (_L("CE QUE C'EST", "WHAT IT IS"), brief["what"]),
+            (_L("COMMENT Y ACCÉDER", "HOW TO ACCESS IT"), brief["how"]),
+            (_L("CE QUE ÇA VOUS APPORTE", "WHAT IT BRINGS YOU"), brief["why"]),
+            (_L("PREMIERS PAS", "FIRST STEPS"), brief["first"]),
+        ]
+        ly = y + 76
+        actions_top = y + H - 56   # zone réservée aux boutons du pied de carte
+        for header, body in sections:
+            if not body or ly + 18 >= actions_top:
+                continue
+            widgets.draw_text(surf, header, (x + 24, ly), fonts.tiny(bold=True),
+                              config.COL_CYAN)
+            ly += 18
+            h = widgets.draw_text_wrapped(surf, body, (x + 24, ly), fonts.small(),
+                                          config.COL_TEXT, W - 48, line_gap=4)
+            ly += h + 12
+        mp = pygame.mouse.get_pos()
+        last = self._brief_page >= len(feats) - 1
+        ok = pygame.Rect(x + W - 150, y + H - 44, 126, 30)
+        self._brief_rects["ok"] = ok
+        bx = x + 24
+        if len(feats) > 1:
+            prev = pygame.Rect(bx, y + H - 44, 44, 30)
+            nxt = pygame.Rect(bx + 50, y + H - 44, 44, 30)
+            self._brief_rects.update({"prev": prev, "next": nxt})
+            for r, label, enabled in ((prev, "←", self._brief_page > 0),
+                                      (nxt, "→", not last)):
+                col = config.COL_TEXT if enabled else config.COL_BORDER
+                hov = enabled and r.collidepoint(mp)
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL,
+                                 r, border_radius=5)
+                pygame.draw.rect(surf, col, r, 1, border_radius=5)
+                widgets.draw_text(surf, label, r.center, fonts.small(bold=True),
+                                  col, align="center")
+            bx += 110
+        from core import unlocks as unlocks_mod
+        if unlocks_mod.FEATURE_TUTORIAL.get(feat):
+            tuto = pygame.Rect(bx, y + H - 44, 150, 30)
+            self._brief_rects["tuto"] = tuto
+            hov = tuto.collidepoint(mp)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL,
+                             tuto, border_radius=5)
+            pygame.draw.rect(surf, config.COL_CYAN, tuto, 1, border_radius=5)
+            widgets.draw_text(surf, _L("Tuto détaillé →", "Full tutorial →"),
+                              tuto.center, fonts.small(bold=True), config.COL_CYAN,
+                              align="center")
+        hov = ok.collidepoint(mp)
+        ok_label = _L("C'est parti !", "Let's go!") if last else _L("Suivant", "Next")
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL,
+                         ok, border_radius=5)
+        pygame.draw.rect(surf, config.COL_UP, ok, 1, border_radius=5)
+        widgets.draw_text(surf, ok_label, ok.center, fonts.small(bold=True),
+                          config.COL_UP, align="center")
+
     # ------------------------------------------------------ tutoriel guidé
     def _check_tutorial(self):
         """Valide l'étape courante du tutoriel de prise en main dès que l'état

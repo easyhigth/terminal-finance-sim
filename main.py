@@ -184,6 +184,7 @@ class App:
         pygame.display.set_caption(config.TITLE)
         pygame.display.set_icon(make_icon_surface(64))
         self.window_mode = display_settings.get_mode()
+        display_settings.apply_resolution()  # applique la résolution choisie
         self.screen = None
         self._apply_window_mode()
         self.clock = pygame.time.Clock()

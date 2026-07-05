@@ -57,6 +57,14 @@ class SettingsScene(Scene):
         self.rows.append((_L("Affichage", "Display"),
                           self._seg([(("window", m), lbl,
                                       self.app.window_mode == m) for m, lbl in disp])))
+        # RÉSOLUTION — presets 16:9 (nécessite un redémarrage de la fenêtre)
+        cur_res = display_settings.get_resolution()
+        res_opts = []
+        for key, preset in config.RESOLUTION_PRESETS.items():
+            lbl = preset["label"][1] if lang == "en" else preset["label"][0]
+            res_opts.append(((("resolution", key), lbl, cur_res == key)))
+        self.rows.append((_L("Résolution", "Resolution"),
+                          self._seg(res_opts)))
         # SON — sourdine
         self.rows.append((_L("Son", "Sound"),
                           self._seg([(("mute", False), _L("Activé", "On"), not audio.is_muted()),
@@ -180,6 +188,11 @@ class SettingsScene(Scene):
         kind, val = action
         if kind == "window":
             self.app.set_window_mode(val)
+        elif kind == "resolution":
+            if val != display_settings.get_resolution():
+                display_settings.set_resolution(val)
+                display_settings.apply_resolution()
+                self.app._apply_window_mode()
         elif kind == "mute":
             audio.set_muted(val)
             if not val:

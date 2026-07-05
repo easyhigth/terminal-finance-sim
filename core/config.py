@@ -14,6 +14,15 @@ SCREEN_HEIGHT = 720        # 1280x720 — tient sur la plupart des écrans
 FPS = 60
 TITLE = "Terminal Alpha"
 
+# Résolutions disponibles (toutes en 16:9 pour éviter les déformations).
+# Les libellés sont en paires (fr, en) pour l'UI réglages.
+RESOLUTION_PRESETS = {
+    "1280x720":  {"w": 1280, "h": 720,  "label": ("1280×720 (HD)", "1280×720 (HD)")},
+    "1600x900":  {"w": 1600, "h": 900,  "label": ("1600×900 (HD+)", "1600×900 (HD+)")},
+    "1920x1080": {"w": 1920, "h": 1080, "label": ("1920×1080 (Full HD)", "1920×1080 (Full HD)")},
+}
+DEFAULT_RESOLUTION = "1280x720"
+
 # ---------------------------------------------------------------------------
 # PALETTE BLOOMBERG-STYLE
 # Couleurs en (R, G, B)

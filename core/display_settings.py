@@ -1,6 +1,6 @@
 """
 display_settings.py — Mode d'affichage de la fenêtre (fenêtré / plein écran /
-plein écran fenêtré), persisté entre deux lancements.
+plein écran fenêtré) + résolution, persisté entre deux lancements.
 
 Stocké dans `display_settings.json` (sous `config.SAVE_DIR`), à part de
 `settings.json` (langue) et `anim_settings.json` (animations), pour garder
@@ -25,23 +25,28 @@ MODE_LABELS = {
 
 _PATH = os.path.join(config.SAVE_DIR, "display_settings.json")
 _MODE = "windowed"
+_RESOLUTION = config.DEFAULT_RESOLUTION
 
 
 def _load():
-    global _MODE
+    global _MODE, _RESOLUTION
     try:
         with open(_PATH, "r", encoding="utf-8") as f:
-            m = json.load(f).get("mode", "windowed")
+            data = json.load(f)
+        m = data.get("mode", "windowed")
         _MODE = m if m in MODES else "windowed"
+        r = data.get("resolution", config.DEFAULT_RESOLUTION)
+        _RESOLUTION = r if r in config.RESOLUTION_PRESETS else config.DEFAULT_RESOLUTION
     except Exception:
         _MODE = "windowed"
+        _RESOLUTION = config.DEFAULT_RESOLUTION
 
 
 def _save():
     try:
         os.makedirs(config.SAVE_DIR, exist_ok=True)
         with open(_PATH, "w", encoding="utf-8") as f:
-            json.dump({"mode": _MODE}, f)
+            json.dump({"mode": _MODE, "resolution": _RESOLUTION}, f)
     except Exception:
         pass
 
@@ -66,6 +71,39 @@ def next_mode():
 def label(mode=None, lang="fr"):
     mode = mode or _MODE
     return MODE_LABELS.get(lang, MODE_LABELS["fr"]).get(mode, mode)
+
+
+def get_resolution():
+    return _RESOLUTION
+
+
+def set_resolution(res_key):
+    """Change la résolution. Nécessite un redémarrage de la fenêtre (appelé
+    par main.py qui recrée l'affichage). Retourne la clé effective."""
+    global _RESOLUTION
+    if res_key in config.RESOLUTION_PRESETS:
+        _RESOLUTION = res_key
+    else:
+        _RESOLUTION = config.DEFAULT_RESOLUTION
+    _save()
+    return _RESOLUTION
+
+
+def apply_resolution():
+    """Applique la résolution choisie aux constantes de config.
+    À appeler AVANT pygame.display.set_mode()."""
+    preset = config.RESOLUTION_PRESETS.get(_RESOLUTION, config.RESOLUTION_PRESETS[config.DEFAULT_RESOLUTION])
+    config.SCREEN_WIDTH = preset["w"]
+    config.SCREEN_HEIGHT = preset["h"]
+    config.WINDOW_HEIGHT = config.SCREEN_HEIGHT + config.TAB_BAR_H
+
+
+def resolution_label(res_key=None, lang="fr"):
+    """Libellé lisible de la résolution pour l'UI."""
+    key = res_key or _RESOLUTION
+    preset = config.RESOLUTION_PRESETS.get(key, config.RESOLUTION_PRESETS[config.DEFAULT_RESOLUTION])
+    lbl = preset["label"]
+    return lbl[1] if lang == "en" else lbl[0]
 
 
 _load()

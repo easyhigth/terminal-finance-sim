@@ -119,15 +119,17 @@ class Window:
             style.draw_aa_filled_circle(surf, (px, py - 3), 3, config.COL_AMBER)
             pygame.draw.polygon(surf, config.COL_AMBER,
                                 [(px - 2, py), (px + 2, py), (px, py + 5)])
-        # boutons réduire / fermer
-        mr = pygame.Rect(rect.right - BTN_W, rect.y, BTN_W, TITLE_H)
-        cr = pygame.Rect(rect.right - 2 * BTN_W, rect.y, BTN_W, TITLE_H)
+        # boutons fermer / réduire (ordre conventionnel : FERMER à droite)
+        cr = pygame.Rect(rect.right - BTN_W, rect.y, BTN_W, TITLE_H)
+        mr = pygame.Rect(rect.right - 2 * BTN_W, rect.y, BTN_W, TITLE_H)
         mp = pygame.mouse.get_pos()
+        # réduire : trait horizontal
         if mr.collidepoint(mp):
             pygame.draw.rect(surf, config.COL_PANEL, mr, border_radius=style.RADIUS_SM)
             pygame.draw.rect(surf, accent, mr, 1, border_radius=style.RADIUS_SM)
         pygame.draw.line(surf, config.COL_TEXT, (mr.centerx - 5, mr.centery),
                          (mr.centerx + 5, mr.centery), 2)
+        # fermer : croix, fond rouge au survol
         if cr.collidepoint(mp):
             style.draw_aa_round_rect(surf, cr, config.COL_DOWN, radius=style.RADIUS_SM)
         xcol = config.COL_WHITE if cr.collidepoint(mp) else config.COL_TEXT

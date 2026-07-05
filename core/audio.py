@@ -51,6 +51,21 @@ _SPECS = {
     # docking, cf. ui/window_manager.py) — distinct de "order" (deux tons
     # montants, plus long) pour rester discret sur une action très fréquente.
     "snap":      [(880.0, 0.04, 0.45), (523.25, 0.05, 0.4)],
+    # sirène grave descendante : crise de marché qui se déclenche
+    "crisis":    [(440.0, 0.15, 0.7), (330.0, 0.20, 0.7), (220.0, 0.30, 0.6)],
+    # ping aigu montant : deal gagné / clôturé avec succès
+    "deal_won":  [(523.25, 0.06, 0.5), (659.25, 0.06, 0.55), (783.99, 0.12, 0.6)],
+    # deux tons descendants : deal perdu / expiré
+    "deal_lost": [(523.25, 0.08, 0.5), (392.0, 0.12, 0.5)],
+    # ping discret : réception d'un message inbox
+    "message":   [(1046.5, 0.04, 0.35), (1318.5, 0.06, 0.4)],
+    # clic très bref : feedback des boutons (optionnel, très discret)
+    "click":     [(1200.0, 0.02, 0.25)],
+    # fanfare courte : succès majeur / achievement
+    "achievement": [(523.25, 0.06, 0.5), (659.25, 0.06, 0.55), (783.99, 0.08, 0.6),
+                    (1046.5, 0.12, 0.7)],
+    # alarme : margin call
+    "margin_call": [(880.0, 0.08, 0.7), (660.0, 0.08, 0.7), (880.0, 0.08, 0.7)],
 }
 
 

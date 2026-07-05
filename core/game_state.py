@@ -498,6 +498,12 @@ class GameState:
                 conditional_orders_executed = _condord.execute_due(p, market)
             financing = portfolio.accrue_financing(p, market, config.DAYS_PER_STEP)
             margin_call = portfolio.check_margin_call(p, market)
+            if margin_call:
+                try:
+                    from core import audio
+                    audio.play("margin_call")
+                except Exception:
+                    pass
             # échantillonnage du levier (style de jeu, indépendant de la progression de
             # grade) : utilisé par career.risk_profile() pour moduler les mandats proposés.
             if portfolio.leverage(p, market) >= 2.5:

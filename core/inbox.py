@@ -44,6 +44,13 @@ def push(player, kind, sender, subject, body):
     player.inbox.append(msg)
     if len(player.inbox) > MAX_INBOX:
         player.inbox.pop(0)
+    # Son de notification (sauf pour les messages système)
+    if kind not in ("system",):
+        try:
+            from core import audio
+            audio.play("message")
+        except Exception:
+            pass
     return msg
 
 

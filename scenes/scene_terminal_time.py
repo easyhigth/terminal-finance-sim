@@ -107,6 +107,13 @@ class TerminalTimeMixin:
                 inbox_mod.push(p, "client", f"Mandat — {ev['client']}", "Mandat perdu",
                                f"{ev['rival']} a décroché le mandat de {ev['client']} "
                                "pendant que vous hésitiez. Soyez plus décidé.")
+        # Trading actif des rivaux (positions visibles)
+        rivals_mod.step_trading(p, m, random)
+        # Messages inbox de provocation des rivaux
+        taunt = rivals_mod.generate_taunt(p, m, random)
+        if taunt:
+            inbox_mod.push(p, "rival", taunt["subject"], taunt["sender"],
+                           taunt["body"])
         self.recent_events = self.recent_events[:8]
         self._log(_L(f"  +{config.DAYS_PER_STEP}j → jour {p.day} (T{p.quarter}). "
                   f"Solde du tour : {widgets.format_money(summary['net'], cur)}",

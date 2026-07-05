@@ -69,7 +69,7 @@ class RivalsScene(Scene):
 
         # cartes : une par acteur, triées par score (déjà fait par leaderboard)
         top = 110
-        ch, gap = 92, 10
+        ch, gap = 110, 10
         log_h = 150  # réserve l'espace du journal d'activité en bas d'écran
         avail = config.footer_y() - 12 - top - log_h
         per_col = max(1, avail // (ch + gap))
@@ -160,14 +160,29 @@ class RivalsScene(Scene):
         widgets.draw_text(surf, widgets.fit_text(firm, fonts.tiny(), rect.w - 230),
                           (rect.x + 70, rect.y + 34), fonts.tiny(), config.COL_TEXT_DIM)
 
-        # voie (badge) + dernière action
+        # voie (badge) + style + dernière action
         if rdata:
             tcol = _TRACK_COL.get(rdata.get("track"), config.COL_TEXT_DIM)
             widgets.draw_badge(surf, rdata.get("track", "?"), (rect.x + 70, rect.y + 54), tcol)
+            style = rdata.get("style", "")
+            if style:
+                style_label = {"aggressive": "🔥 Agressif", "conservative": "🛡 Prudent",
+                               "momentum": "📈 Momentum", "value": "💎 Value",
+                               "balanced": "⚖ Équilibré"}.get(style, "")
+                widgets.draw_text(surf, style_label, (rect.x + 160, rect.y + 54),
+                                  fonts.tiny(), config.COL_TEXT_DIM)
             mood = _MOOD_COL.get(rdata.get("mood", "flat"), config.COL_TEXT_DIM)
             act = "▸ " + rdata.get("last", "—")
             widgets.draw_text(surf, widgets.fit_text(act, fonts.small(), rect.w - 240),
-                              (rect.x + 160, rect.y + 56), fonts.small(), mood)
+                              (rect.x + 70, rect.y + 72), fonts.small(), mood)
+            # Positions du rival
+            positions = rdata.get("positions", {})
+            if positions:
+                pos_list = ", ".join(list(positions.keys())[:3])
+                if len(positions) > 3:
+                    pos_list += f" +{len(positions) - 3}"
+                widgets.draw_text(surf, f"📊 {pos_list}", (rect.x + 70, rect.y + 88),
+                                  fonts.tiny(), config.COL_CYAN)
         else:
             widgets.draw_badge(surf, "VOUS", (rect.x + 70, rect.y + 54), config.COL_AMBER)
 

@@ -19,11 +19,26 @@ def _L(fr, en):
 
 
 RIVAL_PROFILES = [
-    {"name": "Marcus Vale", "firm": "Vale & Co.", "track": "M&A"},
-    {"name": "Lena Ortega", "firm": "Ortega Capital", "track": "Risk"},
-    {"name": "Kenji Sato", "firm": "Sato Quant", "track": "Quant"},
-    {"name": "Sophia Brandt", "firm": "Brandt AM", "track": "Portfolio"},
-    {"name": "Idris Cole", "firm": "Cole Advisory", "track": "Advisory"},
+    {"name": "Marcus Vale", "firm": "Vale & Co.", "track": "M&A",
+     "style": "aggressive", "aggression": 1.4,
+     "desc_fr": "Fonceur, rachète tout ce qui bouge. Vous méprise ouvertement.",
+     "desc_en": "Aggressive, buys everything in sight. Openly scoffs at you."},
+    {"name": "Lena Ortega", "firm": "Ortega Capital", "track": "Risk",
+     "style": "conservative", "aggression": 0.7,
+     "desc_fr": "Prudente et méthodique. Ne prend jamais un risque qu'elle ne peut couvrir.",
+     "desc_en": "Cautious and methodical. Never takes a risk she can't hedge."},
+    {"name": "Kenji Sato", "firm": "Sato Quant", "track": "Quant",
+     "style": "momentum", "aggression": 1.1,
+     "desc_fr": "Mathématicien de génie. Ses algos suivent les tendances comme personne.",
+     "desc_en": "Brilliant mathematician. His algos ride trends like no one else."},
+    {"name": "Sophia Brandt", "firm": "Brandt AM", "track": "Portfolio",
+     "style": "value", "aggression": 0.9,
+     "desc_fr": "Investisseuse value old-school. Achète quand tout le monde vend.",
+     "desc_en": "Old-school value investor. Buys when everyone else is selling."},
+    {"name": "Idris Cole", "firm": "Cole Advisory", "track": "Advisory",
+     "style": "balanced", "aggression": 1.0,
+     "desc_fr": "Conseiller charismatique. Son carnet d'adresses vaut de l'or.",
+     "desc_en": "Charismatic advisor. His rolodex is worth its weight in gold."},
 ]
 
 
@@ -36,9 +51,13 @@ def ensure(player, rng=None):
     for prof in RIVAL_PROFILES:
         player.rivals.append({
             "name": prof["name"], "firm": prof["firm"], "track": prof["track"],
+            "style": prof.get("style", "balanced"),
+            "aggression": prof.get("aggression", 1.0),
             "score": round(config.START_CASH * rng.uniform(0.7, 1.7), 2),
             "last": _L("se positionne sur le marché", "positions itself in the market"),
             "mood": "flat",
+            "positions": {},   # ticker -> {"qty": int, "entry": float}
+            "taunt_cooldown": 0,  # pas restants avant prochain message inbox
         })
 
 
@@ -275,6 +294,277 @@ def act(player, market, rng=None):
             _log_rival_event(player, ev)
 
     return events
+
+
+# ---------------------------------------------------------------------------
+# TRADING ACTIF DES RIVAUX — chaque rival prend des positions visibles
+# ---------------------------------------------------------------------------
+RIVAL_TRADE_PROB = 0.25       # probabilité qu'un rival trade ce pas
+RIVAL_MAX_POSITIONS = 5       # max de positions simultanées par rival
+
+
+def step_trading(player, market, rng=None):
+    """Fait trader les rivaux : ouverture/fermeture de positions, réallocation.
+    Leurs positions influencent leur score (P&L latent) et sont visibles dans
+    la scène rivaux. Chaque rival a un style qui influence ses choix.
+
+    Styles :
+    - aggressive : concentre ses positions, forte exposition, turnover élevé
+    - conservative : diversifié, exposition modérée, peu de turnover
+    - momentum : suit les tendances récentes (achète ce qui monte)
+    - value : contrarian (achète ce qui a baissé)
+    - balanced : mélange équilibré
+    """
+    rng = rng or random
+    ensure(player, rng)
+    if not hasattr(market, "companies") or not market.companies:
+        return
+
+    n_stocks = len(market.companies)
+    if n_stocks == 0:
+        return
+
+    for r in player.rivals:
+        style = r.get("style", "balanced")
+        aggression = r.get("aggression", 1.0)
+
+        # Décide si le rival trade ce pas (modulé par l'agressivité)
+        if rng.random() > RIVAL_TRADE_PROB * aggression:
+            continue
+
+        positions = r.get("positions", {})
+        prices = getattr(market, "price", None)
+        if prices is None:
+            continue
+
+        # Fermeture aléatoire d'une position existante
+        if positions and rng.random() < 0.3 * aggression:
+            tk = rng.choice(list(positions.keys()))
+            pos = positions.pop(tk)
+            i = market.ticker_idx.get(tk)
+            if i is not None:
+                pnl = (float(prices[i]) - pos["entry"]) * pos["qty"]
+                r["score"] += pnl
+            r["last"] = _L(f"cède sa position sur {tk}", f"exits {tk} position")
+            r["mood"] = "up" if pnl > 0 else "down"
+
+        # Ouverture d'une nouvelle position (si capacité restante)
+        if len(positions) < RIVAL_MAX_POSITIONS and rng.random() < 0.5 * aggression:
+            # Choisit un ticker selon le style
+            if style == "momentum":
+                # Préfère les titres qui ont monté récemment
+                candidates = _top_momentum(market, 20, rng)
+            elif style == "value":
+                # Préfère les titres qui ont baissé
+                candidates = _bottom_momentum(market, 20, rng)
+            elif style == "aggressive":
+                # Concentré sur peu de titres, fortes capis
+                candidates = _top_caps(market, 10, rng)
+            else:
+                # Balanced / conservative : diversifié
+                candidates = list(range(n_stocks))
+                rng.shuffle(candidates)
+
+            for idx in candidates:
+                tk = market.companies[idx]["ticker"]
+                if tk in positions:
+                    continue
+                price = float(prices[idx])
+                # Taille de position : modulée par l'agressivité
+                qty = int(rng.uniform(50, 300) * aggression)
+                positions[tk] = {"qty": qty, "entry": price, "step": market.step_count}
+                r["last"] = _L(f"prend position sur {tk}", f"takes position in {tk}")
+                r["mood"] = "flat"
+                break
+
+        r["positions"] = positions
+
+    # Mise à jour du score des rivaux basée sur le P&L latent de leurs positions
+    _update_rival_scores_from_positions(player, market)
+
+
+def _top_momentum(market, n, rng):
+    """Retourne les indices des n sociétés avec la meilleure performance récente."""
+    prices = getattr(market, "price", None)
+    prev = getattr(market, "prev_price", None)
+    if prices is None or prev is None:
+        return []
+    rets = [(i, (float(prices[i]) / float(prev[i]) - 1) if float(prev[i]) > 0 else 0)
+            for i in range(len(prices))]
+    rets.sort(key=lambda x: x[1], reverse=True)
+    return [i for i, _ in rets[:n]]
+
+
+def _bottom_momentum(market, n, rng):
+    """Retourne les indices des n sociétés avec la pire performance récente."""
+    prices = getattr(market, "price", None)
+    prev = getattr(market, "prev_price", None)
+    if prices is None or prev is None:
+        return []
+    rets = [(i, (float(prices[i]) / float(prev[i]) - 1) if float(prev[i]) > 0 else 0)
+            for i in range(len(prices))]
+    rets.sort(key=lambda x: x[1])
+    return [i for i, _ in rets[:n]]
+
+
+def _top_caps(market, n, rng):
+    """Retourne les indices des n plus grosses capitalisations."""
+    prices = getattr(market, "price", None)
+    shares = getattr(market, "shares", None)
+    if prices is None or shares is None:
+        return []
+    caps = [(i, float(prices[i]) * float(shares[i])) for i in range(len(prices))]
+    caps.sort(key=lambda x: x[1], reverse=True)
+    return [i for i, _ in caps[:n]]
+
+
+def _update_rival_scores_from_positions(player, market):
+    """Met à jour le score des rivaux en fonction du P&L latent de leurs positions.
+    Le score évolue progressivement (10% du P&L latent par pas) pour éviter
+    les sauts brutaux."""
+    prices = getattr(market, "price", None)
+    if prices is None:
+        return
+    for r in player.rivals:
+        positions = r.get("positions", {})
+        if not positions:
+            continue
+        total_pnl = 0.0
+        for tk, pos in list(positions.items()):
+            i = market.ticker_idx.get(tk)
+            if i is None:
+                continue
+            pnl = (float(prices[i]) - pos["entry"]) * pos["qty"]
+            total_pnl += pnl
+        # Lissage : on n'incorpore que 10% du P&L latent par pas
+        r["score"] += total_pnl * 0.10
+
+
+# ---------------------------------------------------------------------------
+# MESSAGES INBOX DES RIVAUX — provocations, défis, commentaires
+# ---------------------------------------------------------------------------
+TAUNT_COOLDOWN_MIN = 40   # pas minimum entre deux messages d'un même rival
+TAUNT_COOLDOWN_MAX = 90
+TAUNT_PROB_PER_STEP = 0.03  # probabilité qu'un rival envoie un message ce pas
+
+
+# Messages de provocation par style et contexte
+_TAUNTS = {
+    "aggressive": [
+        (_L("Tu traînes, {player}. À ce rythme, je te rachète avant la fin du trimestre.",
+            "You're lagging, {player}. At this rate, I'll buy you out before quarter-end."),
+         "bad"),
+        (_L("Encore un deal que tu as laissé filer ? Quelle surprise.",
+            "Another deal you let slip? What a surprise."),
+         "bad"),
+        (_L("Mon dernier closing ? {val} M. Et toi, tu fais quoi de tes journées ?",
+            "My latest closing? {val}M. What are you doing with your days?"),
+         "bad"),
+    ],
+    "conservative": [
+        (_L("J'ai couvert mon exposition avant la tempête. Et toi, {player} ?",
+            "I hedged my exposure before the storm. What about you, {player}?"),
+         "info"),
+        (_L("La prudence paie. Mon Sharpe ratio ce trimestre est excellent.",
+            "Prudence pays off. My Sharpe ratio this quarter is excellent."),
+         "info"),
+    ],
+    "momentum": [
+        (_L("Mes algos ont détecté la tendance avant tout le monde. Désolé, {player}.",
+            "My algos caught the trend before anyone else. Sorry, {player}."),
+         "bad"),
+        (_L("Le marché te dépasse, {player}. Passe au quant, on t'apprendra.",
+            "The market is leaving you behind, {player}. Switch to quant, we'll teach you."),
+         "bad"),
+    ],
+    "value": [
+        (_L("J'achète ce que tu vends, {player}. On en reparle dans 2 ans.",
+            "I'm buying what you're selling, {player}. Let's talk in 2 years."),
+         "info"),
+        (_L("Le marché panique, j'accumule. Les bonnes affaires sont là.",
+            "The market panics, I accumulate. The bargains are here."),
+         "info"),
+    ],
+    "balanced": [
+        (_L("Beau parcours, {player}. Mais le classement ne ment pas.",
+            "Nice run, {player}. But the rankings don't lie."),
+         "info"),
+        (_L("On se croisera au prochain deal. Que le meilleur gagne.",
+            "We'll meet at the next deal. May the best one win."),
+         "info"),
+    ],
+}
+
+# Messages quand le rival dépasse le joueur au classement
+_TAUNT_OVERTAKE = [
+    (_L("{rival} vous dépasse au classement. « Je te l'avais dit, {player}. »",
+        "{rival} overtakes you in the rankings. \"Told you, {player}.\""),
+     "bad"),
+    (_L("{rival} est maintenant devant vous. « Rien de personnel, {player}. »",
+        "{rival} is now ahead of you. \"Nothing personal, {player}.\""),
+     "bad"),
+]
+
+# Messages quand le joueur dépasse un rival
+_TAUNT_OVERTAKEN = [
+    (_L("{rival} accuse le coup. « Profite de ta chance, {player}, ça ne durera pas. »",
+        "{rival} is reeling. \"Enjoy your luck, {player}, it won't last.\""),
+     "info"),
+]
+
+
+def generate_taunt(player, market, rng=None):
+    """Génère un message inbox d'un rival (provocation, commentaire).
+    À appeler à chaque pas de marché. Retourne None ou un dict message
+    compatible avec core/inbox.py (expéditeur, sujet, corps, kind)."""
+    rng = rng or random
+    ensure(player, rng)
+    if not player.rivals:
+        return None
+
+    # Vérifie les cooldowns
+    for r in player.rivals:
+        cd = r.get("taunt_cooldown", 0)
+        if cd > 0:
+            r["taunt_cooldown"] = cd - 1
+
+    # Probabilité qu'un message soit envoyé ce pas
+    if rng.random() > TAUNT_PROB_PER_STEP * len(player.rivals):
+        return None
+
+    # Choisit un rival qui n'est pas en cooldown
+    available = [r for r in player.rivals if r.get("taunt_cooldown", 0) <= 0]
+    if not available:
+        return None
+
+    rival = rng.choice(available)
+    style = rival.get("style", "balanced")
+    player_name = getattr(player, "name", "Vous")
+
+    # Vérifie si le rival vient de dépasser le joueur
+    pscore = player_score(player, market)
+    if rival["score"] > pscore and rng.random() < 0.4:
+        tmpl = rng.choice(_TAUNT_OVERTAKE)
+        body = tmpl[0].replace("{rival}", rival["name"]).replace("{player}", player_name)
+        kind = tmpl[1]
+    else:
+        taunts = _TAUNTS.get(style, _TAUNTS["balanced"])
+        tmpl = rng.choice(taunts)
+        val_m = round(rival["score"] / 1_000_000, 1)
+        body = tmpl[0].replace("{player}", player_name).replace("{val}", str(val_m))
+        kind = tmpl[1]
+
+    # Pose le cooldown
+    rival["taunt_cooldown"] = rng.randint(TAUNT_COOLDOWN_MIN, TAUNT_COOLDOWN_MAX)
+
+    return {
+        "sender": rival["name"],
+        "sender_firm": rival["firm"],
+        "subject": _L(f"Message de {rival['name']}", f"Message from {rival['name']}"),
+        "body": body,
+        "kind": kind,
+        "is_rival": True,
+    }
 
 
 # ---------------------------------------------------------------------------

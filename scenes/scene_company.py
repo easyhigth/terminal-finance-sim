@@ -613,14 +613,19 @@ class CompanyScene(Scene):
             widgets.draw_candles(surf, inner, hist, n_candles=32, sma_windows=(10, 30))
             self._x_labels(surf, inner, len(hist))
         elif self.chart_kind == "line":
-            col = config.COL_UP if hist[-1] >= hist[0] else config.COL_DOWN
+            # Couleur de tendance pour le trait, mais remplissage très subtil
+            # (presque transparent) pour éviter l'aspect « gros bloc de couleur »
+            # quand le cours a beaucoup baissé.
+            trend_col = config.COL_UP if hist[-1] >= hist[0] else config.COL_DOWN
             tier = liquidity.equity_tier(m, self.ticker)
             half_spread = liquidity.params(tier)[0]
-            widgets.draw_series(surf, inner, hist, col, baseline=False,
+            widgets.draw_series(surf, inner, hist, trend_col, baseline=False,
                                 mouse_pos=pygame.mouse.get_pos(),
                                 y_fmt=lambda v: f"{v:,.2f} {self.cur}", show_pct=True,
-                                band_frac=half_spread, show_current_line=True,
-                                line_width=2, area_alpha=45)
+                                show_current_line=True,
+                                line_width=2, area_fill=False)
+            # Carnet déplacé à droite du graphe pour ne pas masquer le début de
+            # la courbe ; affiché avant les labels d'axe X.
             self._draw_orderbook(surf, inner, hist[-1], tier, half_spread)
             self._x_labels(surf, inner, len(hist))
         elif self.chart_kind == "vol":
@@ -631,7 +636,8 @@ class CompanyScene(Scene):
             else:
                 widgets.draw_series(surf, inner, vol, config.COL_WARN,
                                     mouse_pos=pygame.mouse.get_pos(),
-                                    y_fmt=lambda v: f"{v:.1f}%")
+                                    y_fmt=lambda v: f"{v:.1f}%",
+                                    line_width=2, area_alpha=25)
                 widgets.draw_text(surf, f"Vol. annualisée (20 pas) = {vol[-1]:.1f}%",
                                   (inner.x, inner.y), fonts.tiny(bold=True), config.COL_WARN)
                 self._x_labels(surf, inner, len(vol))
@@ -658,7 +664,7 @@ class CompanyScene(Scene):
         profondeur de marché avant un gros ordre."""
         lots = self._DEPTH_LOTS.get(tier, self._DEPTH_LOTS["Peu liquide"])
         bw, rh = 116, 13
-        panel = pygame.Rect(rect.x + 6, rect.y + 6, bw, rh * 7 + 6)
+        panel = pygame.Rect(rect.right - bw - 6, rect.y + 6, bw, rh * 7 + 6)
         bg = pygame.Surface((panel.w, panel.h), pygame.SRCALPHA)
         bg.fill((10, 12, 18, 180))
         surf.blit(bg, panel.topleft)

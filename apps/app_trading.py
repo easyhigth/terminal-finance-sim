@@ -236,14 +236,21 @@ class TradingApp(DesktopApp):
     def _confirm_order(self):
         tk = self._order_prompt["ticker"]
         try:
-            trigger = float(self._order_price_str)
+            val = float(self._order_price_str)
         except ValueError:
-            self.msg = "Seuil invalide."
+            self.msg = "Valeur invalide."
             return
-        r = CO.place(self.app.gs.player, self.market, tk, self._order_kind, trigger)
+        if self._order_kind == "trailing":
+            r = CO.place_trailing(self.app.gs.player, self.market, tk, val)
+        else:
+            r = CO.place(self.app.gs.player, self.market, tk, self._order_kind, val)
         if r["ok"]:
-            label = "Stop-loss" if self._order_kind == "stop" else "Take-profit"
-            self.msg = f"{label} posé sur {tk} à {trigger:,.2f}."
+            labels = {"stop": "Stop-loss", "target": "Take-profit", "trailing": "Trailing stop"}
+            label = labels.get(self._order_kind, "Ordre")
+            if self._order_kind == "trailing":
+                self.msg = f"{label} posé sur {tk} à {val:.1f}%."
+            else:
+                self.msg = f"{label} posé sur {tk} à {val:,.2f}."
             self._order_prompt = None
             self._order_focus = False
         else:
@@ -475,10 +482,16 @@ class TradingApp(DesktopApp):
             for order in orders:
                 if oy + COND_ROW_H > cond_area.bottom:
                     break
-                label = "Stop-loss" if order["kind"] == "stop" else "Take-profit"
+                labels = {"stop": "Stop-loss", "target": "Take-profit", "trailing": "Trailing"}
+                label = labels.get(order["kind"], "Ordre")
+                short_tag = " (short)" if order.get("is_short") else ""
                 qty_txt = "tout" if order["qty"] == "ALL" else f"{order['qty']:g}"
+                if order["kind"] == "trailing":
+                    trig_txt = f"{order.get('distance_pct', 0):.1f}%"
+                else:
+                    trig_txt = f"{order['trigger']:,.2f}"
                 widgets.draw_text(surf,
-                                  f"{order['ticker']} · {label} @ {order['trigger']:,.2f} ({qty_txt})",
+                                  f"{order['ticker']}{short_tag} · {label} @ {trig_txt} ({qty_txt})",
                                   (cond_area.x + 6, oy), fonts.tiny(), config.COL_TEXT)
                 cx = pygame.Rect(cond_area.right - 20, oy, 14, 14)
                 self._cond_cancel_rects[order["id"]] = cx
@@ -628,18 +641,24 @@ class TradingApp(DesktopApp):
 
         self._order_kind_rects = {}
         x = box.x + 12
-        for kind, label in (("stop", "Stop-loss"), ("target", "Take-profit")):
-            w = 130
+        kind_opts = [("stop", "Stop-loss", config.COL_DOWN),
+                     ("target", "Take-profit", config.COL_UP),
+                     ("trailing", "Trailing", config.COL_CYAN)]
+        for kind, label, col in kind_opts:
+            w = 96
             r = pygame.Rect(x, box.y + 48, w, 24)
             self._order_kind_rects[kind] = r
             active = (kind == self._order_kind)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if active else config.COL_BG, r, border_radius=4)
-            col = config.COL_DOWN if kind == "stop" else config.COL_UP
             pygame.draw.rect(surf, col if active else config.COL_BORDER, r, 2 if active else 1, border_radius=4)
             widgets.draw_text(surf, label, r.center, fonts.tiny(bold=True), col, align="center")
-            x += w + 8
+            x += w + 6
 
-        widgets.draw_text(surf, "Seuil de déclenchement :", (box.x + 12, box.y + 82),
+        if self._order_kind == "trailing":
+            hint = "Distance (% du cours) :"
+        else:
+            hint = "Seuil de déclenchement :"
+        widgets.draw_text(surf, hint, (box.x + 12, box.y + 82),
                           fonts.tiny(), config.COL_TEXT_DIM)
         self._order_price_rect = pygame.Rect(box.x + 12, box.y + 98, box.w - 24, 26)
         pygame.draw.rect(surf, config.COL_BG, self._order_price_rect, border_radius=4)

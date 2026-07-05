@@ -494,6 +494,7 @@ class GameState:
             # avant une liquidation forcée (subie) sur la position réduite.
             if getattr(p, "conditional_orders", None):
                 from core import conditional_orders as _condord
+                _condord.update_trailing_stops(p, market)
                 conditional_orders_executed = _condord.execute_due(p, market)
             financing = portfolio.accrue_financing(p, market, config.DAYS_PER_STEP)
             margin_call = portfolio.check_margin_call(p, market)

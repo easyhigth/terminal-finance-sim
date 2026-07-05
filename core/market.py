@@ -462,6 +462,10 @@ class Market(MarketQueryMixin):
             if cr.severity >= CRISIS_SEVERE_SEVERITY:
                 self.crisis_cooldown = max(self.crisis_cooldown, CRISIS_COOLDOWN_STEPS)
 
+        # Détection de crise ENDOGÈNE : le marché peut générer ses propres crises
+        # quand les indicateurs de stress s'accumulent, sans injection manuelle.
+        self._check_endogenous_crisis()
+
         # résorption progressive des bumps de crédit régionaux (politique) :
         # décroissance déterministe (aucun tirage RNG → prix inchangés).
         for r in self.region_credit_bump:
@@ -592,6 +596,133 @@ class Market(MarketQueryMixin):
         if lvl < 60.0:
             return "Tension"
         return "Panique"
+
+    # -----------------------------------------------------------------
+    # Crises ENDOGÈNES — le marché génère ses propres crises
+    # -----------------------------------------------------------------
+    # Seuils et probabilités de déclenchement automatique.
+    # Le système surveille plusieurs indicateurs de stress et, quand ils
+    # s'accumulent, peut déclencher une crise sans injection manuelle.
+    # Les crises endogènes sont moins sévères que les crises scénarisées
+    # (injectées par le jeu) mais créent une ambiance de marché vivante.
+    _ENDO_CRISIS_COOLDOWN = 30     # pas minimum entre deux crises endogènes
+    _ENDO_CRISIS_TENSION_MIN = 35  # tension minimum pour envisager une crise
+    _ENDO_CRISIS_BASE_PROB = 0.04  # probabilité de base par pas (quand tension > min)
+
+    def _check_endogenous_crisis(self):
+        """Surveille les indicateurs de stress et peut déclencher une crise
+        endogène (krach éclair, crise de crédit, panique, liquidité).
+        N'agit pas si un cooldown est actif ou si des crises sont déjà en cours."""
+        # Pas de crise endogène pendant le cooldown post-crise majeure
+        if self.crisis_cooldown > 0:
+            return
+        # Pas de crise endogène si une crise est déjà active
+        if self.crises:
+            return
+        # Pas de crise endogène avant la fin du warmup
+        if self.step_count < WARMUP_STEPS:
+            return
+
+        # Cooldown interne entre crises endogènes
+        if not hasattr(self, '_endo_cooldown'):
+            self._endo_cooldown = 0
+        if self._endo_cooldown > 0:
+            self._endo_cooldown -= 1
+            return
+
+        tension = self.tension_level()
+        if tension < self._ENDO_CRISIS_TENSION_MIN:
+            return
+
+        # Probabilité croissante avec la tension
+        prob = self._ENDO_CRISIS_BASE_PROB * (tension / self._ENDO_CRISIS_TENSION_MIN) ** 1.5
+        if self.rng.random_sample() > prob:
+            return
+
+        # Détermine le type de crise selon les indicateurs dominants
+        crisis = self._pick_endogenous_crisis()
+        if crisis:
+            self.add_crisis(crisis)
+            self._endo_cooldown = self._ENDO_CRISIS_COOLDOWN
+
+    def _pick_endogenous_crisis(self):
+        """Choisit le type de crise endogène selon les indicateurs de stress
+        dominants. Retourne un objet Crisis ou None."""
+        # Mesure les contributeurs au stress
+        vol_contrib = getattr(self, 'world_vol_mult_state', 1.0)
+        credit_contrib = sum(abs(v) for v in self.region_credit_bump.values())
+        regime_bad = 1.0 if self.regime in ("Volatil", "Récession") else 0.0
+        macro_bad = 0.0
+        if hasattr(self, 'macro'):
+            g = self.macro.get("growth", {}).get("v", 0)
+            inf = self.macro.get("inflation", {}).get("v", 0)
+            if g < -0.01:
+                macro_bad += 0.5
+            if inf > 0.04:
+                macro_bad += 0.5
+
+        # Score composite de stress
+        total_stress = vol_contrib * 0.3 + min(credit_contrib * 5, 0.4) + regime_bad * 0.2 + macro_bad * 0.1
+
+        # Choisit le type de crise le plus probable selon le profil de stress
+        candidates = []
+
+        # Krach éclair : dominante volatilité
+        if vol_contrib > 1.3:
+            candidates.append((
+                Crisis("Krach éclair", steps=3, world=-0.06, vol_mult=1.8,
+                       severity=1.1, kind="bad"),
+                vol_contrib * 2
+            ))
+
+        # Crise de crédit : dominante spreads
+        if credit_contrib > 0.02:
+            candidates.append((
+                Crisis("Crise de crédit", steps=5, world=-0.03, vol_mult=1.4,
+                       sectors={"Finance": -0.04, "Immobilier": -0.05},
+                       severity=1.2, kind="bad"),
+                credit_contrib * 30
+            ))
+
+        # Panique de marché : régime + macro
+        if regime_bad > 0 and macro_bad > 0.3:
+            candidates.append((
+                Crisis("Panique de marché", steps=4, world=-0.05, vol_mult=1.6,
+                       severity=1.3, kind="bad"),
+                1.5
+            ))
+
+        # Crise de liquidité : vol + corrélation élevées
+        if vol_contrib > 1.5 and self.regime in ("Volatil", "Récession"):
+            candidates.append((
+                Crisis("Crise de liquidité", steps=4, world=-0.04, vol_mult=1.5,
+                       severity=1.0, kind="bad"),
+                1.2
+            ))
+
+        # Crise sectorielle : concentrée sur un secteur
+        if total_stress > 0.4:
+            sector = self.rng.choice(["Tech", "Énergie", "Finance", "Santé", "Industrie"])
+            candidates.append((
+                Crisis(f"Crise sectorielle — {sector}", steps=3, world=-0.02,
+                       sectors={sector: -0.06}, vol_mult=1.3, severity=0.9, kind="bad"),
+                0.8
+            ))
+
+        if not candidates:
+            # Crise par défaut : mini-krach
+            return Crisis("Mini-krach", steps=2, world=-0.03, vol_mult=1.3,
+                          severity=0.8, kind="bad")
+
+        # Tirage pondéré parmi les candidats
+        total_w = sum(w for _, w in candidates)
+        r = self.rng.random_sample() * total_w
+        cumulative = 0.0
+        for crisis, weight in candidates:
+            cumulative += weight
+            if r <= cumulative:
+                return crisis
+        return candidates[-1][0]
 
     def _prepare_next_earnings(self, idx):
         """Tire À L'AVANCE la surprise et la guidance du PROCHAIN print pour les

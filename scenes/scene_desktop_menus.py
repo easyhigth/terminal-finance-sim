@@ -9,7 +9,7 @@ import pygame
 
 from core import app_catalog, config, desktop_onboarding, desktop_tutorial, experience_mode, fuzzy
 from scenes.scene_desktop_common import _L, APPS, TASKBAR_H, TOPBAR_H, _scene_label
-from ui import fonts, keynav, widgets
+from ui import fonts, keynav, style, widgets
 
 START_COLS = 4
 START_BTN_W = 280
@@ -87,8 +87,9 @@ class DesktopMenusMixin:
         shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
         shade.fill((0, 0, 0, 160))
         surf.blit(shade, (0, 0))
-        pygame.draw.rect(surf, config.COL_PANEL, box)
-        pygame.draw.rect(surf, config.COL_AMBER, box, 2)
+        style.draw_window_shadow(surf, box, focused=True)
+        style.draw_glass_panel(surf, box, alpha=215, border_color=config.COL_AMBER,
+                               radius=style.RADIUS_LG)
         widgets.draw_text(surf, _L("RECHERCHE (Ctrl+/) — positions, watchlist, inbox, mandats, deals",
                                    "SEARCH (Ctrl+/) — positions, watchlist, inbox, mandates, deals"),
                           (box.x + 14, box.y + 12), fonts.small(bold=True), config.COL_AMBER)
@@ -298,11 +299,9 @@ class DesktopMenusMixin:
         x = min(x, config.SCREEN_WIDTH - w - 4)
         y = min(y, config.SCREEN_HEIGHT - h - 4)
         panel = pygame.Rect(x, y, w, h)
-        shadow = pygame.Surface((w + 8, h + 8), pygame.SRCALPHA)
-        shadow.fill((0, 0, 0, 110))
-        surf.blit(shadow, (x + 3, y + 4))
-        pygame.draw.rect(surf, config.COL_PANEL, panel)
-        pygame.draw.rect(surf, config.COL_AMBER, panel, 1)
+        style.draw_window_shadow(surf, panel, focused=True)
+        style.draw_glass_panel(surf, panel, alpha=225, border_color=config.COL_AMBER,
+                               radius=style.RADIUS_MD)
         mp = pygame.mouse.get_pos()
         menu["rects"] = []
         iy = y + pad
@@ -450,10 +449,11 @@ class DesktopMenusMixin:
         surf.blit(shade, (0, 0))
         panel = pygame.Rect(30, TOPBAR_H + 20, config.SCREEN_WIDTH - 60,
                            config.SCREEN_HEIGHT - TOPBAR_H - TASKBAR_H - 40)
-        pygame.draw.rect(surf, config.COL_PANEL, panel)
-        pygame.draw.rect(surf, config.COL_AMBER, panel, 2)
+        style.draw_window_shadow(surf, panel, focused=True)
+        style.draw_glass_panel(surf, panel, alpha=210, border_color=config.COL_AMBER,
+                               radius=style.RADIUS_LG)
         widgets.draw_text(surf, _L("APPLICATIONS — ouvrir en fenêtre", "APPLICATIONS — open as a window"),
-                          (panel.x + 16, panel.y + 10), fonts.head(bold=True), config.COL_AMBER)
+                          (panel.x + 16, panel.y + 10), fonts.ui_head(bold=True), config.COL_AMBER)
 
         search_rect = pygame.Rect(panel.x + 16, panel.y + 34, 320, 24)
         pygame.draw.rect(surf, config.COL_BG, search_rect, border_radius=4)

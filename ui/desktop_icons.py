@@ -10,9 +10,11 @@ partout, quelle que soit la police système.
 """
 import pygame
 
+from ui import style
+
 
 def _research(surf, cx, cy, col):
-    pygame.draw.circle(surf, col, (cx - 4, cy - 4), 10, 2)
+    style.draw_aa_circle(surf, (cx - 4, cy - 4), 10, col, 2)
     pygame.draw.line(surf, col, (cx + 3, cy + 3), (cx + 11, cy + 11), 3)
 
 
@@ -42,14 +44,14 @@ def _terminal(surf, cx, cy, col):
 def _ma(surf, cx, cy, col):
     for dx, dy in ((-1, -1), (-1, 1), (1, -1), (1, 1)):
         pygame.draw.line(surf, col, (cx + dx * 13, cy + dy * 9), (cx, cy), 3)
-    pygame.draw.circle(surf, col, (cx, cy), 3)
+    style.draw_aa_filled_circle(surf, (cx, cy), 3, col)
 
 
 def _risk(surf, cx, cy, col):
     pts = [(cx, cy - 13), (cx - 13, cy + 11), (cx + 13, cy + 11)]
     pygame.draw.polygon(surf, col, pts, 2)
     pygame.draw.line(surf, col, (cx, cy - 3), (cx, cy + 3), 2)
-    pygame.draw.circle(surf, col, (cx, cy + 7), 1)
+    style.draw_aa_filled_circle(surf, (cx, cy + 7), 1, col)
 
 
 def _quant(surf, cx, cy, col):
@@ -58,7 +60,7 @@ def _quant(surf, cx, cy, col):
 
 
 def _portfolio(surf, cx, cy, col):
-    pygame.draw.circle(surf, col, (cx, cy), 12, 2)
+    style.draw_aa_circle(surf, (cx, cy), 12, col, 2)
     pygame.draw.line(surf, col, (cx, cy), (cx, cy - 12), 2)
     pygame.draw.line(surf, col, (cx, cy), (cx + 10, cy + 7), 2)
 
@@ -91,7 +93,7 @@ def _generic(surf, cx, cy, col):
 def _market(surf, cx, cy, col):
     pts = [(cx - 12, cy + 8), (cx - 4, cy - 2), (cx + 4, cy + 4), (cx + 12, cy - 10)]
     pygame.draw.lines(surf, col, False, pts, 2)
-    pygame.draw.circle(surf, col, pts[-1], 2)
+    style.draw_aa_filled_circle(surf, pts[-1], 2, col)
 
 
 def _book(surf, cx, cy, col):
@@ -105,7 +107,7 @@ def _book(surf, cx, cy, col):
 def _alert(surf, cx, cy, col):
     pygame.draw.arc(surf, col, (cx - 9, cy - 12, 18, 18), 0.3, 2.85, 2)
     pygame.draw.line(surf, col, (cx - 9, cy + 2), (cx + 9, cy + 2), 2)
-    pygame.draw.circle(surf, col, (cx, cy + 8), 2)
+    style.draw_aa_filled_circle(surf, (cx, cy + 8), 2, col)
 
 
 def _inbox(surf, cx, cy, col):
@@ -138,13 +140,13 @@ def _decide(surf, cx, cy, col):
     pygame.draw.line(surf, col, (cx, cy - 12), (cx, cy - 2), 2)
     pygame.draw.line(surf, col, (cx, cy - 2), (cx - 9, cy + 10), 2)
     pygame.draw.line(surf, col, (cx, cy - 2), (cx + 9, cy + 10), 2)
-    pygame.draw.circle(surf, col, (cx - 9, cy + 12), 2)
-    pygame.draw.circle(surf, col, (cx + 9, cy + 12), 2)
+    style.draw_aa_filled_circle(surf, (cx - 9, cy + 12), 2, col)
+    style.draw_aa_filled_circle(surf, (cx + 9, cy + 12), 2, col)
 
 
 def _examcert(surf, cx, cy, col):
-    pygame.draw.circle(surf, col, (cx, cy - 4), 9, 2)
-    pygame.draw.circle(surf, col, (cx, cy - 4), 4)
+    style.draw_aa_circle(surf, (cx, cy - 4), 9, col, 2)
+    style.draw_aa_filled_circle(surf, (cx, cy - 4), 4, col)
     pygame.draw.polygon(surf, col, [(cx - 6, cy + 3), (cx - 2, cy + 13), (cx - 6, cy + 10)])
     pygame.draw.polygon(surf, col, [(cx + 6, cy + 3), (cx + 2, cy + 13), (cx + 6, cy + 10)])
 
@@ -160,11 +162,11 @@ def _wall(surf, cx, cy, col):
 def _shop(surf, cx, cy, col):
     pygame.draw.polygon(surf, col, [(cx - 12, cy - 10), (cx + 4, cy - 10), (cx + 12, cy + 2),
                                     (cx - 4, cy + 12), (cx - 12, cy)], 2)
-    pygame.draw.circle(surf, col, (cx + 4, cy - 4), 2)
+    style.draw_aa_filled_circle(surf, (cx + 4, cy - 4), 2, col)
 
 
 def _explorer(surf, cx, cy, col):
-    pygame.draw.circle(surf, col, (cx, cy), 12, 2)
+    style.draw_aa_circle(surf, (cx, cy), 12, col, 2)
     pygame.draw.polygon(surf, col, [(cx, cy - 7), (cx + 3, cy), (cx, cy + 7), (cx - 3, cy)], 1)
 
 
@@ -183,10 +185,10 @@ def _save(surf, cx, cy, col):
 
 
 def _help(surf, cx, cy, col):
-    pygame.draw.circle(surf, col, (cx, cy), 12, 2)
+    style.draw_aa_circle(surf, (cx, cy), 12, col, 2)
     pygame.draw.arc(surf, col, (cx - 5, cy - 8, 10, 10), 3.4, 6.2, 2)
     pygame.draw.line(surf, col, (cx, cy + 1), (cx, cy + 3), 2)
-    pygame.draw.circle(surf, col, (cx, cy + 7), 1)
+    style.draw_aa_filled_circle(surf, (cx, cy + 7), 1, col)
 
 
 def _star(surf, cx, cy, col):
@@ -213,8 +215,8 @@ def _bell(surf, cx, cy, col):
     d'alerte de prix) : une vraie forme de cloche, corps + battant + anse."""
     pygame.draw.arc(surf, col, (cx - 10, cy - 12, 20, 22), 0.15, 2.99, 2)
     pygame.draw.line(surf, col, (cx - 10, cy + 5), (cx + 10, cy + 5), 2)
-    pygame.draw.circle(surf, col, (cx, cy + 11), 2)
-    pygame.draw.circle(surf, col, (cx, cy - 13), 2, 1)
+    style.draw_aa_filled_circle(surf, (cx, cy + 11), 2, col)
+    style.draw_aa_circle(surf, (cx, cy - 13), 2, col, 1)
 
 
 _ICONS = {

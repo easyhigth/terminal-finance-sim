@@ -15,7 +15,7 @@ import pygame
 
 from core import config
 from core.sim_clock import SPEEDS
-from ui import fonts, widgets
+from ui import fonts, style, widgets
 
 BTN_W, BTN_H = 30, 20
 GAP = 4
@@ -80,8 +80,8 @@ def _draw_gear(surf, rect, col):
     # roue simplifiée : disque + couronne de dents, lisible à petite taille
     cx, cy = rect.center
     r = rect.h // 2 - 2
-    pygame.draw.circle(surf, col, (cx, cy), r, 1)
-    pygame.draw.circle(surf, col, (cx, cy), max(1, r // 3))
+    style.draw_aa_circle(surf, (cx, cy), r, col, 1)
+    style.draw_aa_filled_circle(surf, (cx, cy), max(1, r // 3), col)
     import math
     for k in range(8):
         a = k * math.pi / 4

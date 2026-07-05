@@ -6,7 +6,7 @@ Bloomberg : panneaux à bordure fine, en-têtes ambre, texte monospace.
 import pygame
 
 from core import config
-from ui import fonts
+from ui import fonts, style
 
 
 # ---------------------------------------------------------------------------
@@ -709,15 +709,32 @@ def draw_scrollbar(surf, panel_rect, list_area, scroll, max_scroll, content_h):
         return scroll
     panel_rect = pygame.Rect(panel_rect)
     list_area = pygame.Rect(list_area)
-    track = pygame.Rect(panel_rect.right - 8, list_area.y, 6, list_area.h)
-    pygame.draw.rect(surf, config.COL_PANEL, track, border_radius=3)
+    mx, my = pygame.mouse.get_pos()
+
+    # piste fine et discrète (4 px), collée au bord droit
+    track_w = 4
+    track_x = panel_rect.right - 6
+    track = pygame.Rect(track_x, list_area.y, track_w, list_area.h)
+    # fond de piste très subtil, presque transparent
+    track_surf = pygame.Surface((track.w, track.h), pygame.SRCALPHA)
+    track_surf.fill((*config.COL_BORDER, 60))
+    surf.blit(track_surf, track.topleft)
+    pygame.draw.rect(surf, (*config.COL_BORDER, 90), track, border_radius=style.RADIUS_SM)
+
     frac = list_area.h / (content_h or 1)
     bar_h = max(24, int(list_area.h * frac))
     bar_y = list_area.y + int((list_area.h - bar_h) * (scroll / max_scroll))
-    pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 6, bar_h), border_radius=3)
+    bar_rect = pygame.Rect(track_x, bar_y, track_w, bar_h)
 
-    grab_zone = track.inflate(10, 0)
-    mx, my = pygame.mouse.get_pos()
+    # élargir le curseur au survol pour un feedback moderne
+    hover = bar_rect.inflate(8, 0).collidepoint(mx, my)
+    if hover:
+        bar_rect.inflate_ip(3, 0)
+        bar_rect.x -= 1
+    bar_color = config.COL_AMBER_DIM if hover else config.COL_TEXT_DIM
+    pygame.draw.rect(surf, bar_color, bar_rect, border_radius=style.RADIUS_SM)
+
+    grab_zone = track.inflate(14, 0)
     if pygame.mouse.get_pressed()[0] and grab_zone.collidepoint(mx, my):
         rel = (my - bar_h // 2 - list_area.y) / max(1, list_area.h - bar_h)
         return max(0, min(max_scroll, int(rel * max_scroll)))

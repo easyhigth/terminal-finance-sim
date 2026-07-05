@@ -17,7 +17,7 @@ surface, pour rester compatible avec les widgets existants (`ui/widgets.py`).
 import pygame
 
 from core import audio, config
-from ui import desktop_icons, fonts, widgets
+from ui import desktop_icons, fonts, style, widgets
 
 TITLE_H = 26          # hauteur de la barre de titre
 BORDER = 2            # épaisseur du liseré de fenêtre
@@ -41,6 +41,7 @@ class Window:
         self.pinned = False       # « toujours au premier plan » (menu contextuel de la
                                   # barre de titre) — cf. WindowManager._z_order
         self._dock_flash_until = 0   # horloge murale : liseré pulsé après ancrage/agrandissement
+        self._open_t = 0.0        # progression d'ouverture [0,1] (animation scale/fade)
 
     # --- sous-rectangles du chrome (recalculés à la volée depuis self.rect) ---
     @property
@@ -68,25 +69,46 @@ class Window:
 
     # ------------------------------------------------------------------ dessin
     def draw(self, surf, focused):
+        if self._open_t < 1.0:
+            # animation d'ouverture : scale de 0.95 à 1.0 + fade-in sur 120 ms
+            tmp = pygame.Surface((self.rect.w, self.rect.h), pygame.SRCALPHA)
+            self._draw_content(tmp, focused)
+            t = self._open_t
+            scale = 0.95 + 0.05 * t
+            alpha = int(255 * (0.35 + 0.65 * t))
+            w = max(1, int(self.rect.w * scale))
+            h = max(1, int(self.rect.h * scale))
+            scaled = pygame.transform.smoothscale(tmp, (w, h))
+            scaled.set_alpha(alpha)
+            dst = scaled.get_rect(center=self.rect.center)
+            surf.blit(scaled, dst)
+        else:
+            self._draw_content(surf, focused)
+
+    def _draw_content(self, surf, focused):
         accent = config.COL_AMBER if focused else config.COL_BORDER
-        # ombre portée discrète
-        shadow = pygame.Surface((self.rect.w + 8, self.rect.h + 8), pygame.SRCALPHA)
-        shadow.fill((0, 0, 0, 90))
-        surf.blit(shadow, (self.rect.x + 4, self.rect.y + 6))
-        # corps
-        pygame.draw.rect(surf, config.COL_BG, self.rect)
-        pygame.draw.rect(surf, accent, self.rect, BORDER)
+        # ombre portée douce et hiérarchisée (active = plus marquée)
+        style.draw_window_shadow(surf, self.rect, focused=focused)
+        # corps avec coins arrondis
+        pygame.draw.rect(surf, config.COL_BG, self.rect, border_radius=style.RADIUS_LG)
+        pygame.draw.rect(surf, accent, self.rect, BORDER, border_radius=style.RADIUS_LG)
         # liseré cyan pulsé bref juste après un ancrage/agrandissement (feedback
         # visuel de docking, s'estompe tout seul via l'horloge murale)
         remaining = self._dock_flash_until - pygame.time.get_ticks()
         if remaining > 0:
             alpha = max(0, min(255, int(255 * remaining / DOCK_FLASH_MS)))
             flash = pygame.Surface((self.rect.w, self.rect.h), pygame.SRCALPHA)
-            pygame.draw.rect(flash, (*config.COL_CYAN, alpha), flash.get_rect(), BORDER + 2)
+            pygame.draw.rect(flash, (*config.COL_CYAN, alpha), flash.get_rect(),
+                             BORDER + 2, border_radius=style.RADIUS_LG)
             surf.blit(flash, self.rect.topleft)
-        # barre de titre
+        # barre de titre avec dégradé subtil
         tr = self.title_rect
-        pygame.draw.rect(surf, config.COL_PANEL_HEAD if focused else config.COL_PANEL, tr)
+        title_grad = style.surface_gradient(
+            tr.w, tr.h,
+            style._lerp_color(config.COL_PANEL_HEAD if focused else config.COL_PANEL,
+                              config.COL_WHITE, 0.04),
+            config.COL_PANEL_HEAD if focused else config.COL_PANEL)
+        surf.blit(title_grad, tr.topleft)
         pygame.draw.line(surf, accent, (tr.x, tr.bottom - 1), (tr.right, tr.bottom - 1), 1)
         icon_kind = getattr(self.app_obj, "icon_kind", "generic")
         icon_col = config.COL_AMBER if focused else config.COL_TEXT_DIM
@@ -98,21 +120,27 @@ class Window:
             # réduire/fermer — pas de glyphe Unicode « 📌 », non garanti par la
             # police embarquée (même précaution que le reste de ce module).
             px, py = tr.right - 3 * BTN_W + BTN_W // 2, tr.centery
-            pygame.draw.circle(surf, config.COL_AMBER, (px, py - 3), 3)
+            style.draw_aa_filled_circle(surf, (px, py - 3), 3, config.COL_AMBER)
             pygame.draw.polygon(surf, config.COL_AMBER,
                                 [(px - 2, py), (px + 2, py), (px, py + 5)])
         # boutons réduire / fermer (dessin vectoriel, cf. ui/desktop_icons.py —
         # les glyphes Unicode « – »/« ✕ » ne s'affichent pas de façon fiable)
         mr, cr = self.min_rect, self.close_rect
         mp = pygame.mouse.get_pos()
+        # bouton réduire : fond au survol
         if mr.collidepoint(mp):
-            pygame.draw.rect(surf, config.COL_PANEL, mr)
-        pygame.draw.line(surf, config.COL_TEXT, (mr.centerx - 5, mr.centery), (mr.centerx + 5, mr.centery), 2)
+            pygame.draw.rect(surf, config.COL_PANEL, mr, border_radius=style.RADIUS_SM)
+            pygame.draw.rect(surf, accent, mr, 1, border_radius=style.RADIUS_SM)
+        pygame.draw.line(surf, config.COL_TEXT, (mr.centerx - 5, mr.centery),
+                         (mr.centerx + 5, mr.centery), 2)
+        # bouton fermer : fond rouge + croix blanche au survol
         if cr.collidepoint(mp):
-            pygame.draw.rect(surf, config.COL_DOWN, cr)
+            style.draw_aa_round_rect(surf, cr, config.COL_DOWN, radius=style.RADIUS_SM)
         xcol = config.COL_WHITE if cr.collidepoint(mp) else config.COL_TEXT
-        pygame.draw.line(surf, xcol, (cr.centerx - 5, cr.centery - 5), (cr.centerx + 5, cr.centery + 5), 2)
-        pygame.draw.line(surf, xcol, (cr.centerx - 5, cr.centery + 5), (cr.centerx + 5, cr.centery - 5), 2)
+        pygame.draw.line(surf, xcol, (cr.centerx - 5, cr.centery - 5),
+                         (cr.centerx + 5, cr.centery + 5), 2)
+        pygame.draw.line(surf, xcol, (cr.centerx - 5, cr.centery + 5),
+                         (cr.centerx + 5, cr.centery - 5), 2)
         # contenu de l'application (clippé à sa zone)
         cont = self.content_rect
         prev_clip = surf.get_clip()
@@ -173,6 +201,7 @@ class WindowManager:
         dw = min(dw, config.SCREEN_WIDTH - px - 20)
         dh = min(dh, config.SCREEN_HEIGHT - py - 60)
         w = Window(key, app_obj, px, py, dw, dh)
+        w._open_t = 0.0
         self.windows.append(w)
         if hasattr(app_obj, "on_open"):
             app_obj.on_open()
@@ -398,7 +427,10 @@ class WindowManager:
 
     # --------------------------------------------------------------- cycle
     def update(self, dt):
+        OPEN_ANIM_MS = 0.12  # durée de l'animation d'ouverture (120 ms)
         for w in self.windows:
+            if w._open_t < 1.0:
+                w._open_t = min(1.0, w._open_t + dt / OPEN_ANIM_MS)
             if not w.minimized and hasattr(w.app_obj, "update"):
                 w.app_obj.update(dt)
 

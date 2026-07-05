@@ -63,7 +63,7 @@ from scenes.scene_desktop_common import (
 )
 from scenes.scene_desktop_menus import DesktopMenusMixin
 from scenes.scene_desktop_widgets import DesktopWidgetsMixin
-from ui import desktop_icons, fonts, keynav, widgets
+from ui import desktop_icons, fonts, keynav, style, widgets
 from ui.window_manager import WindowManager
 
 _ICON_DRAG_THRESHOLD = 6   # px : sous ce seuil un glisser d'icône reste un simple clic
@@ -106,6 +106,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             self._closed_stack = []
         self.start_open = False
         self._icon_rects = {}       # clé -> (Rect, icon_kind, label) — icônes du bureau
+        self._icon_hover_t = {}     # clé -> progression hover [0,1]
         self._icon_focus = None     # clé de l'icône ayant le focus clavier (ou None)
         self._icon_drag = None      # {"key","start","pos"} pendant un glisser d'icône (réorganisation)
         self._show_desktop_restore = []  # clés des fenêtres à restaurer (CTRL+MAJ+D)
@@ -215,6 +216,13 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self._check_new_icons()
         self._check_tutorial()
         self._sync_layout_flag()
+        # animation hover des icônes du bureau
+        mp = pygame.mouse.get_pos()
+        for key, (r, _kind, _label) in self._icon_rects.items():
+            target = 1.0 if r.collidepoint(mp) and self.wm._topmost_at(mp) is None else 0.0
+            cur = self._icon_hover_t.get(key, 0.0)
+            speed = 14.0 * dt if dt else 1.0
+            self._icon_hover_t[key] = cur + (target - cur) * min(1.0, speed)
 
     # ------------------------------------------- espace de travail (layout)
     def _sync_layout_flag(self):
@@ -844,17 +852,32 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             self._draw_intro_guide(surf)
 
     def _draw_wallpaper(self, surf):
-        # léger quadrillage « poste de travail »
+        # Fond de bureau « poste de travail » : dégradé radial subtil depuis le
+        # centre vers les bords, bruit fin, quadrillage discret et watermark.
         area = pygame.Rect(0, TOPBAR_H, config.SCREEN_WIDTH,
                            config.SCREEN_HEIGHT - TOPBAR_H - TASKBAR_H)
-        step = 48
-        for gx in range(0, config.SCREEN_WIDTH, step):
-            pygame.draw.line(surf, config.COL_GRID, (gx, area.y), (gx, area.bottom), 1)
-        for gy in range(area.y, area.bottom, step):
-            pygame.draw.line(surf, config.COL_GRID, (0, gy), (config.SCREEN_WIDTH, gy), 1)
-        widgets.draw_text(surf, "TERMINAL ALPHA — POSTE DE TRAVAIL",
+        # dégradé radial : centre légèrement plus clair, bords plus sombres
+        grad = style.surface_radial_gradient(
+            area.w, area.h,
+            style._lerp_color(config.COL_PANEL, config.COL_WHITE, 0.03),
+            config.COL_BG)
+        surf.blit(grad, area.topleft)
+        # texture de bruit très subtile (5% d'opacité max)
+        noise = style.noise_texture(area.w, area.h, intensity=10, seed=42)
+        noise.set_alpha(18)
+        surf.blit(noise, area.topleft)
+        # quadrillage discret (sur surface alpha pour la transparence)
+        step = 56
+        grid = pygame.Surface((area.w, area.h), pygame.SRCALPHA)
+        for gx in range(0, area.w, step):
+            pygame.draw.line(grid, (*config.COL_GRID, 45), (gx, 0), (gx, area.h), 1)
+        for gy in range(0, area.h, step):
+            pygame.draw.line(grid, (*config.COL_GRID, 45), (0, gy), (area.w, gy), 1)
+        surf.blit(grid, area.topleft)
+        # watermark discret
+        widgets.draw_text(surf, "TERMINAL ALPHA",
                           (config.SCREEN_WIDTH // 2, area.centery),
-                          fonts.title(bold=True), (22, 26, 34), align="center")
+                          fonts.ui_title(bold=True), (22, 26, 34), align="center")
 
     def _icon_visible(self, key):
         """Une icône soumise au déblocage progressif (ICON_FEATURE) n'apparaît
@@ -971,17 +994,32 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             y = TOPBAR_H + 12 + row * (ICON_H + ICON_GAP)
             r = pygame.Rect(x, y, ICON_W, ICON_H)
             self._icon_rects[key] = (r, kind, label)
-            hov = r.collidepoint(mp)
+            hov_t = self._icon_hover_t.get(key, 0.0)
+            hov = hov_t > 0.01
             if hov:
-                pygame.draw.rect(surf, config.COL_PANEL, r, border_radius=8)
-                pygame.draw.rect(surf, accent, r, 1, border_radius=8)
+                halo = r.inflate(int(6 * hov_t), int(6 * hov_t))
+                halo_col = (*config.COL_PANEL, int(120 * hov_t))
+                pygame.draw.rect(surf, halo_col, halo, border_radius=10)
+                pygame.draw.rect(surf, (*accent, int(160 * hov_t)), halo, 1, border_radius=10)
             keynav.draw_focus_ring(surf, r, key == self._icon_focus)
             ghost = dragging_key is not None and key == dragging_key
             icon_col = config.COL_TEXT_DIM if ghost else accent
-            desktop_icons.draw(surf, (r.centerx, r.y + 28), kind, icon_col)
+            # scale de l'icône au survol (1.0 -> 1.10)
+            scale = 1.0 + 0.10 * hov_t
+            if scale > 1.01:
+                isize = 40
+                tmp = pygame.Surface((isize, isize), pygame.SRCALPHA)
+                desktop_icons.draw(tmp, (isize // 2, isize // 2 + 4), kind, icon_col)
+                scaled = pygame.transform.smoothscale(tmp, (int(isize * scale), int(isize * scale)))
+                dst = scaled.get_rect(center=(r.centerx, r.y + 28))
+                surf.blit(scaled, dst)
+            else:
+                desktop_icons.draw(surf, (r.centerx, r.y + 28), kind, icon_col)
+            label_col = config.COL_TEXT_DIM if ghost else (
+                style._lerp_color(config.COL_TEXT, accent, 0.3 * hov_t))
             widgets.draw_text(surf, widgets.fit_text(label, fonts.small(bold=True), ICON_W - 6),
                               (r.centerx, r.bottom - 18), fonts.small(bold=True),
-                              config.COL_TEXT_DIM if ghost else config.COL_TEXT, align="center")
+                              label_col, align="center")
             # tooltip raccourci clavier (seulement si aucune fenêtre ne
             # recouvre l'icône — sinon le survol appartient à la fenêtre)
             sc_label = _ICON_SHORTCUT.get(key)

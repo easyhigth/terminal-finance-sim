@@ -16,7 +16,7 @@ from core import config, desktop_onboarding, desktop_tutorial, unlock_briefs
 from core import portfolio_margin as pm_mod
 from core.i18n import get_lang
 from scenes.scene_desktop_common import _L, TASKBAR_H, TOPBAR_H
-from ui import fonts, widgets
+from ui import fonts, style, widgets
 
 
 class DesktopWidgetsMixin:
@@ -98,15 +98,16 @@ class DesktopWidgetsMixin:
         y = (config.SCREEN_HEIGHT - H) // 2
         card = pygame.Rect(x, y, W, H)
         self._guide_rects = {"card": card}
-        pygame.draw.rect(surf, config.COL_PANEL, card, border_radius=8)
-        pygame.draw.rect(surf, config.COL_AMBER, card, 2, border_radius=8)
+        style.draw_window_shadow(surf, card, focused=True)
+        style.draw_glass_panel(surf, card, alpha=230, border_color=config.COL_AMBER,
+                               radius=style.RADIUS_LG)
         widgets.draw_text(surf, _L("GUIDE DE DÉMARRAGE", "GETTING-STARTED GUIDE"),
                           (x + 24, y + 16), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         widgets.draw_text(surf, _L(f"page {self._guide_page + 1}/{total}",
                                    f"page {self._guide_page + 1}/{total}"),
                           (x + W - 24, y + 16), fonts.tiny(bold=True),
                           config.COL_TEXT_DIM, align="right")
-        widgets.draw_text(surf, title, (x + 24, y + 38), fonts.head(bold=True),
+        widgets.draw_text(surf, title, (x + 24, y + 38), fonts.ui_head(bold=True),
                           config.COL_AMBER)
         ly = y + 80
         for para in paras:
@@ -219,8 +220,9 @@ class DesktopWidgetsMixin:
         y = (config.SCREEN_HEIGHT - H) // 2
         card = pygame.Rect(x, y, W, H)
         self._brief_rects = {"card": card}
-        pygame.draw.rect(surf, config.COL_PANEL, card, border_radius=8)
-        pygame.draw.rect(surf, config.COL_UP, card, 2, border_radius=8)
+        style.draw_window_shadow(surf, card, focused=True)
+        style.draw_glass_panel(surf, card, alpha=230, border_color=config.COL_UP,
+                               radius=style.RADIUS_LG)
         widgets.draw_text(surf, _L(f"NOUVEAU PÉRIMÈTRE — {info.get('grade', '')}",
                                    f"NEW SCOPE — {info.get('grade', '')}"),
                           (x + 24, y + 16), fonts.tiny(bold=True), config.COL_UP)
@@ -229,7 +231,7 @@ class DesktopWidgetsMixin:
                               (x + W - 24, y + 16), fonts.tiny(bold=True),
                               config.COL_TEXT_DIM, align="right")
         widgets.draw_text(surf, brief["title"], (x + 24, y + 36),
-                          fonts.head(bold=True), config.COL_AMBER)
+                          fonts.ui_head(bold=True), config.COL_AMBER)
         sections = [
             (_L("CE QUE C'EST", "WHAT IT IS"), brief["what"]),
             (_L("COMMENT Y ACCÉDER", "HOW TO ACCESS IT"), brief["how"]),
@@ -319,11 +321,12 @@ class DesktopWidgetsMixin:
         y = (config.SCREEN_HEIGHT - H) // 2
         card = pygame.Rect(x, y, W, H)
         self._onboard_card = card
-        pygame.draw.rect(surf, config.COL_PANEL, card, border_radius=8)
-        pygame.draw.rect(surf, config.COL_AMBER, card, 2, border_radius=8)
+        style.draw_window_shadow(surf, card, focused=True)
+        style.draw_glass_panel(surf, card, alpha=230, border_color=config.COL_AMBER,
+                               radius=style.RADIUS_LG)
         widgets.draw_text(surf, _L("Bienvenue sur votre poste de travail",
                                    "Welcome to your workstation"),
-                          (x + 24, y + 20), fonts.head(bold=True), config.COL_AMBER)
+                          (x + 24, y + 20), fonts.ui_head(bold=True), config.COL_AMBER)
         lines = [
             _L("• Les icônes ouvrent des APPLICATIONS en fenêtres déplaçables.",
                "• Icons open APPLICATIONS as draggable windows."),
@@ -368,14 +371,12 @@ class DesktopWidgetsMixin:
         x = (config.SCREEN_WIDTH - W) // 2
         y = TOPBAR_H + 6
         band = pygame.Rect(x, y, W, H)
-        panel = pygame.Surface((W, H), pygame.SRCALPHA)
-        panel.fill((*config.COL_PANEL, 238))
-        surf.blit(panel, (x, y))
-        pygame.draw.rect(surf, config.COL_AMBER, band, 1, border_radius=6)
+        style.draw_glass_panel(surf, band, alpha=230, border_color=config.COL_AMBER,
+                               radius=style.RADIUS_MD)
         widgets.draw_text(surf, _L(f"TUTORIEL {idx + 1}/{total}", f"TUTORIAL {idx + 1}/{total}"),
                           (x + 12, y + 6), fonts.tiny(bold=True), config.COL_CYAN)
         widgets.draw_text(surf, desktop_tutorial.step_title(step),
-                          (x + 110, y + 5), fonts.small(bold=True), config.COL_AMBER)
+                          (x + 110, y + 5), fonts.ui_small(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, widgets.fit_text(desktop_tutorial.step_hint(step),
                                                  fonts.tiny(), W - 130),
                           (x + 12, y + 26), fonts.tiny(), config.COL_TEXT)
@@ -410,10 +411,9 @@ class DesktopWidgetsMixin:
         r = pygame.Rect(x, y, W, H)
         self._ambient_rect = r
         hov = r.collidepoint(pygame.mouse.get_pos())
-        panel = pygame.Surface((W, H), pygame.SRCALPHA)
-        panel.fill((*config.COL_PANEL, 232))
-        surf.blit(panel, (x, y))
-        pygame.draw.rect(surf, config.COL_AMBER if hov else config.COL_BORDER, r, 1, border_radius=6)
+        style.draw_glass_panel(surf, r, alpha=225,
+                               border_color=config.COL_AMBER if hov else config.COL_BORDER,
+                               radius=style.RADIUS_MD)
         nw = pm_mod.net_worth(p, m) if m else p.cash
         lev = pm_mod.leverage(p, m) if m else 0.0
         widgets.draw_text(surf, "PATRIMOINE NET", (x + 10, y + 8), fonts.tiny(bold=True), config.COL_TEXT_DIM)
@@ -464,14 +464,12 @@ class DesktopWidgetsMixin:
         y = (config.SCREEN_HEIGHT - H) // 2
         card = pygame.Rect(x, y, W, H)
         self._qcard_rects = {"card": card}
-        shadow = pygame.Surface((W + 10, H + 10), pygame.SRCALPHA)
-        shadow.fill((0, 0, 0, 130))
-        surf.blit(shadow, (x + 4, y + 5))
-        pygame.draw.rect(surf, config.COL_PANEL, card, border_radius=8)
-        pygame.draw.rect(surf, config.COL_CYAN, card, 2, border_radius=8)
+        style.draw_window_shadow(surf, card, focused=True)
+        style.draw_glass_panel(surf, card, alpha=230, border_color=config.COL_CYAN,
+                               radius=style.RADIUS_LG)
         widgets.draw_text(surf, _L(f"BILAN DU TRIMESTRE T{rep.get('quarter', '?')}",
                                    f"QUARTER Q{rep.get('quarter', '?')} REVIEW"),
-                          (x + 20, y + 16), fonts.head(bold=True), config.COL_CYAN)
+                          (x + 20, y + 16), fonts.ui_head(bold=True), config.COL_CYAN)
         ly = y + 52
         done, total = rep.get("done", 0), rep.get("total", 0)
         col = config.COL_UP if done == total else config.COL_AMBER if done else config.COL_DOWN
@@ -541,10 +539,8 @@ class DesktopWidgetsMixin:
         # juste au-dessus du widget patrimoine (208x96 + marge, cf. _draw_ambient)
         y = config.SCREEN_HEIGHT - TASKBAR_H - 96 - 12 - H - 8
         r = pygame.Rect(x, y, W, H)
-        panel = pygame.Surface((W, H), pygame.SRCALPHA)
-        panel.fill((*config.COL_PANEL, 232))
-        surf.blit(panel, (x, y))
-        pygame.draw.rect(surf, config.COL_BORDER, r, 1, border_radius=6)
+        style.draw_glass_panel(surf, r, alpha=225, border_color=config.COL_BORDER,
+                               radius=style.RADIUS_MD)
         widgets.draw_text(surf, _L("À FAIRE", "TO DO"), (x + 10, y + 6),
                           fonts.tiny(bold=True), config.COL_TEXT_DIM)
         mp = pygame.mouse.get_pos()
@@ -763,10 +759,8 @@ class DesktopWidgetsMixin:
         y = (config.SCREEN_HEIGHT - TASKBAR_H - 96 - 12 - todo_h - todo_gap
              - cal_h - cal_gap - H - 8)
         r = pygame.Rect(x, y, W, H)
-        panel = pygame.Surface((W, H), pygame.SRCALPHA)
-        panel.fill((*config.COL_PANEL, 232))
-        surf.blit(panel, (x, y))
-        pygame.draw.rect(surf, config.COL_BORDER, r, 1, border_radius=6)
+        style.draw_glass_panel(surf, r, alpha=225, border_color=config.COL_BORDER,
+                               radius=style.RADIUS_MD)
         widgets.draw_text(surf, _L("ROUTINE DU JOUR", "DAILY ROUTINE"), (x + 10, y + 6),
                           fonts.tiny(bold=True), config.COL_TEXT_DIM)
         mp = pygame.mouse.get_pos()

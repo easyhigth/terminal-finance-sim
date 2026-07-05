@@ -25,7 +25,7 @@ from apps.base import DesktopApp
 from core import config
 from core.spreadsheet_engine import col_to_idx, idx_to_col
 from core.workbook import ConditionalFormat, SheetChart, Workbook, template_list
-from ui import fonts, widgets
+from ui import fonts, style, widgets
 
 N_ROWS = 24
 N_COLS = 10
@@ -690,8 +690,8 @@ class SheetApp(DesktopApp):
         self._draw_toolbar(surf, rect, pad, toolbar_y)
         # barre de formule
         fr = pygame.Rect(rect.x + pad, toolbar_y + TOOLBAR_H + 2, rect.w - 2 * pad, FORMULA_H)
-        pygame.draw.rect(surf, config.COL_BG, fr)
-        pygame.draw.rect(surf, config.COL_BORDER, fr, 1)
+        style.draw_inset(surf, fr, bg=config.COL_BG, border=config.COL_BORDER,
+                          radius=style.RADIUS_MD)
         widgets.draw_text(surf, self.sel, (fr.x + 8, fr.y + 6), fonts.small(bold=True), config.COL_CYAN)
         content = self.edit_buf if self.editing else self.sheet.get_raw(self.sel)
         cur = "_" if self.editing and pygame.time.get_ticks() % 1000 < 500 else ""
@@ -865,8 +865,8 @@ class SheetApp(DesktopApp):
         panel = pygame.Rect(self._fx_rect.x, self._fx_rect.bottom + 2, 230, 280)
         panel.right = min(panel.right, rect.right - 4)
         panel.bottom = min(panel.bottom, rect.bottom - 4)
-        pygame.draw.rect(surf, config.COL_PANEL, panel)
-        pygame.draw.rect(surf, config.COL_AMBER, panel, 2)
+        style.draw_card(surf, panel, bg=config.COL_PANEL, border=config.COL_AMBER,
+                        radius=style.RADIUS_MD)
         self._fx_panel_rect = panel
         self._fx_item_rects = {}
         y = panel.y + 6
@@ -898,8 +898,8 @@ class SheetApp(DesktopApp):
         panel = pygame.Rect(self._tpl_rect.x, self._tpl_rect.bottom + 2, 240, H)
         panel.right = min(panel.right, rect.right - 4)
         panel.bottom = min(panel.bottom, rect.bottom - 4)
-        pygame.draw.rect(surf, config.COL_PANEL, panel)
-        pygame.draw.rect(surf, config.COL_AMBER, panel, 2)
+        style.draw_card(surf, panel, bg=config.COL_PANEL, border=config.COL_AMBER,
+                        radius=style.RADIUS_MD)
         self._tpl_panel_rect = panel
         self._tpl_item_rects = {}
         mp = pygame.mouse.get_pos()
@@ -923,8 +923,8 @@ class SheetApp(DesktopApp):
         panel = pygame.Rect(self._cf_rect.x, self._cf_rect.bottom + 2, 260, panel_h)
         panel.right = min(panel.right, rect.right - 4)
         panel.bottom = min(panel.bottom, rect.bottom - 4)
-        pygame.draw.rect(surf, config.COL_PANEL, panel)
-        pygame.draw.rect(surf, config.COL_PRESTIGE, panel, 2)
+        style.draw_card(surf, panel, bg=config.COL_PANEL, border=config.COL_PRESTIGE,
+                        radius=style.RADIUS_MD)
         self._cf_panel_rect = panel
         mp = pygame.mouse.get_pos()
 
@@ -1005,8 +1005,8 @@ class SheetApp(DesktopApp):
         chart.x = max(0, min(chart.x, rect.w - chart.w))
         chart.y = max(0, min(chart.y, rect.h - chart.h))
         r = pygame.Rect(rect.x + chart.x, rect.y + chart.y, chart.w, chart.h)
-        pygame.draw.rect(surf, config.COL_BG, r)
-        pygame.draw.rect(surf, config.COL_AMBER, r, 2)
+        style.draw_card(surf, r, bg=config.COL_BG, border=config.COL_AMBER,
+                        radius=style.RADIUS_MD)
         title_r = pygame.Rect(r.x, r.y, r.w, 18)
         self._chart_title_rects[chart.id] = title_r
         self._chart_rects[chart.id] = r

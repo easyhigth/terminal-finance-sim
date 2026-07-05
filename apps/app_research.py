@@ -12,7 +12,7 @@ import pygame
 
 from apps.base import DesktopApp
 from core import config
-from ui import fonts, widgets
+from ui import fonts, style, widgets
 
 ROW_H = 22
 
@@ -30,6 +30,7 @@ class ResearchApp(DesktopApp):
         self.scroll = 0
         self._max_scroll = 0
         self._row_rects = {}       # ticker -> Rect
+        self._row_hover = {}       # ticker -> progression hover [0,1]
         self._list_rect = None
         self._search_rect = None
         self._action_rects = {}    # "trade"|"sheet"|"analyse" -> Rect (liens inter-apps)
@@ -48,6 +49,15 @@ class ResearchApp(DesktopApp):
         else:
             tickers = [c["ticker"] for c in m.top_companies(n=40)]
         return tickers
+
+    # --------------------------------------------------------------- animation
+    def update(self, dt):
+        mp = pygame.mouse.get_pos()
+        for tk, r in self._row_rects.items():
+            target = 1.0 if r.collidepoint(mp) else 0.0
+            cur = self._row_hover.get(tk, 0.0)
+            speed = 12.0 * dt if dt else 1.0
+            self._row_hover[tk] = cur + (target - cur) * min(1.0, speed)
 
     # --------------------------------------------------------------- events
     def handle_event(self, event, rect):
@@ -118,8 +128,8 @@ class ResearchApp(DesktopApp):
         list_top = sr.bottom + 8
         list_area = pygame.Rect(list_x, list_top, list_w, rect.bottom - list_top - pad)
         self._list_rect = list_area
-        pygame.draw.rect(surf, config.COL_BG, list_area)
-        pygame.draw.rect(surf, config.COL_BORDER, list_area, 1)
+        style.draw_card(surf, list_area, bg=config.COL_BG, border=config.COL_BORDER,
+                        radius=style.RADIUS_MD)
 
         rows = self._rows()
         self._row_rects = {}
@@ -149,12 +159,9 @@ class ResearchApp(DesktopApp):
         price = m.price_of(tk)
         r = pygame.Rect(area.x + 2, y, area.w - 4, ROW_H - 2)
         self._row_rects[tk] = r
-        mp = pygame.mouse.get_pos()
-        if tk == self.sel:
-            pygame.draw.rect(surf, config.COL_PANEL_HEAD, r)
-            pygame.draw.rect(surf, config.COL_CYAN, r, 1)
-        elif r.collidepoint(mp):
-            pygame.draw.rect(surf, config.COL_PANEL_HEAD, r)
+        hover_t = self._row_hover.get(tk, 0.0)
+        style.draw_hover_row(surf, r, hover=hover_t > 0.01, selected=(tk == self.sel),
+                             animation_t=hover_t, radius=style.RADIUS_SM)
         widgets.draw_text(surf, tk, (r.x + 6, r.y + 3), fonts.small(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, widgets.fit_text(c["name"], fonts.tiny(), max(30, r.w - 138)),
                           (r.x + 70, r.y + 4), fonts.tiny(), config.COL_TEXT_DIM)
@@ -162,8 +169,8 @@ class ResearchApp(DesktopApp):
                           config.COL_WHITE, align="right")
 
     def _draw_detail(self, surf, rect):
-        pygame.draw.rect(surf, config.COL_BG, rect)
-        pygame.draw.rect(surf, config.COL_BORDER, rect, 1)
+        style.draw_card(surf, rect, bg=config.COL_BG, border=config.COL_BORDER,
+                       radius=style.RADIUS_MD)
         self._action_rects = {}
         if not self.sel:
             widgets.draw_text(surf, "Sélectionnez une société.", (rect.x + 12, rect.y + 12),

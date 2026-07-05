@@ -15,7 +15,7 @@ from core import audio, config, order_confirm, unlocks
 from core import conditional_orders as CO
 from core import portfolio as PF
 from core import portfolio_margin as PM
-from ui import fonts, widgets
+from ui import fonts, style, widgets
 
 ROW_H = 24
 QTY_PRESETS = [1, 5, 10, 25, 100]
@@ -72,6 +72,18 @@ class TradingApp(DesktopApp):
         self._confirm_yes_rect = None
         self._confirm_no_rect = None
         self._flash = widgets.TickFlash()   # flash vert/rouge du cours en direct (COURS)
+        self._row_hover = {}                # ticker -> progression hover [0,1]
+
+    def update(self, dt):
+        mp = pygame.mouse.get_pos()
+        for tk, r in self._buy_rects.items():
+            # on anime le hover sur la ligne entière via son rectangle de base
+            base_r = r.inflate(70 + (68 if self._held(tk) > 0 else 0), 2)
+            base_r.right = r.right
+            target = 1.0 if base_r.collidepoint(mp) else 0.0
+            cur = self._row_hover.get(tk, 0.0)
+            speed = 12.0 * dt if dt else 1.0
+            self._row_hover[tk] = cur + (target - cur) * min(1.0, speed)
 
     def _live_price(self, tk):
         """Cours EN DIRECT (chemin de prix canonique, cf. core/intraday.py) —
@@ -429,8 +441,8 @@ class TradingApp(DesktopApp):
         list_area = pygame.Rect(rect.x + pad, list_top, rect.w - 2 * pad,
                                 rect.bottom - list_top - 30 - cond_h - (6 if cond_h else 0))
         self._list_rect = list_area
-        pygame.draw.rect(surf, config.COL_BG, list_area)
-        pygame.draw.rect(surf, config.COL_BORDER, list_area, 1)
+        style.draw_card(surf, list_area, bg=config.COL_BG, border=config.COL_BORDER,
+                        radius=style.RADIUS_MD)
         widgets.draw_text(surf, "VALEUR", (list_area.x + 8, list_area.y + 4), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         widgets.draw_text(surf, "COURS", (list_area.x + int(list_area.w * 0.52), list_area.y + 4),
                           fonts.tiny(bold=True), config.COL_TEXT_DIM)
@@ -455,8 +467,8 @@ class TradingApp(DesktopApp):
         self._cond_cancel_rects = {}
         if orders:
             cond_area = pygame.Rect(rect.x + pad, list_area.bottom + 6, rect.w - 2 * pad, cond_h)
-            pygame.draw.rect(surf, config.COL_BG, cond_area)
-            pygame.draw.rect(surf, config.COL_PRESTIGE, cond_area, 1)
+            style.draw_card(surf, cond_area, bg=config.COL_BG, border=config.COL_PRESTIGE,
+                            radius=style.RADIUS_MD)
             widgets.draw_text(surf, f"ORDRES CONDITIONNELS ({len(orders)})",
                               (cond_area.x + 6, cond_area.y + 2), fonts.tiny(bold=True), config.COL_PRESTIGE)
             oy = cond_area.y + 16
@@ -502,8 +514,8 @@ class TradingApp(DesktopApp):
         surf.blit(overlay, rect.topleft)
         box = pygame.Rect(0, 0, min(340, rect.w - 40), 150)
         box.center = rect.center
-        pygame.draw.rect(surf, config.COL_PANEL, box)
-        pygame.draw.rect(surf, config.COL_AMBER, box, 2)
+        style.draw_card(surf, box, bg=config.COL_PANEL, border=config.COL_AMBER,
+                        radius=style.RADIUS_MD)
         side_label = "ACHAT" if c["side"] == "buy" else "VENTE"
         widgets.draw_text(surf, f"⚠ ORDRE À FORT IMPACT — {side_label} {c['ticker']}",
                           (box.x + 12, box.y + 8), fonts.small(bold=True), config.COL_AMBER)
@@ -562,9 +574,9 @@ class TradingApp(DesktopApp):
         flash_col = self._flash.tick(tk, price, config.COL_UP, config.COL_DOWN, config.COL_WHITE)
         held = self._held(tk)
         r = pygame.Rect(area.x + 2, y, area.w - 4, ROW_H - 2)
-        mp = pygame.mouse.get_pos()
-        if r.collidepoint(mp):
-            pygame.draw.rect(surf, config.COL_PANEL_HEAD, r)
+        hover_t = self._row_hover.get(tk, 0.0)
+        style.draw_hover_row(surf, r, hover=hover_t > 0.01, selected=False,
+                             animation_t=hover_t, radius=style.RADIUS_SM)
         widgets.draw_text(surf, tk, (r.x + 6, r.y + 4), fonts.small(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, widgets.fit_text(c["name"], fonts.tiny(), int(area.w * 0.40)),
                           (r.x + 66, r.y + 5), fonts.tiny(), config.COL_TEXT_DIM)
@@ -605,8 +617,8 @@ class TradingApp(DesktopApp):
         tk = self._order_prompt["ticker"]
         box = pygame.Rect(0, 0, min(320, rect.w - 40), 160)
         box.center = rect.center
-        pygame.draw.rect(surf, config.COL_PANEL, box)
-        pygame.draw.rect(surf, config.COL_PRESTIGE, box, 2)
+        style.draw_card(surf, box, bg=config.COL_PANEL, border=config.COL_PRESTIGE,
+                        radius=style.RADIUS_MD)
         widgets.draw_text(surf, f"ORDRE CONDITIONNEL — {tk}", (box.x + 12, box.y + 8),
                           fonts.small(bold=True), config.COL_PRESTIGE)
         held = self._held(tk)

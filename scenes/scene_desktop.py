@@ -107,6 +107,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self.start_open = False
         self._icon_rects = {}       # clé -> (Rect, icon_kind, label) — icônes du bureau
         self._icon_hover_t = {}     # clé -> progression hover [0,1]
+        self._wallpaper_cache = None  # surface du fond pré-rendue (resize)
         self._icon_focus = None     # clé de l'icône ayant le focus clavier (ou None)
         self._icon_drag = None      # {"key","start","pos"} pendant un glisser d'icône (réorganisation)
         self._show_desktop_restore = []  # clés des fenêtres à restaurer (CTRL+MAJ+D)
@@ -852,28 +853,32 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             self._draw_intro_guide(surf)
 
     def _draw_wallpaper(self, surf):
-        # Fond de bureau « poste de travail » : dégradé radial subtil depuis le
-        # centre vers les bords, bruit fin, quadrillage discret et watermark.
+        # Fond de bureau pré-rendu et mis en cache : un dégradé linéaire léger
+        # + une texture de bruit tileable étirée + un quadrillage discret.
         area = pygame.Rect(0, TOPBAR_H, config.SCREEN_WIDTH,
                            config.SCREEN_HEIGHT - TOPBAR_H - TASKBAR_H)
-        # dégradé radial : centre légèrement plus clair, bords plus sombres
-        grad = style.surface_radial_gradient(
-            area.w, area.h,
-            style._lerp_color(config.COL_PANEL, config.COL_WHITE, 0.03),
-            config.COL_BG)
-        surf.blit(grad, area.topleft)
-        # texture de bruit très subtile (5% d'opacité max)
-        noise = style.noise_texture(area.w, area.h, intensity=10, seed=42)
-        noise.set_alpha(18)
-        surf.blit(noise, area.topleft)
-        # quadrillage discret (sur surface alpha pour la transparence)
-        step = 56
-        grid = pygame.Surface((area.w, area.h), pygame.SRCALPHA)
-        for gx in range(0, area.w, step):
-            pygame.draw.line(grid, (*config.COL_GRID, 45), (gx, 0), (gx, area.h), 1)
-        for gy in range(0, area.h, step):
-            pygame.draw.line(grid, (*config.COL_GRID, 45), (0, gy), (area.w, gy), 1)
-        surf.blit(grid, area.topleft)
+        if self._wallpaper_cache is None or self._wallpaper_cache.get_size() != (area.w, area.h):
+            wp = pygame.Surface((area.w, area.h))
+            # dégradé linéaire vertical très subtil (plus rapide qu'un radial)
+            grad = style.surface_gradient(
+                area.w, area.h,
+                style._lerp_color(config.COL_PANEL, config.COL_WHITE, 0.02),
+                config.COL_BG)
+            wp.blit(grad, (0, 0))
+            # bruit tileable 128x128 étiré (alpha très faible)
+            noise = style.noise_texture(area.w, area.h, intensity=8, seed=42)
+            noise.set_alpha(12)
+            wp.blit(noise, (0, 0))
+            # quadrillage discret
+            step = 56
+            grid = pygame.Surface((area.w, area.h), pygame.SRCALPHA)
+            for gx in range(0, area.w, step):
+                pygame.draw.line(grid, (*config.COL_GRID, 45), (gx, 0), (gx, area.h), 1)
+            for gy in range(0, area.h, step):
+                pygame.draw.line(grid, (*config.COL_GRID, 45), (0, gy), (area.w, gy), 1)
+            wp.blit(grid, (0, 0))
+            self._wallpaper_cache = wp
+        surf.blit(self._wallpaper_cache, area.topleft)
         # watermark discret
         widgets.draw_text(surf, "TERMINAL ALPHA",
                           (config.SCREEN_WIDTH // 2, area.centery),
@@ -1004,17 +1009,16 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             keynav.draw_focus_ring(surf, r, key == self._icon_focus)
             ghost = dragging_key is not None and key == dragging_key
             icon_col = config.COL_TEXT_DIM if ghost else accent
-            # scale de l'icône au survol (1.0 -> 1.10)
-            scale = 1.0 + 0.10 * hov_t
-            if scale > 1.01:
-                isize = 40
-                tmp = pygame.Surface((isize, isize), pygame.SRCALPHA)
-                desktop_icons.draw(tmp, (isize // 2, isize // 2 + 4), kind, icon_col)
-                scaled = pygame.transform.smoothscale(tmp, (int(isize * scale), int(isize * scale)))
-                dst = scaled.get_rect(center=(r.centerx, r.y + 28))
-                surf.blit(scaled, dst)
+            # icône avec halo/scale au survol, sans smoothscale coûteux :
+            # on décale juste l'icône de 1px vers le haut et on dessine un glow.
+            if hov_t > 0.01:
+                glow = int(4 * hov_t)
+                pygame.draw.circle(surf, (*accent, int(60 * hov_t)),
+                                   (r.centerx, r.y + 28), 18 + glow)
+                offset_y = -int(1.5 * hov_t)
             else:
-                desktop_icons.draw(surf, (r.centerx, r.y + 28), kind, icon_col)
+                offset_y = 0
+            desktop_icons.draw(surf, (r.centerx, r.y + 28 + offset_y), kind, icon_col)
             label_col = config.COL_TEXT_DIM if ghost else (
                 style._lerp_color(config.COL_TEXT, accent, 0.3 * hov_t))
             widgets.draw_text(surf, widgets.fit_text(label, fonts.small(bold=True), ICON_W - 6),

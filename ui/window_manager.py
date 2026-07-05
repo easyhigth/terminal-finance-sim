@@ -41,7 +41,7 @@ class Window:
         self.pinned = False       # « toujours au premier plan » (menu contextuel de la
                                   # barre de titre) — cf. WindowManager._z_order
         self._dock_flash_until = 0   # horloge murale : liseré pulsé après ancrage/agrandissement
-        self._open_t = 0.0        # progression d'ouverture [0,1] (animation scale/fade)
+        self._open_t = 1.0        # progression d'ouverture [0,1] (1 = terminé)
 
     # --- sous-rectangles du chrome (recalculés à la volée depuis self.rect) ---
     @property
@@ -70,39 +70,38 @@ class Window:
     # ------------------------------------------------------------------ dessin
     def draw(self, surf, focused):
         if self._open_t < 1.0:
-            # animation d'ouverture : scale de 0.95 à 1.0 + fade-in sur 120 ms
-            tmp = pygame.Surface((self.rect.w, self.rect.h), pygame.SRCALPHA)
-            self._draw_content(tmp, focused)
+            # animation d'ouverture très légère : simple fade-in alpha sur 100 ms,
+            # sans smoothscale coûteux. Le scale est subtil (1px d'inset).
             t = self._open_t
-            scale = 0.95 + 0.05 * t
-            alpha = int(255 * (0.35 + 0.65 * t))
-            w = max(1, int(self.rect.w * scale))
-            h = max(1, int(self.rect.h * scale))
-            scaled = pygame.transform.smoothscale(tmp, (w, h))
-            scaled.set_alpha(alpha)
-            dst = scaled.get_rect(center=self.rect.center)
-            surf.blit(scaled, dst)
+            alpha = int(255 * (0.45 + 0.55 * t))
+            # on dessine le contenu "en place" avec une légère marge croissante
+            inset = int((1.0 - t) * 2)
+            rect = self.rect.inflate(-inset * 2, -inset * 2)
+            tmp = pygame.Surface((max(1, rect.w), max(1, rect.h)), pygame.SRCALPHA)
+            self._draw_content(tmp, focused, draw_rect=rect)
+            tmp.set_alpha(alpha)
+            surf.blit(tmp, rect.topleft)
         else:
             self._draw_content(surf, focused)
 
-    def _draw_content(self, surf, focused):
+    def _draw_content(self, surf, focused, draw_rect=None):
+        rect = draw_rect if draw_rect is not None else self.rect
         accent = config.COL_AMBER if focused else config.COL_BORDER
-        # ombre portée douce et hiérarchisée (active = plus marquée)
+        # ombre portée douce (mise en cache dans style.py)
         style.draw_window_shadow(surf, self.rect, focused=focused)
         # corps avec coins arrondis
-        pygame.draw.rect(surf, config.COL_BG, self.rect, border_radius=style.RADIUS_LG)
-        pygame.draw.rect(surf, accent, self.rect, BORDER, border_radius=style.RADIUS_LG)
-        # liseré cyan pulsé bref juste après un ancrage/agrandissement (feedback
-        # visuel de docking, s'estompe tout seul via l'horloge murale)
+        pygame.draw.rect(surf, config.COL_BG, rect, border_radius=style.RADIUS_LG)
+        pygame.draw.rect(surf, accent, rect, BORDER, border_radius=style.RADIUS_LG)
+        # liseré cyan pulsé bref juste après un ancrage/agrandissement
         remaining = self._dock_flash_until - pygame.time.get_ticks()
         if remaining > 0:
             alpha = max(0, min(255, int(255 * remaining / DOCK_FLASH_MS)))
-            flash = pygame.Surface((self.rect.w, self.rect.h), pygame.SRCALPHA)
+            flash = pygame.Surface((rect.w, rect.h), pygame.SRCALPHA)
             pygame.draw.rect(flash, (*config.COL_CYAN, alpha), flash.get_rect(),
                              BORDER + 2, border_radius=style.RADIUS_LG)
-            surf.blit(flash, self.rect.topleft)
-        # barre de titre avec dégradé subtil
-        tr = self.title_rect
+            surf.blit(flash, rect.topleft)
+        # barre de titre avec dégradé subtil (mis en cache)
+        tr = pygame.Rect(rect.x, rect.y, rect.w, TITLE_H)
         title_grad = style.surface_gradient(
             tr.w, tr.h,
             style._lerp_color(config.COL_PANEL_HEAD if focused else config.COL_PANEL,
@@ -116,24 +115,19 @@ class Window:
         widgets.draw_text(surf, self.app_obj.title, (tr.x + 32, tr.y + 5),
                           fonts.small(bold=True), icon_col)
         if self.pinned:
-            # petite épingle VECTORIELLE (tête + pointe) juste avant les boutons
-            # réduire/fermer — pas de glyphe Unicode « 📌 », non garanti par la
-            # police embarquée (même précaution que le reste de ce module).
             px, py = tr.right - 3 * BTN_W + BTN_W // 2, tr.centery
             style.draw_aa_filled_circle(surf, (px, py - 3), 3, config.COL_AMBER)
             pygame.draw.polygon(surf, config.COL_AMBER,
                                 [(px - 2, py), (px + 2, py), (px, py + 5)])
-        # boutons réduire / fermer (dessin vectoriel, cf. ui/desktop_icons.py —
-        # les glyphes Unicode « – »/« ✕ » ne s'affichent pas de façon fiable)
-        mr, cr = self.min_rect, self.close_rect
+        # boutons réduire / fermer
+        mr = pygame.Rect(rect.right - BTN_W, rect.y, BTN_W, TITLE_H)
+        cr = pygame.Rect(rect.right - 2 * BTN_W, rect.y, BTN_W, TITLE_H)
         mp = pygame.mouse.get_pos()
-        # bouton réduire : fond au survol
         if mr.collidepoint(mp):
             pygame.draw.rect(surf, config.COL_PANEL, mr, border_radius=style.RADIUS_SM)
             pygame.draw.rect(surf, accent, mr, 1, border_radius=style.RADIUS_SM)
         pygame.draw.line(surf, config.COL_TEXT, (mr.centerx - 5, mr.centery),
                          (mr.centerx + 5, mr.centery), 2)
-        # bouton fermer : fond rouge + croix blanche au survol
         if cr.collidepoint(mp):
             style.draw_aa_round_rect(surf, cr, config.COL_DOWN, radius=style.RADIUS_SM)
         xcol = config.COL_WHITE if cr.collidepoint(mp) else config.COL_TEXT
@@ -142,15 +136,17 @@ class Window:
         pygame.draw.line(surf, xcol, (cr.centerx - 5, cr.centery + 5),
                          (cr.centerx + 5, cr.centery - 5), 2)
         # contenu de l'application (clippé à sa zone)
-        cont = self.content_rect
+        cont = pygame.Rect(rect.x + BORDER, rect.y + TITLE_H,
+                           rect.w - 2 * BORDER, rect.h - TITLE_H - BORDER)
         prev_clip = surf.get_clip()
         surf.set_clip(cont)
         try:
             self.app_obj.draw(surf, cont)
         finally:
             surf.set_clip(prev_clip)
-        # poignée de redimensionnement (trois traits en coin bas-droit)
-        rr = self.resize_rect
+        # poignée de redimensionnement
+        rr = pygame.Rect(rect.right - RESIZE_GRIP, rect.bottom - RESIZE_GRIP,
+                         RESIZE_GRIP, RESIZE_GRIP)
         for i in range(1, 4):
             pygame.draw.line(surf, accent, (rr.right - i * 4, rr.bottom - 2),
                              (rr.right - 2, rr.bottom - i * 4), 1)
@@ -206,6 +202,9 @@ class WindowManager:
         if hasattr(app_obj, "on_open"):
             app_obj.on_open()
         return w
+
+    def _is_animating_open(self):
+        return any(w._open_t < 1.0 for w in self.windows)
 
     def close(self, w):
         if w in self.windows:
@@ -427,7 +426,7 @@ class WindowManager:
 
     # --------------------------------------------------------------- cycle
     def update(self, dt):
-        OPEN_ANIM_MS = 0.12  # durée de l'animation d'ouverture (120 ms)
+        OPEN_ANIM_MS = 0.10  # animation d'ouverture plus courte (100 ms)
         for w in self.windows:
             if w._open_t < 1.0:
                 w._open_t = min(1.0, w._open_t + dt / OPEN_ANIM_MS)

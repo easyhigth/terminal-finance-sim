@@ -70,15 +70,17 @@ class Window:
     # ------------------------------------------------------------------ dessin
     def draw(self, surf, focused):
         if self._open_t < 1.0:
-            # animation d'ouverture très légère : simple fade-in alpha sur 100 ms,
-            # sans smoothscale coûteux. Le scale est subtil (1px d'inset).
+            # Animation d'ouverture : fade-in alpha + inset subtil, SANS smoothscale.
+            # On dessine l'ombre directement dans surf, puis le contenu dans une
+            # surface locale (0,0,w,h) qu'on blitte en place — les coordonnées
+            # absolues de _draw_content ne doivent PAS être utilisées dans tmp.
             t = self._open_t
             alpha = int(255 * (0.45 + 0.55 * t))
-            # on dessine le contenu "en place" avec une légère marge croissante
             inset = int((1.0 - t) * 2)
             rect = self.rect.inflate(-inset * 2, -inset * 2)
-            tmp = pygame.Surface((max(1, rect.w), max(1, rect.h)), pygame.SRCALPHA)
-            self._draw_content(tmp, focused, draw_rect=rect)
+            style.draw_window_shadow(surf, self.rect, focused=focused)
+            tmp = pygame.Surface((rect.w, rect.h), pygame.SRCALPHA)
+            self._draw_content(tmp, focused, draw_rect=pygame.Rect(0, 0, rect.w, rect.h))
             tmp.set_alpha(alpha)
             surf.blit(tmp, rect.topleft)
         else:
@@ -87,8 +89,10 @@ class Window:
     def _draw_content(self, surf, focused, draw_rect=None):
         rect = draw_rect if draw_rect is not None else self.rect
         accent = config.COL_AMBER if focused else config.COL_BORDER
-        # ombre portée douce (mise en cache dans style.py)
-        style.draw_window_shadow(surf, self.rect, focused=focused)
+        # ombre portée douce (mise en cache dans style.py) — dessinée par draw()
+        # sauf en animation d'ouverture où elle est gérée à part.
+        if draw_rect is None:
+            style.draw_window_shadow(surf, self.rect, focused=focused)
         # corps avec coins arrondis
         pygame.draw.rect(surf, config.COL_BG, rect, border_radius=style.RADIUS_LG)
         pygame.draw.rect(surf, accent, rect, BORDER, border_radius=style.RADIUS_LG)

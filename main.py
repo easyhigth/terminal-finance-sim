@@ -273,8 +273,47 @@ class App:
             p.market_step = 0
         if self.market is None or self.market.seed != p.market_seed:
             self.market = Market(seed=p.market_seed)
-        self.market.sync_to(p.market_step)
+        # Affiche une barre de progression pendant le chargement
+        steps_to_replay = p.market_step - self.market.step_count
+        if steps_to_replay > 100 and self.screen is not None:
+            self._draw_loading(0, steps_to_replay)
+            def _progress(current, total):
+                self._draw_loading(current, total)
+            self.market.sync_to(p.market_step, progress_cb=_progress)
+        else:
+            self.market.sync_to(p.market_step)
         return self.market
+
+    def _draw_loading(self, current, total):
+        """Affiche une barre de progression simple pendant le chargement."""
+        if self.screen is None:
+            return
+        self.screen.fill(config.COL_BG)
+        from ui import fonts, widgets
+        font = fonts.body(bold=True)
+        tiny = fonts.tiny()
+        msg = "Chargement de la sauvegarde..."
+        widgets.draw_text(self.screen, msg,
+                          (config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2 - 30),
+                          font, config.COL_AMBER, align="center")
+        # Barre de progression
+        bar_w, bar_h = 400, 8
+        bar_x = config.SCREEN_WIDTH // 2 - bar_w // 2
+        bar_y = config.SCREEN_HEIGHT // 2 + 10
+        ratio = current / max(1, total)
+        pygame.draw.rect(self.screen, config.COL_PANEL,
+                         (bar_x, bar_y, bar_w, bar_h), border_radius=4)
+        if ratio > 0:
+            pygame.draw.rect(self.screen, config.COL_AMBER,
+                             (bar_x, bar_y, int(bar_w * ratio), bar_h), border_radius=4)
+        pct = f"{int(ratio * 100)}%"
+        widgets.draw_text(self.screen, pct,
+                          (config.SCREEN_WIDTH // 2, bar_y + bar_h + 8),
+                          tiny, config.COL_TEXT_DIM, align="center")
+        pygame.display.flip()
+        # Traite les événements pour éviter que l'OS ne pense que l'app est gelée
+        for event in pygame.event.get():
+            pass
 
     def run(self):
         while self.running:

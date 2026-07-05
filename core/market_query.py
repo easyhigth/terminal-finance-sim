@@ -113,16 +113,20 @@ class MarketQueryMixin:
         ref = h[-min(len(h), 20)]
         return h[-1] - ref
 
-    def fast_forward(self, n):
-        """Rejoue n pas (utilisé au chargement pour resynchroniser l'état)."""
-        for _ in range(max(0, int(n))):
+    def fast_forward(self, n, progress_cb=None):
+        """Rejoue n pas (utilisé au chargement pour resynchroniser l'état).
+        `progress_cb(current, total)` est appelé tous les ~50 pas si fourni."""
+        total = max(0, int(n))
+        for i in range(total):
             self.step()
+            if progress_cb and (i % 50 == 0 or i == total - 1):
+                progress_cb(i + 1, total)
 
-    def sync_to(self, step_count):
+    def sync_to(self, step_count, progress_cb=None):
         """Resynchronise le marché jusqu'au pas demandé depuis l'origine."""
         if step_count <= self.step_count:
             return
-        self.fast_forward(step_count - self.step_count)
+        self.fast_forward(step_count - self.step_count, progress_cb=progress_cb)
 
     def add_crisis(self, crisis):
         self.crises.append(crisis)

@@ -165,18 +165,22 @@ class TradingApp(DesktopApp):
         self._execute_sell(tk, qty)
 
     def _maybe_ask_confirmation(self, side, tk, qty):
-        """Ordre au-delà du seuil d'impact (core/order_confirm.py, >30% du
-        patrimoine net) : suspend l'exécution et ouvre une boîte de
+        """Ordre au-delà du seuil d'impact (>30% du patrimoine net) OU vente
+        de >50% d'une position : suspend l'exécution et ouvre une boîte de
         confirmation au lieu d'exécuter directement — retourne True si
         l'ordre est bien mis en attente (donc PAS encore exécuté)."""
         price = self.market.price_of(tk)
         notional = (price or 0.0) * qty
         p = self.app.gs.player
-        if not order_confirm.needs_confirmation(p, self.market, notional):
+        high_impact = order_confirm.needs_confirmation(p, self.market, notional)
+        large_sell = (side == "sell" and order_confirm.is_large_position_sell(p, tk, qty))
+        if not high_impact and not large_sell:
             return False
+        reason = "large_position" if (large_sell and not high_impact) else "high_impact"
         self._confirm_pending = {
             "side": side, "ticker": tk, "qty": qty, "notional": notional,
             "ratio": order_confirm.impact_ratio(p, self.market, notional),
+            "reason": reason,
         }
         return True
 
@@ -185,6 +189,9 @@ class TradingApp(DesktopApp):
         if r["ok"]:
             self.msg = ""
             self._push_feed(f"ACHAT {qty:g}×{tk} @ {r['price']:.2f}", "up")
+            # undo : vendre la même quantité
+            self._last_trade = {"side": "buy", "ticker": tk, "qty": qty,
+                                "price": r["price"], "step": self.market.step_count}
         else:
             self.msg = f"Achat refusé ({r['reason']})."
 
@@ -195,8 +202,37 @@ class TradingApp(DesktopApp):
             self._push_feed(f"VENTE {r['qty']:g}×{tk} @ {r['price']:.2f} "
                             f"(P&L {r['realized']:+,.0f})",
                             "up" if r["realized"] >= 0 else "down")
+            # undo : racheter la même quantité
+            self._last_trade = {"side": "sell", "ticker": tk, "qty": r["qty"],
+                                "price": r["price"], "step": self.market.step_count}
         else:
             self.msg = f"Vente refusée ({r['reason']})."
+
+    def _undo_last_trade(self):
+        """Annule le dernier trade exécuté (Ctrl+Z). Ne fonctionne que dans
+        le même pas de marché (pas après une avance du temps)."""
+        lt = getattr(self, "_last_trade", None)
+        if lt is None:
+            self.msg = "Aucun trade à annuler."
+            return
+        if lt["step"] != self.market.step_count:
+            self.msg = "Trade trop ancien (le marché a avancé)."
+            self._last_trade = None
+            return
+        if lt["side"] == "buy":
+            r = PF.sell(self.app.gs.player, self.market, lt["ticker"], lt["qty"])
+            if r["ok"]:
+                self._push_feed(f"↩ ANNULÉ : vente {r['qty']:g}×{lt['ticker']} @ {r['price']:.2f}", "info")
+                self._last_trade = None
+            else:
+                self.msg = f"Annulation impossible ({r['reason']})."
+        else:
+            r = PF.buy(self.app.gs.player, self.market, lt["ticker"], lt["qty"])
+            if r["ok"]:
+                self._push_feed(f"↩ ANNULÉ : achat {lt['qty']:g}×{lt['ticker']} @ {r['price']:.2f}", "info")
+                self._last_trade = None
+            else:
+                self.msg = f"Annulation impossible ({r['reason']})."
 
     def _confirm_pending_execute(self):
         c = self._confirm_pending
@@ -306,6 +342,10 @@ class TradingApp(DesktopApp):
                     return True
             return False
         if event.type == pygame.KEYDOWN:
+            # Ctrl+Z : undo last trade
+            if event.key == pygame.K_z and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                self._undo_last_trade()
+                return True
             if event.key == pygame.K_BACKSPACE:
                 self.search = self.search[:-1]
                 self.scroll = 0
@@ -519,24 +559,30 @@ class TradingApp(DesktopApp):
 
     def _draw_confirm_dialog(self, surf, rect):
         """Boîte de confirmation modale pour un ordre à fort impact (>30% du
-        patrimoine net, cf. core/order_confirm.py) — même style que la boîte
-        d'ordre conditionnel, couleur ambre pour marquer l'avertissement."""
+        patrimoine net) ou vente de >50% d'une position."""
         c = self._confirm_pending
         overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 160))
         surf.blit(overlay, rect.topleft)
         box = pygame.Rect(0, 0, min(340, rect.w - 40), 150)
         box.center = rect.center
-        style.draw_card(surf, box, bg=config.COL_PANEL, border=config.COL_AMBER,
+        is_large = c.get("reason") == "large_position"
+        border_col = config.COL_WARN if is_large else config.COL_AMBER
+        style.draw_card(surf, box, bg=config.COL_PANEL, border=border_col,
                         radius=style.RADIUS_MD)
         side_label = "ACHAT" if c["side"] == "buy" else "VENTE"
-        widgets.draw_text(surf, f"⚠ ORDRE À FORT IMPACT — {side_label} {c['ticker']}",
-                          (box.x + 12, box.y + 8), fonts.small(bold=True), config.COL_AMBER)
+        title = "⚠ VENTE IMPORTANTE" if is_large else "⚠ ORDRE À FORT IMPACT"
+        widgets.draw_text(surf, f"{title} — {side_label} {c['ticker']}",
+                          (box.x + 12, box.y + 8), fonts.small(bold=True), border_col)
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
         widgets.draw_text(surf, f"{c['qty']:g} titres — {widgets.format_money(c['notional'], cur)}",
                           (box.x + 12, box.y + 32), fonts.small(), config.COL_TEXT)
-        widgets.draw_text(surf, f"Soit {c['ratio']*100:.0f}% de votre patrimoine net en un seul ordre.",
-                          (box.x + 12, box.y + 54), fonts.tiny(), config.COL_TEXT_DIM)
+        if is_large:
+            widgets.draw_text(surf, "Vous vendez plus de 50% de votre position. Confirmer ?",
+                              (box.x + 12, box.y + 54), fonts.tiny(), config.COL_TEXT_DIM)
+        else:
+            widgets.draw_text(surf, f"Soit {c['ratio']*100:.0f}% de votre patrimoine net en un seul ordre.",
+                              (box.x + 12, box.y + 54), fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, "Confirmer ?", (box.x + 12, box.y + 76),
                           fonts.tiny(), config.COL_TEXT_DIM)
         self._confirm_yes_rect = pygame.Rect(box.x + 12, box.bottom - 32, box.w - 88, 24)

@@ -424,6 +424,11 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             if not self._blocking_card_pending():
                 self._open_search()
             return
+        # Ctrl+Space : avance le temps d'un pas (raccourci global)
+        if (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE
+                and (event.mod & pygame.KMOD_CTRL)):
+            self._tick_market()
+            return
         # Ctrl+<lettre> : lance l'icône correspondante (mêmes mnémoniques que
         # les raccourcis du terminal) — seulement si l'icône est visible au
         # grade courant.

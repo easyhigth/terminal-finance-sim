@@ -399,6 +399,30 @@ class CompanyScene(Scene):
                               (rect.x, y), fonts.small(), pcol)
             y += 20
 
+        # Événements d'entreprise récents (core/market_events.py)
+        mkt = self.app.market
+        if mkt is not None:
+            events = mkt.company_events_log.get(self.ticker, [])
+            if events:
+                recent = events[-3:]  # 3 derniers événements
+                y += 4
+                for ev in reversed(recent):
+                    icon = ev.get("icon", "•")
+                    title = ev.get("title", "")
+                    desc = ev.get("desc", "")
+                    ago = mkt.step_count - ev["step"]
+                    ago_str = f"il y a {ago} pas" if ago > 0 else "ce pas"
+                    ecol = _KIND_COL.get(ev.get("kind", "info"), config.COL_CYAN)
+                    line = f"{icon}  {title} — {ago_str}"
+                    widgets.draw_text(surf, line, (rect.x, y), fonts.tiny(bold=True), ecol)
+                    # tooltip avec description complète au survol
+                    mp = pygame.mouse.get_pos()
+                    tw = fonts.tiny().size(line)[0]
+                    if pygame.Rect(rect.x, y, tw, 16).collidepoint(mp):
+                        self._tooltip = (mp[0] + 12, mp[1] - 28, desc)
+                    y += 18
+                y += 2
+
         ph_top = y + 8
         ph = rect.bottom - ph_top
         panel = pygame.Rect(rect.x, ph_top, 560, ph)
@@ -612,6 +636,8 @@ class CompanyScene(Scene):
         if self.chart_kind == "candles":
             widgets.draw_candles(surf, inner, hist, n_candles=32, sma_windows=(10, 30))
             self._x_labels(surf, inner, len(hist))
+            lo_c, hi_c = min(hist), max(hist)
+            self._draw_event_markers(surf, inner, hist, lo_c, hi_c - lo_c or 1.0)
         elif self.chart_kind == "line":
             # Couleur de tendance pour le trait, mais remplissage très subtil
             # (presque transparent) pour éviter l'aspect « gros bloc de couleur »
@@ -628,6 +654,8 @@ class CompanyScene(Scene):
             # la courbe ; affiché avant les labels d'axe X.
             self._draw_orderbook(surf, inner, hist[-1], tier, half_spread)
             self._x_labels(surf, inner, len(hist))
+            lo_line, hi_line = min(hist), max(hist)
+            self._draw_event_markers(surf, inner, hist, lo_line, hi_line - lo_line or 1.0)
         elif self.chart_kind == "vol":
             vol = [v for v in charts.rolling_vol(hist, 20) if v is not None]
             if len(vol) < 2:
@@ -650,6 +678,51 @@ class CompanyScene(Scene):
         labels = x_label_positions(self.chart_period, n, self.app.gs.player.day)
         if labels:
             widgets.draw_chart_x_labels(surf, rect, labels)
+
+    def _draw_event_markers(self, surf, rect, hist, lo, span):
+        """Dessine des icônes d'événements d'entreprise sur la courbe de prix.
+        Les événements sont positionnés à leur pas de marché correspondant
+        sur la série densifiée (intraday)."""
+        mkt = self.app.market
+        if mkt is None:
+            return
+        events = mkt.company_events_log.get(self.ticker, [])
+        if not events:
+            return
+        pps = intraday.points_per_segment_for_n_steps(self.chart_period)
+        if pps <= 0:
+            return
+        current_step = mkt.step_count
+        n = len(hist)
+        if n < 2:
+            return
+        for ev in events:
+            steps_back = current_step - ev["step"]
+            if steps_back < 0 or steps_back > (self.chart_period or 9999):
+                continue
+            idx = n - 1 - steps_back * pps
+            if idx < 0 or idx >= n:
+                continue
+            price = hist[int(idx)]
+            if lo is None or span == 0:
+                continue
+            y = rect.y + rect.h - int((price - lo) / span * rect.h)
+            x = rect.x + int(idx / (n - 1) * rect.w)
+            # Clip aux bords du graphe
+            if not rect.collidepoint(x, y):
+                continue
+            icon = ev.get("icon", "•")
+            ecol = _KIND_COL.get(ev.get("kind", "info"), config.COL_CYAN)
+            # Petit cercle de fond + icône
+            r = 6
+            pygame.draw.circle(surf, (8, 10, 14), (x, y), r + 1)
+            pygame.draw.circle(surf, ecol, (x, y), r, 1)
+            widgets.draw_text(surf, icon, (x, y - 7), fonts.tiny(), ecol, align="center")
+            # Tooltip au survol
+            mp = pygame.mouse.get_pos()
+            if (x - mp[0]) ** 2 + (y - mp[1]) ** 2 < 144:  # 12px radius
+                self._tooltip = (mp[0] + 12, mp[1] - 28,
+                                 f"{ev.get('title', '')}: {ev.get('desc', '')}")
 
     # Tailles indicatives (en lots) du carnet simulé par tier de liquidité :
     # un carnet liquide est profond, un carnet illiquide est mince — cohérent

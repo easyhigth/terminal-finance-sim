@@ -132,6 +132,14 @@ class Market(MarketQueryMixin):
         self.pead_state = np.zeros(self.n)
         # dernière guidance publiée (pour lecture UI / earnings_log), par société
         self.last_guidance = {}      # ticker -> {"value", "label", "step"}
+        # ---- événements d'entreprise (chantier simulation poussée) ----------
+        # Chaque société peut subir un événement ciblé (produit, contrat,
+        # scandale...) avec choc de cours immédiat + drift résiduel. Le module
+        # core/market_events gère les tirages déterministes ; ici on stocke
+        # l'état actif et l'historique narratif par ticker.
+        self.active_company_events = [None] * self.n   # événements en cours de drift
+        self.company_events_log = {}                    # ticker -> [events]
+        self.company_event_news = []                    # news générées ce pas
         self._prepare_next_earnings(np.arange(self.n))
         self.regime = "Calme"        # régime de marché courant (toile de fond lente)
         self.regime_changed = False  # vrai au pas où le régime vient de basculer
@@ -374,13 +382,15 @@ class Market(MarketQueryMixin):
         revision_shock = self._step_revisions()
         pead_shock = self._step_pead()
         earnings_shock = self._step_earnings()
+        company_event_shock, company_event_residual = self._step_company_events()
 
         ret = (self.drift
                + self.beta * F_world
                + nonworld_corr * (self.b_sector * F_sector[self.sec_id]
                                    + self.b_region * F_region[self.reg_id]
                                    + self.sigma * eps)
-               + earnings_shock + anticipation_shock + revision_shock + pead_shock)
+               + earnings_shock + anticipation_shock + revision_shock + pead_shock
+               + company_event_shock + company_event_residual)
         # borne les rendements par pas pour éviter les valeurs aberrantes
         np.clip(ret, -0.35, 0.35, out=ret)
         self.prev_price = self.price.copy()   # mémorise pour l'attribution du P&L
@@ -458,8 +468,13 @@ class Market(MarketQueryMixin):
             v = self.region_credit_bump[r] * 0.72
             self.region_credit_bump[r] = v if v > 1e-5 else 0.0
 
+        # news : générées AVANT l'incrément de step_count pour que le log des
+        # événements d'entreprise porte le bon numéro de pas. On réinitialise
+        # `company_event_news` à chaque pas ici.
+        self.company_event_news = []
         self._last_news = self._generate_news(F_world, F_sector, F_region)
         self._last_news += self._earnings_news()
+        self._last_news += self.company_event_news
         if self.regime_changed:
             good = self.regime in ("Expansion", "Calme")
             self._last_news.insert(0, {
@@ -723,4 +738,35 @@ class Market(MarketQueryMixin):
         # à venir -- un seul tirage par société par cycle (cf. docstring ci-dessus).
         self._prepare_next_earnings(due)
         return shock
+
+    def _step_company_events(self):
+        """Couche d'événements d'entreprise ciblés (produit, contrat, scandale,
+        OPA...). Consomme des tirages rng déterministes à chaque pas, applique un
+        choc de cours immédiat + un drift résiduel décroissant, et alimente
+        `self.company_event_news` pour les news du pas et `self.company_events_log`
+        pour l'affichage sur les graphes.
+
+        Retourne (shock_immediat, residual) : deux vecteurs numpy de taille n à
+        ajouter au rendement du pas.
+        """
+        from core import market_events as mev
+        caps = self.price * self.shares
+        shocks, new_events = mev.step_events(
+            self.n, self.step_count, self.sigma, caps, self.rng)
+        # Mise à jour de l'état actif : les événements précédents continuent de
+        # produire un drift résiduel, et les nouveaux prennent la suite.
+        for i, ev in enumerate(new_events):
+            if ev is not None:
+                self.active_company_events[i] = ev
+                ticker = self.companies[i]["ticker"]
+                self.company_events_log.setdefault(ticker, []).append(ev)
+                # génère une news ciblée si le choc est assez marqué
+                if abs(ev["shock"]) >= 0.02:
+                    self.company_event_news.append({
+                        "region": self.companies[i].get("region"),
+                        "kind": "good" if ev["kind"] == "good" else "bad" if ev["kind"] == "bad" else "info",
+                        "text": f"{ticker} — {ev['title']}: {ev['desc']}",
+                    })
+        residual = mev.decay_residuals(self.active_company_events, self.n)
+        return shocks, residual
 

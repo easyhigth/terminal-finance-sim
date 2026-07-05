@@ -60,6 +60,47 @@ class GraphRenderMixin:
     def _empty(self, surf, rect, msg="Aucune donnée. Saisissez un ticker."):
         widgets.draw_text(surf, msg, (rect.x, rect.y), fonts.small(), config.COL_TEXT_DIM)
 
+    def _draw_event_markers(self, surf, rect, series, lo, span):
+        """Dessine des icônes d'événements d'entreprise sur la courbe de prix.
+        Les événements sont positionnés à leur pas de marché correspondant
+        sur la série densifiée (intraday)."""
+        mkt = self.market
+        if mkt is None or not self.tickers:
+            return
+        tk = self.tickers[0]
+        events = mkt.company_events_log.get(tk, [])
+        if not events:
+            return
+        from core import intraday
+        pps = intraday.points_per_segment_for_n_steps(self.period)
+        if pps <= 0:
+            return
+        current_step = mkt.step_count
+        n = len(series)
+        if n < 2:
+            return
+        _KIND_COL = {"good": config.COL_UP, "bad": config.COL_DOWN, "info": config.COL_CYAN}
+        for ev in events:
+            steps_back = current_step - ev["step"]
+            if steps_back < 0 or steps_back > (self.period or 9999):
+                continue
+            idx = n - 1 - steps_back * pps
+            if idx < 0 or idx >= n:
+                continue
+            price = series[int(idx)]
+            if lo is None or span == 0:
+                continue
+            y = rect.y + rect.h - int((price - lo) / span * rect.h)
+            x = rect.x + int(idx / (n - 1) * rect.w)
+            if not rect.collidepoint(x, y):
+                continue
+            icon = ev.get("icon", "•")
+            ecol = _KIND_COL.get(ev.get("kind", "info"), config.COL_CYAN)
+            r = 6
+            pygame.draw.circle(surf, (8, 10, 14), (x, y), r + 1)
+            pygame.draw.circle(surf, ecol, (x, y), r, 1)
+            widgets.draw_text(surf, icon, (x, y - 7), fonts.tiny(), ecol, align="center")
+
     # ----------------------------------------------------- types : prix
     def _draw_line(self, surf, rect):
         if not self.tickers:
@@ -107,6 +148,7 @@ class GraphRenderMixin:
             self._overlay_aligned(surf, rect, sma_ind, lo, span, config.COL_WARN, width=2)
             legend.append(("SMA20 (indicators)", config.COL_WARN))
         self._legend(surf, rect, legend)
+        self._draw_event_markers(surf, rect, s, lo, span)
 
     def _overlay_aligned(self, surf, rect, series, lo, span, color, width=1):
         """Trace une série alignée sur l'axe x du graphe principal (même longueur,
@@ -171,6 +213,7 @@ class GraphRenderMixin:
         widgets.draw_candles(surf, rect, s, n_candles=n_candles, sma_windows=(10, 30))
         self._x_labels(surf, rect, n_candles)
         self._track_candle_rects(rect, s, n_candles)
+        self._draw_event_markers(surf, rect, s, lo, hi - lo or 1.0)
 
     def _track_candle_rects(self, rect, closes, n_candles):
         """Mémorise le rect écran + le détail brut (sous-échantillon) de
@@ -209,6 +252,7 @@ class GraphRenderMixin:
             pygame.draw.line(surf, col, (cx, yof(h)), (cx, yof(l)), 1)
             pygame.draw.line(surf, col, (cx - 3, yof(o)), (cx, yof(o)), 2)   # ouverture (gauche)
             pygame.draw.line(surf, col, (cx, yof(c)), (cx + 3, yof(c)), 2)   # clôture (droite)
+        self._draw_event_markers(surf, rect, s, lo, span)
 
     def _draw_change(self, surf, rect):
         if not self.tickers:

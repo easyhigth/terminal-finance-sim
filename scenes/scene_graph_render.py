@@ -16,9 +16,18 @@ from ui import fonts, widgets
 
 class GraphRenderMixin:
     # ----------------------------------------------------- helpers de tracé
-    def _plot_axes(self, surf, rect, lo, hi, y_fmt=lambda v: f"{v:.0f}", rows=5):
-        """Grille horizontale + libellés d'axe Y. Retourne (lo, hi, span)."""
-        return widgets.draw_chart_axes(surf, rect, lo, hi, y_fmt, rows)
+    def _plot_axes(self, surf, rect, lo, hi, y_fmt=lambda v: f"{v:.0f}", rows=5,
+                   right_labels=False, pad_pct=0.0):
+        """Grille horizontale + libellés d'axe Y. Retourne (lo, hi, span).
+        `pad_pct` ajoute un padding autour de la série (p. ex. 1.5%) pour que
+        les micro-variations ne soient pas écrasées sur le bord du graphe."""
+        if pad_pct:
+            span = (hi - lo) or 1.0
+            pad = max(span * pad_pct, abs(hi) * pad_pct * 0.5, abs(lo) * pad_pct * 0.5, 0.01)
+            lo -= pad
+            hi += pad
+        return widgets.draw_chart_axes(surf, rect, lo, hi, y_fmt, rows,
+                                       right_labels=right_labels)
 
     def _x_labels(self, surf, rect, n):
         """Libellés d'axe X sous une série temporelle de `n` points (le plus à
@@ -30,19 +39,16 @@ class GraphRenderMixin:
             widgets.draw_chart_x_labels(surf, rect, labels)
 
     def _polyline(self, surf, rect, series, lo, span, color, y_fmt=None, cursor=None,
-                  show_pct=False, area_fill=False, show_current_line=False):
+                  show_pct=False, area_fill=False, show_current_line=False,
+                  line_width=1, area_alpha=None, baseline=True):
         n = len(series)
         if n < 2:
             return
-        pts = [(rect.x + int(i / (n - 1) * rect.w),
-                rect.bottom - int((v - lo) / span * rect.h)) for i, v in enumerate(series)]
-        if area_fill:
-            widgets.fill_gradient_area(surf, rect, pts, color)
-        pygame.draw.aalines(surf, color, False, pts)
-        if show_current_line:
-            widgets.draw_current_price_line(surf, rect, pts[-1][1],
-                                            y_fmt(series[-1]) if y_fmt else f"{series[-1]:,.2f}",
-                                            color)
+        widgets.draw_series(surf, rect, series, color, baseline=baseline, mouse_pos=None,
+                              y_fmt=y_fmt, show_pct=show_pct, show_extrema=False,
+                              area_fill=area_fill, show_current_line=show_current_line,
+                              line_width=line_width, area_alpha=area_alpha,
+                              lo=lo, hi=lo + span)
         if cursor is not None:
             cursor.draw(surf, rect, series, lo, span, mouse_pos=pygame.mouse.get_pos(),
                        y_fmt=y_fmt, color=color, show_pct=show_pct)
@@ -71,18 +77,25 @@ class GraphRenderMixin:
             allv += [v for v in boll[0] if v is not None]
             allv += [v for v in boll[2] if v is not None]
         lo, hi = min(allv), max(allv)
-        lo, hi, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:.0f}")
+        # Style « vraie appli de trading » : labels de prix à droite, pas de
+        # baseline au premier point, courbe cyan épaisse avec dégradé très
+        # transparent — les piques et zigzags du chemin canonique restent visibles.
+        lo, hi, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:.0f}",
+                                       right_labels=True, pad_pct=0.015)
         self._x_labels(surf, rect, len(s))
-        legend = [("Cours", config.COL_AMBER),
-                  ("MM20", config.COL_CYAN), ("MM50", config.COL_TEXT_DIM)]
+        line_col = config.COL_CYAN
+        legend = [("Cours", line_col),
+                  ("MM20", config.COL_WHITE), ("MM50", config.COL_TEXT_DIM)]
         if boll:
             lower, mid, upper = boll
             self._overlay_aligned(surf, rect, lower, lo, span, (150, 150, 160), width=1)
             self._overlay_aligned(surf, rect, upper, lo, span, (150, 150, 160), width=1)
             legend.append(("Bollinger 20·2σ", (150, 150, 160)))
-        self._polyline(surf, rect, s, lo, span, config.COL_AMBER, y_fmt=lambda v: f"{v:,.2f}",
-                       cursor=self._cursor, show_pct=True, area_fill=True, show_current_line=True)
-        for ma, col in ((ma20, config.COL_CYAN), (ma50, config.COL_TEXT_DIM)):
+        self._polyline(surf, rect, s, lo, span, line_col, y_fmt=lambda v: f"{v:,.2f}",
+                       cursor=self._cursor, show_pct=True, area_fill=True,
+                       show_current_line=True, line_width=2, area_alpha=45,
+                       baseline=False)
+        for ma, col in ((ma20, config.COL_WHITE), (ma50, config.COL_TEXT_DIM)):
             seg = [v for v in ma if v is not None]
             if len(seg) >= 2:
                 # aligne la MA à droite (les None sont au début)
@@ -147,7 +160,8 @@ class GraphRenderMixin:
         if len(s) < 2:
             return self._empty(surf, rect, "Historique indisponible.")
         lo, hi = min(s), max(s)
-        self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:.0f}")
+        self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:.0f}",
+                         right_labels=True, pad_pct=0.01)
         # En intraday, `s` est un échantillonnage fin animé (60 points) ; on
         # regroupe en moins de bougies que de points pour que chaque bougie
         # ait un vrai corps/mèche (open/high/low/close distincts) plutôt
@@ -184,7 +198,8 @@ class GraphRenderMixin:
         candles = widgets._aggregate_ohlc(s, min(70, len(s)))
         lo = min(c[2] for c in candles)
         hi = max(c[1] for c in candles)
-        _, _, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:.0f}")
+        _, _, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:.0f}",
+                                       right_labels=True, pad_pct=0.01)
         self._x_labels(surf, rect, len(candles))
         slot = rect.w / len(candles)
         yof = lambda v: rect.bottom - int((v - lo) / span * rect.h)

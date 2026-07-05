@@ -422,11 +422,13 @@ def _gradient_mask(height):
     return mask
 
 
-def fill_gradient_area(surf, rect, pts, color, top_alpha=90):
+def fill_gradient_area(surf, rect, pts, color, top_alpha=55):
     """Remplissage en dégradé vertical sous une polyligne de prix, façon
-    appli de trading (eToro et consorts) : plein près de la courbe,
+    appli de trading (eToro/Trading212) : plein près de la courbe,
     transparent vers le bas du graphe — remplace l'ancien style « ligne nue »
     pour donner un rendu de marché vivant plutôt qu'un tracé technique plat.
+    `top_alpha` réglable (défaut 55) pour garder le tracé principal lisible
+    plutôt qu'noie sous un bloc de couleur opaque.
     `pts` : liste de (x, y) DÉJÀ projetés en pixels, mêmes coordonnées que la
     ligne dessinée par-dessus (donc appelé AVANT `pygame.draw.aalines`)."""
     rect = pygame.Rect(rect)
@@ -463,7 +465,8 @@ def draw_current_price_line(surf, rect, y, label, color, font=None):
 
 def draw_series(surf, rect, vals, color=None, baseline=True, mouse_pos=None, y_fmt=None,
                 show_pct=False, show_extrema=True, extrema_label=True, band_frac=None,
-                area_fill=True, show_current_line=False):
+                area_fill=True, show_current_line=False, line_width=1, area_alpha=None,
+                lo=None, hi=None):
     """Trace une polyligne à partir d'une liste de valeurs, dans `rect`.
 
     Si `mouse_pos` est fourni et survole `rect`, affiche un curseur (ligne
@@ -484,11 +487,18 @@ def draw_series(surf, rect, vals, color=None, baseline=True, mouse_pos=None, y_f
     contextes très compacts où le dégradé n'apporterait rien de lisible.
     `show_current_line` : ligne + pastille de cours actuel sur le bord droit
     (cf. `draw_current_price_line`) — hors par défaut (surchargerait les
-    petites vignettes type watchlist), à activer pour un graphe dédié."""
+    petites vignettes type watchlist), à activer pour un graphe dédié.
+    `line_width` (défaut 1) : épaisseur du trait ; pour les graphes principaux
+    on passe 2–3 px afin d'obtenir une courbe bien visible façon appli mobile.
+    `area_alpha` (None) : alpha au sommet du remplissage ; si None, utilise le
+    nouveau défaut de `fill_gradient_area` (55), plus discret que l'ancien 90.
+    `lo`/`hi` optionnels : bornes Y explicites pour aligner la courbe sur des
+    axes déjà tracés avec un padding (cf. `_plot_axes` de l'atelier de graphes)."""
     rect = pygame.Rect(rect)
     if not vals or len(vals) < 2:
         return
-    lo, hi = min(vals), max(vals)
+    if lo is None or hi is None:
+        lo, hi = min(vals), max(vals)
     span = (hi - lo) or 1.0
     col = color
     if col is None:
@@ -511,12 +521,19 @@ def draw_series(surf, rect, vals, color=None, baseline=True, mouse_pos=None, y_f
         pts.append((x, y))
     if len(pts) >= 2:
         if area_fill:
-            fill_gradient_area(surf, rect, pts, col)
-        pygame.draw.aalines(surf, col, False, pts)
+            fill_gradient_area(surf, rect, pts, col, top_alpha=area_alpha if area_alpha is not None else 55)
+        if line_width <= 1:
+            pygame.draw.aalines(surf, col, False, pts)
+        else:
+            # halo doux derrière le trait épais pour un rendu « néon » façon app mobile
+            glow = tuple(max(0, int(c * 0.35)) for c in col[:3])
+            pygame.draw.lines(surf, glow, False, pts, line_width + 2)
+            pygame.draw.lines(surf, col, False, pts, line_width)
         if show_current_line:
             draw_current_price_line(surf, rect, pts[-1][1],
                                     y_fmt(vals[-1]) if y_fmt else f"{vals[-1]:,.2f}", col)
-    pygame.draw.circle(surf, col, pts[-1], 2)
+    if pts:
+        pygame.draw.circle(surf, col, pts[-1], max(2, line_width))
     if show_extrema:
         draw_chart_extrema(surf, rect, vals, lo, span, y_fmt=y_fmt, color=config.COL_TEXT_DIM,
                            label=extrema_label)
@@ -552,10 +569,13 @@ def _sma(vals, window):
     return out
 
 
-def draw_candles(surf, rect, closes, n_candles=32, sma_windows=(10, 30)):
+def draw_candles(surf, rect, closes, n_candles=32, sma_windows=(10, 30),
+                 body_frac=0.55):
     """Dessine un graphe en chandeliers à partir d'une série de clôtures, avec
     des moyennes mobiles optionnelles (en nombre de pas). Les bougies sont
-    agrégées depuis les clôtures (open/high/low/close par groupe de pas)."""
+    agrégées depuis les clôtures (open/high/low/close par groupe de pas).
+    `body_frac` (0..1) contrôle l'espace entre bougies : 0.55 laisse des
+    interstices visibles, évitant l'aspect « mur de couleur »."""
     rect = pygame.Rect(rect)
     if not closes or len(closes) < 2:
         return
@@ -569,7 +589,7 @@ def draw_candles(surf, rect, closes, n_candles=32, sma_windows=(10, 30)):
 
     n = len(candles)
     slot = rect.w / n
-    bw = max(2, int(slot * 0.6))
+    bw = max(2, int(slot * body_frac))
     for k, (o, h, l, c) in enumerate(candles):
         cx = int(rect.x + (k + 0.5) * slot)
         up = c >= o
@@ -832,7 +852,8 @@ class ScrollState:
         return True
 
 
-def draw_chart_axes(surf, rect, lo, hi, y_fmt=lambda v: f"{v:.0f}", rows=5):
+def draw_chart_axes(surf, rect, lo, hi, y_fmt=lambda v: f"{v:.0f}", rows=5,
+                     right_labels=False):
     """Dessine la grille horizontale + libellés d'axe Y d'un graphe en lignes
     (style atelier de graphes / option / quant). Commun à plusieurs écrans à
     panneaux de graphe (scene_graph, scene_quant...). Retourne (lo, hi, span)
@@ -843,6 +864,8 @@ def draw_chart_axes(surf, rect, lo, hi, y_fmt=lambda v: f"{v:.0f}", rows=5):
     `lo/hi` : bornes de l'axe Y.
     `y_fmt` : formatte la valeur affichée à côté de chaque ligne de grille.
     `rows`  : nombre d'intervalles de la grille (rows+1 lignes, haut compris).
+    `right_labels` : place les libellés d'axe Y à droite (style Trading212)
+                     au lieu de la gauche.
     """
     rect = pygame.Rect(rect)
     span = (hi - lo) or 1.0
@@ -850,8 +873,12 @@ def draw_chart_axes(surf, rect, lo, hi, y_fmt=lambda v: f"{v:.0f}", rows=5):
         v = hi - span * r / rows
         yy = rect.y + int(rect.h * r / rows)
         pygame.draw.line(surf, config.COL_GRID, (rect.x, yy), (rect.right, yy), 1)
-        draw_text(surf, y_fmt(v), (rect.x - 6, yy - 7), fonts.tiny(),
-                  config.COL_TEXT_DIM, align="right")
+        if right_labels:
+            draw_text(surf, y_fmt(v), (rect.right + 6, yy - 7), fonts.tiny(),
+                      config.COL_TEXT_DIM, align="left")
+        else:
+            draw_text(surf, y_fmt(v), (rect.x - 6, yy - 7), fonts.tiny(),
+                      config.COL_TEXT_DIM, align="right")
     return lo, hi, span
 
 

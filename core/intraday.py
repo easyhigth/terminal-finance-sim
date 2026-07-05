@@ -24,17 +24,17 @@ MINUTES_PER_DAY = 24 * 60
 
 # Résolutions des octaves de bruit (minutes), du plus grossier au plus fin —
 # la plus fine (5 min) garantit de la texture même sur la fenêtre la plus
-# zoomée (« 5 dernières minutes »). Poids de l'octave fine relevé (0.2 → 0.3)
-# pour un tracé plus dense/dentelé, façon appli de trading grand public
-# (retour joueur : les graphes "de vraie appli" zigzaguent beaucoup plus que
-# notre courbe lissée précédente, cf. captures eToro fournies).
+# zoomée (« 5 dernières minutes »). Poids de l'octave fine relevé (0.3 → 0.5)
+# et amplitude globale augmentée pour un tracé dense/dentelé façon app de
+# trading grand public (retour joueur : les graphes "de vraie appli" montrent
+# des piques et zigzags bien visibles, cf. captures eToro fournies).
 _RESOLUTIONS = (720, 60, 5)
-_AMPLITUDES = (1.0, 0.5, 0.3)
-# Amplitude relative max du bruit affiché (~0.45%) : purement visuel (n'affecte
-# jamais market.price/index_value, donc jamais le prix d'exécution des ordres)
-# — réduit pour assurer une meilleure cohérence entre périodes courtes et longues
-# tout en restant visuellement dynamique.
-_NOISE_PCT = 0.0035
+_AMPLITUDES = (1.0, 0.5, 0.5)
+# Amplitude relative max du bruit affiché (~0.85%) : purement visuel (n'affecte
+# jamais market.price/index_value, donc jamais le prix d'exécution des ordres).
+# Cette amplitude suffit pour faire apparaître des pics/spikes sur les fenêtres
+# courtes sans dénaturer les tendances de fond sur les vues longues.
+_NOISE_PCT = 0.0060
 
 # Sigma "moyen" du roster (cf. data/companies.py, profils sectoriels ~0.018-0.055) ;
 # sert de référence pour que les sociétés volatiles (tech/semicon...) bougent

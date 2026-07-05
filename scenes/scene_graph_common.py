@@ -79,8 +79,11 @@ def stock_series(market, sim_clock, day, tk, period, region=None):
         window_days = -period / (24 * 60)
         steps_needed = max(2, int(window_days / config.DAYS_PER_STEP) + 2)
         hist = market.history_of(tk, steps_needed)
+        # Fenêtre 1J → 80 points, 1W → 140 points pour révéler la texture fine
+        # du chemin canonique (plus de piques/zigzags, façon app mobile).
+        n_points = 80 if -period <= 1440 else 140
         return intraday.intraday_series(
-            market, sim_clock, day, tk, hist, window_minutes=-period, n_points=60,
+            market, sim_clock, day, tk, hist, window_minutes=-period, n_points=n_points,
             region=region, vol_mult=vol_mult, target=target)
     pps = intraday.points_per_segment_for_n_steps(period)
     hist = market.history_of(tk, period)

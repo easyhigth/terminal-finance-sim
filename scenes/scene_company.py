@@ -616,9 +616,11 @@ class CompanyScene(Scene):
             col = config.COL_UP if hist[-1] >= hist[0] else config.COL_DOWN
             tier = liquidity.equity_tier(m, self.ticker)
             half_spread = liquidity.params(tier)[0]
-            widgets.draw_series(surf, inner, hist, col, mouse_pos=pygame.mouse.get_pos(),
+            widgets.draw_series(surf, inner, hist, col, baseline=False,
+                                mouse_pos=pygame.mouse.get_pos(),
                                 y_fmt=lambda v: f"{v:,.2f} {self.cur}", show_pct=True,
-                                band_frac=half_spread, show_current_line=True)
+                                band_frac=half_spread, show_current_line=True,
+                                line_width=2, area_alpha=45)
             self._draw_orderbook(surf, inner, hist[-1], tier, half_spread)
             self._x_labels(surf, inner, len(hist))
         elif self.chart_kind == "vol":

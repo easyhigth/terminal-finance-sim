@@ -54,6 +54,12 @@ PRESETS = [
               "Capital -25%, salary -20%, strict margin, harsher crises, more aggressive rivals."),
      "cash_mult": 0.75, "salary_mult": 0.8, "maint_margin_mult": 1.25,
      "crisis_bad_mult": 1.35, "crisis_sev_mult": 1.15, "rival_aggro_mult": 1.4},
+    {"id": "custom",
+     "name": ("Personnalisé", "Custom"),
+     "desc": ("Réglez chaque paramètre indépendamment.",
+              "Tune each parameter independently."),
+     "cash_mult": 1.0, "salary_mult": 1.0, "maint_margin_mult": 1.0,
+     "crisis_bad_mult": 1.0, "crisis_sev_mult": 1.0, "rival_aggro_mult": 1.0},
 ]
 
 _BY_ID = {p["id"]: p for p in PRESETS}
@@ -106,6 +112,57 @@ def apply(player, preset_id):
     p = preset(preset_id)
     player.flags["difficulty"] = p["id"]
     player.cash = round(player.cash * p["cash_mult"], 2)
+
+
+# ---------------------------------------------------------------------------
+# Paramètres personnalisés (difficulté "custom")
+# ---------------------------------------------------------------------------
+_CUSTOM_KEYS = ["cash_mult", "salary_mult", "maint_margin_mult",
+                "crisis_bad_mult", "crisis_sev_mult", "rival_aggro_mult"]
+
+
+def get_custom_param(player, key):
+    """Lit un paramètre personnalisé (ou la valeur du preset par défaut)."""
+    if get_id(player) != "custom":
+        return preset(get_id(player)).get(key, 1.0)
+    return player.flags.get(f"diff_{key}", 1.0)
+
+
+def set_custom_param(player, key, value):
+    """Définit un paramètre personnalisé (uniquement en mode custom)."""
+    if get_id(player) != "custom":
+        return
+    player.flags[f"diff_{key}"] = max(0.1, min(3.0, float(value)))
+
+
+def salary_mult(player):
+    if get_id(player) == "custom":
+        return get_custom_param(player, "salary_mult")
+    return preset(get_id(player))["salary_mult"]
+
+
+def maint_margin_mult(player):
+    if get_id(player) == "custom":
+        return get_custom_param(player, "maint_margin_mult")
+    return preset(get_id(player))["maint_margin_mult"]
+
+
+def crisis_bad_mult(player):
+    if get_id(player) == "custom":
+        return get_custom_param(player, "crisis_bad_mult")
+    return preset(get_id(player))["crisis_bad_mult"]
+
+
+def crisis_sev_mult(player):
+    if get_id(player) == "custom":
+        return get_custom_param(player, "crisis_sev_mult")
+    return preset(get_id(player))["crisis_sev_mult"]
+
+
+def rival_aggro_mult(player):
+    if get_id(player) == "custom":
+        return get_custom_param(player, "rival_aggro_mult")
+    return preset(get_id(player))["rival_aggro_mult"]
     return p
 
 

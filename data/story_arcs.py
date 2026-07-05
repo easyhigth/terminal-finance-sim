@@ -169,4 +169,143 @@ ARCS = [
         "effect": {"rep": 1, "cash": 15_000.0,
                    "reason": "Confiance élargie d'une cliente exigeante"},
     },
+    {
+        "id": "fraud_probe",
+        "stages": [
+            {"delay": 2, "category": "compliance",
+             "sender": "Conformité Interne",
+             "subject": "Signalement — transaction suspecte",
+             "body": ("Une transaction sur le compte de votre client Kariba Mining a "
+                      "déclenché un signalement automatique. Rien de grave a priori, "
+                      "mais le régulateur local demande des justificatifs. Transmettez "
+                      "les documents sous 48h ouvrées pour éviter l'escalade.")},
+            {"delay": 8, "category": "compliance",
+             "sender": "Conformité Interne",
+             "subject": "RE: Signalement Kariba — mise à jour",
+             "body": ("Le régulateur a accusé réception des justificatifs. L'enquête "
+                      "préliminaire est close, mais votre nom reste dans le dossier. "
+                      "Soyez irréprochable sur les prochains trimestres : un deuxième "
+                      "signalement déclencherait un audit complet.")},
+            {"delay": 12, "category": "compliance",
+             "sender": "Conformité Interne",
+             "subject": "Clôture — dossier Kariba",
+             "body": ("Dossier refermé sans suite. Votre réactivité a joué en votre "
+                      "faveur. La conformité vous remercie. Continuez comme ça.")},
+        ],
+        "effect": {"rep": 2, "cash": 0.0,
+                   "reason": "Enquête réglementaire refermée sans suite"},
+    },
+    {
+        "id": "hostile_bid",
+        "stages": [
+            {"delay": 2, "category": "client",
+             "sender": "Bloomberg M&A Desk",
+             "subject": "Rumeur : OPA hostile sur Nexora Technologies",
+             "body": ("Des rumeurs de rachat circulent sur Nexora Technologies. Un "
+                      "fonds activiste aurait accumulé une participation de 7 % et "
+                      "préparerait une offre hostile. Le titre a bondi de 12 % en "
+                      "after-hours. À surveiller de très près.")},
+            {"delay": 6, "category": "client",
+             "sender": "Bloomberg M&A Desk",
+             "subject": "OPA Nexora : l'offre est déposée",
+             "body": ("C'est officiel : le fonds Valiance Capital lance une OPA à "
+                      "68 $ par action sur Nexora, soit une prime de 25 %. Le conseil "
+                      "recommande de ne pas apporter. Bataille en vue. Vous avez des "
+                      "clients exposés au titre ?")},
+            {"delay": 10, "category": "client",
+             "sender": "Votre Analyste Senior",
+             "subject": "Nexora : issue de l'OPA",
+             "body": ("L'OPA a échoué : Valiance n'a obtenu que 38 % des titres. "
+                      "Le cours retombe à 52 $. Les arbitragistes ont perdu gros. "
+                      "J'espère que vous n'étiez pas exposé. Bonne leçon : une OPA "
+                      "hostile, c'est jamais gagné d'avance.")},
+        ],
+        "effect": {"rep": 1, "cash": 5_000.0,
+                   "reason": "A bien conseillé ses clients pendant l'OPA Nexora"},
+    },
+    {
+        "id": "whistleblower",
+        "stages": [
+            {"delay": 2, "category": "research",
+             "sender": "Expéditeur Anonyme",
+             "subject": "Vous devriez regarder ça...",
+             "body": ("Je ne peux pas vous dire qui je suis, mais je travaille chez "
+                      "GreenPeak Energy. Leur dernier rapport ESG est truffé de fausses "
+                      "déclarations. Les émissions de CO2 sont 3× supérieures à ce "
+                      "qu'ils publient. Un journal d'investigation va sortir l'article "
+                      "dans quelques semaines. Faites ce que vous voulez de cette info.")},
+            {"delay": 7, "category": "research",
+             "sender": "Financial Times",
+             "subject": "GreenPeak Energy : scandale ESG",
+             "body": ("Le FT révèle ce matin que GreenPeak Energy a massivement "
+                      "sous-déclaré ses émissions. Le titre plonge de 18 % à "
+                      "l'ouverture. Le régulateur environnemental ouvre une enquête. "
+                      "Plusieurs fonds ESG annoncent leur désinvestissement.")},
+            {"delay": 8, "category": "research",
+             "sender": "Votre Comité Éthique",
+             "subject": "GreenPeak : vous étiez informé ?",
+             "body": ("Le comité éthique a noté que vous aviez réduit votre exposition "
+                      "à GreenPeak AVANT la publication du FT. Simple coïncidence ou "
+                      "information privilégiée ? Nous classons sans suite vu les "
+                      "montants modestes, mais soyez plus prudent à l'avenir.")},
+        ],
+        "effect": {"rep": -1, "cash": 20_000.0,
+                   "reason": "A évité le scandale GreenPeak (zone grise éthique)"},
+    },
+    {
+        "id": "startup_ipo",
+        "stages": [
+            {"delay": 2, "category": "client",
+             "sender": "Votre Banquier d'Affaires",
+             "subject": "Mandat IPO — NovaTech AI",
+             "body": ("NovaTech AI, une startup d'IA générative, prépare son IPO. "
+                      "Ils cherchent un bookrunner. Le deal est risqué (boîte de 3 ans, "
+                      "pas encore rentable) mais les commissions sont énormes. Vous "
+                      "voulez qu'on pitche ?")},
+            {"delay": 5, "category": "client",
+             "sender": "Votre Banquier d'Affaires",
+             "subject": "NovaTech AI : on a le mandat !",
+             "body": ("On a décroché le mandat ! NovaTech nous a choisis comme "
+                      "bookrunner. La fourchette de prix est fixée à 22-26 $. Le "
+                      "roadshow commence la semaine prochaine. Préparez-vous à "
+                      "vendre du rêve.")},
+            {"delay": 10, "category": "client",
+             "sender": "Votre Banquier d'Affaires",
+             "subject": "NovaTech IPO : clôture",
+             "body": ("L'IPO est un succès : sursouscrite 8×, le titre ouvre à "
+                      "34 $ (+55 %). Les commissions nettes pour la firme s'élèvent "
+                      "à 2,4 M$. Félicitations — vous venez de mener votre première "
+                      "introduction en bourse.")},
+        ],
+        "effect": {"rep": 3, "cash": 50_000.0,
+                   "reason": "IPO NovaTech AI menée avec succès"},
+    },
+    {
+        "id": "rival_poach",
+        "stages": [
+            {"delay": 2, "category": "desk",
+             "sender": "Chasseur de Têtes Anonyme",
+             "subject": "Opportunité confidentielle",
+             "body": ("Un concurrent de premier plan m'a mandaté pour vous approcher. "
+                      "Ils sont prêts à vous offrir un poste de Managing Director avec "
+                      "un package à 7 chiffres. Intéressé pour en discuter ?")},
+            {"delay": 6, "category": "desk",
+             "sender": "Marcus Vale",
+             "subject": "Alors, ce poste chez nous ?",
+             "body": ("J'ai entendu dire que tu avais été approché. Laisse-moi te "
+                      "donner un conseil : ici, tu construis TA carrière. Là-bas, "
+                      "tu seras juste un numéro. Et puis... tu ne voudrais pas que "
+                      "je rachète ta firme sans toi pour la défendre, non ?")},
+            {"delay": 8, "category": "desk",
+             "sender": "Votre Mentor",
+             "subject": "Fidélité",
+             "body": ("Je sais que vous avez été approché. C'est normal, vous êtes "
+                      "bon. Mais la loyauté paie dans ce métier — pas tout de suite, "
+                      "mais toujours. Restez, continuez à construire, et vous verrez "
+                      "que les opportunités viendront à vous sans avoir à changer "
+                      "de crémerie.")},
+        ],
+        "effect": {"rep": 2, "cash": 0.0,
+                   "reason": "A refusé une offre de débauchage — loyauté remarquée"},
+    },
 ]

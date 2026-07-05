@@ -176,6 +176,111 @@ DILEMMAS = [
          {"label": "Couvrir et profiter", "cash_k": 90, "rep": -4, "heat": 45,
           "outcome": "Argent facile, mais vous êtes désormais complice. Très risqué."},
      ]},
+    # ----------------------------- nouveaux dilemmes ---------------------------
+    {"id": "greenwashing", "category": "ethique", "min_grade": 3, "weight": 2,
+     "title": "Greenwashing tentant",
+     "scenario": "Un client veut labelliser son fonds 'ESG' alors que 40 % du portefeuille "
+                 "est investi dans des énergies fossiles. La labellisation rapporterait gros.",
+     "options": [
+         {"label": "Refuser le label", "cash_k": -15, "rep": 8, "heat": -10,
+          "outcome": "Vous refusez. Le client est déçu mais votre intégrité est intacte."},
+         {"label": "Labelliser quand même", "cash_k": 50, "rep": -3, "heat": 30,
+          "outcome": "L'argent rentre, mais si ça se sait, le scandale sera énorme."},
+     ]},
+    {"id": "short_squeeze", "category": "strategie", "min_grade": 4, "weight": 2,
+     "title": "Short squeeze en vue",
+     "scenario": "Vous détenez une position short sur un titre qui bondit de 30 % en "
+                 "pre-market. Couvrir maintenant limite la casse, mais si ça redescend...",
+     "options": [
+         {"label": "Couvrir immédiatement", "cash_k": -40, "rep": 2, "heat": 0,
+          "outcome": "Vous coupez votre perte. Le titre a continué de monter."},
+         {"label": "Maintenir le short", "cash_k": 20, "rep": -2, "heat": 5,
+          "outcome": "Vous avez tenu bon. Le titre a fini par redescendre."},
+     ]},
+    {"id": "crypto_dilemma", "category": "strategie", "min_grade": 2, "weight": 2,
+     "title": "Pari crypto",
+     "scenario": "Un client veut investir 30 % de son portefeuille dans un token crypto "
+                 "non régulé. Les rendements potentiels sont énormes, mais le risque aussi.",
+     "options": [
+         {"label": "Refuser catégoriquement", "cash_k": 0, "rep": 5, "heat": -5,
+          "outcome": "Le client râle mais vous avez respecté votre devoir de conseil."},
+         {"label": "Accepter avec mise en garde", "cash_k": 35, "rep": -1, "heat": 15,
+          "outcome": "Le client signe une décharge. Si ça tourne mal, il vous tiendra "
+                      "pour responsable."},
+     ]},
+    {"id": "layoff_decision", "category": "signature", "min_grade": 6, "weight": 1,
+     "title": "Plan de restructuration",
+     "scenario": "Le board exige une réduction des coûts de 15 %. Vous devez choisir entre "
+                 "un plan de licenciements ou une baisse des bonus.",
+     "options": [
+         {"label": "Licencier 10 % des effectifs", "cash_k": 80, "rep": -8, "heat": 10,
+          "outcome": "Les coûts baissent, le board est content, mais le moral s'effondre."},
+         {"label": "Baisser les bonus de 30 %", "cash_k": 20, "rep": 4, "heat": 0,
+          "outcome": "Les équipes grognent mais personne ne perd son job."},
+     ]},
+    {"id": "data_leak", "category": "reglementaire", "min_grade": 3, "weight": 2,
+     "title": "Fuite de données clients",
+     "scenario": "Votre stagiaire a envoyé par erreur un fichier de 500 clients à une "
+                 "adresse externe. Le RGPD exige une notification sous 72h.",
+     "options": [
+         {"label": "Notifier les clients et le régulateur", "cash_k": -25, "rep": 3, "heat": -20,
+          "outcome": "Transparence totale. Les clients apprécient, le régulateur aussi."},
+         {"label": "Étouffer l'incident", "cash_k": 5, "rep": -5, "heat": 40,
+          "outcome": "Personne ne sait rien... pour l'instant."},
+     ]},
+    {"id": "activist_investor", "category": "strategie", "min_grade": 5, "weight": 2,
+     "title": "Investisseur activiste",
+     "scenario": "Un fonds activiste a pris 5 % du capital d'un de vos clients et exige "
+                 "un spin-off de la division la plus rentable.",
+     "options": [
+         {"label": "Défendre le statu quo", "cash_k": 10, "rep": 3, "heat": 0,
+          "outcome": "Vous aidez le client à repousser l'activiste."},
+         {"label": "Conseiller le spin-off", "cash_k": 60, "rep": -2, "heat": 5,
+          "outcome": "Le spin-off crée de la valeur à court terme, mais le client perd "
+                      "son joyau."},
+     ]},
+    {"id": "sanctions_breach", "category": "reglementaire", "min_grade": 4, "weight": 2,
+     "title": "Violation de sanctions",
+     "scenario": "Un client veut transférer des fonds vers un pays sous sanctions via une "
+                 "structure écran. C'est illégal mais très bien payé.",
+     "options": [
+         {"label": "Refuser et signaler", "cash_k": -10, "rep": 10, "heat": -30,
+          "outcome": "Vous signalez au compliance officer. Vous êtes clean."},
+         {"label": "Fermer les yeux", "cash_k": 100, "rep": -10, "heat": 60,
+          "outcome": "L'argent est sur votre compte. Mais si le Trésor découvre le "
+                      "montage, c'est la prison."},
+     ]},
+    {"id": "ai_trading", "category": "signature", "min_grade": 5, "weight": 1,
+     "title": "Algo trading maison",
+     "scenario": "Votre équipe Quant a développé un algorithme qui surperforme le marché "
+                 "de 8 % par an en backtest. Voulez-vous le déployer avec le capital firme ?",
+     "options": [
+         {"label": "Déployer l'algo progressivement", "cash_k": 40, "rep": 5, "heat": 5,
+          "outcome": "L'algo fait ses preuves en conditions réelles."},
+         {"label": "Attendre 6 mois de tests supplémentaires", "cash_k": 0, "rep": 2, "heat": 0,
+          "outcome": "Prudent. L'algo avait un bug caché qui aurait coûté cher."},
+     ]},
+    {"id": "client_bankruptcy", "category": "ethique", "min_grade": 3, "weight": 2,
+     "title": "Client en faillite",
+     "scenario": "Votre plus vieux client est au bord de la faillite. Vous pouvez l'aider "
+                 "à masquer ses pertes le temps de trouver un repreneur, ou le laisser tomber.",
+     "options": [
+         {"label": "L'aider à restructurer", "cash_k": -20, "rep": 8, "heat": 10,
+          "outcome": "Le client survit, trouve un repreneur, et vous restez son héros."},
+         {"label": "Couper les ponts", "cash_k": 5, "rep": -6, "heat": -5,
+          "outcome": "Vous sauvez votre bilan mais perdez un client de 15 ans."},
+     ]},
+    {"id": "bonus_allocation", "category": "strategie", "min_grade": 6, "weight": 2,
+     "title": "Allocation des bonus",
+     "scenario": "C'est la saison des bonus. Vous avez 500K à répartir entre 5 équipes. "
+                 "Les équipes M&A et Trading réclament la part du lion.",
+     "options": [
+         {"label": "Répartir équitablement", "cash_k": 0, "rep": 6, "heat": 0,
+          "outcome": "Tout le monde est content. La cohésion d'équipe s'améliore."},
+         {"label": "Favoriser les top performers", "cash_k": 15, "rep": -3, "heat": 5,
+          "outcome": "Les stars sont ravies, mais les autres équipes cherchent déjà "
+                      "un nouveau poste."},
+     ]},
 ]
 
 

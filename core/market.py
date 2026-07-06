@@ -167,7 +167,11 @@ class Market(MarketQueryMixin):
         self.price_hist = {}     # ticker -> liste de prix (rempli paresseusement)
         # historique COMPLET (toutes sociétés) : snapshots du vecteur de prix, borné
         # à HIST_LEN. Permet de grapher n'importe quel actif sans suivi préalable.
-        self.price_hist_all = [self.price.copy()]
+        # Buffer circulaire pour l'historique complet des prix (toutes sociétés).
+        # collections.deque avec maxlen évite le O(n) de pop(0) sur une liste.
+        from collections import deque
+        self.price_hist_all = deque(maxlen=HIST_LEN)
+        self.price_hist_all.append(self.price.copy())
         self.last_world = 0.0
         self.last_sector = np.zeros(len(self.sectors))
         self.last_region = np.zeros(len(self.regions))
@@ -446,10 +450,8 @@ class Market(MarketQueryMixin):
             hist.append(float(self.price[self.ticker_idx[tk]]))
             if len(hist) > HIST_LEN:
                 hist.pop(0)
-        # historique complet (toutes sociétés)
+        # historique complet (toutes sociétés) — deque avec maxlen, O(1)
         self.price_hist_all.append(self.price.copy())
-        if len(self.price_hist_all) > HIST_LEN:
-            self.price_hist_all.pop(0)
 
         # crises : décrément + détection de fin (pour le postmortem et l'accalmie)
         for cr in self.crises:

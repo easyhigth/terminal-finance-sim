@@ -153,3 +153,42 @@ def daily_rank(player):
         if r.get("id") == entry_id:
             return i
     return None
+
+
+# ---------------------------------------------------------------------------
+# Statistiques comparatives entre runs (méta-progression)
+# ---------------------------------------------------------------------------
+def stats():
+    """Retourne des statistiques agrégées sur tous les runs enregistrés :
+    meilleur score, meilleur patrimoine, grade max atteint, voie la plus jouée,
+    nombre total de runs, etc. Pour l'affichage dans le panthéon."""
+    runs = load()
+    if not runs:
+        return {"total_runs": 0}
+    best_score = max(runs, key=lambda r: r.get("score", 0))
+    best_nw = max(runs, key=lambda r: r.get("best_nw", 0))
+    best_grade = max(runs, key=lambda r: r.get("grade", 0))
+    fastest = min(runs, key=lambda r: r.get("quarters", 999))
+    # Voie la plus jouée
+    from collections import Counter
+    track_counts = Counter(r.get("track", "General") for r in runs)
+    fav_track = track_counts.most_common(1)[0][0] if track_counts else "—"
+    # Continent le plus joué
+    cont_counts = Counter(r.get("continent", "Europe") for r in runs)
+    fav_cont = cont_counts.most_common(1)[0][0] if cont_counts else "—"
+    # Taux de survie hardcore
+    hc_runs = [r for r in runs if r.get("hardcore")]
+    return {
+        "total_runs": len(runs),
+        "best_score": best_score.get("score", 0),
+        "best_score_name": best_score.get("name", "?"),
+        "best_nw": best_nw.get("best_nw", 0),
+        "best_nw_name": best_nw.get("name", "?"),
+        "best_grade": best_grade.get("grade", 0),
+        "best_grade_name": best_grade.get("name", "?"),
+        "fastest_quarters": fastest.get("quarters", 0),
+        "fastest_name": fastest.get("name", "?"),
+        "fav_track": fav_track,
+        "fav_continent": fav_cont,
+        "hardcore_runs": len(hc_runs),
+    }

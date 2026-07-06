@@ -236,7 +236,9 @@ class MarketQueryMixin:
         i = self.ticker_idx.get(ticker)
         if i is None:
             return []
-        snaps = self.price_hist_all[-n:] if n else self.price_hist_all
+        # price_hist_all peut être une deque (pas de slicing) : on convertit
+        all_snaps = list(self.price_hist_all)
+        snaps = all_snaps[-n:] if n else all_snaps
         hist = [float(s[i]) for s in snaps]
 
         # Ensure we have enough history points for intraday calculations
@@ -404,7 +406,7 @@ class MarketQueryMixin:
         advancers = int((chg > 0).sum())
         decliners = int((chg < 0).sum())
         unchanged = self.n - advancers - decliners
-        hist = self.price_hist_all
+        hist = list(self.price_hist_all)
         window = hist[-ma_window:] if len(hist) >= ma_window else hist
         ma = np.mean(np.array(window), axis=0)
         above_ma = int((self.price > ma).sum())

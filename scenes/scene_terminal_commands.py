@@ -23,7 +23,7 @@ CMD_NAMES = [
     "COMPANY", "FA", "SEARCH", "ACCESS", "EXPLORE", "SHOP", "WATCHLIST", "COMPARE", "SECTOR", "REGION", "SCREEN",
     "RANKING", "BENCHMARK", "CALENDAR", "RESEARCH", "ALERT", "ALERTS", "LEGACY", "ARCHETYPE",
     "TENSION", "CRISIS",
-    "PORTFOLIO", "BOOK", "BUY", "SELL", "LONG", "SHORT", "COVER", "MARGIN",
+    "PORTFOLIO", "BOOK", "BUY", "SELL", "LONG", "SHORT", "COVER", "TWAP", "PENDING", "MARGIN",
     "BONDS", "BUYBOND", "SELLBOND", "GOV", "GOVERNMENTS", "PAYS",
     "CMDTY", "BUYCMDTY", "SELLCMDTY",
     "CRYPTO", "BUYCRYPTO", "SELLCRYPTO", "ETF", "ETFS", "BUYETF", "SELLETF",
@@ -296,6 +296,10 @@ class TerminalCommandsMixin:
             self._cmd_short(parts[1:])
         elif cmd in ("COVER", "RACHETER"):
             self._cmd_cover(parts[1:])
+        elif cmd in ("TWAP", "FRAC"):
+            self._cmd_twap(parts[1:])
+        elif cmd in ("PENDING", "ORDERS"):
+            self._cmd_pending()
         elif cmd in ("MARGIN", "MARGE"):
             self._cmd_margin()
         elif cmd in ("ALLOCATE", "ALLOC"):
@@ -371,7 +375,7 @@ class TerminalCommandsMixin:
         elif cmd in ("IDEAS", "IDEES", "OPPORTUNITIES"):
             self._cmd_ideas(parts[1:])
         elif cmd in ("TRADES", "TRADELOG", "TJOURNAL"):
-            self._cmd_trades(parts[1:])
+            self.app.scenes.go("tradejournal", return_to="terminal")
         elif cmd == "NOTE":
             self._cmd_note(parts[1:])
         elif cmd in ("JSTATS", "BILAN"):

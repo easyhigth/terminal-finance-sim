@@ -7,11 +7,18 @@ raccourci CLI rapide).
 """
 import pygame
 
+from core import alerts as ALERTS
 from core import config, unlocks
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
 
 ROW_H = 24
+
+_ALERT_KINDS = [
+    ("level", "PRIX ABS."),
+    ("pct", "VARIATION %"),
+    ("trailing", "TRAILING %"),
+]
 
 
 class AlertsScene(Scene):
@@ -22,6 +29,7 @@ class AlertsScene(Scene):
         self.search = ""
         self.text_focus = "search"   # "search" ou "price"
         self.price_text = ""
+        self.kind = "level"          # "level" | "pct" | "trailing"
         self.sel_ticker = kwargs.get("ticker")
         self._t = 0.0
         self.scroll = 0
@@ -38,6 +46,7 @@ class AlertsScene(Scene):
         self._alerts_scroll = 0
         self._alerts_max_scroll = 0
         self._delete_rects = {}
+        self._kind_rects = {}
         self.msg = ""
         self.back_btn = widgets.Button(config.back_button_rect(200),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
@@ -78,30 +87,33 @@ class AlertsScene(Scene):
         if not self.sel_ticker:
             self.msg = "Sélectionnez d'abord un actif dans la liste."
             return
-        try:
-            price = float(self.price_text.replace(",", "."))
-        except ValueError:
-            self.msg = "Seuil invalide : indiquez un nombre positif."
+        value = self.price_text.replace(",", ".")
+        r = ALERTS.place(self.app.gs.player, self.market, self.sel_ticker, self.kind, value)
+        if not r["ok"]:
+            self.msg = {
+                "ticker": "Ticker inconnu.",
+                "price": "Aucune cotation pour cet actif.",
+                "value": "Seuil invalide : indiquez un nombre positif.",
+                "kind": "Type d'alerte invalide.",
+            }.get(r["reason"], f"Refusé ({r['reason']}).")
             return
-        if price <= 0:
-            self.msg = "Seuil invalide : indiquez un nombre positif."
-            return
-        cur_price = self.market.price_of(self.sel_ticker)
-        if cur_price is None:
-            self.msg = f"Aucune cotation pour {self.sel_ticker}."
-            return
+        a = r["alert"]
         self.market.track_company(self.sel_ticker)
-        p = self.app.gs.player
-        p.alerts.append({"ticker": self.sel_ticker, "price": price, "above": price > cur_price})
-        sens = "au-dessus de" if price > cur_price else "en-dessous de"
-        self.msg = f"Alerte posée : {self.sel_ticker} {sens} {price:.2f} (cours {cur_price:.2f})."
+        if self.kind == "level":
+            sens = "au-dessus de" if a["above"] else "en-dessous de"
+            self.msg = f"Alerte posée : {a['ticker']} {sens} {a['value']:.2f}."
+        elif self.kind == "pct":
+            sign = "hausse" if a["above"] else "baisse"
+            self.msg = f"Alerte posée : {a['ticker']} sur {sign} de {a['value']:.1f}%."
+        else:
+            self.msg = f"Stop suiveur posé sur {a['ticker']} à {a['value']:.1f}%."
         self.price_text = ""
 
-    def _remove_alert(self, idx):
-        p = self.app.gs.player
-        if 0 <= idx < len(p.alerts):
-            a = p.alerts.pop(idx)
-            self.msg = f"Alerte {a['ticker']} supprimée."
+    def _remove_alert(self, alert_id):
+        if ALERTS.cancel(self.app.gs.player, alert_id):
+            self.msg = "Alerte supprimée."
+        else:
+            self.msg = "Alerte introuvable."
 
     def _select(self, ticker):
         self.sel_ticker = ticker
@@ -159,8 +171,12 @@ class AlertsScene(Scene):
                 return
             elif event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
                 if self.text_focus == "price":
-                    if event.unicode.isdigit() or (event.unicode in ".," and "." not in self.price_text
-                                                    and "," not in self.price_text):
+                    allow_minus = self.kind in ("pct",)
+                    valid = (event.unicode.isdigit()
+                             or (event.unicode in ".," and "." not in self.price_text
+                                 and "," not in self.price_text)
+                             or (allow_minus and event.unicode == "-" and not self.price_text))
+                    if valid:
                         self.price_text += event.unicode
                 else:
                     self.search += event.unicode
@@ -200,6 +216,11 @@ class AlertsScene(Scene):
             for idx, rect in self._delete_rects.items():
                 if rect.collidepoint(event.pos):
                     self._remove_alert(idx)
+                    return
+            for kind, rect in self._kind_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.kind = kind
+                    self.price_text = ""
                     return
 
     def update(self, dt):
@@ -241,7 +262,7 @@ class AlertsScene(Scene):
             widgets.draw_text(surf, "✕", self._search_clear_rect.center, fonts.small(bold=True),
                               config.COL_TEXT_DIM, align="center")
 
-        # ---- actif sélectionné + seuil ----
+        # ---- actif sélectionné + type d'alerte + seuil ----
         sx = self._search_box.right + 20
         if self.sel_ticker:
             sel_price = self.market.price_of(self.sel_ticker)
@@ -251,9 +272,23 @@ class AlertsScene(Scene):
         else:
             widgets.draw_text(surf, "ACTIF : aucun — cliquez une ligne ci-dessous", (sx, top + 4),
                               fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        # onglets de type d'alerte
+        kx = sx + 220
+        self._kind_rects = {}
+        for kind, label in _ALERT_KINDS:
+            w = max(70, fonts.tiny(bold=True).size(label)[0] + 12)
+            r = pygame.Rect(kx, top - 2, w, 20)
+            self._kind_rects[kind] = r
+            active = self.kind == kind
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if active else config.COL_PANEL, r, border_radius=3)
+            pygame.draw.rect(surf, config.COL_AMBER if active else config.COL_BORDER, r, 1, border_radius=3)
+            widgets.draw_text(surf, label, r.center, fonts.tiny(bold=True),
+                              config.COL_AMBER if active else config.COL_TEXT_DIM, align="center")
+            kx += w + 6
         sx2 = sx + 320
-        widgets.draw_text(surf, "SEUIL :", (sx2, top + 4), fonts.tiny(bold=True), config.COL_TEXT_DIM)
-        self._price_box = pygame.Rect(sx2 + 56, top, 100, 24)
+        unit = "%" if self.kind in ("pct", "trailing") else "prix"
+        widgets.draw_text(surf, f"SEUIL ({unit}) :", (sx2, top + 4), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        self._price_box = pygame.Rect(sx2 + 76, top, 80, 24)
         pygame.draw.rect(surf, config.COL_PANEL, self._price_box, border_radius=4)
         pygame.draw.rect(surf, config.COL_AMBER if self.text_focus == "price" else config.COL_BORDER,
                           self._price_box, 1, border_radius=4)
@@ -313,9 +348,9 @@ class AlertsScene(Scene):
             prev_clip2 = surf.get_clip()
             surf.set_clip(alerts_area)
             ay = rinner.y - self._alerts_scroll
-            for idx, a in enumerate(p.alerts):
+            for a in p.alerts:
                 if (alerts_area.top - ROW_H) < ay < alerts_area.bottom:
-                    self._draw_alert_row(surf, idx, a, ay, rinner, mp)
+                    self._draw_alert_row(surf, a["id"], a, ay, rinner, mp)
                 ay += ROW_H
             surf.set_clip(prev_clip2)
             acontent_h = (ay + self._alerts_scroll) - rinner.y
@@ -348,19 +383,27 @@ class AlertsScene(Scene):
             widgets.draw_text(surf, f"{r['change_pct']:+.1f}%", (inner.x + 560, y),
                               fonts.small(bold=True), vcol)
 
-    def _draw_alert_row(self, surf, idx, a, y, inner, mp):
+    def _draw_alert_row(self, surf, alert_id, a, y, inner, mp):
         row_rect = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, ROW_H)
         if row_rect.collidepoint(mp):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect, border_radius=3)
         widgets.draw_text(surf, a["ticker"], (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
-        sens = "↑" if a["above"] else "↓"
-        widgets.draw_text(surf, f"{sens} {a['price']:.2f}", (inner.x + 70, y),
+        kind = a.get("kind", "level")
+        if kind == "level":
+            sens = "↑" if a["above"] else "↓"
+            desc = f"{sens} {a['value']:.2f}"
+        elif kind == "pct":
+            sign = "+" if a["above"] else "-"
+            desc = f"{sign}{a['value']:.1f}%"
+        else:
+            desc = f"trail {a['value']:.1f}%"
+        widgets.draw_text(surf, desc, (inner.x + 70, y),
                           fonts.small(), config.COL_TEXT)
         cur = self.market.price_of(a["ticker"])
         ctxt = f"{cur:.2f}" if cur is not None else "—"
         widgets.draw_text(surf, f"cours {ctxt}", (inner.x + 170, y), fonts.small(), config.COL_TEXT_DIM)
-        if cur is not None and a["price"]:
-            dist_pct = abs(cur - a["price"]) / a["price"] * 100
+        if cur is not None and kind == "level":
+            dist_pct = abs(cur - a["value"]) / a["value"] * 100
             if dist_pct <= 2:
                 pcol, ptxt = config.COL_DOWN, "imminent"
             elif dist_pct <= 8:
@@ -370,6 +413,6 @@ class AlertsScene(Scene):
             widgets.draw_text(surf, f"{ptxt} ({dist_pct:.1f}%)", (inner.x + 260, y),
                               fonts.tiny(bold=True), pcol)
         del_rect = pygame.Rect(inner.right - 26, y - 2, 22, 20)
-        self._delete_rects[idx] = del_rect
+        self._delete_rects[alert_id] = del_rect
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, del_rect, border_radius=3)
         widgets.draw_text(surf, "✕", del_rect.center, fonts.small(bold=True), config.COL_DOWN, align="center")

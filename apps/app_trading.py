@@ -13,6 +13,7 @@ import pygame
 from apps.base import DesktopApp
 from core import audio, config, order_confirm, unlocks
 from core import conditional_orders as CO
+from core import orders as ORDERS
 from core import portfolio as PF
 from core import portfolio_margin as PM
 from ui import fonts, style, widgets
@@ -65,6 +66,12 @@ class TradingApp(DesktopApp):
         self._order_price_rect = None
         self._order_confirm_rect = None
         self._order_cancel_rect = None
+        self._twap_prompt = None       # {"ticker": tk, "side": "buy"|"sell"} ou None
+        self._twap_steps_str = ""
+        self._twap_focus = False
+        self._twap_price_rect = None
+        self._twap_confirm_rect = None
+        self._twap_cancel_rect = None
         self._cond_cancel_rects = {}   # order_id -> Rect (× dans la liste des ordres en cours)
         # confirmation des ordres à fort impact (>30% du patrimoine net) :
         # {"side","ticker","qty","notional","ratio"} en attente, ou None
@@ -295,10 +302,45 @@ class TradingApp(DesktopApp):
     def _cancel_conditional(self, order_id):
         CO.cancel(self.app.gs.player, order_id)
 
+    def _open_twap_prompt(self, tk, side):
+        self._twap_prompt = {"ticker": tk, "side": side}
+        self._twap_steps_str = "5"
+        self._twap_focus = True
+
+    def _confirm_twap(self):
+        t = self._twap_prompt
+        if t is None:
+            return
+        try:
+            steps = int(self._twap_steps_str)
+        except ValueError:
+            self.msg = "Nombre de pas invalide."
+            return
+        qty = self._qty_for_ticker(t["ticker"])
+        if qty <= 0:
+            self.msg = "Quantité invalide."
+            return
+        r = ORDERS.place_twap(self.app.gs.player, self.market, "Action", t["ticker"],
+                              t["side"], qty, steps, label=t["ticker"])
+        if r["ok"]:
+            side_label = "Achat" if t["side"] == "buy" else "Vente"
+            self.msg = f"TWAP posé : {side_label} {qty:g} {t['ticker']} sur {steps} pas."
+            self._twap_prompt = None
+            self._twap_focus = False
+            self._autosave()
+        else:
+            self.msg = f"TWAP refusé ({r['reason']})."
+
+    def _cancel_twap_prompt(self):
+        self._twap_prompt = None
+        self._twap_focus = False
+
     # --------------------------------------------------------------- events
     def handle_event(self, event, rect):
         if self._confirm_pending is not None:
             return self._handle_confirm_event(event)
+        if self._twap_prompt is not None:
+            return self._handle_twap_prompt_event(event)
         if self._order_prompt is not None:
             return self._handle_order_prompt_event(event)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
@@ -335,6 +377,12 @@ class TradingApp(DesktopApp):
             for tk, r in self._order_rects.items():
                 if r.collidepoint(event.pos):
                     self._open_order_prompt(tk)
+                    return True
+            for tk, r in self._twap_rects.items():
+                if r.collidepoint(event.pos):
+                    held = self._held(tk)
+                    side = "sell" if held > 0 else "buy"
+                    self._open_twap_prompt(tk, side)
                     return True
             for oid, r in self._cond_cancel_rects.items():
                 if r.collidepoint(event.pos):
@@ -407,6 +455,34 @@ class TradingApp(DesktopApp):
             if self._order_cancel_rect and self._order_cancel_rect.collidepoint(event.pos):
                 self._order_prompt = None
                 self._order_focus = False
+                return True
+            return True
+        return False
+
+    def _handle_twap_prompt_event(self, event):
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self._cancel_twap_prompt()
+            return True
+        if self._twap_focus and event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_BACKSPACE:
+                self._twap_steps_str = self._twap_steps_str[:-1]
+                return True
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                self._confirm_twap()
+                return True
+            if event.unicode and event.unicode.isdigit():
+                self._twap_steps_str += event.unicode
+                return True
+            return True
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._twap_price_rect and self._twap_price_rect.collidepoint(event.pos):
+                self._twap_focus = True
+                return True
+            if self._twap_confirm_rect and self._twap_confirm_rect.collidepoint(event.pos):
+                self._confirm_twap()
+                return True
+            if self._twap_cancel_rect and self._twap_cancel_rect.collidepoint(event.pos):
+                self._cancel_twap_prompt()
                 return True
             return True
         return False
@@ -496,7 +572,7 @@ class TradingApp(DesktopApp):
         widgets.draw_text(surf, "POSSÉDÉ", (list_area.x + int(list_area.w * 0.66), list_area.y + 4),
                           fonts.tiny(bold=True), config.COL_TEXT_DIM)
         rows = self._rows()
-        self._buy_rects, self._sell_rects, self._order_rects = {}, {}, {}
+        self._buy_rects, self._sell_rects, self._order_rects, self._twap_rects = {}, {}, {}, {}
         body = pygame.Rect(list_area.x, list_area.y + 22, list_area.w, list_area.h - 24)
         prev_clip = surf.get_clip()
         surf.set_clip(body)
@@ -554,6 +630,8 @@ class TradingApp(DesktopApp):
 
         if self._order_prompt is not None:
             self._draw_order_prompt(surf, rect)
+        if self._twap_prompt is not None:
+            self._draw_twap_prompt(surf, rect)
         if self._confirm_pending is not None:
             self._draw_confirm_dialog(surf, rect)
 
@@ -594,6 +672,45 @@ class TradingApp(DesktopApp):
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._confirm_no_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_TEXT_DIM, self._confirm_no_rect, 1, border_radius=4)
         widgets.draw_text(surf, "Annuler", self._confirm_no_rect.center,
+                          fonts.tiny(), config.COL_TEXT_DIM, align="center")
+
+    def _draw_twap_prompt(self, surf, rect):
+        """Boîte de dialogue pour poser un ordre TWAP (fractionné sur N pas)."""
+        overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 160))
+        surf.blit(overlay, rect.topleft)
+        t = self._twap_prompt
+        tk = t["ticker"]
+        side_label = "ACHAT" if t["side"] == "buy" else "VENTE"
+        box = pygame.Rect(0, 0, min(300, rect.w - 40), 150)
+        box.center = rect.center
+        style.draw_card(surf, box, bg=config.COL_PANEL, border=config.COL_CYAN,
+                        radius=style.RADIUS_MD)
+        widgets.draw_text(surf, f"TWAP — {side_label} {tk}",
+                          (box.x + 12, box.y + 8), fonts.small(bold=True), config.COL_CYAN)
+        qty = self._qty_for_ticker(tk)
+        steps = int(self._twap_steps_str) if self._twap_steps_str.isdigit() else 1
+        widgets.draw_text(surf, f"Qté totale : {qty:g}  ·  tranche ≈ {qty / max(1, steps):.0f}",
+                          (box.x + 12, box.y + 32), fonts.tiny(), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, "Répartir sur combien de pas ?", (box.x + 12, box.y + 54),
+                          fonts.tiny(), config.COL_TEXT_DIM)
+        self._twap_price_rect = pygame.Rect(box.x + 12, box.y + 74, box.w - 24, 26)
+        pygame.draw.rect(surf, config.COL_BG, self._twap_price_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN if self._twap_focus else config.COL_BORDER,
+                         self._twap_price_rect, 1, border_radius=4)
+        cur = "_" if self._twap_focus and pygame.time.get_ticks() % 1000 < 500 else ""
+        widgets.draw_text(surf, (self._twap_steps_str or "0") + cur,
+                          (self._twap_price_rect.x + 8, self._twap_price_rect.y + 5),
+                          fonts.small(), config.COL_TEXT)
+        self._twap_confirm_rect = pygame.Rect(box.x + 12, box.bottom - 32, box.w - 88, 24)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._twap_confirm_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN, self._twap_confirm_rect, 1, border_radius=4)
+        widgets.draw_text(surf, "POSER TWAP", self._twap_confirm_rect.center,
+                          fonts.tiny(bold=True), config.COL_CYAN, align="center")
+        self._twap_cancel_rect = pygame.Rect(self._twap_confirm_rect.right + 6, box.bottom - 32, 60, 24)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._twap_cancel_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_TEXT_DIM, self._twap_cancel_rect, 1, border_radius=4)
+        widgets.draw_text(surf, "Annuler", self._twap_cancel_rect.center,
                           fonts.tiny(), config.COL_TEXT_DIM, align="center")
 
     def _draw_feed(self, surf, rect, y, pad):
@@ -666,6 +783,13 @@ class TradingApp(DesktopApp):
                 pygame.draw.rect(surf, config.COL_PANEL if hov else config.COL_PANEL_HEAD, ore, border_radius=3)
                 pygame.draw.rect(surf, config.COL_PRESTIGE, ore, 1, border_radius=3)
                 widgets.draw_text(surf, "ORD", ore.center, fonts.tiny(bold=True), config.COL_PRESTIGE, align="center")
+            # TWAP : visible sur toutes les lignes (achat si pas de position, vente si détenu)
+            tw = pygame.Rect(r.right - 204 if held > 0 else r.right - 100, r.y, 34, ROW_H - 4)
+            self._twap_rects[tk] = tw
+            hovt = tw.collidepoint(pygame.mouse.get_pos())
+            pygame.draw.rect(surf, config.COL_PANEL if hovt else config.COL_PANEL_HEAD, tw, border_radius=3)
+            pygame.draw.rect(surf, config.COL_CYAN, tw, 1, border_radius=3)
+            widgets.draw_text(surf, "TWAP", tw.center, fonts.tiny(bold=True), config.COL_CYAN, align="center")
 
     def _draw_order_prompt(self, surf, rect):
         """Boîte de dialogue modale (dans la fenêtre) pour poser un ordre

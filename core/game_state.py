@@ -42,6 +42,8 @@ class PlayerState:
     next_deal_id: int = 1                              # compteur d'identifiants de deals
     conditional_orders: list = field(default_factory=list)  # stop-loss/take-profit en attente
     next_conditional_order_id: int = 1                  # compteur d'identifiants d'ordres conditionnels
+    pending_orders: list = field(default_factory=list)  # ordres TWAP/fractionnés en attente
+    next_pending_order_id: int = 1                      # compteur d'identifiants d'ordres TWAP
     market_seed: int = 0                               # graine du moteur de marché (0 = non initialisé)
     market_step: int = 0                               # nb de pas de marché écoulés (resync au chargement)
     portfolio: dict = field(default_factory=dict)      # holdings : ticker -> {"shares","avg"}
@@ -526,6 +528,21 @@ class GameState:
                         _side = _L("Stop-loss", "Stop-loss") if _o["kind"] == "stop" else _L("Take-profit", "Take-profit")
                         _txt = f"{_side} {_o['ticker']} " + _L("exécuté", "executed") + f" @ {_exec['result']['price']:.2f}"
                         _nq.push(p, _txt, "info", action="book")
+            # ordres TWAP/fractionnés : exécution par tranches à chaque pas
+            if getattr(p, "pending_orders", None):
+                from core import orders as _orders
+                twap_executed = _orders.execute_due(p, market)
+                if twap_executed:
+                    from core import notify_queue as _nq
+                    try:
+                        from core import audio as _audio
+                        _audio.play("order")
+                    except Exception:
+                        pass
+                    for _exec in twap_executed[:3]:
+                        _side = _L("Achat", "Buy") if _exec["side"] == "buy" else _L("Vente", "Sell")
+                        _txt = f"TWAP {_exec['key']} : {_side} {_exec['chunk']:g} @ {_exec['price']:.2f}"
+                        _nq.push(p, _txt, "info", action="trading", action_kwargs={"ticker": _exec["key"]})
             financing = portfolio.accrue_financing(p, market, config.DAYS_PER_STEP)
             margin_call = portfolio.check_margin_call(p, market)
             if margin_call:

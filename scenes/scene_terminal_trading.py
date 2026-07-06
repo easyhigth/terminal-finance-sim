@@ -484,3 +484,60 @@ class TerminalTradingMixin:
                                     else _L("Raison", "Reason"), 140),
                                    ("Trades", 60), ("Win %", 60),
                                    ("P&L moy.", 90), ("P&L total", 90)], rows)
+
+    def _cmd_twap(self, args):
+        """TWAP <BUY|SELL> <ticker> <qté> <steps> : exécute l'ordre réparti
+        sur <steps> pas de marché (actions uniquement)."""
+        p = self.app.gs.player
+        if len(args) < 4:
+            self._log(_L("  Usage : TWAP <BUY|SELL> <ticker> <qté> <steps>  (actions).",
+                         "  Usage: TWAP <BUY|SELL> <ticker> <qty> <steps>  (stocks)."))
+            return
+        side_raw = args[0].upper()
+        if side_raw in ("BUY", "ACHETER", "LONG"):
+            side = "buy"
+        elif side_raw in ("SELL", "VENDRE"):
+            side = "sell"
+        else:
+            self._log(_L("  Sens invalide : BUY ou SELL.", "  Invalid side: BUY or SELL."))
+            return
+        tk = self.market.resolve(args[1])
+        if tk is None:
+            self._log(_L(f"  Ticker inconnu : {args[1]}.", f"  Unknown ticker: {args[1]}."))
+            return
+        if not args[2].isdigit() or not args[3].isdigit():
+            self._log(_L("  Quantité et steps doivent être des entiers.",
+                         "  Quantity and steps must be integers."))
+            return
+        qty, steps = int(args[2]), int(args[3])
+        if qty <= 0 or steps <= 0:
+            self._log(_L("  Quantité et steps doivent être positifs.",
+                         "  Quantity and steps must be positive."))
+            return
+        from core import orders as orders_mod
+        r = orders_mod.place_twap(p, self.market, "Action", tk, side, qty, steps, label=tk)
+        if not r["ok"]:
+            self._log(_L(f"  TWAP refusé ({r['reason']}).", f"  TWAP rejected ({r['reason']})."))
+            return
+        o = r["order"]
+        side_label = _L("Achat", "Buy") if side == "buy" else _L("Vente", "Sell")
+        self._log(_L(f"  TWAP posé : {side_label} {o['total_qty']:g} {tk} sur {o['steps_total']} pas.",
+                     f"  TWAP set: {side_label} {o['total_qty']:g} {tk} over {o['steps_total']} steps."))
+
+    def _cmd_pending(self):
+        """PENDING : liste les ordres TWAP/fractionnés en attente."""
+        p = self.app.gs.player
+        from core import orders as orders_mod
+        orders = orders_mod.list_orders(p)
+        if not orders:
+            self._log(_L("  Aucun ordre fractionné en attente.", "  No pending fractional order."))
+            return
+        rows = []
+        for o in orders:
+            side = _L("Achat", "Buy") if o["side"] == "buy" else _L("Vente", "Sell")
+            rows.append(((f"#{o['id']}", config.COL_AMBER), o["key"], side,
+                         f"{o['remaining']:g}/{o['total_qty']:g}",
+                         f"{o['steps_left']}/{o['steps_total']}"))
+        self._open_window(_L("ORDRES TWAP", "TWAP ORDERS"),
+                          [("Id", 40), ("Actif", 70), ("Sens", 70),
+                           ("Reste", 90), ("Pas", 70)], rows)

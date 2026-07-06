@@ -64,6 +64,7 @@ from scenes.scene_history import HistoryScene
 from scenes.scene_inbox import InboxScene
 from scenes.scene_intro import IntroScene
 from scenes.scene_ipo import IPOScene
+from scenes.scene_journal import TradeJournalScene
 from scenes.scene_ma import MAScene
 from scenes.scene_ma_target import MATargetScene
 from scenes.scene_mandates import MandatesScene
@@ -165,6 +166,7 @@ def build_scene_manager(app):
     m.register("tutorials", TutorialsScene(app))
     m.register("alerts", AlertsScene(app))
     m.register("splash", SplashScene(app))
+    m.register("tradejournal", TradeJournalScene(app))
     m.register("markethub", MarketHubScene(app))
     m.register("wall", TradingWallScene(app))
     m.register("settings", SettingsScene(app))

@@ -56,6 +56,7 @@ SECTIONS = [
         ("Analyse portefeuille", "analytics", {}, "Décomposition détaillée de la valeur et du risque du portefeuille."),
         ("Performance & attribution", "performance", {}, "D'où vient la performance : par position, secteur, décision."),
         ("Alertes de prix", "alerts", {}, "Être notifié quand un actif franchit un seuil de prix choisi."),
+        ("Journal de trading", "tradejournal", {}, "Historique des trades, statistiques et réplication d'ordres."),
         ("Risque (VaR)", "risk", {}, "Value-at-Risk et mesures de risque du portefeuille."),
         ("Quant (options)", "quant", {}, "Grecques et pricing d'options pour un pilotage quantitatif."),
         ("M&A (cibles & LBO)", "ma", {}, "Rechercher des cibles de fusion-acquisition et monter des LBO."),

@@ -771,7 +771,14 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             # redirigée vers cette app plutôt que d'héberger l'écran
             # historique — un seul tableur sur le bureau, jamais deux.
             return self._open_sheet_app(kwargs.get("import_data"))
+        if name == "trading":
+            return self.open_trading(kwargs.get("ticker"))
         if name not in self.app.scenes.scenes or name in _FULLSCREEN_EXIT:
+            # essayer une app native (ex. "trading" depuis notification)
+            if name not in self.app.scenes.scenes and not name.startswith("scene:"):
+                launched = self._launch(name)
+                if launched is not None:
+                    return launched
             # flux pré/post-partie : bascule plein écran (hors fenêtres) — on
             # quitte alors vraiment le bureau (ex. MENU, fin de partie).
             if name in self.app.scenes.scenes:

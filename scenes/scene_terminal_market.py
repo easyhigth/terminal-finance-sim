@@ -5,6 +5,7 @@ Extrait de scene_terminal_commands.py pour limiter sa taille ; mixé dans
 TerminalScene avec les autres mixins de commandes.
 """
 
+from core import alerts as alerts_mod
 from core import audio, config
 from core import etfs as etfs_mod
 from core import inbox as inbox_mod
@@ -488,50 +489,71 @@ class TerminalMarketMixin:
     def _cmd_alert(self, args):
         p = self.app.gs.player
         if len(args) < 2:
-            self._log(_L("  Usage : ALERT <ticker> <prix>","  Usage: ALERT <ticker> <price>"))
+            self._log(_L("  Usage : ALERT <ticker> <prix|%|trail%>",
+                         "  Usage: ALERT <ticker> <price|%|trail%>"))
+            self._log(_L("  Exemples : ALERT MVC 185  |  ALERT MVC +5%  |  ALERT MVC -3%  |  ALERT MVC trail 2%",
+                         "  Examples: ALERT MVC 185 | ALERT MVC +5% | ALERT MVC -3% | ALERT MVC trail 2%"))
             return
         tk = self.market.resolve(args[0])
-        try:
-            price = float(args[1].replace(",", "."))
-        except ValueError:
-            self._log(_L("  Prix invalide.","  Invalid price."))
-            return
-        cur_price = self.market.price_of(tk) if tk else None
-        if cur_price is None:
+        if tk is None:
             self._log(_L(f"  Aucun résultat : {args[0]}.", f"  No match: {args[0]}."))
             return
+        raw = args[1].replace(",", ".")
+        kind = "level"
+        if raw.lower().startswith("trail"):
+            kind = "trailing"
+            raw = raw[5:].strip()
+        if raw.endswith("%"):
+            kind = "trailing" if kind == "trailing" else "pct"
+            raw = raw[:-1].strip()
+        r = alerts_mod.place(p, self.market, tk, kind, raw)
+        if not r["ok"]:
+            self._log(_L(f"  Alerte refusée ({r['reason']}).", f"  Alert rejected ({r['reason']})."))
+            return
         self.market.track_company(tk)
-        p.alerts.append({"ticker": tk, "price": price, "above": price > cur_price})
-        sens = "au-dessus de" if price > cur_price else "en-dessous de"
-        self._log(_L(f"  Alerte posée : {tk} {sens} {price:.2f} (cours {cur_price:.2f}).", f"  Alert set: {tk} {sens} {price:.2f} (price {cur_price:.2f})."))
+        a = r["alert"]
+        if a["kind"] == "level":
+            sens = "au-dessus de" if a["above"] else "en-dessous de"
+            self._log(_L(f"  Alerte posée : {tk} {sens} {a['value']:.2f}.",
+                         f"  Alert set: {tk} {sens} {a['value']:.2f}."))
+        elif a["kind"] == "pct":
+            sign = "hausse" if a["above"] else "baisse"
+            self._log(_L(f"  Alerte posée : {tk} sur {sign} de {a['value']:.1f}%.",
+                         f"  Alert set: {tk} {sign} {a['value']:.1f}%."))
+        else:
+            self._log(_L(f"  Stop suiveur posé sur {tk} à {a['value']:.1f}%.",
+                         f"  Trailing stop set on {tk} at {a['value']:.1f}%."))
 
     def _cmd_alerts(self):
         p = self.app.gs.player
-        if not p.alerts:
+        summary = alerts_mod.summary(p)
+        active = summary["active"]
+        if not active:
             self._log(_L("  Aucune alerte active.","  No active alert."))
             return
-        rows = [((a["ticker"], config.COL_AMBER), f"{a['price']:.2f}",
-                 "↑" if a["above"] else "↓",
-                 f"{self.market.price_of(a['ticker']) or 0:.2f}") for a in p.alerts]
+        rows = []
+        for a in active:
+            kind = a.get("kind", "level")
+            if kind == "level":
+                desc = ("↑" if a["above"] else "↓") + f" {a['value']:.2f}"
+            elif kind == "pct":
+                desc = ("+" if a["above"] else "-") + f"{a['value']:.1f}%"
+            else:
+                desc = f"trail {a['value']:.1f}%"
+            rows.append(((a["ticker"], config.COL_AMBER), desc,
+                         f"{self.market.price_of(a['ticker']) or 0:.2f}"))
         self._open_window("ALERTES DE PRIX",
-                          [("Tk", 60), ("Seuil", 70), ("Sens", 50), ("Cours", 70)], rows)
+                          [("Tk", 60), ("Seuil", 90), ("Cours", 70)], rows)
 
     def _check_alerts(self):
-        """Vérifie les alertes ; notifie au franchissement et les retire."""
+        """Vérifie les alertes ; notifie au franchissement avec action vers Trading."""
         p = self.app.gs.player
-        still = []
-        for a in p.alerts:
-            price = self.market.price_of(a["ticker"])
-            if price is None:
-                continue
-            crossed = (price >= a["price"]) if a["above"] else (price <= a["price"])
-            if crossed:
-                audio.play("alert")
-                self._log(_L(f"  ⚠ ALERTE {a['ticker']} : cours {price:.2f} a franchi {a['price']:.2f}.", f"  ⚠ ALERT {a['ticker']}: price {price:.2f} crossed {a['price']:.2f}."))
-                self.app.notify(f"Alerte {a['ticker']} @ {price:.2f}", "warn")
-                inbox_mod.push(p, "desk", "Desk", f"Alerte cours : {a['ticker']}",
-                               f"{a['ticker']} a franchi votre seuil de {a['price']:.2f} "
-                               f"(cours {price:.2f}).")
-            else:
-                still.append(a)
-        p.alerts = still
+        triggered = alerts_mod.check(p, self.market)
+        for e in triggered:
+            audio.play("alert")
+            msg = alerts_mod.format_trigger(e)
+            self._log(_L(f"  ⚠ ALERTE {msg}", f"  ⚠ ALERT {msg}"))
+            self.app.notify(f"Alerte {e['ticker']} @ {e['price']:.2f}",
+                            "warn", action="trading", action_kwargs={"ticker": e["ticker"]})
+            inbox_mod.push(p, "desk", "Desk", f"Alerte cours : {e['ticker']}",
+                           msg + " Cliquez la notification pour trader.")

@@ -444,6 +444,14 @@ class SceneManager:
             self._fade = max(0.0, self._fade - dt / self.FADE_TIME)
         if self.current:
             self.current.update(dt)
+        # toasts différés émis par la logique pure (advance_step, mandats...)
+        player = getattr(getattr(self.app, "gs", None), "player", None)
+        if player is not None:
+            from core import notify_queue
+            for toast in notify_queue.drain(player):
+                self.app.notify(toast["text"], toast["kind"],
+                                action=toast.get("action"),
+                                action_kwargs=toast.get("action_kwargs"))
         notes = getattr(self.app, "notes", None)
         if notes:
             notes.update(dt)

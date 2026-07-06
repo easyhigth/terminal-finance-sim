@@ -9,6 +9,12 @@ from dataclasses import asdict, dataclass, field
 
 from core import autosave_settings, config
 from core.applog import logger
+from core.i18n import get_lang
+
+
+def _L(fr, en):
+    """Helper i18n court pour les messages générés dans ce module."""
+    return fr if get_lang() == "fr" else en
 
 
 @dataclass
@@ -448,6 +454,18 @@ class GameState:
 
         # génération de nouveaux deals (probabilité dépend du grade)
         new_deals = deals.maybe_generate(p)
+        if new_deals:
+            from core import notify_queue as _nq
+            for _nd in new_deals[:2]:
+                _nq.push(p, _L(f"Nouveau deal : {_nd['title']} (reward {_nd['reward_cash']:,.0f}).",
+                               f"New deal : {_nd['title']} (reward {_nd['reward_cash']:,.0f})."),
+                         "prestige", action="deals")
+        if expired:
+            from core import notify_queue as _nq
+            for _ed in expired[:2]:
+                _nq.push(p, _L(f"Deal expiré : {_ed['title']} (pénalité {_ed['penalty_cash']:,.0f}).",
+                               f"Deal expired : {_ed['title']} (penalty {_ed['penalty_cash']:,.0f})."),
+                         "bad", action="deals")
 
         # dividendes des positions (longs touchent, shorts paient) + financement
         # (intérêts sur marge + frais d'emprunt de titres) + appel de marge éventuel
@@ -496,6 +514,18 @@ class GameState:
                 from core import conditional_orders as _condord
                 _condord.update_trailing_stops(p, market)
                 conditional_orders_executed = _condord.execute_due(p, market)
+                if conditional_orders_executed:
+                    from core import notify_queue as _nq
+                    try:
+                        from core import audio as _audio
+                        _audio.play("conditional")
+                    except Exception:
+                        pass
+                    for _exec in conditional_orders_executed[:3]:
+                        _o = _exec["order"]
+                        _side = _L("Stop-loss", "Stop-loss") if _o["kind"] == "stop" else _L("Take-profit", "Take-profit")
+                        _txt = f"{_side} {_o['ticker']} " + _L("exécuté", "executed") + f" @ {_exec['result']['price']:.2f}"
+                        _nq.push(p, _txt, "info", action="book")
             financing = portfolio.accrue_financing(p, market, config.DAYS_PER_STEP)
             margin_call = portfolio.check_margin_call(p, market)
             if margin_call:
@@ -504,6 +534,9 @@ class GameState:
                     audio.play("margin_call")
                 except Exception:
                     pass
+                from core import notify_queue as _nq
+                _nq.push(p, _L("Appel de marge : positions liquidées.",
+                               "Margin call : positions liquidated."), "bad")
             # échantillonnage du levier (style de jeu, indépendant de la progression de
             # grade) : utilisé par career.risk_profile() pour moduler les mandats proposés.
             if portfolio.leverage(p, market) >= 2.5:
@@ -538,25 +571,64 @@ class GameState:
             if getattr(p, "hedges", None):
                 from core import hedging as _hedging
                 hedges_due = _hedging.evaluate_due(p, market)
+                if hedges_due:
+                    from core import notify_queue as _nq
+                    _total = sum(h["pnl"] for h in hedges_due)
+                    _kind = "good" if _total >= 0 else "bad"
+                    _nq.push(p, _L(f"Couverture échue : P&L {_total:+.0f}.",
+                                   f"Hedge expired : P&L {_total:+.0f}."), _kind)
             if getattr(p, "options", None):
                 from core import options as _options
                 options_due = _options.evaluate_due(p, market)
+                if options_due:
+                    from core import notify_queue as _nq
+                    for _opt in options_due[:3]:
+                        _kind = "good" if _opt["pnl"] >= 0 else "bad"
+                        _nq.push(p, _L(f"Option {_opt['position']['ticker']} échue : P&L {_opt['pnl']:+.0f}.",
+                                       f"Option {_opt['position']['ticker']} expired : P&L {_opt['pnl']:+.0f}."), _kind)
             if getattr(p, "ipos", None):
                 from core import ipo as _ipo
                 ipos_settled = _ipo.evaluate_listings(p, market)
+                if ipos_settled:
+                    from core import notify_queue as _nq
+                    for _ipo_res in ipos_settled[:3]:
+                        _nq.push(p, _L(f"IPO {_ipo_res['ticker']} cotée : {_ipo_res['shares']:.0f} actions reçues.",
+                                       f"IPO {_ipo_res['ticker']} listed : {_ipo_res['shares']:.0f} shares received."), "good")
             if getattr(p, "fx_forwards", None):
                 from core import fx as _fx
                 fx_due = _fx.evaluate_due(p, market)
+                if fx_due:
+                    from core import notify_queue as _nq
+                    for _fxr in fx_due[:3]:
+                        _kind = "good" if _fxr.get("pnl", 0) >= 0 else "bad"
+                        _nq.push(p, _L(f"Forward FX échu : P&L {_fxr.get('pnl', 0):+.0f}.",
+                                       f"FX forward expired : P&L {_fxr.get('pnl', 0):+.0f}."), _kind)
             if getattr(p, "macro_events", None):
                 from core import macrocal as _macrocal
                 macro_resolved = _macrocal.resolve_due_events(p, market)
+                if macro_resolved:
+                    from core import notify_queue as _nq
+                    for _mr in macro_resolved[:3]:
+                        _kind = "good" if _mr.get("pnl", 0) >= 0 else "bad"
+                        _nq.push(p, _L(f"Pari macro résolu : P&L {_mr.get('pnl', 0):+.0f}.",
+                                       f"Macro bet resolved : P&L {_mr.get('pnl', 0):+.0f}."), _kind)
             if getattr(p, "currency_swaps", None):
                 from core import swaps as _swaps
                 swap_flow, swaps_expired = _swaps.accrue(p, market, config.DAYS_PER_STEP)
                 if swap_flow:
                     p.adjust_cash(swap_flow, category="revenus")
                     dividends += swap_flow
+                if swaps_expired:
+                    from core import notify_queue as _nq
+                    for _sw in swaps_expired[:3]:
+                        _nq.push(p, _L(f"Swap de devises {_sw['foreign_region']} échu.",
+                                       f"Currency swap {_sw['foreign_region']} expired."), "info")
             nw = portfolio.net_worth(p, market)
+            # news feed contextualisé au portefeuille (résultats, événements,
+            # gros mouvements, crises sectorielles) — après que le marché a step
+            # et que les valorisations sont à jour.
+            from core import portfolio_news as _portfolio_news
+            _portfolio_news.generate(p, market)
         else:
             nw = p.cash
 
@@ -576,6 +648,25 @@ class GameState:
             p.quarter_flows = {}
             p.quarter_nw_anchor = nw
             quarter_report = career.close_quarter(p)
+            if quarter_report and quarter_report.get("total"):
+                from core import notify_queue as _nq
+                _done = quarter_report.get("done", 0)
+                _tot = quarter_report.get("total", 0)
+                if _done == _tot:
+                    try:
+                        from core import audio as _audio
+                        _audio.play("milestone")
+                    except Exception:
+                        pass
+                    _nq.push(p, _L(f"Trimestre parfait ! {_done}/{_tot} objectifs (cash +{quarter_report['cash']:,.0f}).",
+                                   f"Perfect quarter ! {_done}/{_tot} objectives (cash +{quarter_report['cash']:,.0f})."),
+                             "good")
+                elif _done:
+                    _nq.push(p, _L(f"Objectifs trimestriels : {_done}/{_tot} atteints.",
+                                   f"Quarterly objectives : {_done}/{_tot} reached."), "info")
+                else:
+                    _nq.push(p, _L("Objectifs trimestriels non atteints.",
+                                   "Quarterly objectives missed."), "warn")
             # mémorisé pour la carte « Bilan du trimestre » du bureau
             # (scenes/scene_desktop.py) — JSON-sérialisable, persiste au save.
             p.flags["last_quarter_report"] = dict(quarter_report,

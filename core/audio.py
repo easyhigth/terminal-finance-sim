@@ -66,6 +66,14 @@ _SPECS = {
                     (1046.5, 0.12, 0.7)],
     # alarme : margin call
     "margin_call": [(880.0, 0.08, 0.7), (660.0, 0.08, 0.7), (880.0, 0.08, 0.7)],
+    # cloche d'ouverture de séance (deux tons lumineux)
+    "session_open": [(523.25, 0.10, 0.5), (659.25, 0.15, 0.55)],
+    # gong de fermeture de séance (ton grave descendant)
+    "session_close": [(392.0, 0.18, 0.5), (261.63, 0.25, 0.45)],
+    # clic métallique bref : ordre conditionnel déclenché
+    "conditional": [(1200.0, 0.03, 0.4), (900.0, 0.05, 0.4)],
+    # petite fanfare : objectif atteint / milestone
+    "milestone": [(659.25, 0.06, 0.5), (783.99, 0.06, 0.55), (1046.5, 0.12, 0.6)],
 }
 
 

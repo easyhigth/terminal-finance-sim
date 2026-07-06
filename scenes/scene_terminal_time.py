@@ -56,8 +56,22 @@ class TerminalTimeMixin:
         if scenario and m.crises:
             m.crises[-1].start_nw = pf_mod.net_worth(p, m)
         # pas de marché (déterministe)
+        prev_step = m.step_count
         market_news = m.step()
         p.market_step = m.step_count
+        # cloche d'ouverture/fermeture de séance pour la région du joueur
+        if prev_step > 0:
+            from core import market_hours as _mh
+            try:
+                from core import audio as _audio
+                was_open = _mh.is_region_open(p.continent, prev_step)
+                is_open = _mh.is_region_open(p.continent, m.step_count)
+                if not was_open and is_open:
+                    _audio.play("session_open")
+                elif was_open and not is_open:
+                    _audio.play("session_close")
+            except Exception:
+                pass
         self.worldmap.push_news(market_news)
         # retombées visibles : postmortem des crises qui viennent de s'éteindre
         for cr in m.ended_crises:

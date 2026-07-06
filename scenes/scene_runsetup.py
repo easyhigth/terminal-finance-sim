@@ -136,6 +136,7 @@ class RunSetupScene(Scene):
         # démarre la carrière après 5 ans de marché : les graphes ont un passé
         gs.player.market_step = _mkt.WARMUP_STEPS
         self.app.gs = gs
+        gs.attach_app(self.app)
         self.app.market = None   # forcera la (re)création du marché
         gs.save(config.AUTOSAVE_SLOT)
         self.app.scenes.go("intro")

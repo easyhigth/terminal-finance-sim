@@ -7,7 +7,7 @@ import os
 import time
 from dataclasses import asdict, dataclass, field
 
-from core import autosave_settings, config
+from core import autosave_settings, config, ui_state
 from core.applog import logger
 from core.i18n import get_lang
 
@@ -227,6 +227,13 @@ class GameState:
     last_saved: float = 0.0
     version: str = "0.1.0"
 
+    def __post_init__(self):
+        self._app = None
+
+    def attach_app(self, app):
+        """Lien retour vers l'application pour la persistance UI (ui_state)."""
+        self._app = app
+
     # ----- Sérialisation -------------------------------------------------
     def to_dict(self):
         d = asdict(self)
@@ -290,6 +297,11 @@ class GameState:
             logger.warning("save: échec (slot=%s, path=%s)", slot, path, exc_info=True)
             raise
         logger.info("save: succès (slot=%s, path=%s)", slot, path)
+        if self._app is not None:
+            try:
+                ui_state.save(slot, self._app)
+            except Exception:
+                logger.warning("save: échec ui_state (slot=%s)", slot, exc_info=True)
         return path
 
     @classmethod
@@ -357,6 +369,7 @@ class GameState:
         path = os.path.join(config.SAVE_DIR, f"{slot}.json")
         if os.path.exists(path):
             os.remove(path)
+            ui_state.delete(slot)
             return True
         return False
 

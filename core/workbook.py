@@ -212,6 +212,54 @@ class Workbook:
         self.active_index = self.tabs.index(tab)
         return tab
 
+    def to_dict(self):
+        """Sérialise le classeur (onglets, cellules, graphiques, règles CF)."""
+        return {
+            "active_index": self.active_index,
+            "tabs": [
+                {
+                    "name": tab.name,
+                    "sheet": tab.sheet.to_dict(),
+                    "charts": [
+                        {"kind": c.kind, "range": c.range_str,
+                         "x": c.x, "y": c.y, "w": c.w, "h": c.h}
+                        for c in tab.charts
+                    ],
+                    "cf": [
+                        {"range": r.range_str, "op": r.op,
+                         "value": r.value, "color": r.color}
+                        for r in tab.cf_rules
+                    ],
+                }
+                for tab in self.tabs
+            ],
+        }
+
+    @classmethod
+    def from_dict(cls, d, n_rows, n_cols):
+        """Restaure un classeur depuis `to_dict`."""
+        wb = cls.__new__(cls)
+        wb.n_rows = n_rows
+        wb.n_cols = n_cols
+        wb.tabs = []
+        for td in d.get("tabs", []):
+            s = Spreadsheet(n_rows, n_cols)
+            s.load_dict(td.get("sheet", {}))
+            tab = WorkbookTab(td.get("name", "Feuille"), s)
+            for cd in td.get("charts", []):
+                tab.charts.append(SheetChart(
+                    cd["kind"], cd["range"],
+                    cd.get("x", 0), cd.get("y", 0),
+                    cd.get("w", 280), cd.get("h", 180)))
+            for rd in td.get("cf", []):
+                tab.cf_rules.append(ConditionalFormat(
+                    rd["range"], rd["op"], rd["value"], rd["color"]))
+            wb.tabs.append(tab)
+        wb.active_index = max(0, min(d.get("active_index", 0), len(wb.tabs) - 1))
+        if not wb.tabs:
+            wb.add_tab()
+        return wb
+
 
 def _seed_financial(s, data, n_cols, n_rows):
     """Remplit `s` à partir d'un export d'état financier/fiche

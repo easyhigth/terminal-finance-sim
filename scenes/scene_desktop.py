@@ -158,14 +158,17 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             self._terminal_host.bind_opener(self._open_scene_window)
             w = self.wm.open("scene:terminal", lambda: self._terminal_host)
             w.minimized = True   # bureau propre au démarrage ; icône Terminal pour l'ouvrir
-            # « espace de travail » : rouvre la disposition mémorisée à la
-            # dernière sauvegarde (player.flags["desktop_layout"], tenu à
-            # jour en continu par _sync_layout_flag) — seulement à la toute
-            # première arrivée sur le bureau de CETTE App() (nouvelle partie,
-            # reprise) ; un chargement ultérieur dans la même session ne
-            # ré-applique pas la disposition (éviterait de faire disparaître
-            # des fenêtres que le joueur vient d'organiser lui-même).
-            self._restore_layout()
+            # « espace de travail » : disposition pending depuis ui_state
+            # (chargement d'une sauvegarde) prioritaire ; sinon dernière
+            # disposition dans player.flags (reprise classique / nouvelle
+            # partie). Seulement à la toute première arrivée sur le bureau de
+            # CETTE App() pour ne pas écraser l'organisation en cours.
+            pending = getattr(self.app, "_pending_ui_layout", None)
+            if pending:
+                self._apply_layout(pending)
+                self.app._pending_ui_layout = None
+            else:
+                self._restore_layout()
 
     # ------------------------------------------------------ temps (marché)
     def _tick_market(self):

@@ -108,6 +108,15 @@ class PageManager:
         m.go(scene_name, **kwargs)
         return m
 
+    def _create_page(self, scene_name, kwargs):
+        """Crée une Page sans la rendre active (utilisé par la restauration UI)."""
+        m = self._build_manager(scene_name, kwargs)
+        return Page(m, scene_name, kwargs)
+
+    def _ensure_manager(self):
+        """Rafraîchit la scène active après une reconstruction des pages."""
+        self._refresh_active()
+
     # ------------------------------------------------------------ anti-triche
     def can_switch(self):
         cur = self.manager.current

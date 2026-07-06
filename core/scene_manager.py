@@ -7,7 +7,7 @@ Ctrl+K ouvre par-dessus la scène courante une palette de navigation globale
 """
 import pygame
 
-from core import config, fuzzy
+from core import config, fuzzy, ui_state
 from core.i18n import get_lang
 from core.sim_clock import LIVE_SCENE_NAMES
 from ui import fonts, widgets
@@ -439,6 +439,8 @@ class SceneManager:
                                f"No save on {slot.upper()}."), "warn")
             return
         self.app.gs = gs
+        gs.attach_app(self.app)
+        ui_state.load(slot, self.app)
         self.app.ensure_market()
         self.close_palette()
         self.go("gameover" if gs.player.game_over else "desktop")

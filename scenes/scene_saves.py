@@ -9,7 +9,7 @@ import time
 
 import pygame
 
-from core import config
+from core import config, ui_state
 from core.game_state import GameState
 from core.i18n import get_lang
 from core.scene_manager import Scene
@@ -172,6 +172,7 @@ class SavesScene(Scene):
                 self.path_prompt = None
                 return
             self.app.gs = gs
+            gs.attach_app(self.app)
             self.path_prompt = None
             if gs.player.game_over:
                 self.app.scenes.go("gameover")
@@ -210,6 +211,8 @@ class SavesScene(Scene):
             self.message = "Échec du chargement."
             return
         self.app.gs = gs
+        gs.attach_app(self.app)
+        ui_state.load(slot, self.app)
         if gs.player.game_over:
             self.app.scenes.go("gameover")
         else:

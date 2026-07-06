@@ -129,6 +129,37 @@ def test_workbook_tab_cf_color_for_returns_none_without_matching_rule():
     assert wb.active.cf_color_for("A1", 999.0) is None
 
 
+def test_workbook_to_dict_from_dict_roundtrip():
+    """Le classeur (cellules, graphiques, règles CF, onglets, index actif)
+    se sérialise et se restaure correctement."""
+    wb = Workbook(12, 8)
+    wb.active.sheet.set("A1", "Titre")
+    wb.active.sheet.set("B2", "=A1")
+    wb.active.charts.append(type("Chart", (), {
+        "kind": "line", "range_str": "A1:B2",
+        "x": 10, "y": 20, "w": 200, "h": 150,
+    })())
+    wb.active.cf_rules.append(ConditionalFormat("A1:B2", ">", 0.0, "up"))
+    wb.add_tab()
+    wb.active.name = "Résumé"
+    wb.active.sheet.set("A1", 42)
+
+    d = wb.to_dict()
+    restored = Workbook.from_dict(d, wb.n_rows, wb.n_cols)
+
+    assert len(restored.tabs) == len(wb.tabs)
+    assert restored.active_index == wb.active_index
+    assert restored.active.name == "Résumé"
+    assert restored.tabs[0].sheet.get_raw("A1") == "Titre"
+    assert restored.tabs[0].sheet.get_raw("B2") == "=A1"
+    assert restored.tabs[0].sheet.get_value("B2") == "Titre"
+    assert len(restored.tabs[0].charts) == 1
+    assert restored.tabs[0].charts[0].kind == "line"
+    assert len(restored.tabs[0].cf_rules) == 1
+    assert restored.tabs[0].cf_rules[0].color == "up"
+    assert restored.active.sheet.get_value("A1") == 42.0
+
+
 def test_workbook_tab_cf_color_for_last_matching_rule_wins():
     """Comme Excel : si plusieurs règles s'appliquent à la même cellule, la
     DERNIÈRE de la liste l'emporte."""

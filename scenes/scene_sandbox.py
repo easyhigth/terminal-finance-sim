@@ -89,6 +89,7 @@ class SandboxScene(Scene):
         gs.player.market_step = 0
 
         self.app.gs = gs
+        gs.attach_app(self.app)
         self.app.market = None   # forcera la (re)création du marché
         market = self.app.ensure_market()
 

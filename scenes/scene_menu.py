@@ -6,7 +6,7 @@ import math
 
 import pygame
 
-from core import anim_settings, config
+from core import anim_settings, config, ui_state
 from core import portfolio as pf_mod
 from core import score as score_mod
 from core.game_state import GameState
@@ -86,6 +86,8 @@ class MenuScene(Scene):
         if not gs:
             return
         self.app.gs = gs
+        gs.attach_app(self.app)
+        ui_state.load(config.AUTOSAVE_SLOT, self.app)
         self.app.market = None
         self.app.scenes.go("gameover" if gs.player.game_over else "desktop")
 

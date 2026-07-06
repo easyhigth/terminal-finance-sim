@@ -199,6 +199,7 @@ class App:
 
         # état de jeu courant (créé à la sélection du continent)
         self.gs = GameState()
+        self.gs.attach_app(self)
         self.workbook = None    # classeur multi-feuilles de l'app Tableur (LE tableur du jeu)
         self.market = None  # moteur de marché (créé/synchronisé à l'entrée du terminal)
         self.notes = NotificationCenter()   # centre de notifications (toasts)

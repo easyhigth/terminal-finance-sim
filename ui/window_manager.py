@@ -42,6 +42,7 @@ class Window:
                                   # barre de titre) — cf. WindowManager._z_order
         self._dock_flash_until = 0   # horloge murale : liseré pulsé après ancrage/agrandissement
         self._open_t = 0.0        # progression d'ouverture [0,1] (animation scale/fade)
+        self._last_update_frame = 0  # pour throttler les fenêtres cachées
 
     # --- sous-rectangles du chrome (recalculés à la volée depuis self.rect) ---
     @property
@@ -426,13 +427,41 @@ class WindowManager:
         w._dock_flash_until = pygame.time.get_ticks() + DOCK_FLASH_MS
 
     # --------------------------------------------------------------- cycle
+    def _occluding_windows(self, w):
+        """Fenêtres qui sont visuellement AU-DESSUS de `w` (z-order supérieur)."""
+        order = self._z_order()
+        idx = order.index(w) if w in order else -1
+        return order[idx + 1:] if idx >= 0 else []
+
+    def _is_occluded(self, w):
+        """Vrai si `w` est entièrement recouvert par une fenêtre au-dessus de lui."""
+        r = w.rect
+        for above in self._occluding_windows(w):
+            if not above.minimized and above.rect.colliderect(r):
+                if above.rect.x <= r.x and above.rect.y <= r.y \
+                        and above.rect.right >= r.right and above.rect.bottom >= r.bottom:
+                    return True
+        return False
+
     def update(self, dt):
         OPEN_ANIM_MS = 0.12  # durée de l'animation d'ouverture (120 ms)
+        self._update_frame = getattr(self, "_update_frame", 0) + 1
         for w in self.windows:
             if w._open_t < 1.0:
                 w._open_t = min(1.0, w._open_t + dt / OPEN_ANIM_MS)
-            if not w.minimized and hasattr(w.app_obj, "update"):
+            if w.minimized or not hasattr(w.app_obj, "update"):
+                continue
+            # fenêtre focalisée / réclamant l'attention / en animation : toujours update
+            if w is self.focused or w.attention or w._open_t < 1.0:
                 w.app_obj.update(dt)
+                w._last_update_frame = self._update_frame
+                continue
+            # fenêtre entièrement cachée : update throttlé (~6 fois/s à 60 FPS)
+            if self._is_occluded(w):
+                if (self._update_frame - w._last_update_frame) < 10:
+                    continue
+            w.app_obj.update(dt)
+            w._last_update_frame = self._update_frame
 
     def draw(self, surf):
         # aperçu d'ancrage (sous les fenêtres) pendant un glisser vers un bord
@@ -442,6 +471,22 @@ class WindowManager:
             surf.blit(overlay, self._snap_preview.topleft)
             pygame.draw.rect(surf, config.COL_CYAN, self._snap_preview, 2)
         focused = self.focused
-        for w in self._z_order():
-            if not w.minimized:
-                w.draw(surf, w is focused)
+        order = self._z_order()
+        for i, w in enumerate(order):
+            if w.minimized:
+                continue
+            # fenêtre non focus et non alerte, entièrement cachée derrière une
+            # fenêtre plus récente : on saute son dessin.
+            if w is not focused and not w.attention:
+                occluded = False
+                for above in order[i + 1:]:
+                    if above.minimized:
+                        continue
+                    ar = above.rect
+                    if ar.x <= w.rect.x and ar.y <= w.rect.y \
+                            and ar.right >= w.rect.right and ar.bottom >= w.rect.bottom:
+                        occluded = True
+                        break
+                if occluded:
+                    continue
+            w.draw(surf, w is focused)

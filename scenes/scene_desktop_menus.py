@@ -8,7 +8,7 @@ mixé dans `DesktopScene` aux côtés de `DesktopWidgetsMixin`.
 import pygame
 
 from core import app_catalog, config, desktop_onboarding, desktop_tutorial, experience_mode, fuzzy
-from scenes.scene_desktop_common import _L, APPS, TASKBAR_H, TOPBAR_H, _scene_label
+from scenes.scene_desktop_common import _L, APPS, cached_shade, TASKBAR_H, TOPBAR_H, _scene_label
 from ui import fonts, keynav, style, widgets
 
 START_COLS = 4
@@ -84,9 +84,7 @@ class DesktopMenusMixin:
 
     def _draw_search(self, surf):
         box = pygame.Rect((config.SCREEN_WIDTH - 560) // 2, (config.SCREEN_HEIGHT - 360) // 2, 560, 360)
-        shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
-        shade.fill((0, 0, 0, 160))
-        surf.blit(shade, (0, 0))
+        surf.blit(cached_shade(self, surf, 160), (0, 0))
         style.draw_window_shadow(surf, box, focused=True)
         style.draw_glass_panel(surf, box, alpha=215, border_color=config.COL_AMBER,
                                radius=style.RADIUS_LG)
@@ -444,9 +442,7 @@ class DesktopMenusMixin:
         même patron que l'ancien hub PLUS) et description d'une ligne pour
         chaque page débloquée, pour qu'un joueur perdu comprenne ce que fait
         une page avant de cliquer dessus."""
-        shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
-        shade.fill((0, 0, 0, 120))
-        surf.blit(shade, (0, 0))
+        surf.blit(cached_shade(self, surf, 120), (0, 0))
         panel = pygame.Rect(30, TOPBAR_H + 20, config.SCREEN_WIDTH - 60,
                            config.SCREEN_HEIGHT - TOPBAR_H - TASKBAR_H - 40)
         style.draw_window_shadow(surf, panel, focused=True)

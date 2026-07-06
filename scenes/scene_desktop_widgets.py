@@ -15,7 +15,7 @@ import pygame
 from core import config, desktop_onboarding, desktop_tutorial, unlock_briefs
 from core import portfolio_margin as pm_mod
 from core.i18n import get_lang
-from scenes.scene_desktop_common import _L, TASKBAR_H, TOPBAR_H
+from scenes.scene_desktop_common import _L, cached_shade, TASKBAR_H, TOPBAR_H
 from ui import fonts, style, widgets
 
 
@@ -87,9 +87,7 @@ class DesktopWidgetsMixin:
         """Carte modale multi-pages du guide de démarrage : titre, paragraphes
         (retour à la ligne automatique), points de pagination, Précédent /
         Suivant / Passer. Contenu : core/unlock_briefs.INTRO_PAGES."""
-        shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
-        shade.fill((0, 0, 0, 175))
-        surf.blit(shade, (0, 0))
+        surf.blit(cached_shade(self, surf, 175), (0, 0))
         total = unlock_briefs.intro_page_count()
         self._guide_page = max(0, min(self._guide_page, total - 1))
         title, paras = unlock_briefs.intro_page(self._guide_page)
@@ -212,9 +210,7 @@ class DesktopWidgetsMixin:
         brief = unlock_briefs.brief_for(feat) or {
             "title": unlocks.feature_label(feat),
             "what": unlocks.feature_label(feat), "how": "", "why": "", "first": ""}
-        shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
-        shade.fill((0, 0, 0, 150))
-        surf.blit(shade, (0, 0))
+        surf.blit(cached_shade(self, surf, 150), (0, 0))
         W, H = 680, 510
         x = (config.SCREEN_WIDTH - W) // 2
         y = (config.SCREEN_HEIGHT - H) // 2
@@ -313,9 +309,7 @@ class DesktopWidgetsMixin:
     def _draw_onboarding(self, surf):
         """Carte d'accueil (1re visite du bureau) : quelques repères pour
         comprendre le poste de travail. NON modale — se referme au clic."""
-        shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
-        shade.fill((0, 0, 0, 150))
-        surf.blit(shade, (0, 0))
+        surf.blit(cached_shade(self, surf, 150), (0, 0))
         W, H = 560, 320
         x = (config.SCREEN_WIDTH - W) // 2
         y = (config.SCREEN_HEIGHT - H) // 2
@@ -608,9 +602,7 @@ class DesktopWidgetsMixin:
         from core import todo as todo_mod
         p = self.app.gs.player
         items = todo_mod.suggestions(p, self.app.market)
-        shade = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
-        shade.fill((0, 0, 0, 130))
-        surf.blit(shade, (0, 0))
+        surf.blit(cached_shade(self, surf, 130), (0, 0))
         W, H = 460, 200
         x = (config.SCREEN_WIDTH - W) // 2
         y = (config.SCREEN_HEIGHT - H) // 2

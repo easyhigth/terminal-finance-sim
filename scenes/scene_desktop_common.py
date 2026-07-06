@@ -21,6 +21,20 @@ from core.app_catalog import SECTIONS
 TOPBAR_H = 36
 TASKBAR_H = 30
 
+
+def cached_shade(instance, surf, alpha=175):
+    """Surface SRCALPHA plein-écran semi-noire, réutilisée tant que la taille
+    de `surf` et l'alpha ne changent pas. Évite de recréer une surface à
+    chaque frame pour les overlays modaux (guide, bilan trimestre, menus…)."""
+    size = surf.get_size()
+    key = ("_cached_shade", size, alpha)
+    cache = getattr(instance, "_cached_shade_cache", None)
+    if cache is None or cache[0] != key:
+        shade = pygame.Surface(size, pygame.SRCALPHA)
+        shade.fill((0, 0, 0, alpha))
+        instance._cached_shade_cache = (key, shade)
+    return instance._cached_shade_cache[1]
+
 # Scènes qui restent une bascule PLEIN ÉCRAN classique (flux pré/post-partie —
 # quitter le bureau, ce n'est pas ouvrir une fenêtre dessus) : jamais hébergées.
 _FULLSCREEN_EXIT = {"desktop", "gameover", "menu", "splash", "intro",

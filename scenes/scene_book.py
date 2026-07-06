@@ -74,6 +74,9 @@ class BookScene(Scene, PopupMixin):
         self._positions_max_scroll = 0
         self._sector_max_scroll = 0
         self._tooltip = None
+        # ---- panneau latéral (secteur / évolution) ----
+        self.side_mode = "sector"   # "sector" | "history"
+        self._side_mode_rects = {}
 
     # --------------------------------------------------------------- trading
     def _qty(self):
@@ -315,6 +318,10 @@ class BookScene(Scene, PopupMixin):
                 self._do_sell()
                 return
             self.text_focus = None
+            for mode, rect in self._side_mode_rects.items():
+                if rect.collidepoint(event.pos):
+                    self.side_mode = mode
+                    return
             for label, rect in self._name_rects.items():
                 if rect.collidepoint(event.pos):
                     self._open_for(self._row_cls.get(label), label)
@@ -492,41 +499,9 @@ class BookScene(Scene, PopupMixin):
             widgets.draw_text(surf, "clic/clic droit nom → fiche d'analyse · clic valeur/P&L (actions) → graphe",
                               (inner.x, inner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
 
-        # répartition par secteur
+        # ---- panneau latéral : secteur / évolution ----
         alloc = pygame.Rect(960, table_top, config.SCREEN_WIDTH - 1000, ph)
-        ainner = widgets.draw_panel(surf, alloc, "Répartition par secteur", config.COL_AMBER)
-        by_sector = pf.allocation_by(p, m, "sector")
-        if not by_sector:
-            widgets.draw_text(surf, "—", (ainner.x, ainner.y), fonts.body(), config.COL_TEXT_DIM)
-            self._sector_list_rect = None
-        else:
-            total = sum(by_sector.values()) or 1.0
-            top = max(by_sector.values()) / total
-            warn = top > 0.4
-            list_area = pygame.Rect(ainner.x - 4, ainner.y, ainner.w + 8,
-                                    ainner.h - (18 if warn else 0))
-            self._sector_list_rect = list_area
-            prev_clip = surf.get_clip()
-            surf.set_clip(list_area)
-            y0 = ainner.y - self.scroll_sector
-            y = y0
-            for sec, val in sorted(by_sector.items(), key=lambda kv: -kv[1]):
-                if list_area.top - 36 < y < list_area.bottom:
-                    ratio = val / total
-                    widgets.draw_text(surf, sec, (ainner.x, y), fonts.small(), config.COL_TEXT)
-                    widgets.draw_text(surf, f"{ratio*100:.0f}%", (ainner.right, y),
-                                      fonts.small(bold=True), config.COL_WHITE, align="right")
-                    widgets.draw_progress(surf, (ainner.x, y + 18, ainner.w, 6), ratio, config.COL_CYAN)
-                y += 36
-            surf.set_clip(prev_clip)
-            content_h = (y + self.scroll_sector) - ainner.y
-            self._sector_max_scroll = max(0, content_h - list_area.h)
-            self.scroll_sector = max(0, min(self._sector_max_scroll, self.scroll_sector))
-            self.scroll_sector = widgets.draw_scrollbar(surf, alloc, list_area, self.scroll_sector,
-                                   self._sector_max_scroll, content_h)
-            if warn:
-                widgets.draw_text(surf, "⚠ Forte concentration sectorielle.",
-                                  (ainner.x, ainner.bottom - 18), fonts.tiny(), config.COL_WARN)
+        self._draw_side_panel(surf, alloc)
 
         self.back_btn.draw(surf)
         self.analytics_btn.draw(surf)
@@ -535,3 +510,112 @@ class BookScene(Scene, PopupMixin):
         self.popups_draw(surf)
         if self._tooltip:
             widgets.draw_tooltip(surf, *self._tooltip)
+
+    def _draw_side_panel(self, surf, rect):
+        """Panneau latéral à onglets : répartition sectorielle OU évolution de la
+        valeur nette au fil du temps (`cash_history`)."""
+        p = self.app.gs.player
+        inner = widgets.draw_panel(surf, rect, "Analyse globale", config.COL_AMBER)
+        sub_rect = self._draw_side_tabs(surf, inner)
+        if self.side_mode == "sector":
+            self._draw_sector_panel(surf, sub_rect)
+        else:
+            self._draw_history_panel(surf, sub_rect)
+
+    def _draw_side_tabs(self, surf, inner):
+        """Dessine les onglets SECTEUR / ÉVOLUTION en haut du panneau latéral.
+        Retourne le rectangle disponible sous les onglets."""
+        btn_h, gap = 22, 6
+        btn_w = (inner.w - gap) // 2
+        self._side_mode_rects = {}
+        x = inner.x
+        for mode, label in (("sector", "SECTEUR"), ("history", "ÉVOLUTION")):
+            btn = pygame.Rect(x, inner.y, btn_w, btn_h)
+            active = self.side_mode == mode
+            accent = config.COL_AMBER if active else config.COL_TEXT_DIM
+            pygame.draw.rect(surf, config.COL_PANEL, btn)
+            pygame.draw.rect(surf, accent, btn, 2 if active else 1)
+            widgets.draw_text(surf, label, btn.center, fonts.tiny(bold=active),
+                              accent, align="center")
+            self._side_mode_rects[mode] = btn
+            x += btn_w + gap
+        return pygame.Rect(inner.x, inner.y + btn_h + gap, inner.w,
+                           inner.h - btn_h - gap)
+
+    def _draw_sector_panel(self, surf, rect):
+        """Contenu de l'onglet Secteur : répartition sectorielle."""
+        p = self.app.gs.player
+        by_sector = pf.allocation_by(p, self.market, "sector")
+        if not by_sector:
+            widgets.draw_text(surf, "—", (rect.x, rect.y), fonts.body(), config.COL_TEXT_DIM)
+            self._sector_list_rect = None
+            return
+        total = sum(by_sector.values()) or 1.0
+        top = max(by_sector.values()) / total
+        warn = top > 0.4
+        list_area = pygame.Rect(rect.x - 4, rect.y, rect.w + 8,
+                                rect.h - (18 if warn else 0))
+        self._sector_list_rect = list_area
+        prev_clip = surf.get_clip()
+        surf.set_clip(list_area)
+        y0 = rect.y - self.scroll_sector
+        y = y0
+        for sec, val in sorted(by_sector.items(), key=lambda kv: -kv[1]):
+            if list_area.top - 36 < y < list_area.bottom:
+                ratio = val / total
+                widgets.draw_text(surf, sec, (rect.x, y), fonts.small(), config.COL_TEXT)
+                widgets.draw_text(surf, f"{ratio*100:.0f}%", (rect.right, y),
+                                  fonts.small(bold=True), config.COL_WHITE, align="right")
+                widgets.draw_progress(surf, (rect.x, y + 18, rect.w, 6), ratio, config.COL_CYAN)
+            y += 36
+        surf.set_clip(prev_clip)
+        content_h = (y + self.scroll_sector) - rect.y
+        self._sector_max_scroll = max(0, content_h - list_area.h)
+        self.scroll_sector = max(0, min(self._sector_max_scroll, self.scroll_sector))
+        self.scroll_sector = widgets.draw_scrollbar(surf, rect, list_area, self.scroll_sector,
+                               self._sector_max_scroll, content_h)
+        if warn:
+            widgets.draw_text(surf, "⚠ Forte concentration sectorielle.",
+                              (rect.x, rect.bottom - 18), fonts.tiny(), config.COL_WARN)
+
+    def _draw_history_panel(self, surf, rect):
+        """Contenu de l'onglet Évolution : graphe de la valeur nette dans le temps
+        (cash_history). Affiche aussi le P&L total depuis le premier point."""
+        p = self.app.gs.player
+        cur = config.CONTINENTS[p.continent]["currency"]
+        series = getattr(p, "cash_history", []) or []
+        if len(series) < 2:
+            widgets.draw_text(surf, "Historique insuffisant — revenez après quelques pas de marché.",
+                              (rect.x, rect.y), fonts.small(), config.COL_TEXT_DIM)
+            self._sector_list_rect = None
+            return
+        start_val = series[0]
+        current = series[-1]
+        total_pnl = current - start_val
+        total_pct = ((current / start_val) - 1.0) * 100.0 if start_val else 0.0
+        col = config.COL_UP if total_pnl >= 0 else config.COL_DOWN
+
+        # métriques en haut du panneau
+        widgets.draw_text(surf,
+                          f"Actuel : {widgets.format_money(current, cur)}",
+                          (rect.x, rect.y), fonts.small(bold=True), config.COL_WHITE)
+        widgets.draw_text(surf,
+                          f"Départ : {widgets.format_money(start_val, cur)}",
+                          (rect.x, rect.y + 18), fonts.tiny(), config.COL_TEXT_DIM)
+        widgets.draw_text(surf,
+                          f"P&L total : {widgets.format_money(total_pnl, cur)} ({total_pct:+.1f}%)",
+                          (rect.x, rect.y + 36), fonts.small(bold=True), col)
+
+        chart_top = rect.y + 66
+        chart_rect = pygame.Rect(rect.x, chart_top, rect.w,
+                                 rect.bottom - chart_top - 20)
+        if chart_rect.h < 40:
+            return
+        y_fmt = lambda v: widgets.format_money(v, cur)
+        lo, hi, span = widgets.draw_chart_axes(surf, chart_rect, min(series), max(series),
+                                               y_fmt=y_fmt, rows=4)
+        widgets.draw_series(surf, chart_rect, series, color=col, baseline=True,
+                            mouse_pos=pygame.mouse.get_pos(), y_fmt=y_fmt,
+                            show_current_line=True, line_width=2)
+        labels = [(0.0, "début"), (1.0, "auj.")]
+        widgets.draw_chart_x_labels(surf, chart_rect, labels)

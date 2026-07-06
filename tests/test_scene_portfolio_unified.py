@@ -141,3 +141,35 @@ def test_chart_view_renders_with_empty_history_gracefully():
     scene.update(0.016)
     surf = pygame.Surface((1280, 720))
     scene.draw(surf)
+
+
+def test_history_panel_renders_in_portfolio_unified_scene():
+    """Le panneau latéral peut afficher l'évolution globale du portefeuille."""
+    from scenes.scene_portfolio_unified import PortfolioUnifiedScene
+
+    app, _ = _make_app_with_positions()
+    app.gs.player.cash_history = [180_000.0, 185_000.0, 190_000.0, 210_000.0]
+    scene = PortfolioUnifiedScene(app)
+    scene.on_enter(return_to="terminal")
+    scene.update(0.016)
+    surf = pygame.Surface((1280, 720))
+    scene.heat_mode = "history"
+    scene.draw(surf)
+
+
+def test_history_tab_click_switches_heat_mode():
+    """Cliquer sur l'onglet Évolution bascule le panneau latéral."""
+    from scenes.scene_portfolio_unified import PortfolioUnifiedScene
+
+    app, _ = _make_app_with_positions()
+    scene = PortfolioUnifiedScene(app)
+    scene.on_enter(return_to="terminal")
+    scene.update(0.016)
+    surf = pygame.Surface((1280, 720))
+    scene.draw(surf)
+
+    assert scene.heat_mode == "sector"
+    rect = scene._heat_mode_rects["history"]
+    event = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=rect.center)
+    scene.handle_event(event)
+    assert scene.heat_mode == "history"

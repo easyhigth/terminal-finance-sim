@@ -269,15 +269,15 @@ class PortfolioUnifiedScene(Scene):
         self.back_btn.draw(surf)
 
     def _draw_heat_panel(self, surf, rect):
-        """Panneau latéral à deux modes : heatmap sectorielle (actions) ou
-        matrice de corrélation multi-classes des positions détenues. Boutons
-        de bascule en haut du panneau, même convention que `_mode_rects`
-        (P&L/YTM) plus haut dans cette scène."""
+        """Panneau latéral à trois modes : heatmap sectorielle, matrice de
+        corrélation multi-classes, ou évolution de la valeur nette totale du
+        portefeuille dans le temps."""
         btn_h, gap_b = 22, 6
-        btn_w = (rect.w - gap_b) // 2
+        n = 3
+        btn_w = (rect.w - (n - 1) * gap_b) // n
         self._heat_mode_rects = {}
         x = rect.x
-        for mode, label in (("sector", "SECTEUR"), ("corr", "CORRÉL.")):
+        for mode, label in (("sector", "SECTEUR"), ("corr", "CORRÉL."), ("history", "ÉVOLUTION")):
             btn = pygame.Rect(x, rect.y, btn_w, btn_h)
             active = self.heat_mode == mode
             accent = config.COL_AMBER if active else config.COL_TEXT_DIM
@@ -290,6 +290,8 @@ class PortfolioUnifiedScene(Scene):
         sub_rect = pygame.Rect(rect.x, rect.y + btn_h + gap_b, rect.w, rect.h - btn_h - gap_b)
         if self.heat_mode == "corr":
             self._draw_corr_heatmap(surf, sub_rect)
+        elif self.heat_mode == "history":
+            self._draw_history_panel(surf, sub_rect)
         else:
             self._draw_sector_heatmap(surf, sub_rect)
 
@@ -360,6 +362,41 @@ class PortfolioUnifiedScene(Scene):
             widgets.draw_text(surf, f"{a['value']:+,.0f}  ·  {a['pnl_pct']:+.1f}%",
                               (cell.x + 8, cell.y + h - 18), fonts.tiny(), config.COL_TEXT_DIM)
             y += h + gap
+
+    def _draw_history_panel(self, surf, rect):
+        """Contenu de l'onglet Évolution : graphe de la valeur nette totale
+        du portefeuille dans le temps (`player.cash_history`)."""
+        p = self.app.gs.player
+        cur = config.CONTINENTS[p.continent]["currency"]
+        series = getattr(p, "cash_history", []) or []
+        if len(series) < 2:
+            widgets.draw_text(surf, "Historique insuffisant — revenez après quelques pas de marché.",
+                              (rect.x, rect.y), fonts.small(), config.COL_TEXT_DIM)
+            return
+        start_val = series[0]
+        current = series[-1]
+        total_pnl = current - start_val
+        total_pct = ((current / start_val) - 1.0) * 100.0 if start_val else 0.0
+        col = config.COL_UP if total_pnl >= 0 else config.COL_DOWN
+
+        widgets.draw_text(surf, f"Valeur nette : {widgets.format_money(current, cur)}",
+                          (rect.x, rect.y), fonts.small(bold=True), config.COL_WHITE)
+        widgets.draw_text(surf, f"Départ : {widgets.format_money(start_val, cur)}",
+                          (rect.x, rect.y + 18), fonts.tiny(), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, f"P&L total : {widgets.format_money(total_pnl, cur)} ({total_pct:+.1f}%)",
+                          (rect.x, rect.y + 36), fonts.small(bold=True), col)
+
+        chart_top = rect.y + 66
+        chart_rect = pygame.Rect(rect.x, chart_top, rect.w, rect.bottom - chart_top - 20)
+        if chart_rect.h < 40:
+            return
+        y_fmt = lambda v: widgets.format_money(v, cur)
+        lo, hi, span = widgets.draw_chart_axes(surf, chart_rect, min(series), max(series),
+                                               y_fmt=y_fmt, rows=4)
+        widgets.draw_series(surf, chart_rect, series, color=col, baseline=True,
+                            mouse_pos=pygame.mouse.get_pos(), y_fmt=y_fmt,
+                            show_current_line=True, line_width=2)
+        widgets.draw_chart_x_labels(surf, chart_rect, [(0.0, "début"), (1.0, "auj.")])
 
     def _draw_chart_view(self, surf):
         row = self.chart_row

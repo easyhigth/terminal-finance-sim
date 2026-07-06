@@ -352,6 +352,50 @@ class GraphScene(GraphRenderMixin, Scene, PopupMixin):
         hist = ETF.nav_history(self.market, tk, n)
         return intraday.densify_step_series(self.market, tk, hist, pps)
 
+    def _series_for_ohlc(self, tk):
+        """Série haute-résolution pour chandeliers/barres sur les périodes
+        courtes (1M/3M/1W/1D). Utilise le MÊME chemin canonique que `_series`,
+        mais échantillonné beaucoup plus finement pour donner à chaque bougie
+        une vraie texture open/high/low/close (micro-variations visibles).
+        Retourne (series, pps) où pps est le nombre de points intermédiaires
+        par pas utilisé (None pour les fenêtres intraday)."""
+        n = None if (self.period is not None and self.period < 0) else self.period
+        # Fenêtres intraday 1J/1W : `_series` est déjà un chemin canonique fin
+        # (60–140 points). On le réutilise tel quel.
+        if n is None:
+            return self._series(tk), None
+        # Périodes par pas : densification accrue pour les courtes fenêtres.
+        if n <= 6:       # 1M
+            pps = 50
+        elif n <= 18:    # 3M
+            pps = 30
+        elif n <= 73:    # 1A
+            pps = 8
+        elif n <= 219:   # 3A
+            pps = 3
+        else:
+            pps = intraday.points_per_segment_for_n_steps(n)
+        kind = _asset_kind(tk)
+        if kind == "stock":
+            hist = self.market.history_of(tk, n)
+            region = self._region_of(tk)
+            vol_mult = intraday.vol_mult_for_sigma(
+                float(self.market.sigma[self.market.ticker_idx[tk]]))
+            return (intraday.densify_step_series(self.market, tk, hist, pps,
+                                                  region=region, vol_mult=vol_mult),
+                    pps)
+        # Obligations/commodities/crypto/ETF n'ont pas de chemin canonique
+        # intraday dédié ; on se contente d'une densification standard.
+        if kind == "bond":
+            hist = BND.price_history(self.market, tk, n)
+        elif kind == "commodity":
+            hist = CMD.history(self.market, tk, n)
+        elif kind == "crypto":
+            hist = CRY.history(self.market, tk, n)
+        else:
+            hist = ETF.nav_history(self.market, tk, n)
+        return intraday.densify_step_series(self.market, tk, hist, pps), pps
+
     # -------------------------------------------------------------- draw
     def draw(self, surf):
         surf.fill(config.COL_BG)

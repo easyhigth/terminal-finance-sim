@@ -60,10 +60,12 @@ class GraphRenderMixin:
     def _empty(self, surf, rect, msg="Aucune donnée. Saisissez un ticker."):
         widgets.draw_text(surf, msg, (rect.x, rect.y), fonts.small(), config.COL_TEXT_DIM)
 
-    def _draw_event_markers(self, surf, rect, series, lo, span):
+    def _draw_event_markers(self, surf, rect, series, lo, span, pps=None):
         """Dessine des icônes d'événements d'entreprise sur la courbe de prix.
         Les événements sont positionnés à leur pas de marché correspondant
-        sur la série densifiée (intraday)."""
+        sur la série densifiée (intraday). `pps` est le nombre de points
+        intermédiaires par pas utilisé pour générer `series` ; s'il est None
+        (fenêtre intraday), on le déduit du nombre de points par pas."""
         mkt = self.market
         if mkt is None or not self.tickers:
             return
@@ -72,19 +74,27 @@ class GraphRenderMixin:
         if not events:
             return
         from core import intraday
-        pps = intraday.points_per_segment_for_n_steps(self.period)
-        if pps <= 0:
-            return
-        current_step = mkt.step_count
         n = len(series)
         if n < 2:
             return
+        if pps is None:
+            # Graphes ligne/vol/bêta/etc. qui utilisent `_series()` standard :
+            # retomber sur la densification par défaut du moteur. Fenêtres
+            # intraday : on infère grossièrement le pps depuis la longueur.
+            if self.period is not None and self.period > 0:
+                pps = intraday.points_per_segment_for_n_steps(self.period)
+            else:
+                steps_in_series = 1
+                pps = max(1, (n - 1) // max(1, steps_in_series) - 1)
+        if pps <= 0:
+            return
+        current_step = mkt.step_count
         _KIND_COL = {"good": config.COL_UP, "bad": config.COL_DOWN, "info": config.COL_CYAN}
         for ev in events:
             steps_back = current_step - ev["step"]
             if steps_back < 0 or steps_back > (self.period or 9999):
                 continue
-            idx = n - 1 - steps_back * pps
+            idx = n - 1 - steps_back * (pps + 1)
             if idx < 0 or idx >= n:
                 continue
             price = series[int(idx)]
@@ -198,22 +208,51 @@ class GraphRenderMixin:
     def _draw_candles(self, surf, rect):
         if not self.tickers:
             return self._empty(surf, rect)
-        s = self._series(self.tickers[0])
+        s, pps = self._series_for_ohlc(self.tickers[0])
         if len(s) < 2:
             return self._empty(surf, rect, "Historique indisponible.")
         lo, hi = min(s), max(s)
-        self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:.0f}",
+        y_fmt = self._ohlc_y_fmt(lo, hi)
+        self._plot_axes(surf, rect, lo, hi, y_fmt,
                          right_labels=True, pad_pct=0.01)
-        # En intraday, `s` est un échantillonnage fin animé (60 points) ; on
-        # regroupe en moins de bougies que de points pour que chaque bougie
-        # ait un vrai corps/mèche (open/high/low/close distincts) plutôt
-        # qu'un doji plat par point — la bougie la plus récente continue de
-        # bouger en direct à chaque image, tant qu'elle reste "en formation".
-        n_candles = 18 if (self.period is not None and self.period < 0) else min(60, len(s))
+        # Nombre de bougies adapté à la période : plus on zoome, plus on voit
+        # de bougies avec du détail. Les fenêtres intraday utilisent déjà un
+        # chemin canonique fin ; les périodes par pas sont densifiées par
+        # `_series_for_ohlc` pour donner à chaque bougie une vraie texture.
+        n_candles = self._ohlc_n_buckets(s, default_intraday=24,
+                                          default_step=min(60, len(s)))
         widgets.draw_candles(surf, rect, s, n_candles=n_candles, sma_windows=(10, 30))
         self._x_labels(surf, rect, n_candles)
         self._track_candle_rects(rect, s, n_candles)
-        self._draw_event_markers(surf, rect, s, lo, hi - lo or 1.0)
+        self._draw_event_markers(surf, rect, s, lo, hi - lo or 1.0, pps=pps)
+
+    def _ohlc_y_fmt(self, lo, hi):
+        """Format de prix adapté à la plage affichée : centimes quand on zoome
+        (plage étroite), décimal puis entier quand on dézoome."""
+        span = hi - lo
+        if span < 1.0:
+            return lambda v: f"{v:,.2f}"
+        if span < 10.0:
+            return lambda v: f"{v:,.1f}"
+        return lambda v: f"{v:,.0f}"
+
+    def _ohlc_n_buckets(self, s, default_intraday, default_step):
+        """Nombre de buckets (bougies/barres) à afficher selon la période."""
+        n = len(s)
+        if self.period is None:
+            return min(default_step, n)
+        if self.period < 0:
+            window = -self.period
+            if window <= 1440:       # 1J
+                return min(24, n)
+            if window <= 10080:     # 1W
+                return min(48, n)
+            return min(default_intraday, n)
+        if self.period <= 6:         # 1M
+            return min(30, n)
+        if self.period <= 18:        # 3M
+            return min(60, n)
+        return min(default_step, n)
 
     def _track_candle_rects(self, rect, closes, n_candles):
         """Mémorise le rect écran + le détail brut (sous-échantillon) de
@@ -235,13 +274,16 @@ class GraphRenderMixin:
     def _draw_bars(self, surf, rect):
         if not self.tickers:
             return self._empty(surf, rect)
-        s = self._series(self.tickers[0])
+        s, pps = self._series_for_ohlc(self.tickers[0])
         if len(s) < 2:
             return self._empty(surf, rect, "Historique indisponible.")
-        candles = widgets._aggregate_ohlc(s, min(70, len(s)))
+        n_bars = self._ohlc_n_buckets(s, default_intraday=30,
+                                       default_step=min(70, len(s)))
+        candles = widgets._aggregate_ohlc(s, n_bars)
         lo = min(c[2] for c in candles)
         hi = max(c[1] for c in candles)
-        _, _, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:.0f}",
+        y_fmt = self._ohlc_y_fmt(lo, hi)
+        _, _, span = self._plot_axes(surf, rect, lo, hi, y_fmt,
                                        right_labels=True, pad_pct=0.01)
         self._x_labels(surf, rect, len(candles))
         slot = rect.w / len(candles)
@@ -252,7 +294,7 @@ class GraphRenderMixin:
             pygame.draw.line(surf, col, (cx, yof(h)), (cx, yof(l)), 1)
             pygame.draw.line(surf, col, (cx - 3, yof(o)), (cx, yof(o)), 2)   # ouverture (gauche)
             pygame.draw.line(surf, col, (cx, yof(c)), (cx + 3, yof(c)), 2)   # clôture (droite)
-        self._draw_event_markers(surf, rect, s, lo, span)
+        self._draw_event_markers(surf, rect, s, lo, span, pps=pps)
 
     def _draw_change(self, surf, rect):
         if not self.tickers:

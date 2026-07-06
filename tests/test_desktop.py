@@ -2682,6 +2682,39 @@ def test_scene_host_draw_survives_degenerate_rect(app):
     host.draw(surf, pygame.Rect(10, 10, -5, 12))    # ne doit pas lever
 
 
+def test_scene_host_redraws_content_every_frame_at_same_size():
+    """Régression : SceneHostApp mettait en cache le smoothscale et ne
+    rescale que si la taille changeait. L'offscreen est pourtant redessiné
+    à chaque frame : l'image affichée restait donc figée tant que la fenêtre
+    gardait la même taille — les fenêtres semblaient ne plus réagir au clic
+    car le feedback visuel n'était pas mis à jour."""
+    from apps.scene_host import SceneHostApp
+    import main
+    a = main.App()
+    a.ensure_market()
+    host = SceneHostApp(a, "markethub", "Marché", {})
+    host.on_open()
+    rect = pygame.Rect(10, 10, 400, 300)
+
+    calls = []
+    orig_smoothscale = pygame.transform.smoothscale
+    def tracking_smoothscale(surf, size):
+        calls.append(size)
+        return orig_smoothscale(surf, size)
+    pygame.transform.smoothscale = tracking_smoothscale
+    try:
+        host.draw(pygame.Surface((500, 500)), rect)
+        host.draw(pygame.Surface((500, 500)), rect)
+    finally:
+        pygame.transform.smoothscale = orig_smoothscale
+
+    # même taille pour les deux draw : smoothscale doit quand même être appelé
+    # deux fois car l'offscreen a été redessiné entre-temps.
+    assert len(calls) == 2
+    assert calls[0] == (rect.w, rect.h)
+    assert calls[1] == (rect.w, rect.h)
+
+
 def test_apply_layout_clamps_degenerate_rects(app):
     """Un rect de disposition hors bornes (fichier de save édité, autre
     résolution) est ramené à une taille/position jouables."""

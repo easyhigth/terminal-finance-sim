@@ -234,39 +234,6 @@ class WindowManager:
     def open_windows(self):
         return [w for w in self.windows if not w.minimized]
 
-    def save_layout(self):
-        """Retourne une liste serialisable de l'état des fenêtres ouvertes."""
-        return [
-            {"key": w.key,
-             "x": w.rect.x, "y": w.rect.y,
-             "w": w.rect.w, "h": w.rect.h,
-             "minimized": w.minimized}
-            for w in self.windows
-        ]
-
-    def apply_layout(self, layout, opener):
-        """Ré-ouvre/repositionne les fenêtres à partir de `layout`.
-        `opener` : callable(key) qui ouvre la fenêtre correspondante (retourne
-        Window ou None). Les fenêtres natives et hébergées sont identifiées par
-        leur clé."""
-        if not layout:
-            return
-        for wd in layout:
-            key = wd.get("key")
-            if not key:
-                continue
-            w = opener(key)
-            if w is None:
-                continue
-            try:
-                w.rect.x = max(-w.rect.w + 80, min(config.SCREEN_WIDTH - 80, int(wd.get("x", w.rect.x))))
-                w.rect.y = max(config.TOPBAR_H, min(config.SCREEN_HEIGHT - TITLE_H, int(wd.get("y", w.rect.y))))
-                w.rect.w = max(w.app_obj.min_size[0], min(config.SCREEN_WIDTH - w.rect.x, int(wd.get("w", w.rect.w))))
-                w.rect.h = max(w.app_obj.min_size[1], min(config.SCREEN_HEIGHT - w.rect.y, int(wd.get("h", w.rect.h))))
-                w.minimized = bool(wd.get("minimized", False))
-            except Exception:
-                pass
-
     def cycle_focus(self, reverse=False):
         """Alt+Tab : passe à la fenêtre suivante (round-robin déterministe,
         trié par clé — pas par ordre de focus récent, pour un cycle complet

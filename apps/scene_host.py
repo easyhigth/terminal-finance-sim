@@ -103,8 +103,6 @@ class SceneHostApp(DesktopApp):
         self._kwargs = dict(kwargs or {})
         self._rect = None
         self._offscreen = None
-        self._scaled_surf = None
-        self._scaled_size = None
         self._opener_cb = None
         self.router = _Router(app.scenes, self._route_open, scene_name)
         self.proxy = _ProxyApp(app, self.router)
@@ -168,14 +166,11 @@ class SceneHostApp(DesktopApp):
             self._offscreen = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
         with self._mouse_patch():
             self.scene.draw(self._offscreen)
-        # smoothscale est coûteux : on ne rescale que si la taille de la
-        # fenêtre a changé ; le contenu logique est quoi qu'il en soit redessiné
-        # sur l'offscreen à chaque frame.
-        size = (rect.w, rect.h)
-        if self._scaled_surf is None or self._scaled_size != size:
-            self._scaled_surf = pygame.transform.smoothscale(self._offscreen, size)
-            self._scaled_size = size
-        surf.blit(self._scaled_surf, rect.topleft)
+        # smoothscale est coûteux, mais l'offscreen est redessiné à chaque
+        # frame : on ne peut pas réutiliser le scaled_surf précédent car son
+        # contenu source a changé. On rescale donc systématiquement.
+        scaled = pygame.transform.smoothscale(self._offscreen, (rect.w, rect.h))
+        surf.blit(scaled, rect.topleft)
 
     def handle_event(self, event, rect):
         self._rect = rect

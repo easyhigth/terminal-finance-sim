@@ -109,8 +109,15 @@ class PageManager:
         return m
 
     def _create_page(self, scene_name, kwargs):
-        """Crée une Page sans la rendre active (utilisé par la restauration UI)."""
-        m = self._build_manager(scene_name, kwargs)
+        """Crée une Page sans la rendre active et SANS appeler on_enter
+        (utilisé par la restauration UI : on ne veut pas déclencher la logique
+        de la scène pendant le chargement, avant que l'utilisateur ne soit
+        réellement sur le bureau)."""
+        from main import build_scene_manager
+        m = build_scene_manager(self.app)
+        if scene_name in m.scenes:
+            m.current = m.scenes[scene_name]
+            m.current_name = scene_name
         return Page(m, scene_name, kwargs)
 
     def _ensure_manager(self):

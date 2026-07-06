@@ -467,7 +467,9 @@ class CompanyScene(Scene):
 
         chart = pygame.Rect(rect.x + 580, ph_top, rect.w - 580, ph)
         cinner = widgets.draw_panel(surf, chart, "Cours — chandeliers", accent)
-        hist = self.app.market.track_company(self.ticker) if self.app.market else []
+        m = self.app.market
+        hist = (m.track_company(self.ticker, self.app.sim_clock, self.app.gs.player.day)
+                if m else [])
         if hist and len(hist) >= 2:
             widgets.draw_candles(surf, pygame.Rect(cinner.x, cinner.y + 22,
                                                    cinner.w, cinner.h - 60), hist,
@@ -769,7 +771,8 @@ class CompanyScene(Scene):
         i = m.ticker_idx.get(self.ticker)
         region = m.companies[i]["region"] if i is not None else None
         idx_name = next((n for n, r in m.index_region.items() if r == region), None)
-        ridx = m.index_history(idx_name) if idx_name else []
+        ridx = (m.index_history(idx_name, self.app.sim_clock, self.app.gs.player.day)
+                if idx_name else [])
         ry, rx = charts.simple_returns(hist), charts.simple_returns(ridx)
         n = min(len(ry), len(rx))
         if n < 5:

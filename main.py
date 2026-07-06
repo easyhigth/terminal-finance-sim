@@ -214,12 +214,15 @@ class App:
         existante (self.app.scenes.go(...)) agit donc sur la page courante."""
         return self.pages.manager
 
-    def notify(self, text, kind="info", action=None, action_kwargs=None):
+    def notify(self, text, kind="info", action=None, action_kwargs=None,
+               on_click=None):
         """Pousse une notification (toast) affichée en overlay. `action` :
         nom de scène optionnel à rouvrir depuis le centre de notifications
-        (cf. ui/notifications.py::NotificationCenter.push)."""
+        (cf. ui/notifications.py::NotificationCenter.push). `on_click` :
+        callable exécuté au clic sur le toast (ex. ouvrir le trading pré-filtré)."""
         day = self.gs.player.day if getattr(self, "gs", None) else None
-        self.notes.push(text, kind, action=action, action_kwargs=action_kwargs, day=day)
+        self.notes.push(text, kind, action=action, action_kwargs=action_kwargs,
+                        day=day, on_click=on_click)
 
     def route_scene(self, name, **kwargs):
         """Navigation FORCÉE par le jeu (pas un clic joueur) — ex. un dilemme

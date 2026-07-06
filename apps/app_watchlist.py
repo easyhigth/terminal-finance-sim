@@ -15,7 +15,7 @@ désormais retirée : une seule maison pour la watchlist).
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import audio, config
 from ui import fonts, widgets
 
 ROW_H = 26
@@ -61,11 +61,13 @@ class WatchlistApp(DesktopApp):
                 if r.collidepoint(event.pos):
                     if tk in self.app.gs.player.watchlist:
                         self.app.gs.player.watchlist.remove(tk)
+                        audio.play("click")
                     return True
             for tk, r in self._row_rects.items():
                 if r.collidepoint(event.pos):
                     if self.desktop is not None:
                         self.desktop.open_trading(tk)
+                        audio.play("click")
                     return True
         return False
 

@@ -22,7 +22,7 @@ import os
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import audio, config
 from core.spreadsheet_engine import col_to_idx, idx_to_col
 from core.workbook import ConditionalFormat, SheetChart, Workbook, template_list
 from ui import fonts, style, widgets
@@ -334,6 +334,7 @@ class SheetApp(DesktopApp):
                            for r in range(r1, r2 + 1)]
         n = (c2 - c1 + 1) * (r2 - r1 + 1)
         self.msg = f"{n} cellule(s) copiée(s)."
+        audio.play("click")
 
     def _paste_range(self):
         if not self._clipboard:
@@ -350,6 +351,7 @@ class SheetApp(DesktopApp):
         for ref, raw in targets:
             self.sheet.set(ref, raw)
         self.msg = f"{len(targets)} cellule(s) collée(s)."
+        audio.play("click")
 
     # ------------------------------------------------------------- export CSV
     def _export_csv(self):
@@ -379,6 +381,7 @@ class SheetApp(DesktopApp):
                         row.append("" if v == "" else self._fmt(v))
                     w.writerow(row)
             self.msg = f"Exporté vers « {path} »."
+            audio.play("click")
         except OSError:
             self.msg = "Échec de l'export CSV (chemin inaccessible)."
 

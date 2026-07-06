@@ -404,6 +404,33 @@ class SceneManager:
         self.app.gs.save(slot)
         self.app.notify(_L(f"Sauvegardé sur {slot.upper()}.", f"Saved to {slot.upper()}."), "good")
 
+    def _dispatch_notification_action(self, action, action_kwargs):
+        """Construit un callback qui exécute l'action d'une notification.
+        Retourne None si l'action n'est pas reconnaissable."""
+        if not action:
+            return None
+        kwargs = dict(action_kwargs or {})
+
+        def cb():
+            try:
+                if action == "trading":
+                    self.app.route_scene("trading", ticker=kwargs.get("ticker"))
+                elif action == "book":
+                    self.app.route_scene("book")
+                elif action == "sheet":
+                    self.app.route_scene("spreadsheet")
+                elif action == "scene":
+                    name = kwargs.get("name")
+                    if name:
+                        self.app.route_scene(name, **{k: v for k, v in kwargs.items()
+                                                       if k != "name"})
+                else:
+                    self.app.route_scene(action, **kwargs)
+            except Exception:
+                pass
+
+        return cb
+
     def _quickslot_load(self, slot):
         from core.game_state import GameState
         gs = GameState.load(slot)
@@ -431,6 +458,10 @@ class SceneManager:
         if self.palette_open:
             self._handle_palette_event(event)
             return
+        # notifications/toasts cliquables (sous la palette, au-dessus de la scène)
+        notes = getattr(self.app, "notes", None)
+        if notes and notes.handle_event(event):
+            return
         if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
                 and self._handle_breadcrumb_click(event.pos)):
             return
@@ -449,9 +480,12 @@ class SceneManager:
         if player is not None:
             from core import notify_queue
             for toast in notify_queue.drain(player):
+                on_click = self._dispatch_notification_action(
+                    toast.get("action"), toast.get("action_kwargs"))
                 self.app.notify(toast["text"], toast["kind"],
                                 action=toast.get("action"),
-                                action_kwargs=toast.get("action_kwargs"))
+                                action_kwargs=toast.get("action_kwargs"),
+                                on_click=on_click)
         notes = getattr(self.app, "notes", None)
         if notes:
             notes.update(dt)

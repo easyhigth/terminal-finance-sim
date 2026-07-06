@@ -527,7 +527,8 @@ class GameState:
                         _o = _exec["order"]
                         _side = _L("Stop-loss", "Stop-loss") if _o["kind"] == "stop" else _L("Take-profit", "Take-profit")
                         _txt = f"{_side} {_o['ticker']} " + _L("exécuté", "executed") + f" @ {_exec['result']['price']:.2f}"
-                        _nq.push(p, _txt, "info", action="book")
+                        _nq.push(p, _txt, "info", action="trading",
+                                 action_kwargs={"ticker": _o["ticker"]})
             # ordres TWAP/fractionnés : exécution par tranches à chaque pas
             if getattr(p, "pending_orders", None):
                 from core import orders as _orders
@@ -543,6 +544,16 @@ class GameState:
                         _side = _L("Achat", "Buy") if _exec["side"] == "buy" else _L("Vente", "Sell")
                         _txt = f"TWAP {_exec['key']} : {_side} {_exec['chunk']:g} @ {_exec['price']:.2f}"
                         _nq.push(p, _txt, "info", action="trading", action_kwargs={"ticker": _exec["key"]})
+            # alertes de prix déclenchées
+            if getattr(p, "alerts", None):
+                from core import alerts as _alerts
+                triggered_alerts = _alerts.check(p, market)
+                if triggered_alerts:
+                    from core import notify_queue as _nq
+                    for ev in triggered_alerts[:3]:
+                        kind = "warn" if not ev["above"] else "info"
+                        _nq.push(p, _alerts.format_trigger(ev), kind,
+                                 action="trading", action_kwargs={"ticker": ev["ticker"]})
             financing = portfolio.accrue_financing(p, market, config.DAYS_PER_STEP)
             margin_call = portfolio.check_margin_call(p, market)
             if margin_call:
@@ -553,7 +564,8 @@ class GameState:
                     pass
                 from core import notify_queue as _nq
                 _nq.push(p, _L("Appel de marge : positions liquidées.",
-                               "Margin call : positions liquidated."), "bad")
+                               "Margin call : positions liquidated."), "bad",
+                         action="book")
             # échantillonnage du levier (style de jeu, indépendant de la progression de
             # grade) : utilisé par career.risk_profile() pour moduler les mandats proposés.
             if portfolio.leverage(p, market) >= 2.5:
@@ -667,14 +679,14 @@ class GameState:
             quarter_report = career.close_quarter(p)
             if quarter_report and quarter_report.get("total"):
                 from core import notify_queue as _nq
+                try:
+                    from core import audio as _audio
+                    _audio.play("milestone")
+                except Exception:
+                    pass
                 _done = quarter_report.get("done", 0)
                 _tot = quarter_report.get("total", 0)
                 if _done == _tot:
-                    try:
-                        from core import audio as _audio
-                        _audio.play("milestone")
-                    except Exception:
-                        pass
                     _nq.push(p, _L(f"Trimestre parfait ! {_done}/{_tot} objectifs (cash +{quarter_report['cash']:,.0f}).",
                                    f"Perfect quarter ! {_done}/{_tot} objectives (cash +{quarter_report['cash']:,.0f})."),
                              "good")

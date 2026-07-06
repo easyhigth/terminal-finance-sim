@@ -1,154 +1,120 @@
-# Plan — Simulation de marché poussée et graphes vivants
+# Plan : implémentation des 10 améliorations priorisées
 
-## Objectif
-Transformer le moteur de marché existant (déjà à facteurs, crises, earnings, macro) en une simulation **financièrement crédible et visuellement lisible** :
-- des entreprises avec un passé fondamental et des événements narratifs qui **impactent réellement** les cours ;
-- des graphes qui **montrent** ces événements, les anticipations et les chocs ;
-- un « forward » interne (consensus, révisions, scénarios) qui guide l’évolution future et se reflète dans les courbes.
-
-Le tout reste **déterministe** (seed + pas) et couvert par des tests.
+## Contexte
+Suite à l'audit du codebase, 10 axes d'amélioration ont été identifiés et validés par le joueur. Ce plan découpe le travail en phases indépendantes, testables et poussables séparément.
 
 ---
 
-## Phase 1 — Événements d’entreprise et annotations sur les graphes (2-3 sprints)
+## Phase 1 — Toasts actionnables + feedback sonore (court terme, gros impact)
 
-### 1.1 Moteur d’événements d’entreprise (`core/market_events.py`)
-Créer un nouveau module pur qui tire, à chaque pas, des événements **par société** :
-- **Opérationnels** : lancement de produit, contrat gagné/perdu, rappel sanitaire, cyberattaque, grève, panne d’usine.
-- **Corporate** : changement de CEO, scandale comptable, OPA amicale/hostile, buyback, augmentation de capital.
-- **Externes** : perte/gain de commande publique, décision judiciaire, sanction régulatoire ciblée.
+### 1.1 Toasts actionnables pour alertes de prix et ordres conditionnels
+- **Fichiers** : `core/alerts.py`, `core/conditional_orders.py`, `ui/notifications.py`, `scenes/scene_desktop.py`, `scenes/scene_terminal_time.py`
+- **Travail** :
+  - Étendre `NotificationCenter.push()` avec `action="trading"` + `action_kwargs={"ticker": ...}` et un handler de clic qui appelle `DesktopScene.open_trading(ticker)`.
+  - Dans `alerts.check()` et `conditional_orders.execute_due()`, produire des notifications toast au lieu de simples messages inbox/log.
+  - Câbler `scene_terminal_time.py` (où `advance_step` appelle `execute_due`) pour pousser les toasts vers `app.notes`.
+  - Dessiner les toasts avec un bouton/action cliquable (tout le toast ou une zone "Trader →").
 
-Chaque événement a :
-- un ticker cible,
-- un type et une sévérité (-8 % à +8 % environ, calibré par capitalisation),
-- une durée d’impact (choc immédiat + drift résiduel sur 2-8 pas),
-- une **narration** (FR/EN via `data/market_events_en.py`).
-
-Intégration dans `Market.step()` :
-- consommer un tirage rng déterministe par société à chaque pas (probabilité très faible, ~1-3 %/an par société),
-- appliquer le choc de cours dans le rendement du pas sous la forme `event_shock[i]`,
-- stocker `self.company_events_log[ticker]` pour l’UI et les graphes.
-
-### 1.2 Annotation des graphes
-Modifier `draw_series()` / `GraphRenderMixin` / `scene_company.py` pour afficher :
-- des **pastilles verticales** au-dessous du cours aux dates d’événements majeurs,
-- une **infobulle** au survol qui montre date, type, impact,
-- des **icônes** : 📈 contrat, ⚠ scandale, 🏛 régulation, 🛰 produit, etc.
-
-Cela répond directement au retour "les graphes ne montrent pas les événements".
-
-### 1.3 Tests
-- `test_market_events.py` : déterminisme, impact borné, narration présente.
-- `test_graph_annotations.py` : pastilles rendues sans crash, infobulle alignée.
+### 1.2 Feedback sonore contextuel
+- **Fichiers** : `ui/window_manager.py`, `apps/app_sheet.py`, `apps/app_trading.py`, `scenes/scene_terminal_time.py`, `apps/app_calculator.py`
+- **Travail** :
+  - `audio.play("snap")` sur ancrage/maximisation de fenêtre.
+  - `audio.play("message")` sur nouvel inbox.
+  - `audio.play("conditional")` sur ordre conditionnel exécuté.
+  - `audio.play("milestone")` sur bilan trimestriel.
+  - `audio.play("click")` sur export CSV, copier/coller, ajout watchlist.
 
 ---
 
-## Phase 2 — Fondamentaux dynamiques et modèle de valorisation (2-3 sprints)
+## Phase 2 — Performance du bureau (moyen terme)
 
-### 2.1 État fondamental par société
-Ajouter sur chaque société des séries temporelles calculées à chaque pas :
-- `revenue_growth` (YoY),
-- `operating_margin` et `net_margin` (déjà partiellement là, mais lissés),
-- `free_cash_flow`,
-- `net_debt / ebitda` dynamique,
-- `interest_coverage`,
-- `dividend_per_share` et `payout_ratio`.
+### 2.1 Skip update/draw sur fenêtres cachées ou minimisées
+- **Fichiers** : `ui/window_manager.py`, `apps/scene_host.py`
+- **Travail** :
+  - Ajouter `Window.is_visible()` et `Window.is_occluded()`.
+  - Dans `WindowManager.update()`, appeler `update` seulement sur les fenêtres visibles/non minimisées ; throttle à 500 ms pour les fenêtres partiellement cachées.
+  - Dans `WindowManager.draw()`, sauter le draw des fenêtres entièrement couvertes (sauf si c'est la fenêtre active/focus).
 
-### 2.2 Rating de crédit dynamique
-Le rating actuel est instantané. Le rendre **persistant** avec des transitions graduelles (S&P style) : une dégradation est un événement qui a son propre impact de cours et une news.
+### 2.2 Réduction du smoothscale dans SceneHostApp
+- **Fichiers** : `apps/scene_host.py`, `ui/window_manager.py`
+- **Travail** :
+  - Cacher la surface `scaled` dans `SceneHostApp` ; ne rescale que si `rect.size` a changé.
 
-### 2.3 Modèle de croissance endogène
-Les `drift` des sociétés deviennent fonction de :
-- leur secteur/région,
-- leur `revenue_growth` passé (momentum fondamental),
-- leur niveau d’endettement,
-- le régime macro.
-
-Cela crée des "cycles de vie" : les grosses capi tech restent growth, les utilities versent des dividendes stables, etc.
-
-### 2.4 Tests
-- `test_fundamentals.py` : cohérence comptable (mktcap ≈ price × shares, FCF positif sur moyenne, etc.).
-- `test_credit_rating.py` : transitions de rating cohérentes avec la dette.
+### 2.3 Cache des overlays plein-écran
+- **Fichiers** : `scenes/scene_desktop_widgets.py`, `scenes/scene_desktop_menus.py`
+- **Travail** :
+  - Ajouter `self._overlay_surf` et `self._overlay_size` ; recréer la surface SRCALPHA seulement si la taille change.
+  - Appliquer cette logique aux cartes modales (guide, bilan trimestre, nouveautés) et aux menus contextuels/recherche.
 
 ---
 
-## Phase 3 — Contagion, supply chain et concurrence (2 sprints)
+## Phase 3 — Sauvegarde de l'état UI (qualité de vie)
 
-### 3.1 Matrice de liens entre entreprises
-Générer de façon déterministe un graphe de relations `supply_links` :
-- client/fournisseur (même secteur, proximité de capitalisation),
-- concurrent direct (même secteur + même région),
-- holding/subsidiaire (cross-holdings dans les grandes capi).
-
-### 3.2 Contagion d’événements
-Quand une société subit un événement, les liens subissent un choc secondaire atténué :
-- fournisseur perd un gros contrat → client légèrement pénalisé,
-- OPA sur une société → concurrents du même secteur réévalués,
-- crise d’un fournisseur critique (semicon) → secteur auto/tech impacté.
-
-### 3.3 Part de marché dynamique
-Dans chaque secteur/région, introduire un "leader" et un "challenger" dont la croissance relative influe sur le drift relatif (effet gagnant-gagnant).
+### 3.1 Persister la disposition du bureau + classeur + watchlist
+- **Fichiers** : `core/ui_state.py` (nouveau), `ui/window_manager.py`, `core/pages.py`, `core/workbook.py`, `core/game_state.py`, `scenes/scene_saves.py`
+- **Travail** :
+  - Créer `core/ui_state.py` : charge/sauvegarde JSON `ui_state.json` dans `SAVE_DIR`.
+  - Sauvegarder les rectangles des fenêtres (`WindowManager.save_layout()`), l'état `PageManager` (onglets), le workbook actif (feuilles + formules), la watchlist.
+  - Restaurer au chargement de sauvegarde : `GameState` appelle `ui_state.load()` après `load()`.
+  - Ne pas écraser l'UI d'une sandbox / nouvelle partie.
 
 ---
 
-## Phase 4 — Forward, consensus et scénarios (2 sprints)
+## Phase 4 — Accessibilité et onboarding
 
-### 4.1 Consensus analystes
-Pour chaque société, maintenir un `consensus_eps` et un `consensus_growth` :
-- révisions à chaque pas en fonction des news/earnings,
-- écart consensus vs réalité future visible dans l’UI,
-- impact sur le cours via l’anticipation.
+### 4.1 Mode "pause sur événements majeurs"
+- **Fichiers** : `core/sim_clock.py`, `core/market.py`, `core/scenarios.py` (crises), `scenes/scene_desktop.py`, `scenes/scene_settings.py`
+- **Travail** :
+  - Ajouter un flag `auto_pause_on_events` dans `core/sim_clock.py` ou un setting dédié.
+  - Détecter les événements majeurs (crise, margin_call, earnings surprise, dilemme forcé) dans `GameState.advance_step`.
+  - Appeler `sim_clock.set_auto_paused(True)` + toaster explicatif si l'option est active.
+  - Option dans `scene_settings.py`.
 
-### 4.2 Projections de graphes
-Ajouter une option "scénario" dans l’atelier de graphes :
-- Bull / Base / Bear sur 1-3 mois,
-- calculée à partir de la volatilité récente + consensus + régime,
-- affichée en zone ombrée sur le graphe (fan chart).
-
-### 4.3 Tests
-- `test_consensus.py` : révisions déterministes, convergence vers la réalité en moyenne.
-- `test_fan_chart.py` : 3 scénarios cohérents avec le passé.
-
----
-
-## Phase 5 — Calibration avancée et validation statistique (1-2 sprints)
-
-### 5.1 Tests statistiques sur la simulation
-Ajouter des tests sur des échantillons de graines :
-- distribution des rendements (kurtosis > gaussienne),
-- corrélation sectorielle en période calme vs stress,
-- mean-reversion des marges,
-- calibration rendement/vol annuels plus fine.
-
-### 5.2 Paramètres ajustables
-Rendre certains paramètres de calibration (probabilité d’événements, force de contagion, amplitude des jumps) centralisés dans un fichier de config testable.
-
-### 5.3 Documentation
-Documenter dans `CLAUDE.md` le nouveau pipeline : facteurs → événements → fondamentaux → consensus → graphes annotés.
+### 4.2 Aide contextuelle F1 par app native
+- **Fichiers** : `apps/base.py`, `apps/app_trading.py`, `apps/app_sheet.py`, `apps/app_research.py`, `ui/shortcutspanel.py`
+- **Travail** :
+  - Ajouter `DesktopApp.help_shortcuts()` retournant une liste de `(raccourci, description)`.
+  - Implémenter pour Trading, Sheet, Research, Watchlist, Calculator.
+  - Overlay léger dans `WindowManager.handle_event` sur F1 : dessiner un panneau translucide avec les raccourcis de l'app focalisée.
 
 ---
 
-## Approche technique
+## Phase 5 — Qualité / robustesse
 
-1. **Déterminisme strict** : tout nouveau tirage rng est consommé à chaque pas, de manière fixe et indépendante du résultat (comme les sauts existants). Les tests le vérifient.
-2. **Modularité** : chaque phase est un module pur (`core/market_events.py`, `core/fundamentals.py`, `core/consensus.py`) qui s’intègre dans `Market.step()` via un appel helper.
-3. **Affichage** : les annotations et fan charts sont dessinés dans `ui/widgets.py` et réutilisés par `scene_graph_render.py` / `scene_company.py`.
-4. **Tests** : chaque phase a ses tests dédiés + la suite `pytest` globale reste verte.
+### 5.1 Tests headless des apps natives
+- **Fichiers** : `tests/test_app_trading.py`, `tests/test_app_sheet.py`, `tests/test_app_research.py`, `tests/test_app_watchlist.py`
+- **Travail** :
+  - Instancier `main.App()`, atterrir sur `desktop`, ouvrir chaque app via `DesktopScene._launch()`.
+  - Simuler des événements pygame (clic, clavier) et vérifier l'état (ex. ajout à la watchlist, ordre, formule).
+  - Vérifier le routage des événements et l'absence d'exceptions.
 
----
-
-## Livrables intermédiaires
-
-| Phase | Livrable visible pour le joueur |
-|-------|--------------------------------|
-| 1 | Graphes avec pastilles d’événements + news ciblées par entreprise |
-| 2 | Fiches entreprises plus riches (FCF, rating, dette dynamique) |
-| 3 | Corrélation visible entre entreprises liées dans les graphes compare/spread |
-| 4 | Fan chart Bull/Base/Bear dans l’atelier de graphes |
-| 5 | Calibration crédible documentée, tests statistiques |
+### 5.2 Unification des settings persistants
+- **Fichiers** : `core/settings_registry.py` (nouveau), `core/audio.py`, `core/anim_settings.py`, `core/display_settings.py`, `core/colorblind_settings.py`, `core/autosave_settings.py`, `scenes/scene_settings.py`
+- **Travail** :
+  - Créer `SettingsRegistry` avec API `register(key, default, type, path)` + `get/set`.
+  - Migrer les 5 modules de settings existants pour utiliser le registre (compatibilité ascendante des fichiers JSON).
+  - Nettoyer les helpers `_load/_save` dupliqués.
 
 ---
 
-## Priorisation proposée
+## Ordre de réalisation recommandé
 
-Commencer par la **Phase 1** : c’est le meilleur rapport impact/effort, elle répond au besoin immédiat ("graphes pas bons", "incidents avec impacts") et pose les fondations pour les phases suivantes.
+1. Phase 1.1 + 1.2 (impact immédiat, fichiers peu nombreux)
+2. Phase 2.1 + 2.3 (performance, petites surfaces)
+3. Phase 2.2 (SceneHostApp cache)
+4. Phase 3 (sauvegarde UI)
+5. Phase 4.1 (pause événements)
+6. Phase 4.2 (aide F1)
+7. Phase 5.1 (tests apps)
+8. Phase 5.2 (settings registry)
+
+Chaque phase fait l'objet d'un commit co-signé et d'un push séparé.
+
+---
+
+## Critères d'acceptation globaux
+
+- `python -m py_compile main.py main_cheat.py core/*.py ui/*.py scenes/*.py data/*.py apps/*.py` passe.
+- `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest -q` passe à 0 échec après chaque phase.
+- `tests/test_scene_smoke.py` passe.
+- Les nouvelles fonctionnalités sont couvertes par des tests quand c'est pertinent.

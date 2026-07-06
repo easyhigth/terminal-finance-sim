@@ -230,9 +230,6 @@ class TerminalTimeMixin:
                 f"(seuil {order['trigger']:,.2f}) — P&L réalisé {sign}{widgets.format_money(res['realized'], cur)}.",
                 f"  » {kind_label} triggered: {order['ticker']} sold at {res['price']:,.2f} "
                 f"(trigger {order['trigger']:,.2f}) — realized P&L {sign}{widgets.format_money(res['realized'], cur)}."))
-            self.app.notify(_L(f"{kind_label} déclenché : {order['ticker']}",
-                               f"{kind_label} triggered: {order['ticker']}"),
-                             "good" if res["realized"] >= 0 else "warn")
         mc = summary.get("margin_call")
         if mc:
             self._log(_L(
@@ -253,8 +250,6 @@ class TerminalTimeMixin:
                 f"(liquidation {widgets.format_money(mc['liquidated'], cur)})",
                 f"Margin call: leverage {mc['leverage_before']:.2f}x → {mc['leverage_after']:.2f}x "
                 f"(liquidated {widgets.format_money(mc['liquidated'], cur)})"))
-            self.app.notify(_L("Appel de marge : liquidation forcée","Margin call: forced liquidation"), "bad",
-                            action="book")
         elif p.portfolio:
             # alerte préventive : on prévient AVANT que la marge ne déclenche une
             # liquidation forcée (mc ci-dessus), pas seulement après coup.

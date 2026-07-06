@@ -11,7 +11,7 @@ sans dupliquer de logique.
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import audio, config
 from ui import fonts, style, widgets
 
 ROW_H = 22
@@ -96,17 +96,22 @@ class ResearchApp(DesktopApp):
             wl = self.app.gs.player.watchlist
             if self.sel in wl:
                 wl.remove(self.sel)
+                audio.play("click")
             elif len(wl) < 10:
                 wl.append(self.sel)
+                audio.play("click")
             return
         if self.desktop is None:
             return
         if kind == "trade":
             self.desktop.open_trading(self.sel)
+            audio.play("click")
         elif kind == "sheet":
             self.desktop.add_quote_to_sheet(self.sel)
+            audio.play("click")
         elif kind == "analyse":
             self.desktop._open_scene_window("company", ticker=self.sel)
+            audio.play("click")
 
     # --------------------------------------------------------------- draw
     def draw(self, surf, rect):

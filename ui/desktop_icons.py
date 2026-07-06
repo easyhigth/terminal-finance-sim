@@ -4,11 +4,12 @@ desktop_icons.py — Icônes vectorielles du bureau et de l'interface.
 Les emoji Unicode ne s'affichent pas de façon fiable selon les polices système.
 On dessine donc chaque icône en VECTORIEL avec pygame.draw.
 
-Style V3+ « tuiles OS polies » :
-- Fond carré arrondi coloré par fonction, avec contour subtil de même teinte.
-- Pictogramme blanc cassé (#FDFDFD), très simplifié, en traits nets.
-- Alignement systématique sur une grille de 28×28 px.
-- Toujours lisible en 24×24 et en 40×40.
+Style V3++ « tuiles OS haut contraste » :
+- Fonds colorés vifs et saturés, pour trancher sur le bureau sombre.
+- Pictogrammes blancs purs, traits épais (3–4 px).
+- Ombre portée noire légère sous chaque tuile pour un effet de relief.
+- Halo blanc subtil autour du pictogramme pour le faire "sauter".
+- Taille de tuile 30×30 px ; pictogrammes simplifiés et bien centrés.
 """
 import math
 
@@ -18,40 +19,41 @@ from ui import style
 
 
 # ---------------------------------------------------------------------------
-# Palette de fond (style dock flat, légèrement plus douce)
+# Palette de fond (couleurs vives, plus saturées)
 # ---------------------------------------------------------------------------
-C_RESEARCH  = (59, 130, 246)    # bleu
-C_TRADING   = (34, 197, 94)     # vert
-C_SHEET     = (22, 163, 74)     # vert foncé
-C_TERMINAL  = (55, 65, 81)      # gris foncé
-C_MA        = (147, 51, 234)    # violet
-C_RISK      = (249, 115, 22)    # orange
-C_QUANT     = (37, 99, 235)     # bleu royal
-C_PORTFOLIO = (29, 78, 216)     # bleu marine
-C_ADVISORY  = (234, 179, 8)     # jaune
-C_APPS      = (75, 85, 99)      # gris
-C_MENU      = (75, 85, 99)      # gris
-C_MARKET    = (16, 185, 129)    # émeraude
-C_BOOK      = (180, 83, 9)      # marron
-C_ALERT     = (239, 68, 68)     # rouge
-C_INBOX     = (59, 130, 246)    # bleu
-C_NEWS      = (107, 114, 128)   # gris
-C_MISSION   = (249, 115, 22)    # orange
-C_DEALS     = (147, 51, 234)    # violet
-C_DECIDE    = (107, 114, 128)   # gris
-C_EXAMCERT  = (234, 179, 8)     # jaune
-C_WALL      = (107, 114, 128)   # gris
-C_SHOP      = (249, 115, 22)    # orange
-C_EXPLORER  = (37, 99, 235)     # bleu
-C_GRAPH     = (16, 185, 129)    # émeraude
-C_SAVE      = (107, 114, 128)   # gris
-C_HELP      = (234, 179, 8)     # jaune
-C_CALC      = (75, 85, 99)      # gris
-C_STAR      = (234, 179, 8)     # jaune
-C_BELL      = (234, 179, 8)     # jaune
-C_GENERIC   = (107, 114, 128)   # gris
+C_RESEARCH  = (66, 153, 255)    # bleu vif
+C_TRADING   = (52, 211, 153)    # vert vif
+C_SHEET     = (34, 197, 94)     # vert
+C_TERMINAL  = (75, 85, 99)     # gris
+C_MA        = (168, 85, 247)    # violet vif
+C_RISK      = (251, 146, 60)    # orange vif
+C_QUANT     = (59, 130, 246)    # bleu royal
+C_PORTFOLIO = (37, 99, 235)     # bleu marine
+C_ADVISORY  = (250, 204, 21)    # jaune vif
+C_APPS      = (100, 116, 139)   # gris clair
+C_MENU      = (100, 116, 139)   # gris clair
+C_MARKET    = (45, 212, 191)    # émeraude vif
+C_BOOK      = (245, 158, 11)    # ambre/orange foncé
+C_ALERT     = (248, 113, 113)    # rouge vif
+C_INBOX     = (96, 165, 250)    # bleu clair
+C_NEWS      = (148, 163, 184)   # gris clair
+C_MISSION   = (251, 146, 60)    # orange vif
+C_DEALS     = (192, 132, 252)   # violet clair
+C_DECIDE    = (148, 163, 184)   # gris clair
+C_EXAMCERT  = (250, 204, 21)    # jaune vif
+C_WALL      = (148, 163, 184)   # gris clair
+C_SHOP      = (251, 146, 60)    # orange vif
+C_EXPLORER  = (59, 130, 246)    # bleu
+C_GRAPH     = (45, 212, 191)    # émeraude vif
+C_SAVE      = (148, 163, 184)   # gris clair
+C_HELP      = (250, 204, 21)    # jaune vif
+C_CALC      = (100, 116, 139)   # gris clair
+C_STAR      = (250, 204, 21)    # jaune vif
+C_BELL      = (250, 204, 21)    # jaune vif
+C_GENERIC   = (148, 163, 184)   # gris clair
 
-WHITE = (253, 253, 253)
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
 
 
 _ICON_BG = {
@@ -89,20 +91,23 @@ def _poly(surf, pts, col, width=0):
     pygame.draw.polygon(surf, col, pts, width)
 
 
-def _tile(surf, cx, cy, col, size=28, radius=7):
-    """Fond carré arrondi + contour subtil légèrement plus foncé."""
+def _shadow(surf, cx, cy, size=30, radius=7):
+    """Ombre portée noire semi-transparente sous la tuile."""
+    r = pygame.Rect(cx - size // 2 + 2, cy - size // 2 + 3, size, size)
+    shadow_surf = pygame.Surface((size + 4, size + 4), pygame.SRCALPHA)
+    pygame.draw.rect(shadow_surf, (0, 0, 0, 70), shadow_surf.get_rect(), border_radius=radius)
+    surf.blit(shadow_surf, (r.x - 2, r.y - 2))
+
+
+def _tile(surf, cx, cy, col, size=30, radius=7):
+    """Fond carré arrondi coloré + ombre + contour subtil."""
+    _shadow(surf, cx, cy, size, radius)
     r = pygame.Rect(cx - size // 2, cy - size // 2, size, size)
     _rect(surf, r, col, 0, radius=radius)
-    # contour subtil pour mieux détacher la tuile du fond
-    edge = tuple(max(0, int(c * 0.75)) for c in col)
+    # contour plus foncé pour sceller la tuile
+    edge = tuple(max(0, int(c * 0.6)) for c in col)
     _rect(surf, r, edge, 1, radius=radius)
     return r
-
-
-def _rounded_badge(surf, cx, cy, bg, symbol_fn, size=28):
-    """Helper commun : tuile + pictogramme blanc."""
-    _tile(surf, cx, cy, bg, size, size // 4)
-    symbol_fn(surf, cx, cy)
 
 
 # ---------------------------------------------------------------------------
@@ -110,26 +115,21 @@ def _rounded_badge(surf, cx, cy, bg, symbol_fn, size=28):
 # ---------------------------------------------------------------------------
 def _research(surf, cx, cy, col=WHITE):
     _tile(surf, cx, cy, C_RESEARCH)
-    _circle(surf, (cx - 2, cy - 2), 7, col, 3)
-    _line(surf, (cx + 5, cy + 5), (cx + 11, cy + 11), col, 4)
+    _circle(surf, (cx - 2, cy - 2), 8, col, 3)
+    _line(surf, (cx + 5, cy + 5), (cx + 12, cy + 12), col, 4)
 
 
 def _trading(surf, cx, cy, col=WHITE):
     _tile(surf, cx, cy, C_TRADING)
-    # ligne de tendance montante
-    pts = [(cx - 9, cy + 6), (cx - 2, cy - 1), (cx + 6, cy - 6)]
+    pts = [(cx - 10, cy + 6), (cx - 2, cy - 1), (cx + 6, cy - 6)]
     pygame.draw.lines(surf, col, False, pts, 4)
-    # tête de flèche
-    _poly(surf, [(cx + 6, cy - 10), (cx + 11, cy - 4), (cx + 5, cy - 4)], col, 0)
+    _poly(surf, [(cx + 6, cy - 10), (cx + 12, cy - 4), (cx + 5, cy - 4)], col, 0)
 
 
 def _sheet(surf, cx, cy, col=WHITE):
     _tile(surf, cx, cy, C_SHEET)
-    # feuille
     _rect(surf, pygame.Rect(cx - 8, cy - 9, 16, 18), col, 2, radius=2)
-    # barre de formule
     _rect(surf, pygame.Rect(cx - 6, cy - 6, 12, 3), col, 0, radius=1)
-    # grille
     _line(surf, (cx - 1, cy - 2), (cx - 1, cy + 9), col, 2)
     _line(surf, (cx - 6, cy + 3), (cx + 6, cy + 3), col, 2)
     _line(surf, (cx - 6, cy + 7), (cx + 6, cy + 7), col, 2)
@@ -137,37 +137,30 @@ def _sheet(surf, cx, cy, col=WHITE):
 
 def _terminal(surf, cx, cy, col=WHITE):
     _tile(surf, cx, cy, C_TERMINAL)
-    # prompt ">_"
-    _line(surf, (cx - 7, cy - 3), (cx - 3, cy + 2), col, 3)
+    _line(surf, (cx - 7, cy - 3), (cx - 2, cy + 2), col, 3)
     _line(surf, (cx - 7, cy + 2), (cx - 1, cy + 2), col, 3)
-    # curseur
     _rect(surf, pygame.Rect(cx + 2, cy - 1, 5, 3), col, 0, radius=1)
 
 
 def _ma(surf, cx, cy, col=WHITE):
     _tile(surf, cx, cy, C_MA)
-    # deux tours plus hautes
-    _rect(surf, pygame.Rect(cx - 10, cy - 6, 7, 13), col, 2, radius=2)
-    _rect(surf, pygame.Rect(cx + 3, cy - 9, 8, 16), col, 2, radius=2)
-    # flèche de fusion
-    _line(surf, (cx - 2, cy - 2), (cx + 4, cy - 2), col, 3)
-    _poly(surf, [(cx + 4, cy - 5), (cx + 9, cy - 2), (cx + 4, cy + 1)], col, 0)
+    _rect(surf, pygame.Rect(cx - 11, cy - 6, 7, 13), col, 2, radius=2)
+    _rect(surf, pygame.Rect(cx + 4, cy - 9, 8, 16), col, 2, radius=2)
+    _line(surf, (cx - 2, cy - 2), (cx + 5, cy - 2), col, 3)
+    _poly(surf, [(cx + 5, cy - 5), (cx + 10, cy - 2), (cx + 5, cy + 1)], col, 0)
 
 
 def _risk(surf, cx, cy, col=WHITE):
     _tile(surf, cx, cy, C_RISK)
-    # bouclier
     pts = [(cx, cy - 10), (cx + 10, cy - 5), (cx + 10, cy + 3),
            (cx, cy + 11), (cx - 10, cy + 3), (cx - 10, cy - 5)]
     _poly(surf, pts, col, 3)
-    # éclair / vol
     pts2 = [(cx - 4, cy + 2), (cx - 1, cy - 2), (cx + 1, cy + 1), (cx + 4, cy - 3)]
     pygame.draw.lines(surf, col, False, pts2, 3)
 
 
 def _quant(surf, cx, cy, col=WHITE):
     _tile(surf, cx, cy, C_QUANT)
-    # sigma stylisé et équilibré
     _line(surf, (cx - 7, cy - 5), (cx + 7, cy - 5), col, 3)
     _line(surf, (cx - 7, cy - 5), (cx, cy), col, 3)
     _line(surf, (cx, cy), (cx - 7, cy + 5), col, 3)
@@ -176,7 +169,6 @@ def _quant(surf, cx, cy, col=WHITE):
 
 def _portfolio(surf, cx, cy, col=WHITE):
     _tile(surf, cx, cy, C_PORTFOLIO)
-    # camembert
     _circle(surf, (cx, cy), 10, col, 3)
     _line(surf, (cx, cy), (cx, cy - 10), col, 3)
     _line(surf, (cx, cy), (cx + 8, cy + 5), col, 3)
@@ -185,11 +177,9 @@ def _portfolio(surf, cx, cy, col=WHITE):
 
 def _advisory(surf, cx, cy, col=WHITE):
     _tile(surf, cx, cy, C_ADVISORY)
-    # document
     _rect(surf, pygame.Rect(cx - 6, cy - 9, 11, 18), col, 2, radius=2)
     _line(surf, (cx - 4, cy - 4), (cx + 3, cy - 4), col, 2)
     _line(surf, (cx - 4, cy + 1), (cx + 3, cy + 1), col, 2)
-    # bulle de conseil
     _circle(surf, (cx + 6, cy - 4), 5, col, 2)
 
 
@@ -221,7 +211,7 @@ def _generic(surf, cx, cy, col=WHITE):
 # ---------------------------------------------------------------------------
 def _market(surf, cx, cy, col=WHITE):
     _tile(surf, cx, cy, C_MARKET)
-    pts = [(cx - 9, cy + 5), (cx - 3, cy + 1), (cx + 3, cy + 4), (cx + 8, cy - 5)]
+    pts = [(cx - 10, cy + 5), (cx - 3, cy + 1), (cx + 3, cy + 4), (cx + 8, cy - 5)]
     pygame.draw.lines(surf, col, False, pts, 3)
     _poly(surf, [(cx + 8, cy - 9), (cx + 12, cy - 2), (cx + 5, cy - 2)], col, 0)
 
@@ -246,7 +236,6 @@ def _inbox(surf, cx, cy, col=WHITE):
     _tile(surf, cx, cy, C_INBOX)
     r = pygame.Rect(cx - 9, cy - 5, 18, 11)
     _rect(surf, r, col, 2, radius=2)
-    # rabat en V
     pygame.draw.lines(surf, col, False,
                       [(r.x, r.y), (r.centerx, r.centery + 1), (r.right, r.y)], 2)
 
@@ -346,7 +335,6 @@ def _calc(surf, cx, cy, col=WHITE):
     _tile(surf, cx, cy, C_CALC)
     _rect(surf, pygame.Rect(cx - 6, cy - 9, 12, 18), col, 2, radius=2)
     _rect(surf, pygame.Rect(cx - 4, cy - 6, 8, 3), col, 0, radius=1)
-    # touches
     _rect(surf, pygame.Rect(cx - 4, cy - 1, 3, 3), col, 0, radius=1)
     _rect(surf, pygame.Rect(cx + 1, cy - 1, 3, 3), col, 0, radius=1)
     _rect(surf, pygame.Rect(cx - 4, cy + 4, 3, 3), col, 0, radius=1)
@@ -389,8 +377,8 @@ _ICONS = {
 def draw(surf, center, kind, color=WHITE):
     """Dessine l'icône `kind` centrée sur `center`.
 
-    Le fond est une tuile colorée fixe par type d'icône (style dock).
-    `color` teinte le pictogramme (blanc cassé par défaut).
+    Le fond est une tuile colorée vive, avec ombre portée.
+    `color` teinte le pictogramme (blanc pur par défaut).
     Si `kind` est inconnu, dessine une tuile générique sans planter.
     """
     _ICONS.get(kind, _generic)(surf, center[0], center[1], color)

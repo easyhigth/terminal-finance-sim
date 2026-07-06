@@ -211,23 +211,35 @@ class TerminalRenderMixin:
         y = config.TOPBAR_H + 4
         pygame.draw.rect(surf, (12, 14, 20), (0, y, config.SCREEN_WIDTH, config.TICKER_H))
         parts = []
+        sc = getattr(self.app, "sim_clock", None)
+        day = self.app.gs.player.day
         for name, *_ in self.market.index_defs:
-            v = self.market.index_value(name)
-            chg = self.market.index_change_pct(name)
+            hist = self.market.index_history(name, sc, day)
+            v = hist[-1] if hist else self.market.index_value(name)
+            chg = intraday.window_pct(hist)
             sign = "+" if chg >= 0 else ""
             parts.append(f"{name} {v:,.0f} {sign}{chg:.2f}%")
         # positions ouvertes du joueur, à la suite des indices (P&L latent %)
-        for h in pv_mod.holdings(self.app.gs.player, self.market):
-            pct = h.get("pnl_pct")
-            if pct is None:
+        for t, pos in self.app.gs.player.portfolio.items():
+            hist = self.market.history_of(t, sim_clock=sc, day=day)
+            price = hist[-1] if hist else self.market.price_of(t)
+            if price is None:
                 continue
-            tag = "▾" if h.get("short") else "▴"
-            sign = "+" if pct >= 0 else ""
-            parts.append(f"{tag}{h['ticker']} {h['price']:,.2f} {sign}{pct:.2f}%")
+            pnl_pct = ((price / pos["avg"] - 1) if pos["shares"] > 0
+                       else (pos["avg"] / price - 1)) * 100 if pos["avg"] else 0.0
+            tag = "▾" if pos["shares"] < 0 else "▴"
+            sign = "+" if pnl_pct >= 0 else ""
+            parts.append(f"{tag}{t} {price:,.2f} {sign}{pnl_pct:.2f}%")
         # bandeau FX permanent : taux de change + variation de chaque paire,
         # visibles en continu sans ouvrir le desk FX.
         for pair in fx_mod.PAIRS:
-            sp = fx_mod.spot(self.market, pair)
+            hist = fx_mod.history(self.market, pair, 80)
+            if hist:
+                series = intraday.append_live(self.market, sc, day, pair, hist,
+                                               vol_mult=max(0.4, min(2.5, fx_mod.pair_vol(pair) / 0.08)))
+                sp = series[-1]
+            else:
+                sp = fx_mod.spot(self.market, pair)
             if sp is None:
                 continue
             chg = fx_mod.change_pct(self.market, pair, 1)

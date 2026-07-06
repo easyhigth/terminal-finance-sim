@@ -87,6 +87,7 @@ class FinancialsScene(Scene):
         self._inc_rect = None
         self._bal_rect = None
         self._tooltip = None
+        self._flash = widgets.TickFlash()
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -285,10 +286,15 @@ class FinancialsScene(Scene):
         if not mt:
             return
         f2 = lambda v, s="", d=2: ("n.m." if v is None else f"{v:.{d}f}{s}")
+        m = self.app.market
+        live_price = (m.price_of(self.ticker)
+                      if m and hasattr(m, "price_of") else mt.get("price"))
+        live_price = live_price if live_price is not None else mt["price"]
+        price_col = self._flash.tick(self.ticker, live_price, config.COL_UP, config.COL_DOWN, config.COL_WHITE)
         chg = mt["change_pct"]
         ccol = config.COL_UP if chg >= 0 else config.COL_DOWN
-        widgets.draw_text(surf, f"{mt['price']:,.2f} {self.cur}", (inner.x, inner.y),
-                          fonts.head(bold=True), config.COL_WHITE)
+        widgets.draw_text(surf, f"{live_price:,.2f} {self.cur}", (inner.x, inner.y),
+                          fonts.head(bold=True), price_col)
         widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.1f}% (1 an)",
                           (inner.right, inner.y), fonts.small(bold=True), ccol, align="right")
         rows = [
@@ -384,7 +390,12 @@ class FinancialsScene(Scene):
         cinner = widgets.draw_panel(surf, rect, "Cours — 5 ans & attribution", self.accent)
         chart_h = cinner.h - 56     # réserve fixe en bas pour la ligne d'attribution
         plot_rect = pygame.Rect(cinner.x, cinner.y, cinner.w, chart_h)
-        hist = self.app.market.history_of(self.ticker) if self.app.market else []
+        m = self.app.market
+        if m and hasattr(m, "history_of"):
+            hist = m.history_of(self.ticker, sim_clock=getattr(self.app, "sim_clock", None),
+                                day=self.app.gs.player.day)
+        else:
+            hist = []
         if len(hist) >= 2:
             plot = pygame.Rect(plot_rect.x, plot_rect.y + 4, plot_rect.w, plot_rect.h - 34)
             col = config.COL_UP if hist[-1] >= hist[0] else config.COL_DOWN

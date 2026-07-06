@@ -40,6 +40,8 @@ class FXScene(Scene):
         self.close_rects = {}
         self._all_rects = {}
         self.focus = "spot"
+        self._flash = widgets.TickFlash()
+        self._t = 0.0
 
     def _can(self):
         return unlocks.unlocked(self.app.gs.player, "fx")
@@ -191,6 +193,7 @@ class FXScene(Scene):
                             y_fmt=lambda v: f"{v:.4f}", show_pct=True)
 
     def update(self, dt):
+        self._t += dt
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp, dt)
         self.tuto_btn.update(mp, dt)
@@ -231,12 +234,13 @@ class FXScene(Scene):
             sp = FX.spot(m, pair)
             chg = FX.change_pct(m, pair, 1)
             ccol = config.COL_UP if chg >= 0 else config.COL_DOWN
+            spot_col = self._flash.tick(("fx", pair), sp, config.COL_UP, config.COL_DOWN, config.COL_TEXT)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect, border_radius=4)
             pygame.draw.rect(surf, config.COL_CYAN if sel else config.COL_BORDER, rect, 1, border_radius=4)
             widgets.draw_text(surf, pair, (rect.x + 6, rect.y + 3), fonts.tiny(bold=True),
                               config.COL_CYAN if sel else config.COL_TEXT)
             widgets.draw_text(surf, f"{sp:.4f}" if sp else "—", (rect.x + 6, rect.y + 20),
-                              fonts.tiny(bold=True), config.COL_TEXT)
+                              fonts.tiny(bold=True), spot_col)
             widgets.draw_text(surf, f"{chg:+.2f}%", (rect.right - 6, rect.y + 20),
                               fonts.tiny(bold=True), ccol, align="right")
             self.pair_rects[i] = rect
@@ -353,12 +357,17 @@ class FXScene(Scene):
         else:
             for h in spot_hold:
                 col = config.COL_UP if h["pnl"] >= 0 else config.COL_DOWN
+                spot_col = self._flash.tick(("fx_pos", h["pair"], h["entry_rate"], h["notional"]), h["spot"],
+                                            config.COL_UP, config.COL_DOWN, config.COL_TEXT)
                 widgets.draw_text(surf, f"{h['direction'].upper()} {h['pair']} · "
                                         f"{widgets.format_money(h['notional'], cur)}",
                                   (pinner.x, yy), fonts.small(bold=True), config.COL_TEXT)
-                widgets.draw_text(surf, f"entrée {h['entry_rate']:.4f} → {h['spot']:.4f} · "
-                                        f"P&L {widgets.format_money(h['pnl'], cur)}",
-                                  (pinner.x, yy + 18), fonts.tiny(), col)
+                widgets.draw_text(surf, f"entrée {h['entry_rate']:.4f} → ",
+                                  (pinner.x, yy + 18), fonts.tiny(), config.COL_TEXT_DIM)
+                widgets.draw_text(surf, f"{h['spot']:.4f}",
+                                  (pinner.x + 172, yy + 18), fonts.tiny(), spot_col)
+                widgets.draw_text(surf, f" · P&L {widgets.format_money(h['pnl'], cur)}",
+                                  (pinner.x + 240, yy + 18), fonts.tiny(), col)
                 close_rect = pygame.Rect(pinner.right - 90, yy, 86, 30)
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, close_rect, border_radius=4)
                 pygame.draw.rect(surf, config.COL_DOWN, close_rect, 1, border_radius=4)

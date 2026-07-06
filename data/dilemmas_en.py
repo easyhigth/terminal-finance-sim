@@ -172,4 +172,115 @@ DILEMMAS_EN = {
              "outcome": "Easy money, but you're now complicit. Very risky."},
         ],
     },
+    "greenwashing": {
+        "title": "Tempting greenwashing",
+        "scenario": "A client wants to label their fund 'ESG' while 40% of the portfolio is "
+                    "invested in fossil fuels. Labeling it would bring in a lot of money.",
+        "options": [
+            {"label": "Refuse the label",
+             "outcome": "You refuse. The client is disappointed but your integrity is intact."},
+            {"label": "Label it anyway",
+             "outcome": "The money comes in, but if word gets out, the scandal will be huge."},
+        ],
+    },
+    "short_squeeze": {
+        "title": "Short squeeze ahead",
+        "scenario": "You hold a short position on a stock that is up 30% pre-market. Covering "
+                    "now limits the damage, but if it falls back...",
+        "options": [
+            {"label": "Cover immediately",
+             "outcome": "You cut your loss. The stock kept rising."},
+            {"label": "Hold the short",
+             "outcome": "You held on. The stock eventually fell back down."},
+        ],
+    },
+    "crypto_dilemma": {
+        "title": "Crypto bet",
+        "scenario": "A client wants to invest 30% of their portfolio in an unregulated crypto "
+                    "token. Potential returns are huge, but so is the risk.",
+        "options": [
+            {"label": "Refuse outright",
+             "outcome": "The client complains, but you honored your duty of advice."},
+            {"label": "Accept with a warning",
+             "outcome": "The client signs a waiver. If it goes wrong, they will hold you responsible."},
+        ],
+    },
+    "layoff_decision": {
+        "title": "Restructuring plan",
+        "scenario": "The board demands a 15% cost cut. You must choose between a layoff plan "
+                    "or a bonus cut.",
+        "options": [
+            {"label": "Lay off 10% of staff",
+             "outcome": "Costs fall, the board is happy, but morale collapses."},
+            {"label": "Cut bonuses by 30%",
+             "outcome": "Teams grumble, but no one loses their job."},
+        ],
+    },
+    "data_leak": {
+        "title": "Customer data leak",
+        "scenario": "Your intern accidentally emailed a file of 500 clients to an external "
+                    "address. GDPR requires notification within 72 hours.",
+        "options": [
+            {"label": "Notify clients and regulator",
+             "outcome": "Full transparency. Clients appreciate it, and so does the regulator."},
+            {"label": "Bury the incident",
+             "outcome": "No one knows... for now."},
+        ],
+    },
+    "activist_investor": {
+        "title": "Activist investor",
+        "scenario": "An activist fund has built a 5% stake in one of your clients and demands a "
+                    "spin-off of the most profitable division.",
+        "options": [
+            {"label": "Defend the status quo",
+             "outcome": "You help the client fend off the activist."},
+            {"label": "Advise the spin-off",
+             "outcome": "The spin-off creates short-term value, but the client loses its crown jewel."},
+        ],
+    },
+    "sanctions_breach": {
+        "title": "Sanctions breach",
+        "scenario": "A client wants to transfer funds to a sanctioned country via a shell "
+                    "structure. It is illegal but very well paid.",
+        "options": [
+            {"label": "Refuse and report",
+             "outcome": "You report it to the compliance officer. You are clean."},
+            {"label": "Look the other way",
+             "outcome": "The money hits your account. But if the Treasury discovers the scheme, "
+                         "it's prison."},
+        ],
+    },
+    "ai_trading": {
+        "title": "In-house algo",
+        "scenario": "Your Quant team developed an algorithm that outperforms the market by 8% "
+                    "per year in backtest. Do you deploy it with firm capital?",
+        "options": [
+            {"label": "Deploy gradually",
+             "outcome": "The algo proves itself in live conditions."},
+            {"label": "Wait 6 more months of testing",
+             "outcome": "Prudent. The algo had a hidden bug that would have cost dearly."},
+        ],
+    },
+    "client_bankruptcy": {
+        "title": "Client near bankruptcy",
+        "scenario": "Your oldest client is on the brink of bankruptcy. You can help hide losses "
+                    "while finding a buyer, or cut ties.",
+        "options": [
+            {"label": "Help restructure",
+             "outcome": "The client survives, finds a buyer, and you remain their hero."},
+            {"label": "Cut ties",
+             "outcome": "You save your own book but lose a 15-year client."},
+        ],
+    },
+    "bonus_allocation": {
+        "title": "Bonus allocation",
+        "scenario": "It's bonus season. You have 500K to split among 5 teams. M&A and Trading "
+                    "both claim the lion's share.",
+        "options": [
+            {"label": "Split equally",
+             "outcome": "Everyone is happy. Team cohesion improves."},
+            {"label": "Favor top performers",
+             "outcome": "The stars are thrilled, but the other teams are already looking for new jobs."},
+        ],
+    },
 }

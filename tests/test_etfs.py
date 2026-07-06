@@ -61,7 +61,10 @@ def test_sector_etf_tracks_sector(market):
     vérifions que la NAV bouge dans le bon sens au pas suivant."""
     from core.market import Crisis
     before = etfs.price(market, "XLK")
-    market.add_crisis(Crisis("Choc Tech", steps=1, sectors={"Tech": -0.05}))
+    # Choc sectoriel fort : le bruit idiosyncratique/mondial d'un seul pas peut
+    # dominer un petit choc (-5 %), donc on utilise -20 % pour garantir que la
+    # composante sectorielle l'emporte et que l'ETF Tech baisse effectivement.
+    market.add_crisis(Crisis("Choc Tech", steps=1, sectors={"Tech": -0.20}))
     market.step()
     after = etfs.price(market, "XLK")
     assert after < before, "un choc Tech négatif doit faire baisser l'ETF Tech"

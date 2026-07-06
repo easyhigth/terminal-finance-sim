@@ -44,30 +44,30 @@ def _L(fr, en):
 EVENT_MODELS = [
     # ------------------------------- favorables -------------------------------
     {"id": "product_hit", "kind": "good", "category": "operational",
-     "icon": "📈", "base_prob": 0.0040, "magnitude": 0.55, "decay_steps": 5,
+     "icon": "▲", "base_prob": 0.0040, "magnitude": 0.55, "decay_steps": 5,
      "title": ("Produit star lancé", "Breakout product launch"),
      "desc": ("Le dernier produit dépasse les pré-commandes ; les analystes"
               " relèvent leurs estimations.",
               "The latest product beats pre-orders; analysts raise estimates.")},
     {"id": "contract_win", "kind": "good", "category": "operational",
-     "icon": "🤝", "base_prob": 0.0045, "magnitude": 0.42, "decay_steps": 4,
+     "icon": "@", "base_prob": 0.0045, "magnitude": 0.42, "decay_steps": 4,
      "title": ("Gros contrat remporté", "Major contract won"),
      "desc": ("Un contrat stratégique de plusieurs années est signé avec un"
               " client de poids.",
               "A multi-year strategic contract is signed with a major client.")},
     {"id": "buyback", "kind": "good", "category": "corporate",
-     "icon": "💰", "base_prob": 0.0025, "magnitude": 0.30, "decay_steps": 3,
+     "icon": "$", "base_prob": 0.0025, "magnitude": 0.30, "decay_steps": 3,
      "title": ("Programme de rachat d'actions", "Share buyback announced"),
      "desc": ("Le conseil annonce un rachat d'actions qui soutiendra le cours.",
               "The board announces a share buyback to support the stock.")},
     {"id": "guidance_raise", "kind": "good", "category": "corporate",
-     "icon": "⬆", "base_prob": 0.0030, "magnitude": 0.38, "decay_steps": 4,
+     "icon": "↑", "base_prob": 0.0030, "magnitude": 0.38, "decay_steps": 4,
      "title": ("Guidance relevée", "Guidance raised"),
      "desc": ("La direction relève ses prévisions annuelles de chiffre"
               " d'affaires et de marges.",
               "Management raises full-year revenue and margin guidance.")},
     {"id": "upgrade", "kind": "good", "category": "external",
-     "icon": "★", "base_prob": 0.0035, "magnitude": 0.28, "decay_steps": 3,
+     "icon": "*", "base_prob": 0.0035, "magnitude": 0.28, "decay_steps": 3,
      "title": ("Upgrade d'analyste", "Analyst upgrade"),
      "desc": ("Un grand bureau d'analyse relève sa recommandation et son"
               " objectif de cours.",
@@ -75,38 +75,38 @@ EVENT_MODELS = [
 
     # ------------------------------ défavorables ------------------------------
     {"id": "recall", "kind": "bad", "category": "operational",
-     "icon": "⚠", "base_prob": 0.0035, "magnitude": -0.50, "decay_steps": 6,
+     "icon": "!", "base_prob": 0.0035, "magnitude": -0.50, "decay_steps": 6,
      "title": ("Rappel de produit", "Product recall"),
      "desc": ("Un défaut de fabrication oblige un rappel massif et risque"
               " d'alourdir les provisions.",
               "A manufacturing defect triggers a large recall and may increase"
               " provisions.")},
     {"id": "contract_loss", "kind": "bad", "category": "operational",
-     "icon": "✕", "base_prob": 0.0038, "magnitude": -0.40, "decay_steps": 5,
+     "icon": "X", "base_prob": 0.0038, "magnitude": -0.40, "decay_steps": 5,
      "title": ("Perte d'un client majeur", "Major client lost"),
      "desc": ("Le plus gros client annonce qu'il ne renouvellera pas son"
               " contrat l'année prochaine.",
               "The largest client announces it will not renew next year.")},
     {"id": "scandal", "kind": "bad", "category": "corporate",
-     "icon": "🏛", "base_prob": 0.0020, "magnitude": -0.70, "decay_steps": 8,
+     "icon": "SC", "base_prob": 0.0020, "magnitude": -0.70, "decay_steps": 8,
      "title": ("Scandale comptable", "Accounting scandal"),
      "desc": ("Des irrégularités comptables sont révélées ; le régulateur"
               " ouvre une enquête.",
               "Accounting irregularities are revealed; the regulator opens an"
               " investigation.")},
     {"id": "ceo_exit", "kind": "bad", "category": "corporate",
-     "icon": "👤", "base_prob": 0.0028, "magnitude": -0.35, "decay_steps": 4,
+     "icon": "CEO", "base_prob": 0.0028, "magnitude": -0.35, "decay_steps": 4,
      "title": ("Départ surprise du CEO", "Surprise CEO departure"),
      "desc": ("Le CEO démissionne soudainement, suscitant des interrogations"
               " sur la stratégie.",
               "The CEO resigns abruptly, raising questions on strategy.")},
     {"id": "fine", "kind": "bad", "category": "external",
-     "icon": "⚖", "base_prob": 0.0025, "magnitude": -0.32, "decay_steps": 3,
+     "icon": "RG", "base_prob": 0.0025, "magnitude": -0.32, "decay_steps": 3,
      "title": ("Amende régulatoire", "Regulatory fine"),
      "desc": ("Une amende record pour non-conformité vient d'être infligée.",
               "A record fine for non-compliance has just been imposed.")},
     {"id": "downgrade", "kind": "bad", "category": "external",
-     "icon": "⬇", "base_prob": 0.0035, "magnitude": -0.28, "decay_steps": 3,
+     "icon": "↓", "base_prob": 0.0035, "magnitude": -0.28, "decay_steps": 3,
      "title": ("Downgrade d'analyste", "Analyst downgrade"),
      "desc": ("Un bureau d'analyse abaisse sa recommandation à cause des"
               " perspectives de croissance.",
@@ -114,12 +114,12 @@ EVENT_MODELS = [
 
     # -------------------------------- neutres ---------------------------------
     {"id": "esg", "kind": "info", "category": "external",
-     "icon": "🌿", "base_prob": 0.0020, "magnitude": 0.12, "decay_steps": 2,
+     "icon": "ESG", "base_prob": 0.0020, "magnitude": 0.12, "decay_steps": 2,
      "title": ("Engagement ESG", "ESG commitment"),
      "desc": ("La société annonce un plan de neutralité carbone plus ambitieux.",
               "The firm announces a more ambitious net-zero plan.")},
     {"id": "cyber", "kind": "bad", "category": "operational",
-     "icon": "🔒", "base_prob": 0.0030, "magnitude": -0.28, "decay_steps": 4,
+     "icon": "CY", "base_prob": 0.0030, "magnitude": -0.28, "decay_steps": 4,
      "title": ("Cyberattaque", "Cyberattack"),
      "desc": ("Une intrusion informatique perturbe temporairement les"
               " opérations et menace des données.",

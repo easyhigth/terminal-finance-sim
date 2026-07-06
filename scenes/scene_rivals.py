@@ -166,9 +166,9 @@ class RivalsScene(Scene):
             widgets.draw_badge(surf, rdata.get("track", "?"), (rect.x + 70, rect.y + 54), tcol)
             style = rdata.get("style", "")
             if style:
-                style_label = {"aggressive": "🔥 Agressif", "conservative": "🛡 Prudent",
-                               "momentum": "📈 Momentum", "value": "💎 Value",
-                               "balanced": "⚖ Équilibré"}.get(style, "")
+                style_label = {"aggressive": "Agressif", "conservative": "Prudent",
+                               "momentum": "Momentum", "value": "Value",
+                               "balanced": "Équilibré"}.get(style, "")
                 widgets.draw_text(surf, style_label, (rect.x + 160, rect.y + 54),
                                   fonts.tiny(), config.COL_TEXT_DIM)
             mood = _MOOD_COL.get(rdata.get("mood", "flat"), config.COL_TEXT_DIM)

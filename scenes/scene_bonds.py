@@ -43,6 +43,7 @@ class BondsScene(Scene, PopupMixin):
         self._sort_rects = {}
         self.kind_filter = kwargs.get("kind_filter")
         self._kind_rects = {}
+        self._flash = widgets.TickFlash()
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.gov_btn = widgets.Button((220, config.SCREEN_HEIGHT - 50, 160, 42),
@@ -316,7 +317,8 @@ class BondsScene(Scene, PopupMixin):
                 widgets.draw_text(surf, f"{q['coupon']*100:.1f}", (cols["coupon"], y), fonts.small(), config.COL_TEXT)
                 widgets.draw_text(surf, f"{q['years']}a", (cols["mat"], y), fonts.small(), config.COL_TEXT)
                 widgets.draw_text(surf, f"{q['ytm']*100:.2f}%", (cols["ytm"], y), fonts.small(), config.COL_CYAN)
-                widgets.draw_text(surf, f"{q['price']:.1f}", (cols["price"], y), fonts.small(bold=True), config.COL_WHITE)
+                price_col = self._flash.tick(q["id"], q["price"], config.COL_UP, config.COL_DOWN, config.COL_WHITE)
+                widgets.draw_text(surf, f"{q['price']:.1f}", (cols["price"], y), fonts.small(bold=True), price_col)
                 if self._can_trade():
                     price_rect = pygame.Rect(cols["price"] - 2, y - 2, 70, ROW_H - 4)
                     if price_rect.collidepoint(mp):

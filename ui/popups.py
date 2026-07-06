@@ -154,6 +154,7 @@ class CompanyPopup(DataWindow):
         self._sector_rect = None
         self._region_rect = None
         self._type_rect = None
+        self._flash = widgets.TickFlash()
         mt = market.metrics(self.ticker) if market else None
         if accent is None:
             accent = config.CONTINENTS.get(mt["region"], {}).get("color", config.COL_AMBER) \
@@ -202,8 +203,9 @@ class CompanyPopup(DataWindow):
         y = content.y
         self._name_rect = pygame.Rect(content.x, y, 90, 20)
         widgets.draw_text(surf, mt["ticker"], (content.x, y), fonts.body(bold=True), config.COL_AMBER)
+        price_col = self._flash.tick(self.ticker, mt["price"], config.COL_UP, config.COL_DOWN, config.COL_WHITE)
         widgets.draw_text(surf, f"{mt['price']:,.2f} {cur}", (content.right, y),
-                          fonts.body(bold=True), config.COL_WHITE, align="right")
+                          fonts.body(bold=True), price_col, align="right")
         y += 22
         chg = mt["change_pct"]
         chg_col = config.COL_UP if chg >= 0 else config.COL_DOWN
@@ -318,6 +320,7 @@ class CommodityPopup(DataWindow):
         self._name_rect = None
         self._sector_rect = None
         self._type_rect = None
+        self._flash = widgets.TickFlash()
         q = commodities_mod.quote(market, self.cid) if market else None
         accent = accent or config.COL_WARN
         title = f"{self.cid} — {q['name']}" if q else self.cid
@@ -354,8 +357,9 @@ class CommodityPopup(DataWindow):
         y = content.y
         self._name_rect = pygame.Rect(content.x, y, 90, 20)
         widgets.draw_text(surf, self.cid, (content.x, y), fonts.body(bold=True), config.COL_AMBER)
+        price_col = self._flash.tick(self.cid, q["spot"], config.COL_UP, config.COL_DOWN, config.COL_WHITE)
         widgets.draw_text(surf, f"{q['spot']:,.2f}", (content.right, y),
-                          fonts.body(bold=True), config.COL_WHITE, align="right")
+                          fonts.body(bold=True), price_col, align="right")
         y += 22
         widgets.draw_text(surf, widgets.fit_text(q["name"], fonts.small(), content.w - 90),
                           (content.x, y), fonts.small(), config.COL_TEXT)
@@ -407,6 +411,7 @@ class CryptoPopup(DataWindow):
         self._kind_rects = {}
         self._name_rect = None
         self._type_rect = None
+        self._flash = widgets.TickFlash()
         q = crypto_mod.quote(market, self.cid) if market else None
         accent = accent or (config.COL_CYAN if (q and (q["stable"] or q["cbdc"])) else config.COL_DOWN)
         title = f"{self.cid} — {q['name']}" if q else self.cid
@@ -438,8 +443,9 @@ class CryptoPopup(DataWindow):
         y = content.y
         self._name_rect = pygame.Rect(content.x, y, 90, 20)
         widgets.draw_text(surf, self.cid, (content.x, y), fonts.body(bold=True), config.COL_AMBER)
+        price_col = self._flash.tick(self.cid, q["spot"], config.COL_UP, config.COL_DOWN, config.COL_WHITE)
         widgets.draw_text(surf, f"{q['spot']:,.4f}" if q["spot"] < 10 else f"{q['spot']:,.2f}",
-                          (content.right, y), fonts.body(bold=True), config.COL_WHITE, align="right")
+                          (content.right, y), fonts.body(bold=True), price_col, align="right")
         y += 22
         widgets.draw_text(surf, widgets.fit_text(q["name"], fonts.small(), content.w - 90),
                           (content.x, y), fonts.small(), config.COL_TEXT)
@@ -493,6 +499,7 @@ class BondPopup(DataWindow):
         self._sector_rect = None
         self._region_rect = None
         self._type_rect = None
+        self._flash = widgets.TickFlash()
         q = bonds_mod.quote(market, bond_id) if market else None
         accent = accent or config.COL_CYAN
         title = q["name"] if q else bond_id
@@ -533,8 +540,9 @@ class BondPopup(DataWindow):
         self._name_rect = pygame.Rect(content.x, y, content.w - 90, 20)
         widgets.draw_text(surf, widgets.fit_text(q["name"], fonts.body(bold=True), content.w - 90),
                           (content.x, y), fonts.body(bold=True), config.COL_AMBER)
+        price_col = self._flash.tick(self.bond_id, q["price"], config.COL_UP, config.COL_DOWN, config.COL_WHITE)
         widgets.draw_text(surf, f"{q['price']:.1f}", (content.right, y),
-                          fonts.body(bold=True), config.COL_WHITE, align="right")
+                          fonts.body(bold=True), price_col, align="right")
         y += 22
         widgets.draw_text(surf, widgets.fit_text(q["issuer"], fonts.small(), content.w - 90),
                           (content.x, y), fonts.small(), config.COL_TEXT)
@@ -589,6 +597,7 @@ class ETFPopup(DataWindow):
         self._name_rect = None
         self._sector_rect = None
         self._type_rect = None
+        self._flash = widgets.TickFlash()
         q = etfs_mod.quote(market, self.eid) if market else None
         accent = accent or (config.COL_DOWN if (q and q["leveraged"]) else config.COL_PRESTIGE)
         title = f"{self.eid} — {q['name']}" if q else self.eid
@@ -625,8 +634,9 @@ class ETFPopup(DataWindow):
         y = content.y
         self._name_rect = pygame.Rect(content.x, y, 90, 20)
         widgets.draw_text(surf, self.eid, (content.x, y), fonts.body(bold=True), config.COL_AMBER)
+        price_col = self._flash.tick(self.eid, q["price"], config.COL_UP, config.COL_DOWN, config.COL_WHITE)
         widgets.draw_text(surf, f"{q['price']:,.2f}", (content.right, y),
-                          fonts.body(bold=True), config.COL_WHITE, align="right")
+                          fonts.body(bold=True), price_col, align="right")
         y += 22
         chg = q["change_pct"]
         chg_col = config.COL_UP if chg >= 0 else config.COL_DOWN

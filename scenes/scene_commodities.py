@@ -45,6 +45,7 @@ class CommoditiesScene(Scene, PopupMixin):
         self.sort_key = "name"
         self.sort_dir = 1
         self._sort_rects = {}
+        self._flash = widgets.TickFlash()
         self.search_box = widgets.SearchBox((40, 94, 260, 24), "Tapez pour rechercher…")
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
@@ -301,8 +302,10 @@ class CommoditiesScene(Scene, PopupMixin):
                     self._tooltip = (q["name"], mp)
                 widgets.draw_text(surf, fitted_name,
                                   (cols[0][1], y), fonts.small(bold=True), config.COL_TEXT)
-                widgets.draw_text(surf, f"{q['spot']:,.2f}".replace(",", " "), (cols[1][1], y), fonts.small(), config.COL_WHITE)
-                widgets.draw_text(surf, f"{q['front']:,.2f}".replace(",", " "), (cols[2][1], y), fonts.small(bold=True), config.COL_WHITE)
+                spot_col = self._flash.tick((q["id"], "spot"), q["spot"], config.COL_UP, config.COL_DOWN, config.COL_WHITE)
+                widgets.draw_text(surf, f"{q['spot']:,.2f}".replace(",", " "), (cols[1][1], y), fonts.small(), spot_col)
+                front_col = self._flash.tick((q["id"], "front"), q["front"], config.COL_UP, config.COL_DOWN, config.COL_WHITE)
+                widgets.draw_text(surf, f"{q['front']:,.2f}".replace(",", " "), (cols[2][1], y), fonts.small(bold=True), front_col)
                 scol = (config.COL_DOWN if q["structure"] == "Contango" else
                         config.COL_UP if q["structure"] == "Backwardation" else config.COL_TEXT_DIM)
                 widgets.draw_text(surf, q["structure"], (cols[3][1], y), fonts.small(bold=True), scol)

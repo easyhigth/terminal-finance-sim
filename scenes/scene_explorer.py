@@ -28,7 +28,7 @@ import pygame
 
 from core import bonds as B
 from core import commodities as C
-from core import config
+from core import config, intraday
 from core import crypto as CRY
 from core import etfs as ETF
 from core import fx as FX
@@ -83,6 +83,8 @@ class MarketExplorerScene(Scene, PopupMixin):
         self._sub_rects = {}
         self._sort_rects = {}
         self._search_clear_rect = None
+        # flash vert/rouge des cours en direct
+        self._flash = widgets.TickFlash()
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.add_btn = widgets.Button((220, config.SCREEN_HEIGHT - 50, 220, 42),
@@ -164,6 +166,64 @@ class MarketExplorerScene(Scene, PopupMixin):
                 "yield_pct": (rep["ytm"] * 100.0) if rep else None, "change_pct": None,
             })
         return rows
+
+    # --------------------------------------------------------------- live data
+    def _live_quote(self, r):
+        """Valeurs live (prix, valeur, rendement, var%) pour une ligne de
+        l'explorateur. Les actions sont animées via le chemin canonique
+        intraday ; les autres classes utilisent leur quote officielle
+        rafraîchie à chaque pas. Le tri reste figé sur `self.rows`."""
+        m = self.market
+        kind, key = r["kind"], r["key"]
+        price = r["price"]
+        value = r["value"]
+        yield_pct = r["yield_pct"]
+        change_pct = r["change_pct"]
+
+        if kind == "Action":
+            i = m.ticker_idx.get(key)
+            if i is not None:
+                region = m.companies[i].get("region")
+                vol_mult = intraday.vol_mult_for_sigma(float(m.sigma[i]))
+                hist = m.history_of(key, 2)
+                target = m.next_price_of(key)
+                day = self.app.gs.player.day
+                live = intraday.live_point(m, self.app.sim_clock, day, key, hist,
+                                            region=region, vol_mult=vol_mult, target=target)
+                if live is not None:
+                    price = live
+                mt = m.metrics(key)
+                if mt:
+                    value = price * mt["shares"]
+                    change_pct = mt["change_pct"]
+        elif kind == "ETF":
+            q = ETF.quote(m, key)
+            if q:
+                price = q["price"]
+                value = q["price"]
+                yield_pct = q["yield"] * 100.0
+                change_pct = q["change_pct"]
+        elif kind == "Obligation":
+            q = B.quote(m, key)
+            if q:
+                price = q["price"]
+                value = q["price"]
+                yield_pct = q["ytm"] * 100.0
+        elif kind == "Commodity":
+            q = C.quote(m, key)
+            if q:
+                price = q["front"]
+                value = q["front"] * C.MULTIPLIER
+                yield_pct = q["roll_yield"] * 100.0
+        elif kind == "Crypto":
+            q = CRY.quote(m, key)
+            if q:
+                price = q["spot"]
+                value = q["spot"]
+                yield_pct = (q["yield"] * 100.0) if q["yield"] else None
+        # FX / Gouvernement : pas de cours live simple
+        return {"price": price, "value": value, "yield_pct": yield_pct,
+                "change_pct": change_pct}
 
     # --------------------------------------------------------------- helpers
     def _can_watch(self):
@@ -547,9 +607,11 @@ class MarketExplorerScene(Scene, PopupMixin):
 
     def _draw_row(self, surf, r, y, inner, cols, cur, mp, cursor=False):
         kind, key = r["kind"], r["key"]
+        ident = (kind, key)
+        live = self._live_quote(r)
         row_rect = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, ROW_H)
-        self._row_rects[(kind, key)] = row_rect
-        selected = (kind, key) in self.selected
+        self._row_rects[ident] = row_rect
+        selected = ident in self.selected
         if selected:
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect, border_radius=3)
             pygame.draw.rect(surf, config.COL_UP, row_rect, 1, border_radius=3)
@@ -565,18 +627,20 @@ class MarketExplorerScene(Scene, PopupMixin):
         widgets.draw_text(surf, widgets.fit_text(str(r["sub"]), fonts.tiny(), 180),
                           (inner.x + cols[2][1], y + 1), fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, r["region"] or "—", (inner.x + cols[3][1], y), fonts.small(), config.COL_TEXT)
-        price_txt = f"{r['price']:,.2f}".replace(",", " ") if r["price"] is not None else "—"
-        widgets.draw_text(surf, price_txt, (inner.x + cols[4][1], y), fonts.small(), config.COL_WHITE)
-        value_txt = widgets.format_money(r["value"], cur) if r["value"] is not None else "—"
+        price = live["price"]
+        price_txt = f"{price:,.2f}".replace(",", " ") if price is not None else "—"
+        price_col = self._flash.tick(ident, price, config.COL_UP, config.COL_DOWN, config.COL_WHITE)
+        widgets.draw_text(surf, price_txt, (inner.x + cols[4][1], y), fonts.small(), price_col)
+        value_txt = widgets.format_money(live["value"], cur) if live["value"] is not None else "—"
         widgets.draw_text(surf, value_txt, (inner.x + cols[5][1], y), fonts.small(bold=True), config.COL_TEXT)
-        if r["yield_pct"] is not None:
-            ycol = config.COL_UP if r["yield_pct"] >= 0 else config.COL_DOWN
-            widgets.draw_text(surf, f"{r['yield_pct']:+.2f}%", (inner.x + cols[6][1], y), fonts.small(), ycol)
+        if live["yield_pct"] is not None:
+            ycol = config.COL_UP if live["yield_pct"] >= 0 else config.COL_DOWN
+            widgets.draw_text(surf, f"{live['yield_pct']:+.2f}%", (inner.x + cols[6][1], y), fonts.small(), ycol)
         else:
             widgets.draw_text(surf, "—", (inner.x + cols[6][1], y), fonts.small(), config.COL_TEXT_DIM)
-        if r["change_pct"] is not None:
-            vcol = config.COL_UP if r["change_pct"] >= 0 else config.COL_DOWN
-            widgets.draw_text(surf, f"{r['change_pct']:+.1f}%", (inner.x + cols[7][1], y), fonts.small(bold=True), vcol)
+        if live["change_pct"] is not None:
+            vcol = config.COL_UP if live["change_pct"] >= 0 else config.COL_DOWN
+            widgets.draw_text(surf, f"{live['change_pct']:+.1f}%", (inner.x + cols[7][1], y), fonts.small(bold=True), vcol)
         else:
             widgets.draw_text(surf, "—", (inner.x + cols[7][1], y), fonts.small(), config.COL_TEXT_DIM)
 

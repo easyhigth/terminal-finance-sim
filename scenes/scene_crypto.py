@@ -24,6 +24,7 @@ class CryptoScene(Scene, PopupMixin):
         self.name_rects = {}
         self.row_cursor = 0
         self._row_list = []
+        self._flash = widgets.TickFlash()
         self.init_popups()
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
@@ -142,8 +143,9 @@ class CryptoScene(Scene, PopupMixin):
             self.name_rects[q["id"]] = name_rect
             widgets.draw_text(surf, f"{q['name']} ({q['id']})", (cols[0][1], y),
                               fonts.small(bold=True), config.COL_TEXT)
+            spot_col = self._flash.tick(q["id"], q["spot"], config.COL_UP, config.COL_DOWN, config.COL_WHITE)
             widgets.draw_text(surf, f"{q['spot']:,.2f}".replace(",", " "), (cols[1][1], y),
-                              fonts.small(bold=True), config.COL_WHITE)
+                              fonts.small(bold=True), spot_col)
             widgets.draw_text(surf, f"{q['vol']*100:.0f}%", (cols[2][1], y), fonts.small(),
                               config.COL_DOWN if q["vol"] > 1.0 else config.COL_WARN)
             depeg = q["stable"] and q["spot"] < 0.95

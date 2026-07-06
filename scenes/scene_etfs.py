@@ -45,6 +45,7 @@ class ETFScene(Scene, PopupMixin):
         self._cat_rects = {}
         self._sort_rects = {}
         self._search_clear_rect = None
+        self._flash = widgets.TickFlash()
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.explore_btn = widgets.Button((220, config.SCREEN_HEIGHT - 50, 160, 42),
@@ -319,8 +320,9 @@ class ETFScene(Scene, PopupMixin):
         widgets.draw_text(surf, expo_label, (cols["expo"], y + 1), fonts.tiny(), config.COL_TEXT_DIM)
         rcol = (config.COL_UP if q["risk"] <= 2 else config.COL_WARN if q["risk"] == 3 else config.COL_DOWN)
         widgets.draw_text(surf, "●" * q["risk"], (cols["risk"], y), fonts.tiny(bold=True), rcol)
+        nav_col = self._flash.tick(q["id"], q["price"], config.COL_UP, config.COL_DOWN, config.COL_WHITE)
         widgets.draw_text(surf, f"{q['price']:,.1f}".replace(",", " "), (cols["nav"], y),
-                          fonts.small(bold=True), config.COL_WHITE)
+                          fonts.small(bold=True), nav_col)
         vcol = config.COL_UP if q["change_pct"] >= 0 else config.COL_DOWN
         widgets.draw_text(surf, f"{q['change_pct']:+.1f}", (cols["var"], y), fonts.small(), vcol)
         ycol = config.COL_UP if q["change_1y"] >= 0 else config.COL_DOWN

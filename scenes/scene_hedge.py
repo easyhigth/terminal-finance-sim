@@ -32,12 +32,23 @@ class HedgeScene(Scene):
         self.years_rects = {}
         self._all_rects = {}
         self.focus = "buy"
+        self._flash = widgets.TickFlash()
 
     def _can(self):
         return unlocks.unlocked(self.app.gs.player, "hedge")
 
     def _cur(self):
         return config.CONTINENTS[self.app.gs.player.continent]["currency"]
+
+    def _live_index(self, idx):
+        """Point "en direct" de l'indice régional (animation intraday)."""
+        m = self.app.market
+        sim_clock = getattr(self.app, "sim_clock", None)
+        day = getattr(self.app.gs.player, "day", None)
+        if sim_clock is None or day is None:
+            return m.index_value(idx)
+        hist = m.index_history(idx, sim_clock=sim_clock, day=day)
+        return hist[-1] if hist else m.index_value(idx)
 
     def _activate_focus(self):
         key = self.focus
@@ -123,6 +134,8 @@ class HedgeScene(Scene):
 
         m, p = self.app.market, self.app.gs.player
         cur = self._cur()
+        region = p.continent
+        idx = H._index_for_region(m, region)
 
         # ---- cotation / souscription (gauche) ----
         quote_rect = pygame.Rect(40, 110, 440, 280)
@@ -171,9 +184,11 @@ class HedgeScene(Scene):
         years = H.MATURITY_CHOICES[self.years_idx]
         q = H.quote(p, m, strike_pct, years)
         premium = NOTIONAL * q["premium_rate"]
-        widgets.draw_text(surf, f"Sous-jacent : {q['underlying']} @ {q['spot']:.1f} "
+        live_spot = self._live_index(idx)
+        spot_col = self._flash.tick(idx, live_spot, config.COL_UP, config.COL_DOWN, config.COL_TEXT_DIM)
+        widgets.draw_text(surf, f"Sous-jacent : {q['underlying']} @ {live_spot:.1f} "
                                 f"(strike {q['strike']:.1f}, vol {q['sigma']*100:.0f}%)",
-                          (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+                          (inner.x, y), fonts.tiny(), spot_col)
         y += 20
         widgets.draw_text(surf, f"Notionnel couvert : {widgets.format_money(NOTIONAL, cur)}",
                           (inner.x, y), fonts.small(), config.COL_TEXT)
@@ -217,9 +232,14 @@ class HedgeScene(Scene):
                 widgets.draw_text(surf, f"{widgets.format_money(h['notional'], cur)} · "
                                         f"strike {h['strike_pct']*100:.0f}%",
                                   (pinner.x, yy), fonts.small(bold=True), config.COL_TEXT)
-                pcol = config.COL_UP if h["in_money"] else config.COL_TEXT_DIM
-                widgets.draw_text(surf, f"sous-jacent {h['perf']:+.1f}% · échéance {h['years_left']:.1f} an"
-                                        + (" · DANS LA MONNAIE" if h["in_money"] else ""),
+                # performance en direct du sous-jacent vs le niveau d'entrée
+                live_perf = (live_spot / h['start_level'] - 1.0) * 100.0 if h['start_level'] else 0.0
+                in_money = live_spot < h['strike']
+                pcol = self._flash.tick(f"hedge:{h['underlying']}", live_spot,
+                                        config.COL_UP, config.COL_DOWN,
+                                        config.COL_UP if in_money else config.COL_TEXT_DIM)
+                widgets.draw_text(surf, f"sous-jacent {live_perf:+.1f}% · échéance {h['years_left']:.1f} an"
+                                        + (" · DANS LA MONNAIE" if in_money else ""),
                                   (pinner.x, yy + 18), fonts.tiny(), pcol)
                 yy += 40
 

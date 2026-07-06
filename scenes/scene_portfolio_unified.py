@@ -44,6 +44,18 @@ class PortfolioUnifiedScene(Scene):
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.chart_back_btn = widgets.Button(
             config.back_button_rect(200), "← LISTE", config.COL_TEXT_DIM)
+        self._flash = widgets.TickFlash()
+
+    def _live_price(self, row):
+        """Cours "en direct" pour une ligne de position (actions seules)."""
+        if row["cls"] != "equity":
+            return None
+        sim_clock = getattr(self.app, "sim_clock", None)
+        day = getattr(self.app.gs.player, "day", None)
+        if sim_clock is None or day is None:
+            return None
+        hist = self.market.history_of(row["id"], 1, sim_clock=sim_clock, day=day)
+        return hist[-1] if hist else self.market.price_of(row["id"])
 
     def _rows(self):
         p = self.app.gs.player
@@ -242,6 +254,16 @@ class PortfolioUnifiedScene(Scene):
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, pnl_rect, border_radius=3)
                 elif rect.collidepoint(mp):
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect, border_radius=3)
+                live_price = self._live_price(row)
+                if live_price is not None and row["avg"]:
+                    live_value = row["qty"] * live_price
+                    live_pnl = live_value - row["qty"] * row["avg"]
+                else:
+                    live_price = row["price"]
+                    live_value = row["value"]
+                    live_pnl = row["pnl"]
+                pcol = self._flash.tick(row["id"], live_price, config.COL_UP, config.COL_DOWN,
+                                        config.COL_UP if live_pnl >= 0 else config.COL_DOWN)
                 x = inner.x
                 widgets.draw_text(surf, _CLASS_LABEL[row["cls"]], (x, y), fonts.small(), config.COL_TEXT_DIM)
                 x += 110
@@ -252,12 +274,11 @@ class PortfolioUnifiedScene(Scene):
                 x += 110
                 widgets.draw_text(surf, f"{row['avg']:,.2f}", (x, y), fonts.small(), config.COL_TEXT)
                 x += 110
-                widgets.draw_text(surf, f"{row['price']:,.2f}", (x, y), fonts.small(), config.COL_TEXT)
+                widgets.draw_text(surf, f"{live_price:,.2f}", (x, y), fonts.small(), pcol)
                 x += 110
-                widgets.draw_text(surf, f"{row['value']:,.0f}", (x, y), fonts.small(bold=True), config.COL_WHITE)
+                widgets.draw_text(surf, f"{live_value:,.0f}", (x, y), fonts.small(bold=True), config.COL_WHITE)
                 x += 140
-                pcol = config.COL_UP if row["pnl"] >= 0 else config.COL_DOWN
-                widgets.draw_text(surf, f"{row['pnl']:+,.0f}", (x, y), fonts.small(bold=True), pcol)
+                widgets.draw_text(surf, f"{live_pnl:+,.0f}", (x, y), fonts.small(bold=True), pcol)
             y += ROW_H
         surf.set_clip(prev_clip)
 
@@ -407,10 +428,16 @@ class PortfolioUnifiedScene(Scene):
             title = f"Taux exigé (YTM) — {row['id']} ({_CLASS_LABEL[row['cls']]})"
         else:
             title = f"P&L — {row['id']} ({_CLASS_LABEL[row['cls']]})"
+        live_price = self._live_price(row)
+        live_price = live_price if live_price is not None else row["price"]
+        live_pnl = row["pnl"]
+        if live_price is not None and row["avg"]:
+            live_value = row["qty"] * live_price
+            live_pnl = live_value - row["qty"] * row["avg"]
         widgets.draw_text(surf, title, (40, 22), fonts.title(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, f"Qté {row['qty']:+,.2f}  ·  PM {row['avg']:,.2f}  ·  "
-                                f"Cours {row['price']:,.2f}  ·  P&L latent "
-                                f"{row['pnl']:+,.0f} {cur}",
+                                f"Cours {live_price:,.2f}  ·  P&L latent "
+                                f"{live_pnl:+,.0f} {cur}",
                           (42, 72), fonts.tiny(), config.COL_TEXT_DIM)
 
         self._mode_rects = {}

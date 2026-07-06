@@ -74,9 +74,22 @@ class BookScene(Scene, PopupMixin):
         self._positions_max_scroll = 0
         self._sector_max_scroll = 0
         self._tooltip = None
+        self._flash = widgets.TickFlash()
         # ---- panneau latéral (secteur / évolution) ----
         self.side_mode = "sector"   # "sector" | "history"
         self._side_mode_rects = {}
+
+    def _live_price(self, label, cls):
+        """Cours "en direct" pour une ligne de position (actions seules pour
+        l'instant ; les autres classes gardent leur prix de clôture du pas)."""
+        if cls != "Actions":
+            return None
+        sim_clock = getattr(self.app, "sim_clock", None)
+        day = getattr(self.app.gs.player, "day", None)
+        if sim_clock is None or day is None:
+            return None
+        hist = self.market.history_of(label, 1, sim_clock=sim_clock, day=day)
+        return hist[-1] if hist else self.market.price_of(label)
 
     # --------------------------------------------------------------- trading
     def _qty(self):
@@ -454,11 +467,25 @@ class BookScene(Scene, PopupMixin):
                     label = r["label"]
                     kind = CLS_TO_KIND.get(r["cls"], r["cls"])
                     kcol = KIND_COLOR.get(kind, config.COL_TEXT)
-                    pcol = config.COL_UP if r["pnl"] >= 0 else config.COL_DOWN
+                    is_stock = (r["cls"] == "Actions")
+                    live_price = self._live_price(label, r["cls"])
+                    if live_price is not None and r["avg"]:
+                        # recalcule valeur et P&L en direct (shares signé pour short)
+                        live_value = r["qty"] * live_price
+                        live_pnl = live_value - r["qty"] * r["avg"]
+                        live_pnl_pct = ((live_price / r["avg"] - 1.0) * 100.0
+                                        if r["qty"] > 0
+                                        else (r["avg"] / live_price - 1.0) * 100.0)
+                    else:
+                        live_price = r["price"]
+                        live_value = r["value"]
+                        live_pnl = r["pnl"]
+                        live_pnl_pct = r["pnl_pct"]
+                    pcol = self._flash.tick(label, live_price, config.COL_UP, config.COL_DOWN,
+                                            config.COL_UP if live_pnl >= 0 else config.COL_DOWN)
                     name_rect = pygame.Rect(inner.x - 4, y - 2, cols[1][1] - inner.x + 4, 22)
                     self._name_rects[label] = name_rect
                     self._row_cls[label] = r["cls"]
-                    is_stock = (r["cls"] == "Actions")
                     if is_stock:
                         chart_rect = pygame.Rect(cols[5][1] - 40, y - 2,
                                                  inner.right - cols[5][1] + 44, 22)
@@ -472,7 +499,7 @@ class BookScene(Scene, PopupMixin):
                             dy = m.metrics(label)["div_yield"]
                             if dy:
                                 sign = -1.0 if r["short"] else 1.0
-                                income = sign * r["value"] * dy
+                                income = sign * live_value * dy
                                 verb = "perçu" if income >= 0 else "payé (short)"
                                 self._tooltip = (
                                     f"Dividende estimé : {widgets.format_money(abs(income), cur)}/an "
@@ -484,11 +511,11 @@ class BookScene(Scene, PopupMixin):
                     widgets.draw_text(surf, kind, (cols[1][1], y), fonts.tiny(bold=True), kcol)
                     widgets.draw_text(surf, f"{r['qty']:.0f}", (cols[2][1], y), fonts.small(), config.COL_TEXT)
                     widgets.draw_text(surf, f"{r['avg']:.2f}", (cols[3][1], y), fonts.small(), config.COL_TEXT_DIM)
-                    widgets.draw_text(surf, f"{r['price']:.2f}", (cols[4][1], y), fonts.small(), config.COL_WHITE)
-                    widgets.draw_text(surf, widgets.format_money(r["value"], cur), (cols[5][1], y),
+                    widgets.draw_text(surf, f"{live_price:.2f}", (cols[4][1], y), fonts.small(), pcol)
+                    widgets.draw_text(surf, widgets.format_money(live_value, cur), (cols[5][1], y),
                                       fonts.small(), config.COL_TEXT)
-                    widgets.draw_text(surf, f"{'+' if r['pnl']>=0 else ''}{widgets.format_money(r['pnl'], cur)} "
-                                            f"({r['pnl_pct']:+.1f}%)", (cols[6][1], y), fonts.small(bold=True), pcol)
+                    widgets.draw_text(surf, f"{'+' if live_pnl>=0 else ''}{widgets.format_money(live_pnl, cur)} "
+                                            f"({live_pnl_pct:+.1f}%)", (cols[6][1], y), fonts.small(bold=True), pcol)
                 y += row_h
             surf.set_clip(prev_clip)
             content_h = (y + self.scroll_positions) - list_top

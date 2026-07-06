@@ -26,6 +26,7 @@ class TradingWallScene(Scene, PopupMixin):
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self._tile_rects = []   # [(rect, kind, key)] pour le clic
+        self._flash = widgets.TickFlash()
 
     def handle_event(self, event):
         if self.popups_handle_event(event):
@@ -97,13 +98,16 @@ class TradingWallScene(Scene, PopupMixin):
             rect = pygame.Rect(x, y, tile_w, tile_h)
             self._tile_rects.append((rect, kind, key))
             inner = widgets.draw_panel(surf, rect, key, config.COL_AMBER if kind == "stock" else config.COL_CYAN)
-            chg = (hist[-1] / hist[0] - 1.0) * 100.0 if hist[0] else 0.0
-            c = config.COL_UP if chg >= 0 else config.COL_DOWN
-            widgets.draw_text(surf, f"{hist[-1]:,.2f}", (inner.right, inner.y), fonts.small(bold=True),
+            last = hist[-1]
+            prev = hist[-2] if len(hist) >= 2 else hist[0]
+            chg = (last / hist[0] - 1.0) * 100.0 if hist[0] else 0.0
+            base_c = config.COL_UP if chg >= 0 else config.COL_DOWN
+            c = self._flash.tick(key, last, config.COL_UP, config.COL_DOWN, base_c)
+            widgets.draw_text(surf, f"{last:,.2f}", (inner.right, inner.y), fonts.small(bold=True),
                               c, align="right")
             spark = pygame.Rect(inner.x, inner.y + 18, inner.w, inner.h - 36)
-            widgets.draw_series(surf, spark, hist[-40:], c, baseline=False, show_extrema=False)
-            widgets.draw_text(surf, f"{chg:+.2f}%", (inner.x, inner.bottom - 14), fonts.tiny(), c)
+            widgets.draw_series(surf, spark, hist[-40:], base_c, baseline=False, show_extrema=False)
+            widgets.draw_text(surf, f"{chg:+.2f}%", (inner.x, inner.bottom - 14), fonts.tiny(), base_c)
 
         self.back_btn.draw(surf)
         self.popups_draw(surf)

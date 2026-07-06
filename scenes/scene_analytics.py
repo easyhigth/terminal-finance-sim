@@ -52,6 +52,18 @@ class AnalyticsScene(Scene, PopupMixin):
         self._alloc_list_rect = None
         self._holdings_max_scroll = 0
         self._alloc_max_scroll = 0
+        self._flash = widgets.TickFlash()
+
+    def _live_price(self, h):
+        """Cours "en direct" pour une ligne de position (actions seules)."""
+        if h.get("cls") != "Actions":
+            return None
+        sim_clock = getattr(self.app, "sim_clock", None)
+        day = getattr(self.app.gs.player, "day", None)
+        if sim_clock is None or day is None:
+            return None
+        hist = self.market.history_of(h["label"], 1, sim_clock=sim_clock, day=day)
+        return hist[-1] if hist else self.market.price_of(h["label"])
 
     def _open_holding(self, label):
         kind = self._row_cls.get(label)
@@ -252,6 +264,20 @@ class AnalyticsScene(Scene, PopupMixin):
                 ccol = _CLASS_COL.get(h["cls"], config.COL_TEXT)
                 tk = h["label"]
                 self._row_cls[tk] = h["cls"]
+                live_price = self._live_price(h)
+                if live_price is not None and h["avg"]:
+                    live_value = h["qty"] * live_price
+                    live_pnl = live_value - h["qty"] * h["avg"]
+                    live_pnl_pct = ((live_price / h["avg"] - 1.0) * 100.0
+                                    if h["qty"] > 0
+                                    else (h["avg"] / live_price - 1.0) * 100.0)
+                else:
+                    live_price = h["price"]
+                    live_value = h["value"]
+                    live_pnl = h["pnl"]
+                    live_pnl_pct = h["pnl_pct"]
+                pcol = self._flash.tick(tk, live_price, config.COL_UP, config.COL_DOWN,
+                                        config.COL_UP if live_pnl >= 0 else config.COL_DOWN)
                 name_rect = pygame.Rect(inner.x, y - 2, 300, row_h - 2)
                 self._holding_rects[tk] = name_rect
                 if h["cls"] == "Actions":      # graphe de cours dispo seulement pour les actions
@@ -267,11 +293,10 @@ class AnalyticsScene(Scene, PopupMixin):
                 widgets.draw_text(surf, name, (inner.x + 46, y), fonts.small(bold=True), config.COL_WHITE)
                 widgets.draw_text(surf, f"{h['qty']:,.0f}".replace(",", " "),
                                   (inner.x + 300, y), fonts.small(), config.COL_TEXT, align="right")
-                widgets.draw_text(surf, f"{h['price']:.2f}", (inner.x + 390, y),
-                                  fonts.small(), config.COL_TEXT, align="right")
-                widgets.draw_text(surf, widgets.format_money(h["value"], cur),
+                widgets.draw_text(surf, f"{live_price:.2f}", (inner.x + 390, y),
+                                  fonts.small(), pcol, align="right")
+                widgets.draw_text(surf, widgets.format_money(live_value, cur),
                                   (inner.x + 490, y), fonts.small(bold=True), config.COL_WHITE, align="right")
-                pcol = config.COL_UP if h["pnl"] >= 0 else config.COL_DOWN
                 widgets.draw_text(surf, f"{h['weight']:.1f}%", (inner.right, y),
                                   fonts.small(), pcol, align="right")
                 # 2e ligne fine : nom + coût moyen + liquidité + P&L %
@@ -283,8 +308,8 @@ class AnalyticsScene(Scene, PopupMixin):
                            "Illiquide": config.COL_DOWN}.get(h["liquidity"], config.COL_TEXT_DIM)
                 widgets.draw_text(surf, h["liquidity"], (inner.x + 490, y + 13),
                                   fonts.tiny(), liq_col, align="right")
-                sign = "+" if h["pnl_pct"] >= 0 else ""
-                widgets.draw_text(surf, f"{sign}{h['pnl_pct']:.1f}%", (inner.right, y + 13),
+                sign = "+" if live_pnl_pct >= 0 else ""
+                widgets.draw_text(surf, f"{sign}{live_pnl_pct:.1f}%", (inner.right, y + 13),
                                   fonts.tiny(), pcol, align="right")
             y += row_h
         surf.set_clip(prev_clip)

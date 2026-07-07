@@ -113,7 +113,8 @@ class Window:
         pygame.draw.line(surf, accent, (tr.x, tr.bottom - 1), (tr.right, tr.bottom - 1), 1)
         icon_kind = getattr(self.app_obj, "icon_kind", "generic")
         icon_col = config.COL_AMBER if focused else config.COL_TEXT_DIM
-        desktop_icons.draw(surf, (tr.x + 18, tr.centery), icon_kind, icon_col)
+        desktop_icons.draw(surf, (tr.x + 15, tr.centery), icon_kind, size=18,
+                           alpha=255 if focused else 190)
         widgets.draw_text(surf, self.app_obj.title, (tr.x + 32, tr.y + 5),
                           fonts.small(bold=True), icon_col)
         if self.pinned:

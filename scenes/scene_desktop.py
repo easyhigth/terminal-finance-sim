@@ -48,7 +48,6 @@ from scenes.scene_desktop_common import (
     _L,
     _NEEDS_TICKER,
     _NEEDS_TICKERS,
-    _TRACK_SCENE_ICON,
     APPS,
     DESKTOP_SHORTCUTS,
     ICON_FEATURE,
@@ -56,6 +55,7 @@ from scenes.scene_desktop_common import (
     ICON_H,
     ICON_W,
     QUICK_APPS,
+    SCENE_ICON,
     TASKBAR_H,
     TOPBAR_H,
     TRACK_APP,
@@ -800,7 +800,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
 
         def factory():
             host = SceneHostApp(self.app, name, _scene_label(name), kw)
-            host.icon_kind = _TRACK_SCENE_ICON.get(name, "generic")
+            host.icon_kind = SCENE_ICON.get(name, "generic")
             host.bind_opener(self._open_scene_window)
             return host
 
@@ -1033,17 +1033,17 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 pygame.draw.rect(surf, (*accent, int(160 * hov_t)), halo, 1, border_radius=10)
             keynav.draw_focus_ring(surf, r, key == self._icon_focus)
             ghost = dragging_key is not None and key == dragging_key
-            icon_col = config.COL_TEXT_DIM if ghost else accent
             # icône avec halo/scale au survol, sans smoothscale coûteux :
             # on décale juste l'icône de 1px vers le haut et on dessine un glow.
             if hov_t > 0.01:
                 glow = int(4 * hov_t)
                 pygame.draw.circle(surf, (*accent, int(60 * hov_t)),
-                                   (r.centerx, r.y + 28), 18 + glow)
+                                   (r.centerx, r.y + 28), 20 + glow)
                 offset_y = -int(1.5 * hov_t)
             else:
                 offset_y = 0
-            desktop_icons.draw(surf, (r.centerx, r.y + 28 + offset_y), kind, icon_col)
+            desktop_icons.draw(surf, (r.centerx, r.y + 28 + offset_y), kind,
+                               size=36, alpha=110 if ghost else 255)
             label_col = config.COL_TEXT_DIM if ghost else (
                 style._lerp_color(config.COL_TEXT, accent, 0.3 * hov_t))
             widgets.draw_text(surf, widgets.fit_text(label, fonts.small(bold=True), ICON_W - 6),
@@ -1075,7 +1075,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self._menu_rect = pygame.Rect(8, 5, 66, TOPBAR_H - 10)
         mh = self._menu_rect.collidepoint(pygame.mouse.get_pos())
         pygame.draw.rect(surf, config.COL_PANEL if mh else config.COL_PANEL_HEAD, self._menu_rect, border_radius=4)
-        desktop_icons.draw(surf, (self._menu_rect.x + 16, self._menu_rect.centery), "menu", config.COL_AMBER)
+        desktop_icons.draw(surf, (self._menu_rect.x + 16, self._menu_rect.centery), "menu", size=18)
         widgets.draw_text(surf, "Menu", (self._menu_rect.x + 28, self._menu_rect.y + 5),
                           fonts.small(bold=True), config.COL_AMBER)
 
@@ -1124,7 +1124,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         active = self.start_open
         pygame.draw.rect(surf, config.COL_AMBER if active else config.COL_PANEL, self._start_rect, border_radius=4)
         desktop_icons.draw(surf, (self._start_rect.x + 16, self._start_rect.centery), "apps",
-                           config.COL_BG if active else config.COL_AMBER)
+                           size=18)
         widgets.draw_text(surf, "Apps", (self._start_rect.x + 28, self._start_rect.y + 4),
                           fonts.small(bold=True), config.COL_BG if active else config.COL_AMBER)
         pygame.draw.line(surf, config.COL_BORDER, (self._start_rect.right + 4, bar.y + 4),
@@ -1139,7 +1139,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             self._launch_rects[key] = r
             hov = r.collidepoint(pygame.mouse.get_pos())
             pygame.draw.rect(surf, config.COL_PANEL if hov else config.COL_PANEL_HEAD, r, border_radius=4)
-            desktop_icons.draw(surf, r.center, kind, config.COL_AMBER)
+            desktop_icons.draw(surf, r.center, kind, size=18)
             x += 30
         pygame.draw.line(surf, config.COL_BORDER, (x + 2, bar.y + 4), (x + 2, bar.bottom - 4), 1)
         x += 10
@@ -1167,7 +1167,8 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             pygame.draw.rect(surf, border, r, 1, border_radius=4)
             col = config.COL_WHITE if flash else config.COL_TEXT_DIM if w.minimized else config.COL_TEXT
             kind = getattr(w.app_obj, "icon_kind", "generic")
-            desktop_icons.draw(surf, (r.x + 12, r.centery), kind, col)
+            desktop_icons.draw(surf, (r.x + 12, r.centery), kind, size=16,
+                               alpha=150 if w.minimized else 255)
             if r.w > 48:   # trop étroit : icône seule, pas de texte tronqué illisible
                 widgets.draw_text(surf, widgets.fit_text(w.app_obj.title, fonts.tiny(), r.w - 26),
                                   (r.x + 22, r.y + 5), fonts.tiny(bold=True), col)

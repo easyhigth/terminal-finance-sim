@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:  # permet de lancer manuellement depuis GitHub
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:

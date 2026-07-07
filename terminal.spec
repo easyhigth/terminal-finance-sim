@@ -29,6 +29,20 @@ hiddenimports = [
     "scipy._lib.messagestream",
     "pygame",
     "numpy",
+    # modules du jeu importés dynamiquement (SceneManager, routeurs, etc.)
+    "core",
+    "core.config", "core.game_state", "core.market", "core.scene_manager",
+    "core.sim_clock", "core.pages", "core.i18n", "core.autosave_settings",
+    "scenes",
+    "scenes.scene_desktop", "scenes.scene_terminal", "scenes.scene_menu",
+    "scenes.scene_intro", "scenes.scene_saves", "scenes.scene_settings",
+    "apps",
+    "apps.base", "apps.scene_host", "apps.app_sheet", "apps.app_research",
+    "apps.app_trading", "apps.app_watchlist", "apps.app_calculator",
+    "ui",
+    "ui.window_manager", "ui.widgets", "ui.fonts", "ui.simclock_widget",
+    "data",
+    "data.companies",
 ]
 
 a = Analysis(

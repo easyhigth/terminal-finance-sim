@@ -1,0 +1,82 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # permet de lancer manuellement depuis GitHub
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-build.txt
+
+      - name: Build PyInstaller
+        run: python build.py --clean
+
+      - name: Compresser le build (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd dist
+          zip -r ../TERMINAL-macOS.zip TERMINAL.app
+
+      - name: Compresser le build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cd dist
+          Compress-Archive -Path TERMINAL -DestinationPath ..\TERMINAL-Windows.zip
+
+      - name: Upload artifact (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TERMINAL-macOS
+          path: TERMINAL-macOS.zip
+
+      - name: Upload artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TERMINAL-Windows
+          path: TERMINAL-Windows.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Télécharger tous les artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Créer / mettre à jour la release "latest"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-build
+          name: Dernière version compilée
+          body: |
+            Versions exécutables de TERMINAL — Finance Career Simulator.
+            - `TERMINAL-Windows.zip` : dézipper et lancer `TERMINAL/TERMINAL.exe`
+            - `TERMINAL-macOS.zip` : dézipper et lancer `TERMINAL.app`
+          files: |
+            artifacts/TERMINAL-Windows/TERMINAL-Windows.zip
+            artifacts/TERMINAL-macOS/TERMINAL-macOS.zip
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

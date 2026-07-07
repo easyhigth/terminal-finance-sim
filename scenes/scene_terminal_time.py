@@ -223,12 +223,16 @@ class TerminalTimeMixin:
                                  "good" if won_bets else "bad")
         for exe in (summary.get("conditional_orders_executed") or []):
             order, res = exe["order"], exe["result"]
-            kind_label = _L("Stop-loss", "Stop-loss") if order["kind"] == "stop" else _L("Take-profit", "Take-profit")
+            kind_labels = {"stop": "Stop-loss", "target": "Take-profit", "trailing": "Trailing stop"}
+            kind_label = kind_labels.get(order["kind"], "Ordre")
+            # sur un SHORT, l'exécution est un RACHAT (cover), pas une vente
+            act_fr = "couvert" if order.get("is_short") else "vendu"
+            act_en = "covered" if order.get("is_short") else "sold"
             sign = "+" if res["realized"] >= 0 else ""
             self._log(_L(
-                f"  » {kind_label} déclenché : {order['ticker']} vendu à {res['price']:,.2f} "
+                f"  » {kind_label} déclenché : {order['ticker']} {act_fr} à {res['price']:,.2f} "
                 f"(seuil {order['trigger']:,.2f}) — P&L réalisé {sign}{widgets.format_money(res['realized'], cur)}.",
-                f"  » {kind_label} triggered: {order['ticker']} sold at {res['price']:,.2f} "
+                f"  » {kind_label} triggered: {order['ticker']} {act_en} at {res['price']:,.2f} "
                 f"(trigger {order['trigger']:,.2f}) — realized P&L {sign}{widgets.format_money(res['realized'], cur)}."))
         mc = summary.get("margin_call")
         if mc:

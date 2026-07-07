@@ -29,6 +29,16 @@ def _next_id(player):
     return oid
 
 
+def _position(player, ticker):
+    """(pos, is_short) de la position détenue sur `ticker`, ou (None, False).
+    Les positions COURTES vivent dans `player.portfolio` avec un nombre de
+    titres NÉGATIF (cf. core/portfolio.short) — il n'y a PAS de dict séparé."""
+    pos = player.portfolio.get(ticker)
+    if not pos or abs(pos.get("shares", 0)) <= 1e-9:
+        return None, False
+    return pos, pos["shares"] < 0
+
+
 def place(player, market, ticker, kind, trigger, qty="ALL"):
     """Pose un ordre conditionnel sur une position (longue ou courte) détenue.
     Retourne {"ok": True, "order": ...} ou {"ok": False, "reason": ...}."""
@@ -41,15 +51,8 @@ def place(player, market, ticker, kind, trigger, qty="ALL"):
     if trigger <= 0:
         return {"ok": False, "reason": "trigger"}
 
-    # Cherche d'abord une position longue, puis une position courte
-    pos = player.portfolio.get(ticker)
-    is_short = False
-    if not pos or pos.get("shares", 0) <= 0:
-        # Vérifie les positions courtes
-        shorts = getattr(player, "shorts", None) or {}
-        pos = shorts.get(ticker)
-        is_short = True
-    if not pos or pos.get("shares", 0) <= 0:
+    pos, is_short = _position(player, ticker)
+    if pos is None:
         return {"ok": False, "reason": "noposition"}
 
     if qty != "ALL":
@@ -59,7 +62,7 @@ def place(player, market, ticker, kind, trigger, qty="ALL"):
             return {"ok": False, "reason": "qty"}
         if qty <= 0:
             return {"ok": False, "reason": "qty"}
-        qty = min(qty, pos["shares"])
+        qty = min(qty, abs(pos["shares"]))
 
     order = {"id": _next_id(player), "ticker": ticker, "kind": kind,
              "trigger": trigger, "qty": qty, "is_short": is_short}
@@ -83,9 +86,12 @@ def for_ticker(player, ticker):
 def _triggered(order, price):
     """Détermine si l'ordre est déclenché au prix courant.
     Pour les shorts, la logique est inversée (un stop-loss sur short
-    se déclenche quand le prix MONTE, un take-profit quand il BAISSE)."""
+    se déclenche quand le prix MONTE, un take-profit quand il BAISSE).
+    Un trailing stop a la sémantique d'un STOP (son seuil suit le cours,
+    cf. update_trailing_stops) — surtout pas celle d'un target, sinon il
+    s'exécuterait immédiatement (seuil posé du côté favorable du cours)."""
     is_short = order.get("is_short", False)
-    if order["kind"] == "stop":
+    if order["kind"] in ("stop", "trailing"):
         return price >= order["trigger"] if is_short else price <= order["trigger"]
     # "target"
     return price <= order["trigger"] if is_short else price >= order["trigger"]
@@ -104,20 +110,19 @@ def execute_due(player, market):
     remaining = []
     for order in orders:
         is_short = order.get("is_short", False)
-        if is_short:
-            shorts = getattr(player, "shorts", None) or {}
-            pos = shorts.get(order["ticker"])
-        else:
-            pos = player.portfolio.get(order["ticker"])
-        if not pos or pos.get("shares", 0) <= 0:
-            continue   # position disparue entre-temps : ordre abandonné silencieusement
+        pos, side_short = _position(player, order["ticker"])
+        # position disparue OU retournée (ex. short couvert puis racheté en
+        # long) entre-temps : ordre abandonné silencieusement — jamais
+        # d'exécution sur une position qui n'est plus celle visée.
+        if pos is None or side_short != is_short:
+            continue
         price = market.price_of(order["ticker"])
         if price is None or not _triggered(order, price):
             remaining.append(order)
             continue
         qty = order["qty"]
         if qty != "ALL":
-            qty = min(qty, pos["shares"])
+            qty = min(qty, abs(pos["shares"]))
         if is_short:
             result = pf_mod.cover(player, market, order["ticker"], qty)
         else:
@@ -144,14 +149,8 @@ def place_trailing(player, market, ticker, distance_pct, qty="ALL"):
     if price is None or price <= 0:
         return {"ok": False, "reason": "price"}
 
-    # Cherche la position (longue ou courte)
-    pos = player.portfolio.get(ticker)
-    is_short = False
-    if not pos or pos.get("shares", 0) <= 0:
-        shorts = getattr(player, "shorts", None) or {}
-        pos = shorts.get(ticker)
-        is_short = True
-    if not pos or pos.get("shares", 0) <= 0:
+    pos, is_short = _position(player, ticker)
+    if pos is None:
         return {"ok": False, "reason": "noposition"}
 
     if qty != "ALL":
@@ -161,7 +160,7 @@ def place_trailing(player, market, ticker, distance_pct, qty="ALL"):
             return {"ok": False, "reason": "qty"}
         if qty <= 0:
             return {"ok": False, "reason": "qty"}
-        qty = min(qty, pos["shares"])
+        qty = min(qty, abs(pos["shares"]))
 
     # Seuil initial : distance_pct% en-dessous du cours (long) ou au-dessus (short)
     if is_short:

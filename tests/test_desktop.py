@@ -1383,40 +1383,36 @@ def test_onboarding_seen_flag_roundtrip():
     assert desktop_onboarding.seen() is True
 
 
-def test_desktop_shows_onboarding_until_dismissed():
+def test_desktop_marks_onboarding_seen_when_guide_wont_show():
+    """L'ex-carte d'accueil machine a été FUSIONNÉE dans le guide de
+    démarrage : quand le guide ne s'affichera pas (déjà lu, vétéran,
+    sandbox), l'arrivée sur le bureau marque directement l'accueil comme vu
+    pour que le tutoriel guidé démarre sans étape fantôme."""
     from core import desktop_onboarding
     desktop_onboarding.reset()
     a = main.App()
     a.ensure_market()
-    # guide de démarrage déjà lu (sinon il REMPLACE la carte d'accueil au
-    # tout début d'une carrière — cf. DesktopScene._intro_guide_active)
-    a.gs.player.flags["intro_guide_done"] = True
+    a.gs.player.flags["intro_guide_done"] = True    # guide déjà lu
     a.scenes.go("desktop")
-    desk = a.scenes.current
-    desk.draw(a.screen)
-    assert desk._onboard_btn is not None            # carte affichée (1re visite)
-    # clic sur « Commencer » : marque vu, la carte disparaît
-    desk.handle_event(_click(desk._onboard_btn.centerx, desk._onboard_btn.centery))
     assert desktop_onboarding.seen() is True
     desktop_onboarding.mark_seen()                  # laisse l'état propre pour la suite
 
 
-def test_onboarding_click_outside_card_dismisses_and_passes_through():
+def test_desktop_keeps_onboarding_unseen_while_guide_is_active():
+    """Tant que le guide de démarrage (modal) est affiché, l'accueil n'est
+    pas marqué vu à l'arrivée : c'est SA fermeture qui le marque (cf.
+    _close_intro_guide) — le tutoriel guidé ne doit pas se superposer."""
     from core import desktop_onboarding
     desktop_onboarding.reset()
     a = main.App()
-    a.ensure_market()
-    a.gs.player.grade_index = 9
-    a.gs.player.flags["desktop_seeded"] = True   # pas de disposition de départ pour ce test
+    a.ensure_market()          # grade 0, jour 1 : guide actif
     a.scenes.go("desktop")
     desk = a.scenes.current
-    desk.draw(a.screen)
-    # clic sur une icône du bureau (hors carte) : referme l'accueil ET ouvre l'app
-    r, _kind, _label = desk._icon_rects["research"]
-    desk.handle_event(_click(r.centerx, r.centery))
-    desk.handle_event(_up(r.centerx, r.centery))
+    assert desk._intro_guide_active() is True
+    assert desktop_onboarding.seen() is False
+    desk._close_intro_guide()
     assert desktop_onboarding.seen() is True
-    assert any(w.key == "research" for w in desk.wm.windows)
+    assert a.gs.player.flags.get("intro_guide_done") is True
     desktop_onboarding.mark_seen()
 
 
@@ -1766,11 +1762,54 @@ def test_sheet_app_copy_paste_range(app):
     sa.range_anchor, sa.range_end = "A1", "A2"
     rect = pygame.Rect(0, 0, 900, 600)
     sa.handle_event(_ctrl_key(pygame.K_c), rect)
-    assert sa._clipboard == [["10"], ["20"]]
+    assert sa._clipboard["data"] == [["10"], ["20"]]
+    assert sa._clipboard["origin"] == (0, 1)   # colonne A, ligne 1
     sa.sel = "C1"
     sa.handle_event(_ctrl_key(pygame.K_v), rect)
     assert sa.sheet.get_raw("C1") == "10"
     assert sa.sheet.get_raw("C2") == "20"
+
+
+def test_sheet_app_paste_shifts_relative_references(app):
+    """Comportement Excel : une formule collée ailleurs voit ses références
+    décalées du même vecteur que la copie (sauf ancres $)."""
+    sa = SheetApp(app)
+    sa.on_open()
+    sa.sheet.set("A1", "10"); sa.sheet.set("A2", "20")
+    sa.sheet.set("B1", "=A1*2")
+    sa.range_anchor = sa.range_end = "B1"
+    sa._copy_range()
+    sa.sel = "B2"
+    sa._paste_range()
+    assert sa.sheet.get_raw("B2") == "=A2*2"
+    assert sa.sheet.get_value("B2") == 40.0
+
+
+def test_sheet_app_paste_respects_absolute_anchors(app):
+    sa = SheetApp(app)
+    sa.on_open()
+    sa.sheet.set("A1", "5"); sa.sheet.set("A2", "7")
+    sa.sheet.set("B1", "=$A$1+A1")
+    sa.range_anchor = sa.range_end = "B1"
+    sa._copy_range()
+    sa.sel = "B2"
+    sa._paste_range()
+    assert sa.sheet.get_raw("B2") == "=$A$1+A2"
+    assert sa.sheet.get_value("B2") == 12.0
+
+
+def test_sheet_app_paste_out_of_grid_reference_becomes_ref_error(app):
+    """Décaler une référence au-dessus de la ligne 1 donne une erreur (#REF),
+    pas un plantage ni une référence silencieusement fausse."""
+    sa = SheetApp(app)
+    sa.on_open()
+    sa.sheet.set("B2", "=B1*2")
+    sa.range_anchor = sa.range_end = "B2"
+    sa._copy_range()
+    sa.sel = "B1"        # colle une ligne PLUS HAUT : B1 -> B0 impossible
+    sa._paste_range()
+    assert "#REF" in sa.sheet.get_raw("B1")
+    assert sa.sheet.get_value("B1") == "#ERR"
 
 
 def test_sheet_app_paste_without_copy_shows_message(app):
@@ -2168,7 +2207,9 @@ def test_search_finds_inbox_message_and_opens_inbox(app):
     results = desk._search_results()
     assert len(results) == 1
     desk._search_navigate(results[0])
-    assert any(w.key == "scene:inbox" for w in desk.wm.windows)
+    # l'Inbox est désormais une app NATIVE du bureau (clé "inbox", plus
+    # d'hébergement de la scène plein écran — cf. apps/app_inbox.py)
+    assert any(w.key == "inbox" for w in desk.wm.windows)
 
 
 def test_search_typing_and_backspace(app):
@@ -3105,3 +3146,55 @@ def test_company_sheet_switching_period_updates_rects(app):
     r = sc._chart_period_rects[18]   # 3M
     sc.handle_event(_click(*r.center))
     assert sc.chart_period == 18
+
+
+# ================== apps natives Inbox / Alertes (ex-scènes hébergées) =======
+def test_inbox_window_opens_native_app_and_targets_message(app):
+    """Ouvrir « inbox » en fenêtre lance l'app NATIVE (plus d'hébergement flou
+    de la scène plein écran) et `select_idx` cible/marque lu le bon message."""
+    app.gs.player.inbox = [
+        {"id": 1, "kind": "manager", "day": 1, "subject": "Bienvenue",
+         "sender": "Boss", "body": "…", "read": True},
+        {"id": 2, "kind": "client", "day": 2, "subject": "Mandat",
+         "sender": "Client", "body": "…", "read": False},
+    ]
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    w = desk._open_scene_window("inbox", select_idx=1)
+    assert w is not None and w.key == "inbox"
+    assert w.app_obj.sel == 1
+    assert app.gs.player.inbox[1]["read"] is True
+    w.app_obj.draw(app.screen, w.content_rect)   # dessin natif : ne lève pas
+
+
+def test_alerts_window_opens_native_app_and_posts_alert(app):
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    tk = app.market.companies[0]["ticker"]
+    w = desk._open_scene_window("alerts", ticker=tk)
+    assert w is not None and w.key == "alerts"
+    a = w.app_obj
+    assert a.sel_ticker == tk
+    price = app.market.price_of(tk)
+    a.price_text = f"{price * 1.1:.2f}"
+    a._post_alert()
+    assert any(al["ticker"] == tk for al in app.gs.player.alerts)
+    a.draw(app.screen, w.content_rect)
+    # suppression via l'API (le × passe par le même chemin)
+    from core import alerts as ALERTS
+    aid = app.gs.player.alerts[-1]["id"]
+    assert ALERTS.cancel(app.gs.player, aid) is True
+
+
+def test_inbox_and_alerts_desktop_icons_launch_native_apps(app):
+    """Les icônes Inbox/Alertes du bureau lancent les apps natives (elles ont
+    remplacé les accès rapides qinbox/qalerts vers les scènes hébergées)."""
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    keys = {k for k, _l, _kind, _acc in desk._icon_list()}
+    assert "inbox" in keys and "alerts" in keys
+    assert "qinbox" not in keys and "qalerts" not in keys
+    w = desk._launch("inbox")
+    assert w is not None and w.app_obj.__class__.__name__ == "InboxApp"
+    w2 = desk._launch("alerts")
+    assert w2 is not None and w2.app_obj.__class__.__name__ == "AlertsApp"

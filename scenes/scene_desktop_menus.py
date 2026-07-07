@@ -7,7 +7,7 @@ mixé dans `DesktopScene` aux côtés de `DesktopWidgetsMixin`.
 """
 import pygame
 
-from core import app_catalog, config, desktop_onboarding, desktop_tutorial, experience_mode, fuzzy
+from core import app_catalog, config, desktop_tutorial, experience_mode, fuzzy
 from scenes.scene_desktop_common import _L, APPS, cached_shade, TASKBAR_H, TOPBAR_H, _scene_label
 from ui import fonts, keynav, style, widgets
 
@@ -231,7 +231,6 @@ class DesktopMenusMixin:
             (_L("Réglages", "Settings"), lambda: self.app.scenes.go("settings", return_to="desktop")),
             (_L("Fermer toutes les fenêtres", "Close all windows"), self._close_all_windows),
             (_L("Guide de démarrage", "Getting-started guide"), self._open_intro_guide),
-            (_L("Revoir l'accueil", "Show welcome again"), desktop_onboarding.reset),
             (_L("Revoir le tutoriel", "Replay the tutorial"), desktop_tutorial.reset),
             (_L("Tutoriels (leçons guidées)", "Tutorials (guided lessons)"),
              lambda: self._open_scene_window("tutorials")),

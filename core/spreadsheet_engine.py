@@ -3,13 +3,14 @@ spreadsheet_engine.py — Moteur de tableur (type Excel) sans dépendance.
 Grille de cellules + évaluation de formules ('=...') via un parseur
 récursif-descendant propre (pas de juggling de regex).
 
-Supporte : littéraux numériques/texte, références (A1), plages (A1:B3),
-opérateurs + - * / ^, parenthèses, comparaisons (> < >= <= = <>),
-et un jeu de fonctions financières/statistiques.
+Supporte : littéraux numériques/texte, références (A1, avec ancres absolues
+$A$1/$A1/A$1 façon Excel), plages (A1:B3), opérateurs + - * / ^, parenthèses,
+comparaisons (> < >= <= = <>), et un jeu de fonctions financières/statistiques.
 
 Logique pure : aucun import pygame. Testable seule.
 """
 import math
+import re
 
 
 # ---------------------------------------------------------------------------
@@ -163,6 +164,63 @@ def idx_to_col(idx):
 
 
 # ---------------------------------------------------------------------------
+# Décalage de références (collage relatif façon Excel)
+# ---------------------------------------------------------------------------
+_REF_RE = re.compile(r'(\$?)([A-Za-z]+)(\$?)([0-9]+)')
+
+
+def shift_formula(raw, dr, dc):
+    """Réécrit les références d'une formule décalée de (`dr` lignes,
+    `dc` colonnes) — le comportement d'Excel au collage : `=B1*2` copié une
+    ligne plus bas devient `=B2*2`. Les ancres `$` bloquent le décalage
+    ($A$1 ne bouge jamais, $A1 fige la colonne, A$1 fige la ligne). Une
+    référence décalée hors grille devient `#REF` (la cellule affichera une
+    erreur, comme Excel). Les non-formules et les textes entre guillemets
+    sont laissés intacts."""
+    s = str(raw)
+    if not s.startswith("="):
+        return s
+    out, i, n = [], 0, len(s)
+    while i < n:
+        ch = s[i]
+        if ch == '"':                      # littéral texte : ne pas toucher
+            j = s.find('"', i + 1)
+            j = n - 1 if j < 0 else j
+            out.append(s[i:j + 1])
+            i = j + 1
+            continue
+        m = _REF_RE.match(s, i)
+        # pas une référence si collée à un identifiant plus long (ex. « X1 »
+        # au milieu de « MAX1 ») ou suivie de lettres
+        if m and not (i > 0 and (s[i - 1].isalnum() or s[i - 1] == '$')):
+            end = m.end()
+            if end < n and s[end].isalpha():
+                out.append(ch)
+                i += 1
+                continue
+            # nom de fonction du type LOG10( : pas une référence
+            k = end
+            while k < n and s[k].isspace():
+                k += 1
+            if k < n and s[k] == '(':
+                out.append(s[i:end])
+                i = end
+                continue
+            dol_c, col, dol_r, row = m.groups()
+            ci = col_to_idx(col.upper()) + (0 if dol_c else dc)
+            ri = int(row) + (0 if dol_r else dr)
+            if ci < 0 or ri < 1:
+                out.append("#REF")
+            else:
+                out.append(f"{dol_c}{idx_to_col(ci)}{dol_r}{ri}")
+            i = end
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+# ---------------------------------------------------------------------------
 # Tokeniseur
 # ---------------------------------------------------------------------------
 class Tok:
@@ -205,7 +263,25 @@ def tokenize(s):
             toks.append(Tok(Tok.NUM, float(s[i:j])))
             i = j
             continue
-        if c.isalpha():
+        if c == '$' or c.isalpha():
+            # référence ANCRÉE ($A$1, $A1, A$1) : les '$' sont des marqueurs
+            # d'ancrage pour le collage relatif (shift_formula) — l'évaluation
+            # les ignore (même valeur que A1).
+            j = i + (1 if c == '$' else 0)
+            k = j
+            while k < n and s[k].isalpha():
+                k += 1
+            letters = s[j:k]
+            m = k + (1 if k < n and s[k] == '$' else 0)
+            d = m
+            while d < n and s[d].isdigit():
+                d += 1
+            if c == '$' or m > k:
+                if letters and d > m:
+                    toks.append(Tok(Tok.REF, (letters + s[m:d]).upper()))
+                    i = d
+                    continue
+                raise ValueError("Référence invalide après '$'")
             j = i
             while j < n and s[j].isalnum():
                 j += 1

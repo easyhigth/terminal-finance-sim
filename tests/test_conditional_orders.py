@@ -180,3 +180,121 @@ def test_advance_step_executes_conditional_orders_and_reports_them():
     assert executed is not None and len(executed) == 1
     assert executed[0]["order"]["ticker"] == tk
     assert tk not in p.portfolio
+
+
+# =========================================================================
+# Positions COURTES (short) — les shorts vivent dans player.portfolio avec
+# un nombre de titres NÉGATIF (core/portfolio.short), pas dans un dict à part
+# =========================================================================
+def _short_position(cash=1_000_000.0, qty=100, price=100.0):
+    p, m = _setup(cash)
+    tk = m.companies[0]["ticker"]
+    _set_price(m, tk, price)
+    r = pf.short(p, m, tk, qty)
+    assert r["ok"], r
+    return p, m, tk
+
+
+def test_place_stop_on_short_position():
+    p, m, tk = _short_position()
+    r = CO.place(p, m, tk, "stop", 110.0)
+    assert r["ok"] is True
+    assert p.conditional_orders[0]["is_short"] is True
+
+
+def test_short_stop_executes_when_price_rises_to_trigger():
+    """Stop-loss sur short : couvre quand le cours MONTE au seuil."""
+    p, m, tk = _short_position(price=100.0)
+    CO.place(p, m, tk, "stop", 110.0)
+    _set_price(m, tk, 112.0)
+    executed = CO.execute_due(p, m)
+    assert len(executed) == 1
+    assert tk not in p.portfolio            # position couverte intégralement
+    assert p.conditional_orders == []
+
+
+def test_short_stop_does_not_execute_below_trigger():
+    p, m, tk = _short_position(price=100.0)
+    CO.place(p, m, tk, "stop", 110.0)
+    _set_price(m, tk, 105.0)
+    assert CO.execute_due(p, m) == []
+    assert len(p.conditional_orders) == 1
+
+
+def test_short_target_executes_when_price_falls_to_trigger():
+    """Take-profit sur short : couvre quand le cours BAISSE au seuil."""
+    p, m, tk = _short_position(price=100.0)
+    CO.place(p, m, tk, "target", 90.0)
+    _set_price(m, tk, 88.0)
+    executed = CO.execute_due(p, m)
+    assert len(executed) == 1
+    assert tk not in p.portfolio
+
+
+def test_short_order_abandoned_if_position_flipped_to_long():
+    """Un ordre posé sur un short est abandonné si la position a changé de
+    côté entre-temps (couverte puis rachetée en long) — jamais d'exécution
+    sur une position qui n'est plus celle visée."""
+    p, m, tk = _short_position(price=100.0)
+    CO.place(p, m, tk, "stop", 110.0)
+    pf.cover(p, m, tk, "ALL")
+    pf.buy(p, m, tk, 50)                    # maintenant LONG
+    _set_price(m, tk, 120.0)
+    assert CO.execute_due(p, m) == []
+    assert p.conditional_orders == []       # ordre retiré silencieusement
+    assert p.portfolio[tk]["shares"] == 50  # le long n'a pas été touché
+
+
+def test_place_clamps_qty_to_short_size():
+    p, m, tk = _short_position(qty=100)
+    r = CO.place(p, m, tk, "stop", 110.0, qty=500)
+    assert r["ok"] is True
+    assert r["order"]["qty"] == 100.0
+
+
+# =========================================================================
+# Trailing stops — sémantique de STOP (le seuil suit le cours), jamais
+# d'exécution immédiate côté favorable
+# =========================================================================
+def test_trailing_stop_long_does_not_fire_immediately():
+    p, m, tk = _held_position(price=100.0)
+    r = CO.place_trailing(p, m, tk, 5.0)
+    assert r["ok"] is True
+    # cours inchangé : le seuil est 5% SOUS le cours, rien ne doit partir
+    assert CO.execute_due(p, m) == []
+    assert len(p.conditional_orders) == 1
+
+
+def test_trailing_stop_long_follows_price_up_then_fires_on_drawdown():
+    p, m, tk = _held_position(price=100.0)
+    CO.place_trailing(p, m, tk, 5.0)
+    _set_price(m, tk, 120.0)                # le stop remonte à 114
+    CO.update_trailing_stops(p, m)
+    assert CO.execute_due(p, m) == []       # toujours au-dessus du seuil
+    assert p.conditional_orders[0]["trigger"] == pytest.approx(114.0)
+    _set_price(m, tk, 113.0)                # retombe sous 114 : vend
+    CO.update_trailing_stops(p, m)
+    executed = CO.execute_due(p, m)
+    assert len(executed) == 1
+    assert tk not in p.portfolio
+
+
+def test_trailing_stop_short_does_not_fire_immediately():
+    p, m, tk = _short_position(price=100.0)
+    r = CO.place_trailing(p, m, tk, 5.0)
+    assert r["ok"] is True
+    assert CO.execute_due(p, m) == []
+
+
+def test_trailing_stop_short_follows_price_down_then_fires_on_rebound():
+    p, m, tk = _short_position(price=100.0)
+    CO.place_trailing(p, m, tk, 5.0)
+    _set_price(m, tk, 80.0)                 # le stop descend à 84
+    CO.update_trailing_stops(p, m)
+    assert CO.execute_due(p, m) == []
+    assert p.conditional_orders[0]["trigger"] == pytest.approx(84.0)
+    _set_price(m, tk, 85.0)                 # rebond au-dessus de 84 : couvre
+    CO.update_trailing_stops(p, m)
+    executed = CO.execute_due(p, m)
+    assert len(executed) == 1
+    assert tk not in p.portfolio

@@ -210,18 +210,19 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   popups FORCÉS par le jeu — dilemmes) fait clignoter l'entrée de la fenêtre dans la barre des
   tâches (`_draw_taskbar`) jusqu'au premier `WindowManager.focus` (un coup d'œil éteint le
   clignotement).
-  **Étape 12 : découvrabilité (accueil + menus contextuels).** (1) **Carte d'accueil** du bureau
-  à la 1re visite (`DesktopScene._draw_onboarding`) : mode d'emploi rapide (icônes = apps en
-  fenêtres, ancrage/maximisation, Alt+Tab, le terminal reste le moteur, clic droit, widget
-  patrimoine). NON modale — un clic sur « Commencer » (ou ailleurs) la referme ; l'état « vue »
-  est persisté à part (`core/desktop_onboarding.py`, JSON dédié — distinct de `core/onboarding.py`
-  qui est le parcours guidé du TERMINAL). L'action « Revoir l'accueil » du menu contextuel du
-  fond appelle `desktop_onboarding.reset()`. (2) **Menus contextuels (clic droit)**
+  **Étape 12 : découvrabilité (accueil + menus contextuels).** (1) **Accueil du bureau** :
+  l'ex-carte d'accueil machine (`_draw_onboarding`) a été FUSIONNÉE dans le guide de démarrage
+  de l'étape 19 (sa dernière page couvre le poste de travail : fenêtres/ancrage/Alt+Tab, clic
+  droit, terminal-moteur, widget patrimoine, Ctrl+K / Ctrl+/ / F1). `core/desktop_onboarding.py`
+  (JSON par machine, distinct de `core/onboarding.py` — parcours guidé du TERMINAL) ne sert plus
+  que de porte d'entrée du tutoriel guidé : marqué vu à la fermeture du guide, ou dès l'arrivée
+  sur le bureau quand le guide ne s'affichera pas (vétéran/sandbox/déjà lu — cf. `on_enter`).
+  (2) **Menus contextuels (clic droit)**
   (`_open_context_menu`/`_handle_ctx_event`/`_draw_context_menu`, état `self._ctx_menu`) selon la
   cible sous le curseur : icône du bureau (Ouvrir / Ouvrir puis ancrer à gauche·droite), barre de
   titre OU entrée de barre des tâches d'une fenêtre (Réduire/Restaurer, Agrandir/Restaurer,
   Ancrer gauche·droite, Fermer), fond du bureau (Menu Applications, Réglages, Fermer toutes les
-  fenêtres, Revoir l'accueil). L'ancrage réutilise la logique de l'étape 10 (`_snap_window` pose
+  fenêtres, Guide de démarrage). L'ancrage réutilise la logique de l'étape 10 (`_snap_window` pose
   `_restore_rect`) ; « Fermer toutes les fenêtres » ne fait que MINIMISER le terminal (jamais
   arrêter le moteur). Le menu se referme au clic sur un item (exécute son action), à tout clic
   hors menu, ou sur Échap ; un clic droit sur le CONTENU d'une fenêtre reste routé vers l'app.
@@ -241,32 +242,40 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   formules) de la feuille active vers le dossier personnel de l'utilisateur — pas de sélecteur de
   fichier natif (comme la sauvegarde rapide du bureau), le message affiche le chemin écrit.
   **Copier/coller de plage** (Ctrl+C/Ctrl+V, `_copy_range`/`_paste_range`) : copie les FORMULES
-  brutes (pas les valeurs), collées telles quelles à partir de la cellule sélectionnée (pas de
-  décalage relatif des références) et bornées aux limites de la feuille. **Annuler/rétablir**
+  brutes (pas les valeurs) ; au collage, les références sont DÉCALÉES du vecteur copie→collage
+  comme dans Excel (`core/spreadsheet_engine.shift_formula` — les ancres `$` de `$A$1`/`$A1`/
+  `A$1` figent colonne et/ou ligne, supportées aussi à l'évaluation ; une référence décalée hors
+  grille devient `#REF`), bornées aux limites de la feuille. **Annuler/rétablir**
   (Ctrl+Z/Ctrl+Y, `_undo`/`_redo`, pile en mémoire non persistée) : chaque édition/effacement/
   collage empile l'état AVANT modification (`_record_undo`) ; un collage multi-cellules s'annule
   en un seul Ctrl+Z (toute la plage), pas cellule par cellule ; toute NOUVELLE action vide la
   pile de rétablissement. Les raccourcis Ctrl+C/V/Z/Y ne s'activent que HORS édition d'une
   cellule (`not self.editing`) pour ne jamais intercepter la frappe normale dans la barre de
   formule.
-  **Étape 14 : ordres conditionnels (stop-loss / take-profit).** `core/conditional_orders.py`
-  (logique pure) : un ordre (`{"id","ticker","kind","trigger","qty"}`, `kind` = `"stop"` ou
-  `"target"`) posé sur une position LONGUE détenue (short/cover hors scope — la notion de
-  « perte » s'y inverse et mériterait sa propre UI) ; `execute_due(player, market)` vend
-  (`core/portfolio.sell`) dès que le cours franchit le seuil (`<=` pour stop, `>=` pour target),
-  retire l'ordre (usage unique) et abandonne SILENCIEUSEMENT tout ordre dont la position a
-  disparu entre-temps (vente manuelle...). Câblé dans `GameState.advance_step` : exécuté à
-  CHAQUE pas de marché, juste avant `check_margin_call` (un ordre voulu par le joueur passe
-  avant une liquidation forcée sur la position déjà réduite), résultat exposé dans
-  `summary["conditional_orders_executed"]` et loggé/notifié par
-  `scenes/scene_terminal_time.py`. Contrairement à l'ALERTE de prix (notifie sans agir), un
-  ordre conditionnel EXÉCUTE une vente réelle, même fenêtre Trading fermée (le terminal reste
+  **Étape 14 : ordres conditionnels (stop-loss / take-profit / trailing).**
+  `core/conditional_orders.py` (logique pure) : un ordre (`{"id","ticker","kind","trigger",
+  "qty","is_short"}`, `kind` = `"stop"`, `"target"` ou `"trailing"`) posé sur une position
+  LONGUE **ou COURTE** détenue — les shorts vivent dans `player.portfolio` avec un nombre de
+  titres NÉGATIF (cf. `core/portfolio.short`, PAS de dict séparé ; helper `_position`). Sur un
+  long, `execute_due(player, market)` vend (`core/portfolio.sell`) au franchissement (`<=` pour
+  stop, `>=` pour target) ; sur un short, il COUVRE (`core/portfolio.cover`) avec la logique
+  INVERSÉE (stop si le cours monte, target s'il baisse). Le trailing (posé par
+  `place_trailing`, seuil suivant le cours à distance % via `update_trailing_stops`, appelé
+  AVANT `execute_due`) a la sémantique d'un STOP — surtout pas d'un target, sinon exécution
+  immédiate côté favorable. Un ordre dont la position a disparu OU CHANGÉ DE CÔTÉ entre-temps
+  est abandonné silencieusement. Câblé dans `GameState.advance_step` : exécuté à CHAQUE pas de
+  marché, juste avant `check_margin_call` (un ordre voulu par le joueur passe avant une
+  liquidation forcée sur la position déjà réduite), résultat exposé dans
+  `summary["conditional_orders_executed"]` et loggé/notifié par `scenes/scene_terminal_time.py`
+  (« vendu »/« couvert » selon le côté). Contrairement à l'ALERTE de prix (notifie sans agir),
+  un ordre conditionnel EXÉCUTE un ordre réel, même fenêtre Trading fermée (le terminal reste
   le moteur). UI : `apps/app_trading.py` — bouton « ORD » (texte plain, pas de glyphe
-  pictographique) sur chaque ligne détenue ouvre une boîte de dialogue (choix stop/target +
-  seuil) ; une bande « ORDRES CONDITIONNELS » sous la liste des valeurs récapitule les ordres en
-  cours de la partie (tous titres confondus, pas seulement celui affiché), avec annulation (×)
-  individuelle — rétrécit dynamiquement la liste de valeurs pour rester visible sans la
-  recouvrir.
+  pictographique) sur chaque ligne détenue (longue OU courte — quantité courte affichée en
+  rouge) ouvre une boîte de dialogue (choix stop/target/trailing + seuil, avec une ligne
+  expliquant le sens de déclenchement selon le côté) ; une bande « ORDRES CONDITIONNELS » sous
+  la liste des valeurs récapitule les ordres en cours de la partie (tag « (short) », tous
+  titres confondus), avec annulation (×) individuelle — rétrécit dynamiquement la liste de
+  valeurs pour rester visible sans la recouvrir.
   **Étape 15 : recherche globale sur les données de partie (Ctrl+/).** `core/global_search.py`
   (logique pure) cherche dans ce que le joueur POSSÈDE/REÇOIT déjà dans sa partie — positions,
   watchlist, inbox, mandats actifs, deals actifs — par opposition à la palette de navigation
@@ -275,7 +284,7 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   terminal pour M&A, cf. `RAIL_SHORTCUTS` dans `scenes/scene_terminal.py`), câblé dans
   `DesktopScene.handle_event` (prioritaire, avant même le menu contextuel). Chaque résultat
   ({"label", "kind", "action"}) navigue selon son type : position/watchlist → Trading pré-filtré
-  (`DesktopScene.open_trading`), inbox/mandats/deals → la scène hébergée correspondante. Réutilise
+  (`DesktopScene.open_trading`), inbox/mandats/deals → la fenêtre correspondante. Réutilise
   `core/fuzzy.filter_sorted` (même moteur de correspondance floue que Ctrl+K) sur un haystack
   concaténé par entrée (ticker+nom, sujet+expéditeur+corps, nom client, titre de deal).
   **Étape 16 : les clics ne traversent plus les fenêtres + rendu moins flou.**
@@ -299,6 +308,16 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   taille de la fenêtre ; une fenêtre par défaut plus proche de cette résolution réduit
   nettement le facteur de réduction (donc le flou) sans toucher à la résolution logique
   elle-même (jugé trop risqué à changer globalement, cf. décision précédente).
+  **Apps natives Inbox / Alertes (netteté).** Les écrans les plus consultés migrent
+  progressivement de l'hébergement de scène (rendu 1280×720 réduit par `smoothscale` → flou,
+  cf. `apps/scene_host.py`) vers de vraies apps du bureau dessinées à la résolution de leur
+  fenêtre : `apps/app_inbox.py` (`InboxApp`, messagerie — `select_message(idx)` pour cibler un
+  message depuis le centre de notifications/recherche globale) et `apps/app_alerts.py`
+  (`AlertsApp`, alertes de prix — même logique `core/alerts` + verrou de grade « analyst » que
+  la scène, `preselect(ticker)`). Enregistrées dans `APPS` (icônes du bureau, remplacent les
+  accès rapides `qinbox`/`qalerts`) ; toute ouverture EN FENÊTRE des scènes `"inbox"`/`"alerts"`
+  est redirigée vers l'app native par `DesktopScene._open_scene_window` (même principe que le
+  Tableur) — les scènes plein écran restent enregistrées pour la navigation hors bureau.
   **Étape 17 (polish V0) : un seul jeu de contrôles temps/pause.** La topbar du bureau
   (`DesktopScene._draw_topbar`) redessinait pause/vitesse/⚙ (`_pause_rect`/`_speed_rects`/
   `_gear_rect`) JUSTE en dessous du widget d'horloge de la bande d'onglets

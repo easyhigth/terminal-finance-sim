@@ -306,52 +306,6 @@ class DesktopWidgetsMixin:
         else:
             self.app.notify(_L("Étape validée ✓", "Step complete ✓"), "good")
 
-    def _draw_onboarding(self, surf):
-        """Carte d'accueil (1re visite du bureau) : quelques repères pour
-        comprendre le poste de travail. NON modale — se referme au clic."""
-        surf.blit(cached_shade(self, surf, 150), (0, 0))
-        W, H = 560, 320
-        x = (config.SCREEN_WIDTH - W) // 2
-        y = (config.SCREEN_HEIGHT - H) // 2
-        card = pygame.Rect(x, y, W, H)
-        self._onboard_card = card
-        style.draw_window_shadow(surf, card, focused=True)
-        style.draw_glass_panel(surf, card, alpha=230, border_color=config.COL_AMBER,
-                               radius=style.RADIUS_LG)
-        widgets.draw_text(surf, _L("Bienvenue sur votre poste de travail",
-                                   "Welcome to your workstation"),
-                          (x + 24, y + 20), fonts.ui_head(bold=True), config.COL_AMBER)
-        lines = [
-            _L("• Les icônes ouvrent des APPLICATIONS en fenêtres déplaçables.",
-               "• Icons open APPLICATIONS as draggable windows."),
-            _L("• Glissez une fenêtre vers un bord pour l'ancrer ; double-clic sur",
-               "• Drag a window to an edge to snap it; double-click the title bar"),
-            _L("  la barre de titre pour l'agrandir. Alt+Tab pour changer de fenêtre.",
-               "  to maximize. Alt+Tab to switch windows."),
-            _L("• Le TERMINAL (icône dédiée) reste le moteur : le temps s'écoule même",
-               "• The TERMINAL (its own icon) stays the engine: time flows even when"),
-            _L("  fenêtre fermée. ▌▌/▶▶ en haut à droite règlent la vitesse.",
-               "  its window is closed. ▌▌/▶▶ top-right control speed."),
-            _L("• Clic DROIT sur une icône, une fenêtre ou le fond : menu d'actions.",
-               "• RIGHT-click an icon, a window or the background: action menu."),
-            _L("• Le widget en bas à droite suit votre patrimoine en direct.",
-               "• The bottom-right widget tracks your net worth live."),
-            _L("• Ctrl+/ cherche dans vos positions, watchlist, inbox, mandats et deals.",
-               "• Ctrl+/ searches your positions, watchlist, inbox, mandates and deals."),
-        ]
-        ly = y + 58
-        for ln in lines:
-            widgets.draw_text(surf, ln, (x + 24, ly), fonts.small(), config.COL_TEXT)
-            ly += 24
-        btn = pygame.Rect(x + W - 160, y + H - 44, 136, 30)
-        self._onboard_btn = btn
-        hov = btn.collidepoint(pygame.mouse.get_pos())
-        pygame.draw.rect(surf, config.COL_AMBER if hov else config.COL_PANEL_HEAD, btn, border_radius=5)
-        pygame.draw.rect(surf, config.COL_AMBER, btn, 1, border_radius=5)
-        widgets.draw_text(surf, _L("Commencer", "Get started"), btn.center,
-                          fonts.small(bold=True), config.COL_BG if hov else config.COL_AMBER,
-                          align="center")
-
     def _draw_tutorial(self, surf):
         """Bandeau du tutoriel guidé (au-dessus des fenêtres) + halo pulsé sur
         l'icône visée par l'étape courante."""

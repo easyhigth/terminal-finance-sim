@@ -85,7 +85,7 @@ class TradingApp(DesktopApp):
         mp = pygame.mouse.get_pos()
         for tk, r in self._buy_rects.items():
             # on anime le hover sur la ligne entière via son rectangle de base
-            base_r = r.inflate(70 + (68 if self._held(tk) > 0 else 0), 2)
+            base_r = r.inflate(70 + (68 if self._held(tk) != 0 else 0), 2)
             base_r.right = r.right
             target = 1.0 if base_r.collidepoint(mp) else 0.0
             cur = self._row_hover.get(tk, 0.0)
@@ -760,10 +760,11 @@ class TradingApp(DesktopApp):
                           fonts.small(), flash_col)
         held_x = area.x + int(area.w * 0.66)
         held_avail = max(20, (r.right - 174) - held_x)   # jamais sous les boutons ORD/VENDRE/ACHETER
+        held_col = (config.COL_AMBER if held > 0
+                    else config.COL_DOWN if held < 0 else config.COL_TEXT_DIM)
         widgets.draw_text(surf, widgets.fit_text(f"{held:g}" if held else "—",
-                                                 fonts.small(bold=held > 0), held_avail),
-                          (held_x, r.y + 4), fonts.small(bold=held > 0),
-                          config.COL_AMBER if held > 0 else config.COL_TEXT_DIM)
+                                                 fonts.small(bold=held != 0), held_avail),
+                          (held_x, r.y + 4), fonts.small(bold=held != 0), held_col)
         if self._can_trade():
             br = pygame.Rect(r.right - 66, r.y, 64, ROW_H - 4)
             self._buy_rects[tk] = br
@@ -774,17 +775,22 @@ class TradingApp(DesktopApp):
                 self._sell_rects[tk] = sre
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, sre, border_radius=3)
                 widgets.draw_text(surf, "VENDRE", sre.center, fonts.tiny(bold=True), config.COL_DOWN, align="center")
-                # ordre conditionnel (stop-loss/take-profit) sur cette position
-                # (texte plain, pas de glyphe pictographique — non couvert par
-                # la police embarquée, cf. CLAUDE.md/ui/desktop_icons.py)
-                ore = pygame.Rect(sre.x - 34, r.y, 30, ROW_H - 4)
+            if held != 0:
+                # ordre conditionnel (stop-loss/take-profit) sur cette position,
+                # LONGUE ou COURTE — pour un short, le stop couvre si le cours
+                # MONTE, le target s'il BAISSE (texte plain, pas de glyphe
+                # pictographique — non couvert par la police embarquée,
+                # cf. CLAUDE.md/ui/desktop_icons.py)
+                ore_x = (r.right - 168) if held > 0 else (r.right - 100)
+                ore = pygame.Rect(ore_x, r.y, 30, ROW_H - 4)
                 self._order_rects[tk] = ore
                 hov = ore.collidepoint(pygame.mouse.get_pos())
                 pygame.draw.rect(surf, config.COL_PANEL if hov else config.COL_PANEL_HEAD, ore, border_radius=3)
                 pygame.draw.rect(surf, config.COL_PRESTIGE, ore, 1, border_radius=3)
                 widgets.draw_text(surf, "ORD", ore.center, fonts.tiny(bold=True), config.COL_PRESTIGE, align="center")
             # TWAP : visible sur toutes les lignes (achat si pas de position, vente si détenu)
-            tw = pygame.Rect(r.right - 204 if held > 0 else r.right - 100, r.y, 34, ROW_H - 4)
+            tw = pygame.Rect(r.right - 204 if held > 0
+                             else r.right - 138 if held < 0 else r.right - 100, r.y, 34, ROW_H - 4)
             self._twap_rects[tk] = tw
             hovt = tw.collidepoint(pygame.mouse.get_pos())
             pygame.draw.rect(surf, config.COL_PANEL if hovt else config.COL_PANEL_HEAD, tw, border_radius=3)
@@ -798,7 +804,7 @@ class TradingApp(DesktopApp):
         overlay.fill((0, 0, 0, 160))
         surf.blit(overlay, rect.topleft)
         tk = self._order_prompt["ticker"]
-        box = pygame.Rect(0, 0, min(320, rect.w - 40), 160)
+        box = pygame.Rect(0, 0, min(320, rect.w - 40), 184)
         box.center = rect.center
         style.draw_card(surf, box, bg=config.COL_PANEL, border=config.COL_PRESTIGE,
                         radius=style.RADIUS_MD)
@@ -806,7 +812,9 @@ class TradingApp(DesktopApp):
                           fonts.small(bold=True), config.COL_PRESTIGE)
         held = self._held(tk)
         price = self.market.price_of(tk)
-        widgets.draw_text(surf, f"Détenu : {held:g} · cours {price:,.2f}" if price is not None else f"Détenu : {held:g}",
+        side = "SHORT" if held < 0 else "LONG"
+        pos_txt = f"Position {side} : {held:g}"
+        widgets.draw_text(surf, f"{pos_txt} · cours {price:,.2f}" if price is not None else pos_txt,
                           (box.x + 12, box.y + 28), fonts.tiny(), config.COL_TEXT_DIM)
 
         self._order_kind_rects = {}
@@ -824,13 +832,26 @@ class TradingApp(DesktopApp):
             widgets.draw_text(surf, label, r.center, fonts.tiny(bold=True), col, align="center")
             x += w + 6
 
+        # sens de déclenchement selon le CÔTÉ de la position (sur un short,
+        # stop = couvre si le cours monte, target = couvre s'il baisse)
+        is_short = held < 0
+        act = "Couvre" if is_short else "Vend"
+        senses = {
+            "stop":     f"{act} si le cours passe {'AU-DESSUS' if is_short else 'SOUS'} le seuil.",
+            "target":   f"{act} si le cours passe {'SOUS' if is_short else 'AU-DESSUS'} le seuil.",
+            "trailing": (f"{act} si le cours rebondit de X% depuis son plus bas."
+                         if is_short else
+                         f"{act} si le cours retombe de X% depuis son plus haut."),
+        }
+        widgets.draw_text(surf, senses[self._order_kind], (box.x + 12, box.y + 76),
+                          fonts.tiny(), config.COL_TEXT)
         if self._order_kind == "trailing":
             hint = "Distance (% du cours) :"
         else:
             hint = "Seuil de déclenchement :"
-        widgets.draw_text(surf, hint, (box.x + 12, box.y + 82),
+        widgets.draw_text(surf, hint, (box.x + 12, box.y + 94),
                           fonts.tiny(), config.COL_TEXT_DIM)
-        self._order_price_rect = pygame.Rect(box.x + 12, box.y + 98, box.w - 24, 26)
+        self._order_price_rect = pygame.Rect(box.x + 12, box.y + 110, box.w - 24, 26)
         pygame.draw.rect(surf, config.COL_BG, self._order_price_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN if self._order_focus else config.COL_BORDER,
                          self._order_price_rect, 1, border_radius=4)

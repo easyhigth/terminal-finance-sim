@@ -127,8 +127,6 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self._todo_rects = []        # lignes du widget « À faire » (clic → scène)
         self._calendar_rect = None   # widget calendrier macro (clic → calendrier)
         self._ctx_menu = None        # menu contextuel (clic droit) : dict ou None
-        self._onboard_card = None    # carte d'accueil (rect) — 1re visite
-        self._onboard_btn = None
         self._tuto_skip_rect = None  # bouton « Passer » du tutoriel guidé
         self._qcard_rects = {}       # boutons de la carte « Bilan du trimestre »
         self._brief_rects = {}       # boutons de la carte « Nouveautés » (promotion)
@@ -136,6 +134,13 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self._guide_rects = {}       # boutons du guide de démarrage (multi-pages)
         self._guide_page = 0
         self._guide_force = getattr(self, "_guide_force", False)
+        # L'ex-carte d'accueil machine a été FUSIONNÉE dans le guide de
+        # démarrage (sa dernière page couvre le poste de travail). Quand le
+        # guide ne s'affichera pas (vétéran, sandbox, déjà lu), on marque
+        # directement l'accueil comme vu pour que le tutoriel guidé puisse
+        # démarrer sans étape fantôme.
+        if not self._intro_guide_active():
+            desktop_onboarding.mark_seen()
         self._assistant_open = False   # carte « Assistant » (F1)
         self._assistant_rects = {}
         self._checklist_rects = []     # lignes du widget « Routine du jour » (clic → coche)
@@ -454,20 +459,6 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         # menu contextuel ouvert : il capture les clics/échap en priorité
         if self._ctx_menu is not None and self._handle_ctx_event(event):
             return
-        # carte d'accueil (1re visite) : NON modale — un clic sur son bouton (ou
-        # ailleurs) la referme ; les clics sur la carte elle-même sont avalés,
-        # les autres continuent (on peut ouvrir une app du même clic).
-        if not desktop_onboarding.seen():
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if self._onboard_btn and self._onboard_btn.collidepoint(event.pos):
-                    desktop_onboarding.mark_seen()
-                    return
-                if self._onboard_card and self._onboard_card.collidepoint(event.pos):
-                    return
-                desktop_onboarding.mark_seen()
-            elif event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
-                desktop_onboarding.mark_seen()
-                return
         # Alt+Tab : passe à la fenêtre suivante (façon OS), prioritaire sur tout
         if event.type == pygame.KEYDOWN and event.key == pygame.K_TAB and (event.mod & pygame.KMOD_ALT):
             self.wm.cycle_focus(reverse=bool(event.mod & pygame.KMOD_SHIFT))
@@ -776,6 +767,24 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             return self._open_sheet_app(kwargs.get("import_data"))
         if name == "trading":
             return self.open_trading(kwargs.get("ticker"))
+        if name == "inbox":
+            # messagerie NATIVE (apps/app_inbox.py) : plus d'hébergement flou
+            # de la scène plein écran ; `select_idx` (centre de notifications,
+            # recherche globale) cible un message précis.
+            w = self._launch("inbox")
+            if w is not None:
+                if kwargs.get("select_idx") is not None:
+                    w.app_obj.select_message(kwargs["select_idx"])
+                self.wm.focus(w)
+            return w
+        if name == "alerts":
+            # alertes de prix NATIVES (apps/app_alerts.py), même principe
+            w = self._launch("alerts")
+            if w is not None:
+                if kwargs.get("ticker"):
+                    w.app_obj.preselect(kwargs["ticker"])
+                self.wm.focus(w)
+            return w
         if name not in self.app.scenes.scenes or name in _FULLSCREEN_EXIT:
             # essayer une app native (ex. "trading" depuis notification)
             if name not in self.app.scenes.scenes and not name.startswith("scene:"):
@@ -871,8 +880,6 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             self._draw_search(surf)
         if self._assistant_open:
             self._draw_assistant_card(surf)
-        if not desktop_onboarding.seen() and not self._intro_guide_active():
-            self._draw_onboarding(surf)
         # guide de démarrage : TOUT au-dessus (modal, début de partie)
         if self._intro_guide_active():
             self._draw_intro_guide(surf)

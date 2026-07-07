@@ -23,7 +23,7 @@ import pygame
 
 from apps.base import DesktopApp
 from core import audio, config
-from core.spreadsheet_engine import col_to_idx, idx_to_col
+from core.spreadsheet_engine import col_to_idx, idx_to_col, shift_formula
 from core.workbook import ConditionalFormat, SheetChart, Workbook, template_list
 from ui import fonts, style, widgets
 
@@ -330,8 +330,13 @@ class SheetApp(DesktopApp):
     # --------------------------------------------------- copier/coller de plage
     def _copy_range(self):
         c1, c2, r1, r2 = self._range_bounds()
-        self._clipboard = [[self.sheet.get_raw(f"{idx_to_col(c)}{r}") for c in range(c1, c2 + 1)]
-                           for r in range(r1, r2 + 1)]
+        # on garde l'ORIGINE de la copie : au collage, les références des
+        # formules sont décalées d'autant (comportement Excel) — sauf ancres $.
+        self._clipboard = {
+            "origin": (c1, r1),
+            "data": [[self.sheet.get_raw(f"{idx_to_col(c)}{r}") for c in range(c1, c2 + 1)]
+                     for r in range(r1, r2 + 1)],
+        }
         n = (c2 - c1 + 1) * (r2 - r1 + 1)
         self.msg = f"{n} cellule(s) copiée(s)."
         audio.play("click")
@@ -341,12 +346,15 @@ class SheetApp(DesktopApp):
             self.msg = "Presse-papiers vide (Ctrl+C d'abord)."
             return
         c0, r0 = _split_ref(self.sel)
+        oc, orow = self._clipboard["origin"]
+        shift_r, shift_c = r0 - orow, c0 - oc
         targets = []
-        for dr, row in enumerate(self._clipboard):
+        for dr, row in enumerate(self._clipboard["data"]):
             for dc, raw in enumerate(row):
                 c, r = c0 + dc, r0 + dr
                 if c < N_COLS and r <= N_ROWS:
-                    targets.append((f"{idx_to_col(c)}{r}", raw))
+                    targets.append((f"{idx_to_col(c)}{r}",
+                                    shift_formula(raw, shift_r, shift_c)))
         self._record_undo([ref for ref, _ in targets])
         for ref, raw in targets:
             self.sheet.set(ref, raw)

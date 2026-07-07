@@ -170,6 +170,12 @@ INTRO_PAGES = [
              "Shortcuts to remember: Ctrl+K (universal palette — open anything "
              "from the keyboard), Ctrl+/ (search YOUR data: positions, inbox, "
              "mandates), F1 (the “what should I do now?” Assistant)."),
+            ("Le TERMINAL reste le moteur : le temps s'écoule même sa fenêtre "
+             "fermée (▌▌/▶▶ en haut à droite règlent la vitesse), et le widget "
+             "en bas à droite du bureau suit votre patrimoine en direct.",
+             "The TERMINAL stays the engine: time flows even with its window "
+             "closed (▌▌/▶▶ top-right control speed), and the bottom-right "
+             "desktop widget tracks your net worth live."),
             ("C'est tout ce qu'il faut savoir pour commencer. Résumé en une "
              "phrase : faites des MISSIONS, montez votre RÉPUTATION, passez "
              "l'EXAMEN — le reste s'ouvrira à vous. Bonne carrière !",

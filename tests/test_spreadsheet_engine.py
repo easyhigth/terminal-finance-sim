@@ -475,3 +475,63 @@ def test_range_aggregate_unaffected_by_grid_shape_refactor():
     sh = _lookup_sheet()
     sh.set("D1", "=SUM(B1:B3)")
     assert sh.get_value("D1") == 600.0
+
+
+# =========================================================================
+# Ancres absolues ($) et décalage de références (shift_formula)
+# =========================================================================
+def test_absolute_anchors_evaluate_like_plain_references():
+    from core.spreadsheet_engine import Spreadsheet
+    sh = Spreadsheet()
+    sh.set("A1", "10")
+    sh.set("B1", "=$A$1+A$1+$A1")
+    assert sh.get_value("B1") == 30.0
+
+
+def test_anchored_range_in_function():
+    from core.spreadsheet_engine import Spreadsheet
+    sh = Spreadsheet()
+    sh.set("A1", "1"); sh.set("A2", "2"); sh.set("A3", "3")
+    sh.set("B1", "=SUM($A$1:$A$3)")
+    assert sh.get_value("B1") == 6.0
+
+
+def test_dollar_without_reference_is_an_error():
+    from core.spreadsheet_engine import Spreadsheet
+    sh = Spreadsheet()
+    sh.set("B1", "=$+1")
+    assert sh.get_value("B1") == "#ERR"
+
+
+def test_shift_formula_moves_relative_references():
+    from core.spreadsheet_engine import shift_formula
+    assert shift_formula("=A1+B2*3", 1, 0) == "=A2+B3*3"
+    assert shift_formula("=A1+B2", 0, 2) == "=C1+D2"
+    assert shift_formula("=SUM(A1:A5)", 2, 1) == "=SUM(B3:B7)"
+
+
+def test_shift_formula_respects_anchors():
+    from core.spreadsheet_engine import shift_formula
+    assert shift_formula("=$A$1+A1", 1, 1) == "=$A$1+B2"
+    assert shift_formula("=$A1", 3, 3) == "=$A4"     # colonne figée
+    assert shift_formula("=A$1", 3, 3) == "=D$1"     # ligne figée
+
+
+def test_shift_formula_leaves_non_formulas_and_strings_alone():
+    from core.spreadsheet_engine import shift_formula
+    assert shift_formula("A1", 5, 5) == "A1"          # pas une formule
+    assert shift_formula('="A1"&""', 1, 1) == '="A1"&""'
+    assert shift_formula("123.5", 1, 1) == "123.5"
+
+
+def test_shift_formula_out_of_grid_becomes_ref_marker():
+    from core.spreadsheet_engine import shift_formula
+    assert shift_formula("=A1*2", -1, 0) == "=#REF*2"
+    assert shift_formula("=A1*2", 0, -1) == "=#REF*2"
+
+
+def test_shift_formula_does_not_touch_function_names():
+    from core.spreadsheet_engine import shift_formula
+    # LOG10( ressemble à une référence (lettres+chiffres) mais est suivi
+    # d'une parenthèse : nom de fonction, pas de décalage.
+    assert shift_formula("=LOG10(A1)", 1, 0) == "=LOG10(A2)"

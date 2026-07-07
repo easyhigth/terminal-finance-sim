@@ -137,6 +137,19 @@ ICON_GAP = 6
 # scène -> icon_kind (façade visuelle des fenêtres hébergées de la voie choisie)
 _TRACK_SCENE_ICON = {scene: kind for _track, (scene, _label, kind) in TRACK_APP.items()}
 
+# scène -> icon_kind pour TOUTES les fenêtres hébergées (barre de titre +
+# barre des tâches) : accès rapides + apps de voie + quelques écrans courants.
+# Une scène absente d'ici retombe sur l'icône « generic ».
+SCENE_ICON = dict(_TRACK_SCENE_ICON)
+SCENE_ICON.update({scene: kind for _k, _l, kind, scene in QUICK_APPS if scene})
+SCENE_ICON.update({
+    "terminal": "terminal",
+    "company": "research",
+    "saves": "save",
+    "achievements": "star",
+    "compare": "graph",
+})
+
 
 def _L(fr, en):
     from core.i18n import get_lang

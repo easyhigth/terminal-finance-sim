@@ -38,7 +38,7 @@ jobs:
         shell: pwsh
         run: |
           cd dist
-          Compress-Archive -Path TERMINAL -DestinationPath ..\TERMINAL-Windows.zip
+          Compress-Archive -Path TERMINAL.exe -DestinationPath ..\TERMINAL-Windows.zip
 
       - name: Upload artifact (macOS)
         if: runner.os == 'macOS'

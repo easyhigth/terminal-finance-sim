@@ -19,6 +19,10 @@ import shutil
 import subprocess
 import sys
 
+# Évite les erreurs d'encodage sur Windows (cp1252) quand on affiche des flèches.
+if sys.platform.startswith("win") and hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 SPEC = os.path.join(HERE, "terminal.spec")
 
@@ -45,11 +49,11 @@ def main():
     print("Lancement :", " ".join(cmd))
     result = subprocess.run(cmd, cwd=HERE)
     if result.returncode == 0:
-        print("\nBuild terminé. Voir le dossier dist/.")
+        print("\nBuild termine. Voir le dossier dist/.")
         if sys.platform == "darwin":
-            print("  → dist/TERMINAL.app")
+            print("  -> dist/TERMINAL.app")
         elif sys.platform.startswith("win"):
-            print("  → dist/TERMINAL.exe")
+            print("  -> dist/TERMINAL.exe")
     return result.returncode
 
 

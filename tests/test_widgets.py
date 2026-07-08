@@ -203,3 +203,17 @@ def test_draw_series_area_fill_can_be_disabled():
     surf = pygame.Surface((200, 100))
     rect = pygame.Rect(0, 0, 200, 100)
     widgets.draw_series(surf, rect, [10.0, 12.0, 9.0], (64, 220, 240), area_fill=False)
+
+
+def test_hover_sync_reexported_and_shared_with_chart_widgets():
+    """Régression : `ui/datawindow.py` accède à `widgets._hover_sync` (état de
+    synchronisation du survol entre fenêtres-graphes), mais ce dict vit dans
+    `ui/chart_widgets.py` et n'était PAS dans la liste de réexport de
+    `ui/widgets.py` — chaque graphe DataWindow avec >= 2 points de données
+    plantait donc au dessin (AttributeError), fermant toute la partie au clic
+    sur un indice/société/ticker. Doit rester le MÊME objet (mutation en
+    place par `sync_chart_hover`, pas de réassignation) pour que les deux
+    accès restent synchronisés."""
+    from ui import chart_widgets
+    assert hasattr(widgets, "_hover_sync")
+    assert widgets._hover_sync is chart_widgets._hover_sync

@@ -384,7 +384,7 @@ from ui.chart_widgets import (  # noqa: F401, E402 — réexport
     draw_series, _aggregate_ohlc, _sma, draw_candles,
     draw_chart_axes, draw_chart_x_labels, draw_chart_zero_line,
     draw_chart_crosshair, draw_chart_extrema, sync_chart_hover,
-    draw_chart_ghost, ChartCursor, draw_chart_legend,
+    draw_chart_ghost, ChartCursor, draw_chart_legend, _hover_sync,
 )
 
 # ---------------------------------------------------------------------------

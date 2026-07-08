@@ -112,3 +112,18 @@ def test_holdings_lists_open_positions():
 def test_coverage_ratio_zero_without_positions_or_exposure():
     p, m = _mk()
     assert H.coverage_ratio(p, m) == 0.0
+
+
+def test_holdings_expose_strike_and_start_level_for_display():
+    """Régression : scene_hedge.draw lit h['start_level'] et h['strike'] pour
+    la perf en direct du sous-jacent — l'écran plantait à chaque frame dès
+    qu'une couverture était active (KeyError), holdings() ne renvoyant pas
+    ces clés."""
+    p, m = _mk()
+    r = H.buy_put(p, m, notional=100_000, strike_pct=0.95, years=1.0)
+    assert r["ok"] is True
+    hold = H.holdings(p, m)
+    assert len(hold) == 1
+    h = hold[0]
+    assert h["start_level"] > 0
+    assert abs(h["strike"] - h["start_level"] * 0.95) < 1e-9

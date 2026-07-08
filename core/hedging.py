@@ -129,6 +129,7 @@ def holdings(player, market):
         steps_left = max(0, pos["maturity_step"] - market.step_count)
         out.append({"underlying": pos["underlying"], "notional": pos["notional"],
                      "strike_pct": pos["strike_pct"], "premium": pos["premium"],
+                     "strike": pos["strike"], "start_level": pos["start_level"],
                      "perf": perf, "steps_left": steps_left,
                      "years_left": steps_left / STEPS_PER_YEAR,
                      "in_money": cur < pos["strike"]})

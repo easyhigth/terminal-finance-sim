@@ -428,6 +428,33 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   la fenêtre relance le temps (geste explicite « je mets ce travail de côté »). En plein
   écran, la même garantie vient déjà de `SceneManager.go` (auto-pause hors
   `LIVE_SCENE_NAMES`).
+  **Étape 20 (netteté, suite) : Décision et Revue de performance en apps natives.**
+  `apps/app_dilemma.py` (`DilemmaApp`) et `apps/app_review.py` (`ReviewApp`) migrent
+  `scenes/scene_dilemma.py`/`scenes/scene_review.py` (popups FORCÉS par le jeu via
+  `App.route_scene`, cf. étape 4) hors de l'hébergement flou — même principe que
+  Portefeuille/Marché. Particularité par rapport aux autres apps natives : ces deux écrans
+  sont RE-DÉCLENCHABLES pendant qu'une fenêtre déjà résolue traîne encore ouverte (un
+  deuxième dilemme signature avant d'avoir fermé le premier) ; `DesktopScene._open_scene_window`
+  ferme donc l'éventuelle fenêtre existante avant d'en relancer une fraîche plutôt que de
+  garder un état "outcome" périmé affiché. Ces deux clés de fenêtre (`"dilemma"`/`"review"`,
+  SANS préfixe `"scene:"` contrairement aux scènes encore hébergées) sont désormais
+  reconnues par `DesktopScene._engaged_in_focus_work()` (auto-pause) ET par
+  `App.route_scene`/`_open_scene_window(attention=True)` (clignotement de barre des tâches
+  SANS voler le focus — la version précédente focalisait immédiatement la fenêtre pour
+  book/markethub, ce qui aurait annulé le clignotement pour ces popups forcés).
+- **`core/clipboard.py`** : lecture/écriture presse-papiers système best-effort
+  (`pygame.scrap`), silencieux si le backend est indisponible (headless/CI, plateforme sans
+  presse-papiers). `copy(text)` factorise l'ancien `scenes/scene_commands.py::_try_clipboard`
+  (conservé comme fine façade de compat) ; `paste()` et `is_paste_shortcut(event)` (Ctrl+V/
+  Cmd+V) sont le côté LECTURE, câblés dans la boîte « Importer un code » de
+  `scenes/scene_gameover.py` (coller un code de défi partagé plutôt que le retaper caractère
+  par caractère) et le chemin d'export/import de `scenes/scene_saves.py`.
+- **`core/crashlog.py`** (lecture) + **`ui/crashlogpanel.py`** : visualiseur en jeu du journal
+  de plantage (`crashlog.read()`/`clear()`, ajoutés au module déjà existant du filet de
+  sécurité), overlay déplaçable/défilable (même pattern que `ui/shortcutspanel.py`) ouvert
+  depuis un bouton « ⚠ Journal de plantage » de `scenes/scene_settings.py` — un joueur qui
+  rencontre un comportement inattendu peut consulter/copier les tracebacks journalisés SANS
+  accès au système de fichiers, pour les transmettre en rapport de bug.
 - **`core/sim_clock.py`** : horloge de jeu temps réel (`SimClock`) — vitesse (x1/x2/x3),
   pause manuelle, pause automatique. Cadence : à x1, un jour de jeu dure ~16 s réelles
   (`GAME_MINUTES_PER_REAL_SECOND_AT_X1 = 90`), soit un nouveau pas de marché (5 jours) toutes
@@ -530,7 +557,13 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   `scene_commands._try_clipboard`, l'affiche aussi en clair pour copie manuelle) et
   « IMPORTER UN CODE » (boîte de saisie modale, même pattern que
   `scene_saves.py::path_prompt` — Échap annule la SAISIE sans quitter l'écran, contrairement
-  au Échap habituel de cet écran qui renvoie au menu).
+  au Échap habituel de cet écran qui renvoie au menu). **Retour social à l'import** :
+  `GameOverScene._confirm_code_prompt` compare, quand CE run est lui-même un défi du jour
+  (seul cas où le classement s'affiche), mon score (`self.score.total`, déjà calculé à
+  `on_enter`) à celui de l'ami tout juste importé (`result["score"]`) et l'annonce dans le
+  toast de confirmation (« Vous le devancez de N points ! » / « <Ami> vous devance de N
+  points. » / égalité) — sans ça, « score ajouté au classement » laissait deviner qui est
+  devant sans aller relire le tableau.
 - **`core/anim_settings.py`** : réglage persisté « réduire les animations » (fichier JSON
   séparé sous `config.SAVE_DIR`, distinct de `core/i18n.py`/`settings.json`). Unique point de
   gating dans `core/intraday.py::wiggle()` : si actif, toutes les courbes intraday retombent

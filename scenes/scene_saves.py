@@ -134,6 +134,10 @@ class SavesScene(Scene):
             if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                 self._confirm_path_prompt()
                 return
+            from core import clipboard
+            if clipboard.is_paste_shortcut(event):
+                self.path_buf += clipboard.paste()
+                return
             if event.unicode and event.unicode.isprintable():
                 self.path_buf += event.unicode
                 return

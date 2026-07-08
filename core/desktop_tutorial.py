@@ -48,7 +48,7 @@ def _terminal_visible(desktop):
 
 
 def _market_open(desktop):
-    return _win(desktop, "scene:markethub") is not None
+    return _win(desktop, "markethub") is not None   # app native, cf. apps/app_markethub.py
 
 
 def _window_snapped(desktop):
@@ -87,7 +87,7 @@ STEPS = [
      "hint": ("Ouvrez l'icône « Terminal » : c'est le moteur de la partie — le temps s'y écoule même fenêtre fermée.",
               "Open the “Terminal” icon: it's the game engine — time flows even with its window closed."),
      "check": _terminal_visible},
-    {"id": "market", "target": "qmarket",
+    {"id": "market", "target": "markethub",
      "title": ("Consultez le Marché", "Check the Market"),
      "hint": ("Ouvrez « Marché » pour suivre indices, secteurs et devises pendant que le temps passe.",
               "Open “Market” to follow indices, sectors and currencies while time passes."),

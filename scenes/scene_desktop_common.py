@@ -11,8 +11,10 @@ l'écran bureau, pas réutilisable ailleurs dans le jeu).
 import pygame
 
 from apps.app_alerts import AlertsApp
+from apps.app_book import BookApp
 from apps.app_calculator import CalculatorApp
 from apps.app_inbox import InboxApp
+from apps.app_markethub import MarketHubApp
 from apps.app_notifications import NotificationCenterApp
 from apps.app_research import ResearchApp
 from apps.app_sheet import SheetApp
@@ -49,6 +51,8 @@ APPS = [
     ("sheet", "Tableur", "sheet", SheetApp),
     ("inbox", "Inbox", "inbox", InboxApp),
     ("alerts", "Alertes", "alert", AlertsApp),
+    ("markethub", "Marché", "market", MarketHubApp),
+    ("book", "Portefeuille", "book", BookApp),
     ("watchlist", "Watchlist", "star", WatchlistApp),
     ("calculator", "Calculatrice", "calc", CalculatorApp),
     ("notifcenter", "Notifications", "bell", NotificationCenterApp),
@@ -76,10 +80,9 @@ TRACK_APP = {
 # icon_kind, scène) — "save" (clé "save") est une action instantanée (pas une
 # fenêtre), cf. `DesktopScene._quick_save`.
 QUICK_APPS = [
-    ("qmarket", "Marché", "market", "markethub"),
-    ("qbook", "Portef.", "book", "book"),
-    # (Inbox et Alertes sont devenues des apps NATIVES, cf. APPS ci-dessus —
-    # dessinées à la résolution de leur fenêtre, plus d'hébergement flou)
+    # (Marché, Portefeuille, Inbox et Alertes sont devenues des apps NATIVES,
+    # cf. APPS ci-dessus — dessinées à la résolution de leur fenêtre, plus
+    # d'hébergement flou)
     ("qnews", "News", "news", "news"),
     ("qmission", "Mission", "mission", "mission"),
     ("qmandates", "Mandats", "advisory", "mandates"),
@@ -112,8 +115,8 @@ ICON_FEATURE = {
 # ici : il n'ouvre pas une icône mais bascule le menu Démarrer directement
 # (cf. DesktopScene.handle_event), pas de fenêtre dédiée à ouvrir.
 DESKTOP_SHORTCUTS = {
-    pygame.K_m: "qmarket",
-    pygame.K_p: "qbook",
+    pygame.K_m: "markethub",
+    pygame.K_p: "book",
     pygame.K_i: "inbox",
     pygame.K_n: "qnews",
     pygame.K_j: "qmission",
@@ -154,6 +157,8 @@ SCENE_ICON.update({
     "compare": "graph",
     "inbox": "inbox",
     "alerts": "alert",
+    "book": "book",
+    "markethub": "market",
 })
 
 

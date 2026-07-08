@@ -776,6 +776,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 if kwargs.get("select_idx") is not None:
                     w.app_obj.select_message(kwargs["select_idx"])
                 self.wm.focus(w)
+                self.start_open = False
             return w
         if name == "alerts":
             # alertes de prix NATIVES (apps/app_alerts.py), même principe
@@ -784,6 +785,15 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 if kwargs.get("ticker"):
                     w.app_obj.preselect(kwargs["ticker"])
                 self.wm.focus(w)
+                self.start_open = False
+            return w
+        if name in ("book", "markethub"):
+            # Portefeuille/Marché NATIFS (apps/app_book.py, apps/app_markethub.py),
+            # même principe (netteté — plus de rendu 1280×720 réduit)
+            w = self._launch(name)
+            if w is not None:
+                self.wm.focus(w)
+                self.start_open = False
             return w
         if name not in self.app.scenes.scenes or name in _FULLSCREEN_EXIT:
             # essayer une app native (ex. "trading" depuis notification)

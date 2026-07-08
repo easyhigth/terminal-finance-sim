@@ -340,6 +340,25 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   accès rapides `qinbox`/`qalerts`) ; toute ouverture EN FENÊTRE des scènes `"inbox"`/`"alerts"`
   est redirigée vers l'app native par `DesktopScene._open_scene_window` (même principe que le
   Tableur) — les scènes plein écran restent enregistrées pour la navigation hors bureau.
+  **Apps natives Marché / Portefeuille (netteté, suite).** Migration des deux plus gros écrans
+  restants : `apps/app_markethub.py` (`MarketHubApp` — onglets Vue d'ensemble/Secteurs/
+  Top-Flop/Heatmap/FX/Watchlist ; la plupart des méthodes `_draw_*` de la scène d'origine
+  prenaient déjà un `rect` en paramètre, seule la disposition de haut niveau dépendait de
+  `config.SCREEN_WIDTH`/`content_top()`/`footer_y()`) et `apps/app_book.py` (`BookApp` —
+  table de positions toutes classes + barre de trading rapide + panneau latéral secteur/
+  évolution, qui passe SOUS la table plutôt qu'à côté si la fenêtre est trop étroite pour 2
+  colonnes). Les deux réutilisent `ui/popups.py::PopupMixin` pour les fiches d'analyse
+  flottantes (société/ETF/obligation/matière première/crypto/structuré/crédit/graphe
+  d'indice), avec `_popup_pos()` SURCHARGÉE pour ouvrir en cascade près de LA FENÊTRE plutôt
+  qu'à une position fixe de l'écran entier (défaut de `PopupMixin`, pensé pour une scène
+  plein écran). Enregistrées dans `APPS` avec les clés `"book"`/`"markethub"` (mêmes clés que
+  les anciennes scènes, donc mêmes raccourcis Ctrl+P/Ctrl+M) ; les accès rapides
+  `qbook`/`qmarket` de `QUICK_APPS` ont été retirés (doublon, même principe qu'Inbox/Alertes).
+  **Bug corrigé au passage** : les quatre redirections vers apps natives (Inbox/Alertes/
+  Portefeuille/Marché) retournaient tôt dans `_open_scene_window`, AVANT la ligne
+  `self.start_open = False` du chemin générique d'hébergement de scène — ouvrir l'une de ces
+  apps depuis le menu Démarrer laissait le menu ouvert par-dessus la fenêtre nouvellement
+  ouverte (chaque bloc de redirection pose désormais `start_open = False` lui-même).
   **Étape 17 (polish V0) : un seul jeu de contrôles temps/pause.** La topbar du bureau
   (`DesktopScene._draw_topbar`) redessinait pause/vitesse/⚙ (`_pause_rect`/`_speed_rects`/
   `_gear_rect`) JUSTE en dessous du widget d'horloge de la bande d'onglets

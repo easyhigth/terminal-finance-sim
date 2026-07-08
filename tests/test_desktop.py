@@ -598,7 +598,9 @@ def test_palette_navigate_opens_window_on_desktop(app):
     mgr = app.scenes
     mgr._palette_navigate("markethub", {})
     assert app.scenes.current_name == "desktop"      # pas de bascule plein écran
-    assert any(w.key == "scene:markethub" for w in desk.wm.windows)
+    # "markethub" est une app NATIVE (apps/app_markethub.py, plus d'hébergement
+    # de la scène plein écran — cf. étape "netteté" du bureau) : clé sans préfixe.
+    assert any(w.key == "markethub" for w in desk.wm.windows)
 
 
 def test_palette_navigate_fullscreen_outside_desktop():
@@ -776,7 +778,7 @@ def test_risk_badge_click_opens_portfolio(app):
     scene.draw(app.screen)
     r = scene._risk_badge_rect
     scene.handle_event(_click(r.centerx, r.centery))
-    assert any(w.key == "scene:book" for w in scene.wm.windows)
+    assert any(w.key == "book" for w in scene.wm.windows)   # app native, cf. apps/app_book.py
 
 
 def test_settings_screen_has_experience_mode_row(app):
@@ -1051,15 +1053,17 @@ def test_back_button_closes_own_window_instead_of_forcing_terminal_open(app):
 def test_back_does_not_force_open_a_window_that_was_not_already_open(app):
     """Après le correctif, `back()` ne fait QUE fermer la fenêtre appelante —
     il n'ouvre plus jamais la fenêtre cible (return_to) si elle n'était pas
-    déjà ouverte, contrairement à l'ancien comportement basé sur go()."""
+    déjà ouverte, contrairement à l'ancien comportement basé sur go().
+    Utilise "career" (scène encore HÉBERGÉE, pas une app native) pour
+    exercer le mécanisme générique SceneHostApp/_Router.back()."""
     app.gs.player.grade_index = 9
     app.scenes.go("desktop")
     desk = app.scenes.current
     desk.wm.close(next(w for w in desk.wm.windows if w.key == "scene:terminal"))
-    w = desk._open_scene_window("book")
-    book = w.app_obj.scene
-    book.app.scenes.back(book.return_to)
-    assert not any(win.key == "scene:book" for win in desk.wm.windows)
+    w = desk._open_scene_window("career")
+    career = w.app_obj.scene
+    career.app.scenes.back(career.return_to)
+    assert not any(win.key == "scene:career" for win in desk.wm.windows)
     assert not any(win.key == "scene:terminal" for win in desk.wm.windows)
 
 
@@ -1115,12 +1119,14 @@ def test_scene_host_wraps_and_draws(app):
 
 
 def test_scene_host_navigation_opens_window_not_switch(app):
+    """"risk" (scène encore HÉBERGÉE, pas une app native comme "markethub"
+    désormais) pour exercer le routeur générique SceneHostApp/_Router."""
     app.scenes.go("desktop")
     desk = app.scenes.current
     desk.draw(app.screen)
     # ouvre une scène hébergée via le menu Démarrer
-    w = desk._open_scene_window("markethub")
-    assert any(win.key == "scene:markethub" for win in desk.wm.windows)
+    w = desk._open_scene_window("risk")
+    assert any(win.key == "scene:risk" for win in desk.wm.windows)
     # la navigation interne de la scène ouvre une AUTRE fenêtre (routeur)
     w.app_obj.router.go("bonds")
     assert any(win.key == "scene:bonds" for win in desk.wm.windows)
@@ -1138,7 +1144,26 @@ def test_desktop_launcher_lists_scenes(app):
     r, scene, kw, locked, _label, _desc = desk._launcher_rects[0]
     assert not locked
     desk.handle_event(_click(r.centerx, r.centery))
-    assert any(win.key == f"scene:{scene}" for win in desk.wm.windows)
+    # certaines scènes du catalogue (ex. "markethub") sont redirigées vers une
+    # app NATIVE (clé sans préfixe) plutôt qu'hébergées (clé "scene:<nom>") —
+    # cf. DesktopScene._open_scene_window.
+    assert any(win.key in (f"scene:{scene}", scene) for win in desk.wm.windows)
+    assert desk.start_open is False
+
+
+@pytest.mark.parametrize("key", ["book", "markethub", "inbox", "alerts"])
+def test_native_app_redirects_close_the_start_menu(app, key):
+    """Régression : les redirections vers les apps NATIVES (Portefeuille,
+    Marché, Inbox, Alertes — cf. _open_scene_window) retournaient tôt, AVANT
+    la ligne `self.start_open = False` du chemin générique d'hébergement de
+    scène — ouvrir l'une de ces apps depuis le menu Démarrer laissait le menu
+    ouvert par-dessus la fenêtre nouvellement ouverte."""
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    desk._open_start_menu()
+    assert desk.start_open is True
+    desk._open_scene_window(key)
+    assert desk.start_open is False
 
 
 def test_every_launcher_scene_hosts_without_error(app):
@@ -1366,7 +1391,7 @@ def test_ambient_widget_opens_portfolio(app):
     assert desk._ambient_rect is not None
     r = desk._ambient_rect
     desk.handle_event(_click(r.centerx, r.centery))
-    assert any(win.key == "scene:book" for win in desk.wm.windows)
+    assert any(win.key == "book" for win in desk.wm.windows)   # app native, cf. apps/app_book.py
 
 
 # ============================================= PR5 : onboarding + clic droit =====
@@ -2522,8 +2547,8 @@ def test_seeded_default_layout_opens_market_and_portfolio_for_general_track():
     a.scenes.go("desktop")
     desk = a.scenes.current
     keys = {w.key for w in desk.wm.windows}
-    assert "scene:markethub" in keys
-    assert "scene:book" in keys
+    assert "markethub" in keys   # apps NATIVES, cf. apps/app_markethub.py / apps/app_book.py
+    assert "book" in keys
 
 
 def test_seeded_default_layout_includes_track_scene():
@@ -2758,13 +2783,16 @@ def test_scene_host_redraws_content_every_frame_at_same_size():
 
 def test_apply_layout_clamps_degenerate_rects(app):
     """Un rect de disposition hors bornes (fichier de save édité, autre
-    résolution) est ramené à une taille/position jouables."""
+    résolution) est ramené à une taille/position jouables. Format
+    kind="scene" volontairement ANCIEN (rétrocompatibilité d'une sauvegarde
+    d'avant la conversion en app native, cf. apps/app_markethub.py) : la
+    redirection de _open_scene_window doit rester transparente."""
     app.scenes.go("desktop")
     desk = app.scenes.current
     layout = [{"kind": "scene", "name": "markethub", "kwargs": {},
                "rect": [5000, -300, 3, 2], "minimized": False, "pinned": False}]
     desk._apply_layout(layout)
-    w = next(w for w in desk.wm.windows if w.key == "scene:markethub")
+    w = next(w for w in desk.wm.windows if w.key == "markethub")
     assert w.rect.w >= 300 and w.rect.h >= 200
     assert 0 <= w.rect.x <= config.SCREEN_WIDTH - 60
     assert w.rect.y >= 0

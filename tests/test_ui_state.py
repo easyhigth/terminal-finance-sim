@@ -80,12 +80,14 @@ def test_ui_state_pending_layout_applied_on_desktop(app):
     a2.workbook = Workbook(12, 8)
     ui_state.load(slot, a2)
     assert getattr(a2, "_pending_ui_layout", None) is not None
-    assert any(e.get("name") == "markethub" for e in a2._pending_ui_layout if e.get("kind") == "scene")
+    # "markethub" est une app NATIVE (apps/app_markethub.py) : sérialisée en
+    # kind="app"/key="markethub" par _snapshot_layout, pas kind="scene".
+    assert any(e.get("key") == "markethub" for e in a2._pending_ui_layout if e.get("kind") == "app")
 
     # arrivée sur le bureau : le layout pending est appliqué
     a2.scenes.go("desktop")
     desk2 = a2.scenes.current
-    assert any(w.key == "scene:markethub" for w in desk2.wm.windows)
+    assert any(w.key == "markethub" for w in desk2.wm.windows)
     assert a2._pending_ui_layout is None
 
 

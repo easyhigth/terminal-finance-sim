@@ -807,6 +807,38 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                     self.wm.focus(w)
                 self.start_open = False
             return w
+        if name == "evaluation":
+            # Évaluation NATIVE (apps/app_evaluation.py, netteté) — même règle
+            # de ré-ouverture que Mission : un examen EN COURS retrouve SA
+            # fenêtre (jamais de perte de progression, l'état de pause est
+            # géré à part via player.eval_state) ; un examen TERMINÉ (état
+            # "result") est relancé fraîche. kwargs (mode/program/level/tier,
+            # cf. scene_cert.py) transmis via `configure()`.
+            existing = next((w for w in self.wm.windows if w.key == "evaluation"), None)
+            if existing is not None and getattr(existing.app_obj, "state", "") == "result":
+                self.wm.close(existing)
+                existing = None
+            is_new = existing is None
+            w = self._launch("evaluation")
+            if w is not None:
+                if is_new and kwargs:
+                    # nouvelle fenêtre avec un mode précis (ex. certification,
+                    # cf. scene_cert.py) : configure AVANT que le joueur la
+                    # voie — un examen EN COURS retrouvé (fenêtre déjà
+                    # existante) garde son état, jamais réinitialisé ici.
+                    w.app_obj.configure(**kwargs)
+                self.wm.focus(w)
+                self.start_open = False
+            return w
+        if name in ("tradejournal", "deals"):
+            # Journal de trading / Deals NATIFS (apps/app_journal.py,
+            # apps/app_deals.py, netteté) — simple ouverture/focus, pas une
+            # popup forcée par le jeu.
+            w = self._launch(name)
+            if w is not None:
+                self.wm.focus(w)
+                self.start_open = False
+            return w
         if name in ("book", "markethub", "dilemma", "review"):
             # Portefeuille/Marché/Décision/Revue NATIFS (apps/app_book.py,
             # apps/app_markethub.py, apps/app_dilemma.py, apps/app_review.py),
@@ -969,6 +1001,18 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         feat = ICON_FEATURE.get(key)
         return feat is None or unlocks_mod.unlocked(self.app.gs.player, feat)
 
+    # apps NATIVES enregistrées dans APPS uniquement pour que `_launch`/
+    # `_open_scene_window` trouvent leur classe factory (popups forcés par le
+    # jeu ou navigation interne) — PAS des icônes de bureau à part entière :
+    # "dilemma"/"review" restent conditionnées à "qdecide" (widget À FAIRE,
+    # cf. commentaire de `_icon_visible`) ou déclenchées par le jeu, jamais un
+    # clic direct ; "evaluation" ne doit JAMAIS être un accès direct, sinon un
+    # joueur pourrait lancer un examen de promotion sans remplir les critères
+    # vérifiés par `scene_examcert.py::_go_exam` (réputation, missions, deals)
+    # avant de router vers "evaluation" ; "deals" a déjà son icône via
+    # QUICK_APPS ("qdeals") — une seconde ferait doublon.
+    _FACTORY_ONLY_APPS = {"dilemma", "review", "evaluation", "deals"}
+
     def _icon_list(self):
         """Liste (clé, libellé, icon_kind, couleur accent) des icônes du
         bureau : apps natives + Terminal (toujours) + app de la voie (une fois
@@ -976,7 +1020,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         si la liste s'allonge. Les icônes verrouillées (ICON_FEATURE) sont
         masquées jusqu'au grade requis."""
         items = [(k, lbl, kind, config.COL_AMBER) for k, lbl, kind, _cls in APPS
-                 if self._icon_visible(k)]
+                 if k not in self._FACTORY_ONLY_APPS and self._icon_visible(k)]
         items.append(("terminal", "Terminal", "terminal", config.COL_CYAN))
         track = getattr(self.app.gs.player, "track", "General")
         info = TRACK_APP.get(track)

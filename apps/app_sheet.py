@@ -157,6 +157,14 @@ class SheetApp(DesktopApp):
         self._cf_apply_rect = None
         self._cf_remove_rects = {}
         self._csv_rect = None
+        self._csv_import_rect = None
+        # boîte de saisie du chemin à importer (même pattern que
+        # scene_saves.py::path_prompt — Ctrl+V collable, cf. core/clipboard.py)
+        self.csv_import_prompt = False
+        self._csv_import_buf = ""
+        self._csv_import_box_rect = None
+        self._csv_import_confirm_rect = None
+        self._csv_import_cancel_rect = None
 
     @property
     def sheet(self):
@@ -393,6 +401,93 @@ class SheetApp(DesktopApp):
         except OSError:
             self.msg = "Échec de l'export CSV (chemin inaccessible)."
 
+    # ------------------------------------------------------------- import CSV
+    def _confirm_csv_import(self):
+        """Lit le fichier CSV au chemin saisi et le verse dans le classeur
+        (feuille active si vierge, sinon nouvelle feuille — cf.
+        Workbook.import_csv) — symétrique de _export_csv."""
+        path = self._csv_import_buf.strip()
+        self.csv_import_prompt = False
+        if not path:
+            self.msg = "Chemin vide."
+            return
+        try:
+            with open(path, "r", newline="", encoding="utf-8") as f:
+                rows = list(csv.reader(f))
+        except OSError:
+            self.msg = f"Échec de l'import CSV (chemin inaccessible : {path})."
+            return
+        except csv.Error:
+            self.msg = "Échec de l'import CSV (fichier mal formé)."
+            return
+        name = os.path.splitext(os.path.basename(path))[0] or None
+        tab = self.workbook.import_csv(rows, name=name)
+        if tab is None:
+            self.msg = "Fichier CSV vide : rien à importer."
+            return
+        self.msg = f"Importé « {tab.name} » ({len(rows)} ligne(s))."
+        audio.play("click")
+
+    def _handle_csv_import_prompt_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.csv_import_prompt = False
+                return True
+            if event.key == pygame.K_BACKSPACE:
+                self._csv_import_buf = self._csv_import_buf[:-1]
+                return True
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                self._confirm_csv_import()
+                return True
+            from core import clipboard
+            if clipboard.is_paste_shortcut(event):
+                self._csv_import_buf += clipboard.paste().replace("\n", " ").strip()
+                return True
+            if event.unicode and event.unicode.isprintable():
+                self._csv_import_buf += event.unicode
+            return True
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._csv_import_confirm_rect and self._csv_import_confirm_rect.collidepoint(event.pos):
+                self._confirm_csv_import()
+                return True
+            if self._csv_import_cancel_rect and self._csv_import_cancel_rect.collidepoint(event.pos):
+                self.csv_import_prompt = False
+                return True
+            return True
+        return False
+
+    def _draw_csv_import_prompt(self, surf, rect):
+        overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 160))
+        surf.blit(overlay, rect.topleft)
+        box = pygame.Rect(0, 0, min(420, rect.w - 40), 120)
+        box.center = rect.center
+        style.draw_card(surf, box, bg=config.COL_PANEL, border=config.COL_CYAN,
+                        radius=style.RADIUS_MD)
+        widgets.draw_text(surf, "IMPORTER UN CSV", (box.x + 12, box.y + 8),
+                          fonts.small(bold=True), config.COL_CYAN)
+        widgets.draw_text(surf, "Chemin du fichier :", (box.x + 12, box.y + 32),
+                          fonts.tiny(), config.COL_TEXT_DIM)
+        self._csv_import_box_rect = pygame.Rect(box.x + 12, box.y + 48, box.w - 24, 26)
+        pygame.draw.rect(surf, config.COL_BG, self._csv_import_box_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN, self._csv_import_box_rect, 1, border_radius=4)
+        cur = "_" if pygame.time.get_ticks() % 1000 < 500 else ""
+        widgets.draw_text(surf, widgets.fit_text(self._csv_import_buf + cur, fonts.small(),
+                                                 self._csv_import_box_rect.w - 16),
+                          (self._csv_import_box_rect.x + 8, self._csv_import_box_rect.y + 5),
+                          fonts.small(), config.COL_TEXT)
+        self._csv_import_confirm_rect = pygame.Rect(box.x + 12, box.bottom - 30, 100, 24)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._csv_import_confirm_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_UP, self._csv_import_confirm_rect, 1, border_radius=4)
+        widgets.draw_text(surf, "IMPORTER", self._csv_import_confirm_rect.center,
+                          fonts.tiny(bold=True), config.COL_UP, align="center")
+        self._csv_import_cancel_rect = pygame.Rect(self._csv_import_confirm_rect.right + 8,
+                                                    box.bottom - 30, 90, 24)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._csv_import_cancel_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_TEXT_DIM, self._csv_import_cancel_rect, 1, border_radius=4)
+        widgets.draw_text(surf, "Annuler", self._csv_import_cancel_rect.center,
+                          fonts.tiny(), config.COL_TEXT_DIM, align="center")
+
     # ---------------------------------------------- mise en forme conditionnelle
     def _cf_value(self):
         try:
@@ -503,6 +598,8 @@ class SheetApp(DesktopApp):
 
     # --------------------------------------------------------------- events
     def handle_event(self, event, rect):
+        if self.csv_import_prompt:
+            return self._handle_csv_import_prompt_event(event)
         if self.fx_open:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 for name, r in self._fx_item_rects.items():
@@ -562,6 +659,10 @@ class SheetApp(DesktopApp):
                 return True
             if self._csv_rect and self._csv_rect.collidepoint(event.pos):
                 self._export_csv()
+                return True
+            if self._csv_import_rect and self._csv_import_rect.collidepoint(event.pos):
+                self.csv_import_prompt = True
+                self._csv_import_buf = ""
                 return True
             for kind, r in self._chart_btn_rects.items():
                 if r.collidepoint(event.pos):
@@ -799,6 +900,8 @@ class SheetApp(DesktopApp):
             self._draw_tpl_panel(surf, rect)
         if self.cf_open:
             self._draw_cf_panel(surf, rect)
+        if self.csv_import_prompt:
+            self._draw_csv_import_prompt(surf, rect)
 
     def _draw_tab_bar(self, surf, rect, pad):
         bar = pygame.Rect(rect.x + pad, rect.y + pad, rect.w - 2 * pad, TAB_BAR_H)
@@ -867,13 +970,20 @@ class SheetApp(DesktopApp):
         widgets.draw_text(surf, "CF", self._cf_rect.center, fonts.tiny(bold=True),
                           config.COL_PRESTIGE, align="center")
         x = self._cf_rect.right + 6
-        self._csv_rect = pygame.Rect(x, bar.y + 2, 42, TOOLBAR_H - 4)
+        self._csv_rect = pygame.Rect(x, bar.y + 2, 60, TOOLBAR_H - 4)
         hov = self._csv_rect.collidepoint(mp)
         pygame.draw.rect(surf, config.COL_PANEL if hov else config.COL_BG, self._csv_rect, border_radius=3)
         pygame.draw.rect(surf, config.COL_TEXT_DIM, self._csv_rect, 1, border_radius=3)
-        widgets.draw_text(surf, "CSV", self._csv_rect.center, fonts.tiny(bold=True),
+        widgets.draw_text(surf, "CSV ↓", self._csv_rect.center, fonts.tiny(bold=True),
                           config.COL_TEXT_DIM, align="center")
-        x = self._csv_rect.right + 8
+        x = self._csv_rect.right + 6
+        self._csv_import_rect = pygame.Rect(x, bar.y + 2, 60, TOOLBAR_H - 4)
+        hov = self._csv_import_rect.collidepoint(mp)
+        pygame.draw.rect(surf, config.COL_PANEL if hov else config.COL_BG, self._csv_import_rect, border_radius=3)
+        pygame.draw.rect(surf, config.COL_TEXT_DIM, self._csv_import_rect, 1, border_radius=3)
+        widgets.draw_text(surf, "CSV ↑", self._csv_import_rect.center, fonts.tiny(bold=True),
+                          config.COL_TEXT_DIM, align="center")
+        x = self._csv_import_rect.right + 8
         if self.msg:
             widgets.draw_text(surf, widgets.fit_text(self.msg, fonts.tiny(), bar.right - x - 8),
                               (x + 8, bar.y + 6), fonts.tiny(), config.COL_TEXT_DIM)

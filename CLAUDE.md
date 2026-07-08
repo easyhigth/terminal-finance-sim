@@ -447,6 +447,56 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   une mission EN COURS retrouve SA fenêtre (jamais de perte de progression), seule une
   mission TERMINÉE (état `"result"`) est relancée fraîche (cf. le bloc `"mission"` de
   `_open_scene_window`).
+  **Étape 21 (netteté, fin du gros du chantier) : Évaluation, Deals, Journal de trading.**
+  `apps/app_evaluation.py` (`EvaluationApp`, examen de promotion ET de certification),
+  `apps/app_deals.py` (`DealsApp`, hub des opportunités) et `apps/app_journal.py`
+  (`JournalApp`, nouveau — historique des trades, filtres, annotation, réplication)
+  migrent `scenes/scene_evaluation.py`/`scenes/scene_deals.py`/`scenes/scene_journal.py`.
+  `EvaluationApp` a une API à deux temps : `on_open()` (appelé sans argument par
+  `WindowManager.open()`) initialise le mode PROMOTION par défaut ; `configure(**kwargs)`
+  (mode "cert" + programme/palier, cf. `scene_cert.py`) est appelé EXPLICITEMENT par le
+  redirecteur du bureau seulement à la CRÉATION de la fenêtre — un examen déjà EN COURS
+  retrouve sa fenêtre SANS jamais rappeler `configure` (pas de perte de progression) ;
+  un examen TERMINÉ (état `"result"`) est relancé fraîche, même règle que Mission.
+  `DealsApp` ouvre le mini-jeu (scène "deal", encore hébergée — hors scope de cette
+  migration) via `desktop._open_scene_window("deal", ...)` et NON `app.scenes.go(...)`,
+  qui basculerait tout l'écran hors du bureau puisque `self.app` d'une app native est le
+  vrai `App` global (pas le proxy `_Router` d'une scène hébergée). `JournalApp` réutilise
+  `core/journal.py` tel quel ; sa réplication d'un trade ouvre Trading pré-filtré via
+  `desktop.open_trading(ticker)` plutôt que la ligne de commande `BUY`. Accessible depuis
+  une icône dédiée du bureau ET un bouton « JOURNAL » ajouté dans Trading et Portefeuille
+  (`apps/app_trading.py`, `apps/app_book.py`).
+  **Bug corrigé au passage (icônes en double)** : ajouter une scène à `APPS` (nécessaire
+  pour que `_launch`/`_open_scene_window` trouvent sa classe factory) l'affiche AUSSI comme
+  icône permanente du bureau via `_icon_list()` — sans y penser, les migrations Mission et
+  Décision/Revue de l'étape précédente avaient donc produit DEUX icônes « Mission »
+  (l'ancien accès rapide `qmission` de `QUICK_APPS` + la nouvelle icône `APPS`) et une
+  icône « Décision » PERMANENTE alors que `qdecide` est volontairement conditionné à un
+  dilemme réellement en attente (cf. commentaire de `_icon_visible` — sinon l'icône ouvre
+  un écran vide). Plus grave : une icône « Évaluation » cliquable directement aurait
+  contourné les critères de promotion (réputation, missions, deals) que
+  `scene_examcert.py::_go_exam` vérifie AVANT de router vers `"evaluation"` — un joueur
+  aurait pu lancer un examen sans les remplir. Corrigé par
+  `DesktopScene._FACTORY_ONLY_APPS = {"dilemma", "review", "evaluation", "deals"}`, exclu
+  de `_icon_list()` (ces clés restent dans `APPS` pour la factory, jamais pour l'icône —
+  "deals" a déjà son icône via `QUICK_APPS`/`qdeals`) ; `qmission` retiré de `QUICK_APPS`
+  (Mission a désormais sa seule icône via `APPS`, `DESKTOP_SHORTCUTS`/Ctrl+J et
+  `core/desktop_tutorial.py` repointés vers la clé `"mission"`). Verrouillé par
+  `tests/test_desktop.py::test_desktop_never_shows_two_icons_with_the_same_label` et
+  `test_evaluation_and_review_and_dilemma_are_factory_only_not_standing_icons`.
+- **Notifications de résultats (earnings) pour la watchlist** (`core/game_state.py::advance_step`) :
+  le moteur publie déjà `market.last_earnings` à chaque pas (~1/4 des sociétés, cf.
+  `Market._step_earnings`) mais rien ne le signalait — il fallait être sur la bonne fiche
+  au bon moment. Toast (`core/notify_queue.py`, action `"scene"`→`"company"` pour ouvrir la
+  fiche d'un clic) + message inbox (raison de suivre une valeur), pour chaque société de
+  `player.watchlist` qui publie CE pas — même emplacement dans `advance_step` que les
+  alertes de prix, comparaison de ticker insensible à la casse.
+- **Import CSV du Tableur** (`core/workbook.py::Workbook.import_csv` + bouton « CSV ↑ » de
+  `apps/app_sheet.py`) : symétrique de l'export déjà existant (« CSV ↓ ») — chemin saisi
+  dans une boîte modale (Ctrl+V supporté), remplit la feuille ACTIVE si elle est vierge,
+  sinon ouvre une NOUVELLE feuille nommée d'après le fichier (même règle que
+  `import_financial`/`import_template`, jamais d'écrasement silencieux). Valeurs écrites
+  comme LITTÉRALES (un CSV n'a pas de formules), bornées à la taille de la feuille.
 - **`ui/order_prompt.py`** (`ConditionalOrderMixin`) : boîte modale « poser un ordre
   conditionnel » (stop/target/trailing) + bande récapitulative « ORDRES CONDITIONNELS »
   (croix d'annulation par ligne), FACTORISÉES depuis `apps/app_trading.py` (qui les

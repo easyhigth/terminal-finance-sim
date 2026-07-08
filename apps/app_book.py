@@ -66,6 +66,7 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         self._sell_btn = None
         self._pa_btn = None
         self._shop_btn = None
+        self._journal_btn = None
         self.msg = ""
         self._t = 0.0
         self._key_suggest_rects = []
@@ -306,6 +307,11 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
             if self.desktop is not None:
                 self.desktop._open_scene_window("shop")
             return True
+        if self._journal_btn and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 \
+                and self._journal_btn.collidepoint(event.pos):
+            if self.desktop is not None:
+                self.desktop._open_scene_window("tradejournal")
+            return True
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
             delta = -32 if event.button == 4 else 32
@@ -406,7 +412,7 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         widgets.draw_text(surf, widgets.fit_text(marg, fonts.tiny(), rect.w - 2 * pad - 170),
                           (rect.x + pad, rect.y + pad + 40), fonts.tiny(), lev_col)
 
-        self._pa_btn = pygame.Rect(rect.right - pad - 160, rect.y + pad, 78, 20)
+        self._pa_btn = pygame.Rect(rect.right - pad - 222, rect.y + pad, 78, 20)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._pa_btn, border_radius=3)
         pygame.draw.rect(surf, config.COL_CYAN, self._pa_btn, 1, border_radius=3)
         widgets.draw_text(surf, "ANALYSE (PA)", self._pa_btn.center, fonts.tiny(bold=True),
@@ -416,6 +422,11 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         pygame.draw.rect(surf, config.COL_AMBER, self._shop_btn, 1, border_radius=3)
         widgets.draw_text(surf, "SHOP", self._shop_btn.center, fonts.tiny(bold=True),
                           config.COL_AMBER, align="center")
+        self._journal_btn = pygame.Rect(self._shop_btn.right + 6, rect.y + pad, 72, 20)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._journal_btn, border_radius=3)
+        pygame.draw.rect(surf, config.COL_PRESTIGE, self._journal_btn, 1, border_radius=3)
+        widgets.draw_text(surf, "JOURNAL", self._journal_btn.center, fonts.tiny(bold=True),
+                          config.COL_PRESTIGE, align="center")
 
         # ---- barre de trading rapide ----
         bar_y = rect.y + pad + 62

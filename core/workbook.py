@@ -200,6 +200,29 @@ class Workbook:
         self.active_index = self.tabs.index(tab)
         return tab
 
+    def import_csv(self, rows, name=None):
+        """Remplit la feuille ACTIVE si elle est vierge ; sinon crée une
+        NOUVELLE feuille (nommée d'après le fichier importé) — même règle
+        que `import_financial`/`import_template`, jamais d'écrasement
+        silencieux d'un modèle en cours. `rows` : liste de listes de
+        chaînes (une ligne CSV = une liste de champs), écrites comme
+        valeurs LITTÉRALES (pas de formules — un CSV n'en contient pas).
+        Bornée à la taille de la feuille (n_rows x n_cols) ; les lignes/
+        colonnes en trop sont silencieusement ignorées. Retourne l'onglet
+        rempli (et le rend actif), ou None si `rows` est vide."""
+        if not rows:
+            return None
+        if self.is_blank():
+            tab = self.active
+        else:
+            tab = self.add_tab(name=name)
+        for r, row in enumerate(rows[:self.n_rows], start=1):
+            for c, val in enumerate(row[:self.n_cols]):
+                if val != "":
+                    tab.sheet.set(f"{idx_to_col(c)}{r}", val)
+        self.active_index = self.tabs.index(tab)
+        return tab
+
     def import_financial(self, data):
         """Remplit la feuille ACTIVE si elle est vierge ; sinon crée une
         NOUVELLE feuille (nommée d'après l'export) — jamais d'écrasement d'un

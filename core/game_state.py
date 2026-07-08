@@ -567,6 +567,34 @@ class GameState:
                         kind = "warn" if not ev["above"] else "info"
                         _nq.push(p, _alerts.format_trigger(ev), kind,
                                  action="trading", action_kwargs={"ticker": ev["ticker"]})
+            # résultats trimestriels d'une société SUIVIE (watchlist) : le
+            # moteur publie déjà `market.last_earnings` à chaque pas (~1/4 des
+            # sociétés, cf. Market._step_earnings), mais rien ne le signalait
+            # jusqu'ici — il fallait être sur la bonne fiche au bon moment
+            # pour le voir. Toast + message inbox (raison de suivre une valeur).
+            watchlist = getattr(p, "watchlist", None)
+            if watchlist and getattr(market, "last_earnings", None):
+                from core import inbox as _inbox
+                from core import notify_queue as _nq
+                watched = {t.upper() for t in watchlist}
+                for rep in market.last_earnings:
+                    if rep["ticker"] not in watched:
+                        continue
+                    verb = _L("bat les attentes", "beats expectations") if rep["beat"] \
+                        else _L("déçoit", "misses expectations")
+                    pct = rep["surprise"] * 100.0
+                    txt = (f"{rep['ticker']} {verb} ({pct:+.1f}%)")
+                    _nq.push(p, txt, "good" if rep["beat"] else "warn",
+                             action="scene", action_kwargs={"name": "company", "ticker": rep["ticker"]})
+                    _inbox.push(p, "desk",
+                               _L("Bureau de recherche", "Research desk"),
+                               _L(f"Résultats {rep['ticker']} : {verb}",
+                                  f"{rep['ticker']} earnings: {verb}"),
+                               _L(f"{rep['name']} ({rep['ticker']}) publie une surprise de "
+                                  f"{pct:+.1f}% par rapport aux attentes. Guidance : "
+                                  f"{rep['guidance_label']}.",
+                                  f"{rep['name']} ({rep['ticker']}) reports a {pct:+.1f}% "
+                                  f"surprise vs expectations. Guidance: {rep['guidance_label']}."))
             financing = portfolio.accrue_financing(p, market, config.DAYS_PER_STEP)
             margin_call = portfolio.check_margin_call(p, market)
             if margin_call:

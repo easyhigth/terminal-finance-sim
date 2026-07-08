@@ -97,7 +97,7 @@ STEPS = [
      "hint": ("Glissez une fenêtre vers un bord de l'écran (ou double-cliquez sa barre de titre) pour l'ancrer.",
               "Drag a window to a screen edge (or double-click its title bar) to snap it."),
      "check": _window_snapped},
-    {"id": "mission", "target": "qmission",
+    {"id": "mission", "target": "mission",
      "title": ("Faites votre travail", "Do your job"),
      "hint": ("Ouvrez « Mission » : accomplir le travail de votre grade rapporte cash et réputation.",
               "Open “Mission”: doing your grade's work earns cash and reputation."),

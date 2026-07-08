@@ -29,6 +29,28 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   les régressions de rendu (AttributeError...) qu'un simple `py_compile` ne voit pas. Ce
   test nécessite pygame ; la CI (`.github/workflows/tests.yml`) installe donc
   `numpy scipy pytest pygame` avec `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy`.
+  **Angle mort connu de ce smoke test** : le marché y est fraîchement créé (1-2 points
+  d'historique), donc il n'exerce JAMAIS le rendu des graphes avec un historique réel
+  (`len(vals) >= 2` dans `ui/datawindow.py`) — c'est ce qui a laissé passer le crash
+  `widgets._hover_sync` (cf. plus bas). `tests/test_terminal_desktop_fuzz.py` couvre ce
+  cas : marché avancé de 40 pas puis fuzz pseudo-aléatoire (graine fixe, ~150 évènements)
+  du terminal/bureau/marché/portefeuille, plus un test ciblé qui clique CHAQUE ligne du
+  panneau INDICES et vérifie que chacune ouvre bien SON PROPRE graphe.
+- `tests/test_facade_exports.py` verrouille par ANALYSE AST (pas une recherche texte, pour
+  ignorer commentaires/docstrings) que toute expression `widgets.<x>` / `pf.<x>` /
+  `pf_mod.<x>` / `PF.<x>` réellement présente dans le code résout sur le VRAI module
+  (`ui.widgets`/`core.portfolio`) — ces deux modules réexportent explicitement des helpers
+  depuis `ui/chart_widgets.py`/`core/portfolio_margin.py`/`core/portfolio_views.py`
+  (`from X import (...)`, cf. commentaire « réexport » dans ces fichiers), et un symbole
+  oublié de cette liste (`widgets._hover_sync`) a fait planter tout le jeu au clic sur un
+  graphe avec historique — invisible à la compilation, seulement à l'exécution.
+- `core/crashlog.py` + `main.py::App._safe_call` : la boucle principale (`App.run`) n'attrape
+  plus aucune exception qui, avant, fermait le jeu entier (ex. le crash ci-dessus). Chaque
+  appel à `handle_event`/`update`/`draw` est absorbé individuellement : l'exception est
+  journalisée (fichier `crash.log` sous `config.SAVE_DIR`, borné à 20 entrées, best-effort —
+  ne doit jamais lui-même lever) et un toast prévient le joueur (au plus un par 5 s, pour ne
+  pas spammer si le même bug se reproduit à chaque frame), mais la partie continue. Ne
+  remplace pas la correction des bugs eux-mêmes : un filet, pas une excuse à ne pas tester.
 
 ## Vérification d'une modif
 

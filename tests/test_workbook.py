@@ -43,6 +43,49 @@ def test_import_financial_opens_new_sheet_if_active_not_blank():
     assert tab.name == "Cible M&A"
 
 
+# ------------------------------------------------------------ import CSV
+def test_import_csv_returns_none_for_empty_rows():
+    wb = Workbook(10, 5)
+    assert wb.import_csv([]) is None
+
+
+def test_import_csv_fills_blank_active_sheet():
+    wb = Workbook(10, 5)
+    tab = wb.import_csv([["MVC", "142.5"], ["NVDA", "98.1"]], name="Cours")
+    assert tab is wb.active
+    assert wb.active.sheet.get_raw("A1") == "MVC"
+    assert wb.active.sheet.get_raw("B1") == "142.5"
+    assert wb.active.sheet.get_raw("A2") == "NVDA"
+
+
+def test_import_csv_opens_new_sheet_if_active_not_blank():
+    wb = Workbook(10, 5)
+    wb.active.sheet.set("A1", "modèle en cours")
+    n_before = len(wb.tabs)
+    tab = wb.import_csv([["x", "y"]], name="Import")
+    assert len(wb.tabs) == n_before + 1
+    assert tab is wb.active
+    assert tab.name == "Import"
+
+
+def test_import_csv_ignores_empty_string_cells():
+    wb = Workbook(10, 5)
+    tab = wb.import_csv([["A", "", "C"]])
+    assert tab.sheet.get_raw("A1") == "A"
+    assert tab.sheet.get_raw("B1") == ""
+    assert tab.sheet.get_raw("C1") == "C"
+
+
+def test_import_csv_is_bounded_to_sheet_size():
+    wb = Workbook(2, 2)   # 2 lignes, 2 colonnes
+    tab = wb.import_csv([["a", "b", "c"], ["d", "e"], ["f", "g"]])
+    assert tab.sheet.get_raw("A1") == "a"
+    assert tab.sheet.get_raw("B1") == "b"
+    # 3e colonne et 3e ligne ignorées silencieusement (hors gabarit)
+    assert tab.sheet.get_raw("A2") == "d"
+    assert tab.sheet.get_raw("B2") == "e"
+
+
 # --------------------------------------------- modèles prêts à l'emploi
 def test_template_list_matches_templates_dict():
     listed = dict(template_list())

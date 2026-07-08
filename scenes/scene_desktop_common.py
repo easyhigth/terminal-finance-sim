@@ -13,8 +13,11 @@ import pygame
 from apps.app_alerts import AlertsApp
 from apps.app_book import BookApp
 from apps.app_calculator import CalculatorApp
+from apps.app_deals import DealsApp
 from apps.app_dilemma import DilemmaApp
+from apps.app_evaluation import EvaluationApp
 from apps.app_inbox import InboxApp
+from apps.app_journal import JournalApp
 from apps.app_markethub import MarketHubApp
 from apps.app_mission import MissionApp
 from apps.app_notifications import NotificationCenterApp
@@ -62,6 +65,9 @@ APPS = [
     ("dilemma", "Décision", "decide", DilemmaApp),
     ("review", "Revue de performance", "review", ReviewApp),
     ("mission", "Mission", "mission", MissionApp),
+    ("tradejournal", "Journal de trading", "journal", JournalApp),
+    ("evaluation", "Évaluation", "examcert", EvaluationApp),
+    ("deals", "Deals", "deals", DealsApp),
 ]
 
 # Application supplémentaire propre à la VOIE (track) choisie par le joueur
@@ -86,11 +92,11 @@ TRACK_APP = {
 # icon_kind, scène) — "save" (clé "save") est une action instantanée (pas une
 # fenêtre), cf. `DesktopScene._quick_save`.
 QUICK_APPS = [
-    # (Marché, Portefeuille, Inbox et Alertes sont devenues des apps NATIVES,
-    # cf. APPS ci-dessus — dessinées à la résolution de leur fenêtre, plus
-    # d'hébergement flou)
+    # (Marché, Portefeuille, Inbox, Alertes et Mission sont devenues des apps
+    # NATIVES, cf. APPS ci-dessus — dessinées à la résolution de leur
+    # fenêtre, plus d'hébergement flou ; leur icône vit désormais dans APPS,
+    # retirée d'ici pour ne pas en afficher deux)
     ("qnews", "News", "news", "news"),
-    ("qmission", "Mission", "mission", "mission"),
     ("qmandates", "Mandats", "advisory", "mandates"),
     ("qdeals", "Deals", "deals", "deals"),
     ("qdecide", "Décide", "decide", "dilemma"),
@@ -125,7 +131,7 @@ DESKTOP_SHORTCUTS = {
     pygame.K_p: "book",
     pygame.K_i: "inbox",
     pygame.K_n: "qnews",
-    pygame.K_j: "qmission",
+    pygame.K_j: "mission",
     pygame.K_a: "qmandates",
     pygame.K_d: "qdeals",
     pygame.K_x: "qexamcert",

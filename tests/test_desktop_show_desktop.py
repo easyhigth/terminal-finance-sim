@@ -73,4 +73,4 @@ def test_noop_with_no_windows_open(desktop):
 def test_plain_ctrl_d_still_opens_deals_icon_not_show_desktop(desktop):
     ev = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_d, mod=pygame.KMOD_CTRL, unicode="")
     desktop.handle_event(ev)
-    assert any(w.key == "scene:deals" for w in desktop.wm.windows)
+    assert any(w.key == "deals" for w in desktop.wm.windows)

@@ -1249,7 +1249,7 @@ def test_terminal_rail_is_gone(app):
 def test_quick_apps_open_matching_scene_windows(app):
     from scenes.scene_desktop import QUICK_APPS
     # apps NATIVES migrées (netteté) : clé nue, pas "scene:<nom>".
-    _NATIVE = {"book", "markethub", "dilemma", "review", "mission"}
+    _NATIVE = {"book", "markethub", "dilemma", "review", "mission", "deals"}
     app.scenes.go("desktop")
     desk = app.scenes.current
     desk.draw(app.screen)
@@ -3229,3 +3229,30 @@ def test_inbox_and_alerts_desktop_icons_launch_native_apps(app):
     assert w is not None and w.app_obj.__class__.__name__ == "InboxApp"
     w2 = desk._launch("alerts")
     assert w2 is not None and w2.app_obj.__class__.__name__ == "AlertsApp"
+
+
+def test_desktop_never_shows_two_icons_with_the_same_label(app):
+    """Régression : migrer une scène vers une app native (cf. APPS) sans
+    retirer son ancien accès rapide de QUICK_APPS affiche deux icônes
+    identiques côte à côte (arrivé pour Mission/Deals lors de leur
+    migration). Vérifié avec un dilemme EN ATTENTE (qui rend "qdecide"
+    visible) pour couvrir aussi ce cas conditionnel."""
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    app.gs.player.pending_dilemmas = [{"id": "x", "category": "ethique",
+                                       "title": "T", "scenario": "S", "options": []}]
+    labels = [lbl for _k, lbl, _kind, _acc in desk._icon_list()]
+    dupes = {lbl for lbl in labels if labels.count(lbl) > 1}
+    assert not dupes, f"icônes en double : {dupes}"
+
+
+def test_evaluation_and_review_and_dilemma_are_factory_only_not_standing_icons(app):
+    """"dilemma"/"review"/"evaluation"/"deals" sont enregistrées dans APPS
+    uniquement pour que `_launch` trouve leur classe (popups forcés/liens
+    internes) — jamais une icône de bureau permanente : "evaluation" en
+    particulier contournerait les critères de promotion vérifiés par
+    scene_examcert.py::_go_exam si elle était directement cliquable."""
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    keys = {k for k, _l, _kind, _acc in desk._icon_list()}
+    assert not keys & {"dilemma", "review", "evaluation", "deals"}

@@ -54,6 +54,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         self._preset_rects = {}
         self._qty_minus = self._qty_plus = None
         self._list_rect = None
+        self._journal_btn = None
         # ordres conditionnels (stop-loss / take-profit) — mixin partagé avec
         # l'app Portefeuille, cf. ui/order_prompt.py
         self.init_order_prompt()
@@ -309,6 +310,10 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
                                          self.scroll + (-48 if event.button == 4 else 48)))
                 return True
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._journal_btn and self._journal_btn.collidepoint(event.pos):
+                if self.desktop is not None:
+                    self.desktop._open_scene_window("tradejournal")
+                return True
             for mode, r in self._qty_mode_rects.items():
                 if r.collidepoint(event.pos):
                     if mode != self.qty_mode:
@@ -486,6 +491,12 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
             pygame.draw.rect(surf, config.COL_BORDER, r, 1, border_radius=3)
             widgets.draw_text(surf, plabel, r.center, fonts.tiny(bold=True), config.COL_TEXT_DIM, align="center")
             px += w + 6
+
+        self._journal_btn = pygame.Rect(rect.right - pad - 72, qy, 72, 22)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._journal_btn, border_radius=3)
+        pygame.draw.rect(surf, config.COL_PRESTIGE, self._journal_btn, 1, border_radius=3)
+        widgets.draw_text(surf, "JOURNAL", self._journal_btn.center, fonts.tiny(bold=True),
+                          config.COL_PRESTIGE, align="center")
 
         # liste (rétrécie si des ordres conditionnels sont en cours, pour leur
         # réserver une bande visible sans qu'ils soient enterrés hors écran)

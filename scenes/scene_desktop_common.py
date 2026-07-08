@@ -16,6 +16,7 @@ from apps.app_calculator import CalculatorApp
 from apps.app_dilemma import DilemmaApp
 from apps.app_inbox import InboxApp
 from apps.app_markethub import MarketHubApp
+from apps.app_mission import MissionApp
 from apps.app_notifications import NotificationCenterApp
 from apps.app_research import ResearchApp
 from apps.app_review import ReviewApp
@@ -60,6 +61,7 @@ APPS = [
     ("notifcenter", "Notifications", "bell", NotificationCenterApp),
     ("dilemma", "Décision", "decide", DilemmaApp),
     ("review", "Revue de performance", "review", ReviewApp),
+    ("mission", "Mission", "mission", MissionApp),
 ]
 
 # Application supplémentaire propre à la VOIE (track) choisie par le joueur

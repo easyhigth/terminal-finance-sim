@@ -36,6 +36,17 @@ class RunSetupScene(Scene):
         self.diff_idx = next(i for i, p in enumerate(diff_mod.PRESETS)
                              if p["id"] == diff_mod.DEFAULT)
         self.daily = False           # « Défi du jour » : marché du jour partagé
+        # classement du défi du JOUR (runs locaux + amis importés), affiché
+        # dès que la case est cochée — on voit le score à battre AVANT de
+        # lancer le run. Cache rafraîchi au cochage et après un import.
+        self._daily_ranking = None
+        self._daily_import_rect = None
+        self._daily_panel_rect = None
+        self.code_prompt = False
+        self.code_buf = ""
+        self._code_box_rect = None
+        self._code_confirm_rect = None
+        self._code_cancel_rect = None
         self.page = 1
         self._scen_rects = {}
         self._arch_rects = {}
@@ -53,7 +64,61 @@ class RunSetupScene(Scene):
         self.confirm_btn = widgets.Button(
             (config.SCREEN_WIDTH-300, fy, 260, 42), t("runsetup.confirm"), config.COL_UP)
 
+    def _today_iso(self):
+        import datetime
+        return datetime.date.today().isoformat()
+
+    def _refresh_daily_ranking(self):
+        from core import hall_of_fame as hof
+        self._daily_ranking = hof.combined_daily_ranking(self._today_iso(), n=5)
+
+    def _handle_code_prompt_event(self, event):
+        """Boîte « Importer un code d'ami » — même pattern que
+        scene_gameover.py (modale, Échap annule la saisie seulement)."""
+        from core import clipboard
+        from core import hall_of_fame as hof
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.code_prompt = False
+                return
+            if event.key == pygame.K_BACKSPACE:
+                self.code_buf = self.code_buf[:-1]
+                return
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                self._confirm_code_prompt()
+                return
+            if clipboard.is_paste_shortcut(event):
+                self.code_buf += clipboard.paste()
+                return
+            if event.unicode and event.unicode.isprintable():
+                self.code_buf += event.unicode
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._code_confirm_rect and self._code_confirm_rect.collidepoint(event.pos):
+                self._confirm_code_prompt()
+                return
+            if self._code_cancel_rect and self._code_cancel_rect.collidepoint(event.pos):
+                self.code_prompt = False
+                return
+            if not (self._code_box_rect and self._code_box_rect.collidepoint(event.pos)):
+                self.code_prompt = False
+
+    def _confirm_code_prompt(self):
+        from core import hall_of_fame as hof
+        ok, result = hof.import_friend_code(self.code_buf)
+        self.code_prompt = False
+        if ok:
+            self.app.notify(f"Score de {result['name']} ajouté au classement du défi.", "good")
+            self._refresh_daily_ranking()
+        elif result == "duplicate":
+            self.app.notify("Ce code a déjà été importé.", "warn")
+        else:
+            self.app.notify("Code invalide — vérifiez le copier-coller.", "bad")
+
     def handle_event(self, event):
+        if self.code_prompt:
+            self._handle_code_prompt_event(event)
+            return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             if self.page == 2:
                 self.page = 1
@@ -69,6 +134,16 @@ class RunSetupScene(Scene):
                 if st and st.handle_wheel(event):
                     return
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # panneau « Défi du jour » dessiné PAR-DESSUS la liste des
+                # archétypes : absorbe tout clic dans ses limites (import ou
+                # non), jamais de fallthrough vers les cartes derrière.
+                if self.daily and self._daily_panel_rect \
+                        and self._daily_panel_rect.collidepoint(event.pos):
+                    if self._daily_import_rect \
+                            and self._daily_import_rect.collidepoint(event.pos):
+                        self.code_prompt = True
+                        self.code_buf = ""
+                    return
                 for idx, rect in self._scen_rects.items():
                     if rect.collidepoint(event.pos):
                         self.scen_idx = idx
@@ -86,6 +161,8 @@ class RunSetupScene(Scene):
                         return
                 if self._daily_rect and self._daily_rect.collidepoint(event.pos):
                     self.daily = not self.daily
+                    if self.daily:
+                        self._refresh_daily_ranking()
                     return
             if self.next_btn.handle(event):
                 self.page = 2
@@ -180,6 +257,11 @@ class RunSetupScene(Scene):
             self._draw_hardcore_bar(surf, pygame.Rect(40, hardcore_top, config.SCREEN_WIDTH - 80, 60))
             self.back_btn.draw(surf)
             self.next_btn.draw(surf)
+            if self.daily:
+                self._draw_daily_panel(surf, pygame.Rect(config.SCREEN_WIDTH - 40 - 330, top,
+                                                         330, min(236, diff_top - 12 - top)))
+            if self.code_prompt:
+                self._draw_code_prompt(surf)
         else:
             bottom = fy - 12
             firm_rect = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, bottom - top)
@@ -286,6 +368,86 @@ class RunSetupScene(Scene):
         label = widgets.fit_text(label, fonts.small(bold=self.daily), dr.right - (box.right + 8) - 8)
         widgets.draw_text(surf, label, (box.right + 8, dr.y + 5), fonts.small(bold=self.daily),
                           config.COL_PRESTIGE if self.daily else config.COL_TEXT_DIM)
+
+    def _draw_daily_panel(self, surf, rect):
+        """Classement du défi du JOUR (runs locaux + amis importés, cf.
+        core/hall_of_fame.combined_daily_ranking) affiché AVANT de jouer —
+        le score à battre est visible dès qu'on coche la case, avec import
+        de code d'ami directement ici (pas besoin d'attendre un game over)."""
+        from core.i18n import get_lang
+        en = get_lang() == "en"
+        if self._daily_ranking is None:
+            self._refresh_daily_ranking()
+        self._daily_panel_rect = rect
+        pygame.draw.rect(surf, config.COL_PANEL, rect)
+        pygame.draw.rect(surf, config.COL_PRESTIGE, rect, 2)
+        widgets.draw_text(surf, ("DÉFI DU JOUR — " if not en else "DAILY CHALLENGE — ")
+                          + self._today_iso(),
+                          (rect.x + 12, rect.y + 8), fonts.small(bold=True), config.COL_PRESTIGE)
+        y = rect.y + 34
+        ranking = self._daily_ranking or []
+        if not ranking:
+            widgets.draw_text_wrapped(
+                surf, ("Personne n'a encore relevé le défi d'aujourd'hui. "
+                       "Soyez le premier — ou importez le code d'un ami." if not en else
+                       "Nobody has taken today's challenge yet. Be the first — "
+                       "or import a friend's code."),
+                (rect.x + 12, y), fonts.tiny(), config.COL_TEXT_DIM, rect.w - 24)
+            y += 52
+        else:
+            for i, r in enumerate(ranking, start=1):
+                if y > rect.bottom - 60:
+                    break
+                tag = " (ami)" if r.get("friend") else ""
+                line = f"{i}. {r.get('name', '?')}{tag} — {r.get('score', 0):g} pts"
+                widgets.draw_text(surf, widgets.fit_text(line, fonts.tiny(bold=i == 1), rect.w - 24),
+                                  (rect.x + 12, y), fonts.tiny(bold=i == 1),
+                                  config.COL_PRESTIGE if i == 1 else config.COL_TEXT)
+                y += 18
+        self._daily_import_rect = pygame.Rect(rect.x + 12, rect.bottom - 36, rect.w - 24, 26)
+        hov = self._daily_import_rect.collidepoint(pygame.mouse.get_pos())
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_BG,
+                         self._daily_import_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN, self._daily_import_rect, 1, border_radius=4)
+        widgets.draw_text(surf, "IMPORTER UN CODE D'AMI" if not en else "IMPORT A FRIEND CODE",
+                          self._daily_import_rect.center, fonts.tiny(bold=True),
+                          config.COL_CYAN, align="center")
+
+    def _draw_code_prompt(self, surf):
+        """Boîte modale de saisie d'un code de défi partagé (Ctrl+V supporté)."""
+        from core.i18n import get_lang
+        en = get_lang() == "en"
+        shade = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT), pygame.SRCALPHA)
+        shade.fill((0, 0, 0, 170))
+        surf.blit(shade, (0, 0))
+        box = pygame.Rect(0, 0, 560, 130)
+        box.center = (config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2)
+        pygame.draw.rect(surf, config.COL_PANEL, box)
+        pygame.draw.rect(surf, config.COL_CYAN, box, 2)
+        widgets.draw_text(surf, "Collez le code d'un ami (FSC1:…) :" if not en
+                          else "Paste a friend's code (FSC1:…):",
+                          (box.x + 16, box.y + 12), fonts.small(bold=True), config.COL_CYAN)
+        self._code_box_rect = pygame.Rect(box.x + 16, box.y + 40, box.w - 32, 30)
+        pygame.draw.rect(surf, config.COL_BG, self._code_box_rect)
+        pygame.draw.rect(surf, config.COL_BORDER, self._code_box_rect, 1)
+        cur = "_" if pygame.time.get_ticks() % 1000 < 500 else ""
+        widgets.draw_text(surf, widgets.fit_text(self.code_buf + cur, fonts.small(),
+                                                 self._code_box_rect.w - 16),
+                          (self._code_box_rect.x + 8, self._code_box_rect.y + 7),
+                          fonts.small(), config.COL_TEXT)
+        self._code_confirm_rect = pygame.Rect(box.x + 16, box.bottom - 40, 130, 28)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._code_confirm_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_UP, self._code_confirm_rect, 1, border_radius=4)
+        widgets.draw_text(surf, "IMPORTER" if not en else "IMPORT",
+                          self._code_confirm_rect.center, fonts.tiny(bold=True),
+                          config.COL_UP, align="center")
+        self._code_cancel_rect = pygame.Rect(self._code_confirm_rect.right + 8,
+                                             box.bottom - 40, 100, 28)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._code_cancel_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_TEXT_DIM, self._code_cancel_rect, 1, border_radius=4)
+        widgets.draw_text(surf, "Annuler" if not en else "Cancel",
+                          self._code_cancel_rect.center, fonts.tiny(),
+                          config.COL_TEXT_DIM, align="center")
 
     def _draw_hardcore_bar(self, surf, rect):
         self._hardcore_rect = rect

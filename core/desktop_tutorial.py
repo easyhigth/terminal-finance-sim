@@ -56,7 +56,7 @@ def _window_snapped(desktop):
 
 
 def _mission_open(desktop):
-    return _win(desktop, "scene:mission") is not None
+    return _win(desktop, "mission") is not None   # app native, cf. apps/app_mission.py
 
 
 def _trade_unlocked(desktop):

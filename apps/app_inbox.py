@@ -104,6 +104,11 @@ class InboxApp(DesktopApp):
                     self.sel = idx
                     self.app.gs.player.inbox[idx]["read"] = True
                 return True
+            from core import clipboard
+            if clipboard.is_paste_shortcut(event):
+                self.search += clipboard.paste().replace("\n", " ").strip()
+                self.scroll = 0
+                return True
             if event.unicode and event.unicode.isprintable() and event.key != pygame.K_TAB:
                 self.search += event.unicode
                 self.scroll = 0

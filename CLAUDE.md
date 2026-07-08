@@ -442,13 +442,30 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   `App.route_scene`/`_open_scene_window(attention=True)` (clignotement de barre des tâches
   SANS voler le focus — la version précédente focalisait immédiatement la fenêtre pour
   book/markethub, ce qui aurait annulé le clignotement pour ces popups forcés).
+  **Mission aussi** (`apps/app_mission.py`, `MissionApp`) — l'écran de carrière le plus
+  consulté, migré au même modèle, avec une règle de ré-ouverture différente des popups :
+  une mission EN COURS retrouve SA fenêtre (jamais de perte de progression), seule une
+  mission TERMINÉE (état `"result"`) est relancée fraîche (cf. le bloc `"mission"` de
+  `_open_scene_window`).
+- **`ui/order_prompt.py`** (`ConditionalOrderMixin`) : boîte modale « poser un ordre
+  conditionnel » (stop/target/trailing) + bande récapitulative « ORDRES CONDITIONNELS »
+  (croix d'annulation par ligne), FACTORISÉES depuis `apps/app_trading.py` (qui les
+  portait seul) et désormais partagées avec `apps/app_book.py` — bouton « ORD » sur
+  chaque ligne ACTION de la table du Portefeuille, la table rétrécit dynamiquement quand
+  des ordres sont en cours. L'app hôte fournit `app`/`market`/`msg`/`_held(tk)`.
 - **`core/clipboard.py`** : lecture/écriture presse-papiers système best-effort
   (`pygame.scrap`), silencieux si le backend est indisponible (headless/CI, plateforme sans
   presse-papiers). `copy(text)` factorise l'ancien `scenes/scene_commands.py::_try_clipboard`
   (conservé comme fine façade de compat) ; `paste()` et `is_paste_shortcut(event)` (Ctrl+V/
   Cmd+V) sont le côté LECTURE, câblés dans la boîte « Importer un code » de
   `scenes/scene_gameover.py` (coller un code de défi partagé plutôt que le retaper caractère
-  par caractère) et le chemin d'export/import de `scenes/scene_saves.py`.
+  par caractère) et le chemin d'export/import de `scenes/scene_saves.py`. **Généralisé
+  ensuite à tous les champs de saisie principaux** : ligne de commande du terminal
+  (`scene_terminal.py`, Ctrl+V libre — seul Ctrl+Shift+V est pris), barre de formule du
+  Tableur (en ÉDITION seulement — hors édition, Ctrl+V reste le collage de PLAGE),
+  champ ticker du Trading rapide du Portefeuille, recherches de Recherche/Trading/Inbox/
+  Alertes, et boîte d'import de code du panneau Défi du jour de `scene_runsetup.py`.
+  Les retours à la ligne collés sont aplatis en espaces (champs mono-ligne).
 - **`core/crashlog.py`** (lecture) + **`ui/crashlogpanel.py`** : visualiseur en jeu du journal
   de plantage (`crashlog.read()`/`clear()`, ajoutés au module déjà existant du filet de
   sécurité), overlay déplaçable/défilable (même pattern que `ui/shortcutspanel.py`) ouvert
@@ -563,7 +580,12 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   `on_enter`) à celui de l'ami tout juste importé (`result["score"]`) et l'annonce dans le
   toast de confirmation (« Vous le devancez de N points ! » / « <Ami> vous devance de N
   points. » / égalité) — sans ça, « score ajouté au classement » laissait deviner qui est
-  devant sans aller relire le tableau.
+  devant sans aller relire le tableau. **Classement visible AVANT de jouer** : cocher
+  « Défi du jour » dans `scene_runsetup.py` affiche un panneau (par-dessus la liste des
+  archétypes, clics absorbés — pas de fallthrough) avec le top 5 du jour
+  (`combined_daily_ranking`, entrées d'amis taguées « (ami) ») et un bouton « IMPORTER UN
+  CODE D'AMI » (même boîte modale que l'écran de fin, Ctrl+V supporté) — le score à battre
+  se voit dès le lancement du run, pas seulement au game over.
 - **`core/anim_settings.py`** : réglage persisté « réduire les animations » (fichier JSON
   séparé sous `config.SAVE_DIR`, distinct de `core/i18n.py`/`settings.json`). Unique point de
   gating dans `core/intraday.py::wiggle()` : si actif, toutes les courbes intraday retombent

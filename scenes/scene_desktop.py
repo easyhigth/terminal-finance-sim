@@ -791,6 +791,22 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 self.wm.focus(w)
                 self.start_open = False
             return w
+        if name == "mission":
+            # Mission NATIVE (apps/app_mission.py, netteté). Ré-ouvrir une
+            # mission EN COURS retrouve la même fenêtre (ne jamais perdre la
+            # progression) ; ré-ouvrir une mission TERMINÉE (état "result")
+            # en relance une fraîche.
+            existing = next((w for w in self.wm.windows if w.key == "mission"), None)
+            if existing is not None and getattr(existing.app_obj, "state", "") == "result":
+                self.wm.close(existing)
+            w = self._launch("mission")
+            if w is not None:
+                if attention:
+                    w.attention = True
+                else:
+                    self.wm.focus(w)
+                self.start_open = False
+            return w
         if name in ("book", "markethub", "dilemma", "review"):
             # Portefeuille/Marché/Décision/Revue NATIFS (apps/app_book.py,
             # apps/app_markethub.py, apps/app_dilemma.py, apps/app_review.py),

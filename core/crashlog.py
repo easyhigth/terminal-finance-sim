@@ -45,3 +45,24 @@ def record(exc, context=""):
 def path():
     """Chemin du fichier de journal (pour l'afficher au joueur/le diagnostic)."""
     return _PATH
+
+
+def read():
+    """Contenu brut du journal, ou "" s'il n'existe pas/est illisible — pour
+    un écran de diagnostic accessible sans accès au système de fichiers
+    (ex. joueur sur une machine où il ne peut pas ouvrir le dossier de
+    sauvegarde)."""
+    try:
+        with open(_PATH, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception:
+        return ""
+
+
+def clear():
+    """Vide le journal (best-effort, ne lève jamais)."""
+    try:
+        if os.path.exists(_PATH):
+            os.remove(_PATH)
+    except Exception:
+        pass

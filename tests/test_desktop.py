@@ -1221,7 +1221,7 @@ def test_dilemma_routes_to_window_when_on_desktop():
     a.route_scene("dilemma", return_to="terminal")
     desk = a.scenes.current
     assert a.scenes.current_name == "desktop"   # le bureau reste la scène courante
-    assert any(w.key == "scene:dilemma" for w in desk.wm.windows)
+    assert any(w.key == "dilemma" for w in desk.wm.windows)
 
 
 def test_route_scene_falls_back_to_classic_switch_outside_desktop():
@@ -1248,6 +1248,8 @@ def test_terminal_rail_is_gone(app):
 
 def test_quick_apps_open_matching_scene_windows(app):
     from scenes.scene_desktop import QUICK_APPS
+    # apps NATIVES migrées (netteté) : clé nue, pas "scene:<nom>".
+    _NATIVE = {"book", "markethub", "dilemma", "review"}
     app.scenes.go("desktop")
     desk = app.scenes.current
     desk.draw(app.screen)
@@ -1255,7 +1257,8 @@ def test_quick_apps_open_matching_scene_windows(app):
         if scene is None:      # "save" : action instantanée, pas une fenêtre
             continue
         desk._launch(key)
-        assert any(w.key == f"scene:{scene}" for w in desk.wm.windows), key
+        expected = scene if scene in _NATIVE else f"scene:{scene}"
+        assert any(w.key == expected for w in desk.wm.windows), key
 
 
 def test_quick_save_action_saves_without_opening_window(app):
@@ -1370,7 +1373,7 @@ def test_forced_popup_flags_attention_and_focus_clears_it():
     a.scenes.go("desktop")
     desk = a.scenes.current
     a.route_scene("dilemma", return_to="terminal")   # popup FORCÉ
-    w = next(win for win in desk.wm.windows if win.key == "scene:dilemma")
+    w = next(win for win in desk.wm.windows if win.key == "dilemma")
     assert w.attention is True                       # clignote dans la barre des tâches
     desk.wm.focus(w)                                 # la regarder éteint le clignotement
     assert w.attention is False
@@ -2703,7 +2706,7 @@ def test_assistant_go_button_opens_target_scene_and_closes_card(app):
     btn, _target = scene._assistant_rects["go"]
     scene.handle_event(_click(*btn.center))
     assert scene._assistant_open is False
-    assert any(w.key == "scene:review" for w in scene.wm.windows)
+    assert any(w.key == "review" for w in scene.wm.windows)
 
 
 def test_assistant_reassures_when_nothing_pending(app):

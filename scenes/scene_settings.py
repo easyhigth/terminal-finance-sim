@@ -27,6 +27,7 @@ from core import (
 from core.i18n import get_lang, set_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
+from ui.crashlogpanel import CrashLogPanel
 from ui.shortcutspanel import ShortcutsPanel
 
 
@@ -42,6 +43,7 @@ class SettingsScene(Scene):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "menu")
         self.shortcuts_panel = None   # overlay raccourcis clavier (déplaçable)
+        self.crashlog_panel = None    # overlay journal de plantage (déplaçable)
         self._build()
 
     # --- construction des contrôles (rejouée à chaque changement de langue) ---
@@ -120,6 +122,9 @@ class SettingsScene(Scene):
         self.shortcuts_btn = widgets.Button((360, ry, 320, 38),
                                             _L("⌨ Raccourcis clavier", "⌨ Keyboard shortcuts"),
                                             config.COL_CYAN)
+        self.crashlog_btn = widgets.Button((360, ry + 46, 320, 38),
+                                           _L("⚠ Journal de plantage", "⚠ Crash log"),
+                                           config.COL_WARN)
 
     def _seg(self, options):
         """Construit une rangée de boutons-segments ; `options` = liste de
@@ -143,7 +148,7 @@ class SettingsScene(Scene):
         lignes, bornée à [40, 68] px pour rester lisible."""
         x0 = 360
         y0 = config.content_top() + 10
-        shortcuts_reserve = 38 + 24          # bouton « Raccourcis » + respiration
+        shortcuts_reserve = 38 + 46 + 24     # boutons « Raccourcis » + « Journal » + respiration
         avail = config.footer_y() - 36 - y0 - shortcuts_reserve
         pitch = max(40, min(68, avail // max(1, len(self.rows))))
         btn_h = min(40, pitch - 6)
@@ -163,11 +168,17 @@ class SettingsScene(Scene):
 
     # ----------------------------------------------------------------- events
     def handle_event(self, event):
-        # le panneau des raccourcis (overlay) capte tout tant qu'il est ouvert
+        # les overlays (raccourcis, journal de plantage) captent tout tant
+        # qu'ils sont ouverts
         if self.shortcuts_panel is not None:
             if self.shortcuts_panel.handle(event):
                 if self.shortcuts_panel.closed:
                     self.shortcuts_panel = None
+                return
+        if self.crashlog_panel is not None:
+            if self.crashlog_panel.handle(event):
+                if self.crashlog_panel.closed:
+                    self.crashlog_panel = None
                 return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.back(self.return_to)
@@ -177,6 +188,9 @@ class SettingsScene(Scene):
             return
         if self.shortcuts_btn.handle(event):
             self.shortcuts_panel = ShortcutsPanel()
+            return
+        if self.crashlog_btn.handle(event):
+            self.crashlog_panel = CrashLogPanel()
             return
         for _label, btns in self.rows:
             for b in btns:
@@ -221,6 +235,7 @@ class SettingsScene(Scene):
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp, dt)
         self.shortcuts_btn.update(mp, dt)
+        self.crashlog_btn.update(mp, dt)
         for _label, btns in self.rows:
             for b in btns:
                 b.update(mp, dt)
@@ -246,6 +261,7 @@ class SettingsScene(Scene):
                     pygame.draw.rect(surf, config.COL_CYAN, b.rect, 2, border_radius=6)
 
         self.shortcuts_btn.draw(surf)
+        self.crashlog_btn.draw(surf)
         # aide contextuelle bas d'écran
         hint = _L("Astuce : F11 bascule plein écran · Espace met le jeu en pause.",
                   "Tip: F11 toggles fullscreen · Space pauses the game.")
@@ -254,3 +270,5 @@ class SettingsScene(Scene):
         self.back_btn.draw(surf)
         if self.shortcuts_panel is not None:
             self.shortcuts_panel.draw(surf)
+        if self.crashlog_panel is not None:
+            self.crashlog_panel.draw(surf)

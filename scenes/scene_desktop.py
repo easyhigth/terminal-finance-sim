@@ -202,9 +202,13 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             return True
         from core.sim_clock import FOCUS_SCENE_NAMES
         for w in self.wm.windows:
-            if w.minimized or not w.key.startswith("scene:"):
+            if w.minimized:
                 continue
-            if w.key[len("scene:"):] in FOCUS_SCENE_NAMES:
+            # scène hébergée ("scene:<nom>") ou app native migrée (clé nue,
+            # ex. "dilemma"/"review") — les deux formes désignent la même
+            # activité de carrière du point de vue de l'auto-pause.
+            name = w.key[len("scene:"):] if w.key.startswith("scene:") else w.key
+            if name in FOCUS_SCENE_NAMES:
                 return True
         return False
 
@@ -787,12 +791,24 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 self.wm.focus(w)
                 self.start_open = False
             return w
-        if name in ("book", "markethub"):
-            # Portefeuille/Marché NATIFS (apps/app_book.py, apps/app_markethub.py),
-            # même principe (netteté — plus de rendu 1280×720 réduit)
+        if name in ("book", "markethub", "dilemma", "review"):
+            # Portefeuille/Marché/Décision/Revue NATIFS (apps/app_book.py,
+            # apps/app_markethub.py, apps/app_dilemma.py, apps/app_review.py),
+            # même principe (netteté — plus de rendu 1280×720 réduit). Une
+            # décision/revue en attente peut changer entre deux appels (un
+            # nouveau dilemme signature après avoir traité le précédent) : si
+            # la fenêtre existe déjà, on la referme et relance une instance
+            # fraîche plutôt que de garder un état périmé affiché.
+            if name in ("dilemma", "review"):
+                existing = next((w for w in self.wm.windows if w.key == name), None)
+                if existing is not None:
+                    self.wm.close(existing)
             w = self._launch(name)
             if w is not None:
-                self.wm.focus(w)
+                if attention:
+                    w.attention = True   # popup FORCÉ : clignote plutôt que de voler le focus
+                else:
+                    self.wm.focus(w)
                 self.start_open = False
             return w
         if name not in self.app.scenes.scenes or name in _FULLSCREEN_EXIT:

@@ -127,6 +127,18 @@ def test_path_prompt_typing_appends_and_backspace_removes(app):
     assert scene.path_buf == "a"
 
 
+def test_path_prompt_pastes_via_ctrl_v(app, monkeypatch):
+    from core import clipboard
+    monkeypatch.setattr(clipboard, "paste", lambda: "/tmp/pasted_save.json")
+
+    scene = app.scenes.current
+    scene.path_prompt = {"kind": "export", "slot": "slot1"}
+    scene.path_buf = ""
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_v,
+                                           unicode="v", mod=pygame.KMOD_CTRL))
+    assert scene.path_buf == "/tmp/pasted_save.json"
+
+
 def test_empty_path_shows_message_and_keeps_prompt_open(app):
     scene = app.scenes.current
     scene.path_prompt = {"kind": "export", "slot": "slot1"}

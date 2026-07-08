@@ -156,6 +156,10 @@ class GameOverScene(Scene):
             if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                 self._confirm_code_prompt()
                 return
+            from core import clipboard
+            if clipboard.is_paste_shortcut(event):
+                self.code_buf += clipboard.paste()
+                return
             if event.unicode and event.unicode.isprintable():
                 self.code_buf += event.unicode
             return
@@ -173,7 +177,24 @@ class GameOverScene(Scene):
         ok, result = hof_mod.import_friend_code(self.code_buf)
         self.code_prompt = False
         if ok:
-            self.app.notify(f"Score de {result['name']} ajouté au classement du défi.", "good")
+            msg = f"Score de {result['name']} ajouté au classement du défi."
+            kind = "good"
+            # retour social : si CE run est un défi du jour (seul cas où le
+            # classement s'affiche, cf. test_non_daily_run_shows_no_export_
+            # import_buttons), on compare tout de suite mon score à celui de
+            # l'ami importé — sinon "ajouté au classement" laisse le joueur
+            # deviner s'il est devant ou derrière sans regarder le tableau.
+            if self._daily_date and result.get("daily_date") == self._daily_date:
+                mine, theirs = self.score.total, result.get("score", 0.0)
+                diff = abs(round(mine - theirs, 1))
+                if mine > theirs:
+                    msg += f" Vous le devancez de {diff:g} points !"
+                elif mine < theirs:
+                    msg += f" {result['name']} vous devance de {diff:g} points."
+                    kind = "warn"
+                else:
+                    msg += " Vous êtes à égalité !"
+            self.app.notify(msg, kind)
             if self._daily_date:
                 self.hof_daily_top = hof_mod.combined_daily_ranking(self._daily_date, n=8)
         elif result == "duplicate":

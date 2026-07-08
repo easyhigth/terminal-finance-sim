@@ -80,6 +80,29 @@ def test_import_button_opens_prompt_and_imports_code(monkeypatch):
     assert any(r.get("friend") for r in scene.hof_daily_top)
 
 
+def test_import_prompt_pastes_code_via_ctrl_v(monkeypatch):
+    a1 = _daily_app()
+    a1.gs.player.name = "Ada"
+    code = cs.encode_entry(hof.make_entry(a1.gs.player, 88.0))
+
+    from core import clipboard
+    monkeypatch.setattr(clipboard, "paste", lambda: code)
+
+    a2 = _daily_app()
+    a2.scenes.go("gameover")
+    scene = a2.scenes.current
+    scene.draw(a2.screen)
+    scene.handle_event(_click(scene._import_rect.centerx, scene._import_rect.centery))
+    assert scene.code_prompt is True
+
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_v,
+                                           unicode="v", mod=pygame.KMOD_CTRL))
+    assert scene.code_buf == code
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, unicode="", mod=0))
+    assert scene.code_prompt is False
+    assert any(r["name"] == "Ada" for r in scene.hof_daily_top)
+
+
 def test_import_invalid_code_shows_error_and_does_not_crash():
     a = _daily_app()
     a.scenes.go("gameover")
@@ -101,6 +124,58 @@ def test_escape_cancels_code_prompt_without_going_to_menu():
     scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, unicode="", mod=0))
     assert scene.code_prompt is False
     assert a.scenes.current_name == "gameover"   # pas de sortie vers le menu
+
+
+def test_import_notifies_when_player_beats_friend():
+    a1 = _daily_app()
+    a1.gs.player.name = "Ada"
+    entry = hof.make_entry(a1.gs.player, 1.0)   # score d'ami très faible
+    code = cs.encode_entry(entry)
+
+    a2 = _daily_app()
+    a2.scenes.go("gameover")
+    scene = a2.scenes.current
+    scene.draw(a2.screen)   # calcule scene.score
+    scene.code_buf = code
+    scene._confirm_code_prompt()
+    assert any("Vous le devancez" in t["text"] for t in a2.notes.toasts)
+
+
+def test_import_notifies_when_friend_beats_player(monkeypatch):
+    a1 = _daily_app()
+    a1.gs.player.name = "Ada"
+    entry = hof.make_entry(a1.gs.player, 1_000_000.0)   # score d'ami très élevé
+    code = cs.encode_entry(entry)
+
+    a2 = _daily_app()
+    a2.scenes.go("gameover")
+    scene = a2.scenes.current
+    scene.draw(a2.screen)
+    scene.code_buf = code
+    scene._confirm_code_prompt()
+    assert any("Ada vous devance" in t["text"] for t in a2.notes.toasts)
+
+
+def test_import_no_comparison_for_non_daily_run():
+    """Un run classique n'affiche pas le classement du défi (bouton importer
+    absent) : si import_friend_code est appelé quand même (ex. programmatique-
+    ment), aucune comparaison ne doit être tentée (self._daily_date est None)."""
+    a1 = _daily_app()
+    a1.gs.player.name = "Ada"
+    code = cs.encode_entry(hof.make_entry(a1.gs.player, 50.0))
+
+    a2 = main.App()
+    a2.ensure_market()
+    a2.gs.player.cash = -10.0
+    a2.gs.player.game_over = True
+    a2.gs.player.game_over_reason = "Test"
+    a2.scenes.go("gameover")
+    scene = a2.scenes.current
+    scene.draw(a2.screen)
+    assert scene._daily_date is None
+    scene.code_buf = code
+    scene._confirm_code_prompt()
+    assert not any("devance" in t["text"] for t in a2.notes.toasts)
 
 
 def test_non_daily_run_shows_no_export_import_buttons():

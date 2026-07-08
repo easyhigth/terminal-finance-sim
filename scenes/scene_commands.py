@@ -194,13 +194,8 @@ def _label_lock_grade(label, player):
 
 def _try_clipboard(text):
     """Copie best-effort dans le presse-papiers système (silencieux si indispo)."""
-    try:
-        import pygame.scrap as scrap
-        if not scrap.get_init():
-            scrap.init()
-        scrap.put(pygame.SCRAP_TEXT, text.encode("utf-8"))
-    except Exception:
-        pass
+    from core import clipboard
+    clipboard.copy(text)
 
 
 class CommandsScene(Scene):

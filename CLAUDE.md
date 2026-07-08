@@ -510,6 +510,27 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   même société. Les libellés d'axe X (`scene_graph_common.x_label_positions`, échelle
   adaptative minutes/heures/jours/dates/années) sont de même factorisés et réutilisés par les
   deux écrans.
+- **`core/challenge_share.py`** : partage SANS SERVEUR d'un score de « Défi du jour »
+  (`core/difficulty.py::daily_seed`) entre joueurs. `encode_entry`/`decode_entry` convertissent
+  une entrée de panthéon (`core/hall_of_fame.py::make_entry`) en un code texte compact
+  (`"FSC1:..."`, base64 d'un JSON compact + checksum CRC32) qu'un joueur copie/colle
+  (Discord, SMS…) et qu'un AUTRE colle dans SON propre jeu — aucune inscription, aucun
+  serveur. Le checksum détecte une faute de frappe/un copier-coller tronqué (pas une
+  signature anti-triche : l'enjeu, un classement LOCAL entre amis, ne le justifie pas).
+  `decode_entry` rejette un code non-`FSC1:`, corrompu, tronqué, ou dont l'entrée n'est PAS
+  un run de défi du jour (`daily_date` absent — un run classique n'a pas vocation à être
+  comparé). Les scores importés vivent dans un troisième fichier
+  (`core/hall_of_fame.py::load_friends`/`hall_of_fame_friends.json`, séparé de
+  `hall_of_fame_daily.json` qui ne contient QUE les runs réellement joués sur cette machine)
+  via `import_friend_code` (dédoublonne un import répété du même code) ;
+  `combined_daily_ranking(date)` fusionne runs locaux + scores d'amis en un seul classement
+  trié (entrées d'amis taguées `"friend": True`). UI dans `scenes/scene_gameover.py` (visible
+  uniquement pour un run de Défi du jour) : bouton « EXPORTER MON SCORE » (génère le code au
+  clic, copie best-effort dans le presse-papiers système via
+  `scene_commands._try_clipboard`, l'affiche aussi en clair pour copie manuelle) et
+  « IMPORTER UN CODE » (boîte de saisie modale, même pattern que
+  `scene_saves.py::path_prompt` — Échap annule la SAISIE sans quitter l'écran, contrairement
+  au Échap habituel de cet écran qui renvoie au menu).
 - **`core/anim_settings.py`** : réglage persisté « réduire les animations » (fichier JSON
   séparé sous `config.SAVE_DIR`, distinct de `core/i18n.py`/`settings.json`). Unique point de
   gating dans `core/intraday.py::wiggle()` : si actif, toutes les courbes intraday retombent

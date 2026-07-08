@@ -140,6 +140,68 @@ def top_for_daily(date, n=5):
     return [r for r in load_daily() if r.get("daily_date") == iso][:n]
 
 
+# ---------------------------------------------------------------------------
+# Défi du jour PARTAGÉ (core/challenge_share.py) : scores d'AUTRES joueurs
+# importés via un code texte (pas de serveur) — stockage à PART des runs
+# réellement joués sur cette machine (`load_daily`/`_save_daily`), pour ne
+# jamais mélanger « j'ai joué ce run » et « on m'a montré ce run ».
+# ---------------------------------------------------------------------------
+_FRIENDS_PATH = None
+
+
+def _friends_path():
+    global _FRIENDS_PATH
+    if _FRIENDS_PATH is None:
+        _FRIENDS_PATH = os.path.join(config.SAVE_DIR, "hall_of_fame_friends.json")
+    return _FRIENDS_PATH
+
+
+def load_friends():
+    return _load_json(_friends_path())
+
+
+def _save_friends(runs):
+    _save_json(_friends_path(), runs)
+
+
+def import_friend_code(code):
+    """Décode un code de défi partagé (core/challenge_share.py) et l'ajoute
+    au classement LOCAL « entre amis ». Retourne (True, entry) si importé,
+    ou (False, raison) sinon — "invalid" (code corrompu/mal formé) ou
+    "duplicate" (déjà importé) — jamais d'exception."""
+    from core import challenge_share
+    entry = challenge_share.decode_entry(code)
+    if entry is None:
+        return False, "invalid"
+    entry = dict(entry)
+    dup_key = (entry.get("name"), entry.get("score"), entry.get("daily_date"))
+    friends = load_friends()
+    if any((r.get("name"), r.get("score"), r.get("daily_date")) == dup_key for r in friends):
+        return False, "duplicate"
+    entry["id"] = "friend-" + uuid.uuid4().hex[:12]
+    entry["friend"] = True
+    friends.append(entry)
+    friends.sort(key=lambda r: -r.get("score", 0.0))
+    _save_friends(friends[:MAX_DAILY_RUNS])
+    return True, entry
+
+
+def friends_for_daily(date, n=10):
+    """Scores d'amis importés pour le défi du jour DE CETTE DATE."""
+    iso = date.isoformat() if hasattr(date, "isoformat") else date
+    return [r for r in load_friends() if r.get("daily_date") == iso][:n]
+
+
+def combined_daily_ranking(date, n=8):
+    """Classement du défi du jour FUSIONNANT les runs joués localement et les
+    scores d'amis importés — un seul classement trié, plutôt que deux listes
+    à comparer manuellement. Les entrées d'amis portent `"friend": True`
+    (l'UI peut les distinguer visuellement, ex. un tag « (ami) »)."""
+    combined = top_for_daily(date, n=MAX_DAILY_RUNS) + friends_for_daily(date, n=MAX_DAILY_RUNS)
+    combined.sort(key=lambda r: -r.get("score", 0.0))
+    return combined[:n]
+
+
 def daily_rank(player):
     """Rang du dernier run enregistré (player.flags['hof_entry_id']) dans le
     classement de SON défi du jour, ou None (run non-défi, ou hors du top

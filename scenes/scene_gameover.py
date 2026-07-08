@@ -8,7 +8,7 @@ import math
 
 import pygame
 
-from core import audio, config
+from core import audio, challenge_share, config
 from core import badges as badges_mod
 from core import difficulty as difficulty_mod
 from core import hall_of_fame as hof_mod
@@ -68,12 +68,30 @@ class GameOverScene(Scene):
                 audio.play("badge")
         self.hof_top = hof_mod.top(5)
         # classement du défi du jour à part (marché différent des runs
-        # classiques, comparer les scores mélangés serait trompeur)
+        # classiques, comparer les scores mélangés serait trompeur) — FUSIONNE
+        # les runs joués localement et les scores d'amis importés (codes
+        # texte, cf. core/challenge_share.py) en un seul classement trié ;
+        # "mine" se détermine par ID (pas par rang positionnel, qui change au
+        # fil des imports) plutôt que via hof_daily_rank.
         self.hof_daily_top = None
         self.hof_daily_rank = None
+        self._my_hof_entry_id = p.flags.get("hof_entry_id")
+        self._daily_date = p.flags.get("daily_challenge")
         if difficulty_mod.is_daily_challenge(p):
-            self.hof_daily_top = hof_mod.top_for_daily(p.flags.get("daily_challenge"), n=5)
+            self.hof_daily_top = hof_mod.combined_daily_ranking(self._daily_date, n=8)
             self.hof_daily_rank = hof_mod.daily_rank(p)
+        # code d'export du score de CE run (généré paresseusement au clic sur
+        # « Exporter », pas à chaque entrée sur l'écran)
+        self._export_code = None
+        self._export_rect = None
+        self._import_rect = None
+        # boîte de saisie du code d'un ami à importer (même pattern que
+        # scene_saves.py::path_prompt)
+        self.code_prompt = False
+        self.code_buf = ""
+        self._code_box_rect = None
+        self._code_confirm_rect = None
+        self._code_cancel_rect = None
         self.menu_btn = widgets.Button(
             (config.SCREEN_WIDTH // 2 - 150, 660, 300, 26),
             "RETOUR AU MENU", config.COL_AMBER)
@@ -86,6 +104,12 @@ class GameOverScene(Scene):
         self._journal_list_rect = None
 
     def handle_event(self, event):
+        # boîte de saisie du code d'un ami : MODALE, capture tout en premier
+        # (même pattern que scene_saves.py::path_prompt) — sinon RETURN/ÉCHAP
+        # ci-dessous renverraient au menu au milieu de la frappe.
+        if self.code_prompt:
+            self._handle_code_prompt_event(event)
+            return
         if self.menu_btn.handle(event):
             self.app.scenes.go("menu")
             return
@@ -100,6 +124,62 @@ class GameOverScene(Scene):
             if self._journal_list_rect and self._journal_list_rect.collidepoint(event.pos):
                 self.scroll_journal = max(0, min(self._journal_max_scroll, self.scroll_journal + delta))
                 return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._export_rect and self._export_rect.collidepoint(event.pos):
+                self._export_score()
+                return
+            if self._import_rect and self._import_rect.collidepoint(event.pos):
+                self.code_prompt = True
+                self.code_buf = ""
+                return
+
+    def _export_score(self):
+        """Génère (paresseusement, au 1er clic) le code de partage du score
+        de CE run et le copie dans le presse-papiers système (best-effort,
+        cf. scenes/scene_commands.py::_try_clipboard — jamais bloquant)."""
+        if self._export_code is None:
+            p = self.app.gs.player
+            entry = hof_mod.make_entry(p, self.score.total)
+            self._export_code = challenge_share.encode_entry(entry)
+        from scenes.scene_commands import _try_clipboard
+        _try_clipboard(self._export_code)
+        self.app.notify("Code copié — collez-le à un ami (Discord, SMS…).", "good")
+
+    def _handle_code_prompt_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.code_prompt = False
+                return
+            if event.key == pygame.K_BACKSPACE:
+                self.code_buf = self.code_buf[:-1]
+                return
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                self._confirm_code_prompt()
+                return
+            if event.unicode and event.unicode.isprintable():
+                self.code_buf += event.unicode
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._code_confirm_rect and self._code_confirm_rect.collidepoint(event.pos):
+                self._confirm_code_prompt()
+                return
+            if self._code_cancel_rect and self._code_cancel_rect.collidepoint(event.pos):
+                self.code_prompt = False
+                return
+            if not (self._code_box_rect and self._code_box_rect.collidepoint(event.pos)):
+                self.code_prompt = False
+
+    def _confirm_code_prompt(self):
+        ok, result = hof_mod.import_friend_code(self.code_buf)
+        self.code_prompt = False
+        if ok:
+            self.app.notify(f"Score de {result['name']} ajouté au classement du défi.", "good")
+            if self._daily_date:
+                self.hof_daily_top = hof_mod.combined_daily_ranking(self._daily_date, n=8)
+        elif result == "duplicate":
+            self.app.notify("Ce code a déjà été importé.", "warn")
+        else:
+            self.app.notify("Code invalide — vérifiez le copier-coller.", "bad")
 
     def update(self, dt):
         self.t += dt
@@ -154,6 +234,39 @@ class GameOverScene(Scene):
                                (cx, bottom.bottom + 10), config.COL_DOWN, align="center")
 
         self.menu_btn.draw(surf)
+        if self.code_prompt:
+            self._draw_code_prompt(surf)
+
+    def _draw_code_prompt(self, surf):
+        """Boîte modale pour coller le code de score d'un ami (cf.
+        core/challenge_share.py) — même style que scene_saves.py::path_prompt."""
+        overlay = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 170))
+        surf.blit(overlay, (0, 0))
+
+        box = pygame.Rect(0, 0, 520, 160)
+        box.center = (config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2)
+        widgets.draw_panel(surf, box, "IMPORTER UN CODE D'AMI", config.COL_AMBER)
+        widgets.draw_text(surf, "Collez le code de score reçu (Discord, SMS…) :",
+                          (box.x + 20, box.y + 46), fonts.small(), config.COL_TEXT_DIM)
+
+        self._code_box_rect = pygame.Rect(box.x + 20, box.y + 70, box.w - 40, 30)
+        pygame.draw.rect(surf, config.COL_BG, self._code_box_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_AMBER, self._code_box_rect, 1, border_radius=4)
+        cur = "_" if pygame.time.get_ticks() % 1000 < 500 else ""
+        widgets.draw_text(surf, widgets.fit_text(self.code_buf + cur, fonts.small(), self._code_box_rect.w - 16),
+                          (self._code_box_rect.x + 8, self._code_box_rect.y + 6), fonts.small(), config.COL_TEXT)
+
+        self._code_confirm_rect = pygame.Rect(box.x + 20, box.bottom - 34, 120, 26)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._code_confirm_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_AMBER, self._code_confirm_rect, 1, border_radius=4)
+        widgets.draw_text(surf, "IMPORTER", self._code_confirm_rect.center,
+                          fonts.tiny(bold=True), config.COL_AMBER, align="center")
+        self._code_cancel_rect = pygame.Rect(self._code_confirm_rect.right + 10, box.bottom - 34, 90, 26)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._code_cancel_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_TEXT_DIM, self._code_cancel_rect, 1, border_radius=4)
+        widgets.draw_text(surf, "Annuler", self._code_cancel_rect.center,
+                          fonts.tiny(), config.COL_TEXT_DIM, align="center")
 
     def _draw_report_panel(self, surf, rect, p, cur):
         """Rapport final + stats de run — défilable à la molette pour
@@ -207,19 +320,41 @@ class GameOverScene(Scene):
                                   (inner.x, y), fonts.tiny(bold=mine), col)
                 y += 16
         # classement du défi du jour à part (marché déterministe partagé,
-        # comparaison équitable uniquement entre joueurs du MÊME jour).
+        # comparaison équitable uniquement entre joueurs du MÊME jour) —
+        # FUSIONNE runs joués localement et scores d'amis importés (codes
+        # texte, cf. core/challenge_share.py) ; "mine" par ID, pas par rang
+        # positionnel (qui change au fil des imports).
+        self._export_rect = None
+        self._import_rect = None
         if self.hof_daily_top:
             y += 10
             widgets.draw_text(surf, "CLASSEMENT DU DÉFI DU JOUR", (inner.x, y),
                               fonts.tiny(bold=True), config.COL_CYAN)
             y += 18
-            for i, run in enumerate(self.hof_daily_top, start=1):
-                mine = (self.hof_daily_rank == i)
+            for run in self.hof_daily_top:
+                mine = (self._my_hof_entry_id is not None and run.get("id") == self._my_hof_entry_id)
                 col = config.COL_CYAN if mine else config.COL_TEXT
-                txt = f"{i}. {run['name']} — {run['grade']} · score {run['score']:g}"
+                tag = " (ami)" if run.get("friend") else ""
+                txt = f"{run['name']} — {run['grade']} · score {run['score']:g}{tag}"
                 widgets.draw_text(surf, widgets.fit_text(txt, fonts.tiny(), inner.w),
                                   (inner.x, y), fonts.tiny(bold=mine), col)
                 y += 16
+            y += 6
+            self._export_rect = pygame.Rect(inner.x, y, inner.w // 2 - 4, 22)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._export_rect, border_radius=4)
+            pygame.draw.rect(surf, config.COL_CYAN, self._export_rect, 1, border_radius=4)
+            widgets.draw_text(surf, "EXPORTER MON SCORE", self._export_rect.center,
+                              fonts.tiny(bold=True), config.COL_CYAN, align="center")
+            self._import_rect = pygame.Rect(self._export_rect.right + 8, y, inner.w // 2 - 4, 22)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._import_rect, border_radius=4)
+            pygame.draw.rect(surf, config.COL_AMBER, self._import_rect, 1, border_radius=4)
+            widgets.draw_text(surf, "IMPORTER UN CODE", self._import_rect.center,
+                              fonts.tiny(bold=True), config.COL_AMBER, align="center")
+            y += 26
+            if self._export_code:
+                y += widgets.draw_text_wrapped(
+                    surf, "Code copié : " + self._export_code, (inner.x, y),
+                    fonts.tiny(), config.COL_TEXT_DIM, inner.w, line_gap=2)
         surf.set_clip(prev_clip)
         content_h = (y + self.scroll_report) - inner.y
         self._report_max_scroll = max(0, content_h - list_area.h)

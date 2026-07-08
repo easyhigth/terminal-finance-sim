@@ -29,6 +29,28 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   les régressions de rendu (AttributeError...) qu'un simple `py_compile` ne voit pas. Ce
   test nécessite pygame ; la CI (`.github/workflows/tests.yml`) installe donc
   `numpy scipy pytest pygame` avec `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy`.
+  **Angle mort connu de ce smoke test** : le marché y est fraîchement créé (1-2 points
+  d'historique), donc il n'exerce JAMAIS le rendu des graphes avec un historique réel
+  (`len(vals) >= 2` dans `ui/datawindow.py`) — c'est ce qui a laissé passer le crash
+  `widgets._hover_sync` (cf. plus bas). `tests/test_terminal_desktop_fuzz.py` couvre ce
+  cas : marché avancé de 40 pas puis fuzz pseudo-aléatoire (graine fixe, ~150 évènements)
+  du terminal/bureau/marché/portefeuille, plus un test ciblé qui clique CHAQUE ligne du
+  panneau INDICES et vérifie que chacune ouvre bien SON PROPRE graphe.
+- `tests/test_facade_exports.py` verrouille par ANALYSE AST (pas une recherche texte, pour
+  ignorer commentaires/docstrings) que toute expression `widgets.<x>` / `pf.<x>` /
+  `pf_mod.<x>` / `PF.<x>` réellement présente dans le code résout sur le VRAI module
+  (`ui.widgets`/`core.portfolio`) — ces deux modules réexportent explicitement des helpers
+  depuis `ui/chart_widgets.py`/`core/portfolio_margin.py`/`core/portfolio_views.py`
+  (`from X import (...)`, cf. commentaire « réexport » dans ces fichiers), et un symbole
+  oublié de cette liste (`widgets._hover_sync`) a fait planter tout le jeu au clic sur un
+  graphe avec historique — invisible à la compilation, seulement à l'exécution.
+- `core/crashlog.py` + `main.py::App._safe_call` : la boucle principale (`App.run`) n'attrape
+  plus aucune exception qui, avant, fermait le jeu entier (ex. le crash ci-dessus). Chaque
+  appel à `handle_event`/`update`/`draw` est absorbé individuellement : l'exception est
+  journalisée (fichier `crash.log` sous `config.SAVE_DIR`, borné à 20 entrées, best-effort —
+  ne doit jamais lui-même lever) et un toast prévient le joueur (au plus un par 5 s, pour ne
+  pas spammer si le même bug se reproduit à chaque frame), mais la partie continue. Ne
+  remplace pas la correction des bugs eux-mêmes : un filet, pas une excuse à ne pas tester.
 
 ## Vérification d'une modif
 
@@ -318,6 +340,25 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   accès rapides `qinbox`/`qalerts`) ; toute ouverture EN FENÊTRE des scènes `"inbox"`/`"alerts"`
   est redirigée vers l'app native par `DesktopScene._open_scene_window` (même principe que le
   Tableur) — les scènes plein écran restent enregistrées pour la navigation hors bureau.
+  **Apps natives Marché / Portefeuille (netteté, suite).** Migration des deux plus gros écrans
+  restants : `apps/app_markethub.py` (`MarketHubApp` — onglets Vue d'ensemble/Secteurs/
+  Top-Flop/Heatmap/FX/Watchlist ; la plupart des méthodes `_draw_*` de la scène d'origine
+  prenaient déjà un `rect` en paramètre, seule la disposition de haut niveau dépendait de
+  `config.SCREEN_WIDTH`/`content_top()`/`footer_y()`) et `apps/app_book.py` (`BookApp` —
+  table de positions toutes classes + barre de trading rapide + panneau latéral secteur/
+  évolution, qui passe SOUS la table plutôt qu'à côté si la fenêtre est trop étroite pour 2
+  colonnes). Les deux réutilisent `ui/popups.py::PopupMixin` pour les fiches d'analyse
+  flottantes (société/ETF/obligation/matière première/crypto/structuré/crédit/graphe
+  d'indice), avec `_popup_pos()` SURCHARGÉE pour ouvrir en cascade près de LA FENÊTRE plutôt
+  qu'à une position fixe de l'écran entier (défaut de `PopupMixin`, pensé pour une scène
+  plein écran). Enregistrées dans `APPS` avec les clés `"book"`/`"markethub"` (mêmes clés que
+  les anciennes scènes, donc mêmes raccourcis Ctrl+P/Ctrl+M) ; les accès rapides
+  `qbook`/`qmarket` de `QUICK_APPS` ont été retirés (doublon, même principe qu'Inbox/Alertes).
+  **Bug corrigé au passage** : les quatre redirections vers apps natives (Inbox/Alertes/
+  Portefeuille/Marché) retournaient tôt dans `_open_scene_window`, AVANT la ligne
+  `self.start_open = False` du chemin générique d'hébergement de scène — ouvrir l'une de ces
+  apps depuis le menu Démarrer laissait le menu ouvert par-dessus la fenêtre nouvellement
+  ouverte (chaque bloc de redirection pose désormais `start_open = False` lui-même).
   **Étape 17 (polish V0) : un seul jeu de contrôles temps/pause.** La topbar du bureau
   (`DesktopScene._draw_topbar`) redessinait pause/vitesse/⚙ (`_pause_rect`/`_speed_rects`/
   `_gear_rect`) JUSTE en dessous du widget d'horloge de la bande d'onglets
@@ -469,6 +510,27 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   même société. Les libellés d'axe X (`scene_graph_common.x_label_positions`, échelle
   adaptative minutes/heures/jours/dates/années) sont de même factorisés et réutilisés par les
   deux écrans.
+- **`core/challenge_share.py`** : partage SANS SERVEUR d'un score de « Défi du jour »
+  (`core/difficulty.py::daily_seed`) entre joueurs. `encode_entry`/`decode_entry` convertissent
+  une entrée de panthéon (`core/hall_of_fame.py::make_entry`) en un code texte compact
+  (`"FSC1:..."`, base64 d'un JSON compact + checksum CRC32) qu'un joueur copie/colle
+  (Discord, SMS…) et qu'un AUTRE colle dans SON propre jeu — aucune inscription, aucun
+  serveur. Le checksum détecte une faute de frappe/un copier-coller tronqué (pas une
+  signature anti-triche : l'enjeu, un classement LOCAL entre amis, ne le justifie pas).
+  `decode_entry` rejette un code non-`FSC1:`, corrompu, tronqué, ou dont l'entrée n'est PAS
+  un run de défi du jour (`daily_date` absent — un run classique n'a pas vocation à être
+  comparé). Les scores importés vivent dans un troisième fichier
+  (`core/hall_of_fame.py::load_friends`/`hall_of_fame_friends.json`, séparé de
+  `hall_of_fame_daily.json` qui ne contient QUE les runs réellement joués sur cette machine)
+  via `import_friend_code` (dédoublonne un import répété du même code) ;
+  `combined_daily_ranking(date)` fusionne runs locaux + scores d'amis en un seul classement
+  trié (entrées d'amis taguées `"friend": True`). UI dans `scenes/scene_gameover.py` (visible
+  uniquement pour un run de Défi du jour) : bouton « EXPORTER MON SCORE » (génère le code au
+  clic, copie best-effort dans le presse-papiers système via
+  `scene_commands._try_clipboard`, l'affiche aussi en clair pour copie manuelle) et
+  « IMPORTER UN CODE » (boîte de saisie modale, même pattern que
+  `scene_saves.py::path_prompt` — Échap annule la SAISIE sans quitter l'écran, contrairement
+  au Échap habituel de cet écran qui renvoie au menu).
 - **`core/anim_settings.py`** : réglage persisté « réduire les animations » (fichier JSON
   séparé sous `config.SAVE_DIR`, distinct de `core/i18n.py`/`settings.json`). Unique point de
   gating dans `core/intraday.py::wiggle()` : si actif, toutes les courbes intraday retombent

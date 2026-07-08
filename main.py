@@ -196,6 +196,7 @@ class App:
                                       # bande d'onglets, mode test uniquement)
         self.sim_clock = SimClock()   # horloge de jeu temps réel (vitesse, pause)
         self.pending_market_steps = 0  # pas de marché bancarisés par l'horloge, à jouer au terminal
+        self._last_crash_notify_ms = -1_000_000  # anti-spam du toast d'erreur (cf. _safe_call)
 
         # état de jeu courant (créé à la sélection du continent)
         self.gs = GameState()
@@ -321,6 +322,36 @@ class App:
         for event in pygame.event.get():
             pass
 
+    def _safe_call(self, fn, context):
+        """Exécute `fn()` en absorbant toute exception IMPRÉVUE : journalise
+        (fichier crash.log + logger debug) et notifie le joueur (au plus une
+        fois toutes les quelques secondes, pour ne pas spammer si le même bug
+        se reproduit à chaque frame), SANS jamais fermer la partie. Un bug
+        d'affichage ponctuel (widget mal alimenté, régression comme celle du
+        popup d'indice — cf. widgets._hover_sync) ne doit plus faire perdre
+        une progression non sauvegardée en fermant tout le processus."""
+        try:
+            fn()
+        except Exception as exc:
+            from core import applog, crashlog
+            applog.logger.exception("erreur non gérée dans %s", context)
+            crashlog.record(exc, context)
+            now = pygame.time.get_ticks()
+            if now - self._last_crash_notify_ms > 5000:
+                self._last_crash_notify_ms = now
+                try:
+                    from core.i18n import get_lang
+                    fr = get_lang() != "en"
+                except Exception:
+                    fr = True
+                msg = (f"Erreur interne ({context}) — journalisée dans {crashlog.path()}."
+                       if fr else
+                       f"Internal error ({context}) — logged to {crashlog.path()}.")
+                try:
+                    self.notify(msg, "bad")
+                except Exception:
+                    pass
+
     def run(self):
         while self.running:
             dt = self.clock.tick(config.FPS) / 1000.0
@@ -330,11 +361,11 @@ class App:
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
                     self.toggle_fullscreen()
                     continue
-                self.pages.handle_event(event)
+                self._safe_call(lambda event=event: self.pages.handle_event(event), "handle_event")
             if self.gs.player.market_seed:
                 self.pending_market_steps += self.sim_clock.advance(dt, config.DAYS_PER_STEP)
-            self.pages.update(dt)
-            self.pages.draw(self.screen)
+            self._safe_call(lambda: self.pages.update(dt), "update")
+            self._safe_call(lambda: self.pages.draw(self.screen), "draw")
             pygame.display.flip()
 
         pygame.quit()

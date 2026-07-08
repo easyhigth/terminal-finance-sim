@@ -71,7 +71,9 @@ def test_unlocked_entry_opens_window_and_closes_menu(desktop):
     rect, scene, _kw, _locked, _label, _desc = unlocked[0]
     desktop.handle_event(_click(rect.centerx, rect.centery))
     assert desktop.start_open is False
-    assert any(w.key == f"scene:{scene}" for w in desktop.wm.windows)
+    # certaines entrées (ex. "markethub") sont redirigées vers une app NATIVE
+    # (clé sans préfixe) plutôt qu'hébergées (clé "scene:<nom>").
+    assert any(w.key in (f"scene:{scene}", scene) for w in desktop.wm.windows)
 
 
 def test_search_filters_entries_by_label(desktop):
@@ -104,7 +106,7 @@ def test_keyboard_navigation_moves_cursor_and_enter_activates(desktop):
     desktop._start_cursor = 0
     desktop.handle_event(_key(pygame.K_RETURN))
     assert desktop.start_open is False
-    assert any(w.key == "scene:markethub" for w in desktop.wm.windows)
+    assert any(w.key == "markethub" for w in desktop.wm.windows)   # app native
 
 
 def test_clicking_outside_panel_closes_menu(desktop):

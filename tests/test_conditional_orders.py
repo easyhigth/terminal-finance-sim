@@ -298,3 +298,38 @@ def test_trailing_stop_short_follows_price_down_then_fires_on_rebound():
     executed = CO.execute_due(p, m)
     assert len(executed) == 1
     assert tk not in p.portfolio
+
+
+def test_prune_orphans_drops_closed_and_flipped_positions():
+    """Après une liquidation forcée (appel de marge, APRÈS execute_due dans
+    advance_step), les ordres des positions fermées sont purgés immédiatement
+    — un ordre périmé ne doit jamais s'appliquer à une position rouverte."""
+    p, m, tk = _held_position()
+    CO.place(p, m, tk, "stop", 90.0)
+    tk2 = m.companies[1]["ticker"]
+    _set_price(m, tk2, 50.0)
+    pf.buy(p, m, tk2, 10)
+    CO.place(p, m, tk2, "target", 60.0)
+    # tk fermé « de force » (équivalent liquidation) ; tk2 conservé
+    del p.portfolio[tk]
+    CO.prune_orphans(p)
+    assert [o["ticker"] for o in p.conditional_orders] == [tk2]
+    # position retournée (long -> short) : l'ordre long est purgé aussi
+    pf.sell(p, m, tk2, "ALL")
+    pf.short(p, m, tk2, 5)
+    CO.prune_orphans(p)
+    assert p.conditional_orders == []
+
+
+def test_execute_due_purges_earlier_orders_when_later_one_closes_position():
+    """Régression : un ordre en FIN de liste qui clôture toute la position ne
+    doit pas laisser survivre les ordres du même titre placés AVANT lui (déjà
+    passés dans `remaining` quand la position existait encore) — ils
+    pourraient s'exécuter plus tard sur une position rouverte."""
+    p, m, tk = _held_position(price=100.0)
+    CO.place(p, m, tk, "stop", 50.0)      # loin : ne se déclenche pas
+    CO.place(p, m, tk, "target", 100.0)   # au cours : vend TOUT immédiatement
+    executed = CO.execute_due(p, m)
+    assert len(executed) == 1
+    assert tk not in p.portfolio
+    assert p.conditional_orders == []     # le stop n'a pas survécu

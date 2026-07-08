@@ -579,6 +579,13 @@ class GameState:
                 _nq.push(p, _L("Appel de marge : positions liquidées.",
                                "Margin call : positions liquidated."), "bad",
                          action="book")
+                # une liquidation forcée (APRÈS execute_due) peut avoir fermé
+                # des positions portant des ordres conditionnels : on les purge
+                # tout de suite, sinon un ordre périmé survivrait un pas et
+                # pourrait s'appliquer à une position rouverte entre-temps.
+                if getattr(p, "conditional_orders", None):
+                    from core import conditional_orders as _condord
+                    _condord.prune_orphans(p)
             # échantillonnage du levier (style de jeu, indépendant de la progression de
             # grade) : utilisé par career.risk_profile() pour moduler les mandats proposés.
             if portfolio.leverage(p, market) >= 2.5:

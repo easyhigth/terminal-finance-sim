@@ -72,6 +72,23 @@ def place(player, market, ticker, kind, trigger, qty="ALL"):
     return {"ok": True, "order": order}
 
 
+def prune_orphans(player):
+    """Retire immédiatement les ordres dont la position a disparu ou changé
+    de côté. `execute_due` le fait déjà paresseusement au pas suivant, mais
+    après une LIQUIDATION FORCÉE (appel de marge, juste APRÈS execute_due
+    dans advance_step) un ordre périmé survivrait un pas entier — et
+    pourrait s'appliquer à une position rouverte entre-temps."""
+    orders = getattr(player, "conditional_orders", None) or []
+    if not orders:
+        return
+    kept = []
+    for o in orders:
+        pos, side_short = _position(player, o["ticker"])
+        if pos is not None and side_short == o.get("is_short", False):
+            kept.append(o)
+    player.conditional_orders = kept
+
+
 def cancel(player, order_id):
     orders = getattr(player, "conditional_orders", None) or []
     before = len(orders)
@@ -132,6 +149,13 @@ def execute_due(player, market):
         else:
             remaining.append(order)   # échec (rare) : on retente au pas suivant
     player.conditional_orders = remaining
+    if executed:
+        # une exécution en FIN de liste peut avoir clôturé une position dont
+        # d'autres ordres, PLUS TÔT dans la liste, étaient déjà passés dans
+        # `remaining` (vérifiés quand la position existait encore) : on les
+        # purge tout de suite, sinon ils survivraient un pas et pourraient
+        # s'appliquer à une position rouverte entre-temps.
+        prune_orphans(player)
     return executed
 
 

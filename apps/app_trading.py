@@ -12,22 +12,20 @@ import pygame
 
 from apps.base import DesktopApp
 from core import audio, config, order_confirm, unlocks
-from core import conditional_orders as CO
 from core import orders as ORDERS
 from core import portfolio as PF
 from core import portfolio_margin as PM
 from ui import fonts, style, widgets
+from ui.order_prompt import ConditionalOrderMixin
 
 ROW_H = 24
 QTY_PRESETS = [1, 5, 10, 25, 100]
 AMOUNT_PRESETS = [500, 1000, 5000, 10000]
-COND_ROW_H = 20
-COND_LIST_MAX_H = 88   # zone réservée aux ordres en cours (0 si aucun)
 FEED_MAX = 5           # derniers ordres exécutés affichés en bas de fenêtre
 FEED_FLASH_MS = 900    # durée du flash de fond sur le dernier ordre
 
 
-class TradingApp(DesktopApp):
+class TradingApp(DesktopApp, ConditionalOrderMixin):
     title = "Trading — Ordres"
     icon_kind = "trading"
     default_size = (840, 520)
@@ -56,16 +54,9 @@ class TradingApp(DesktopApp):
         self._preset_rects = {}
         self._qty_minus = self._qty_plus = None
         self._list_rect = None
-        # ordres conditionnels (stop-loss / take-profit)
-        self._order_rects = {}         # ticker -> Rect (bouton "⚑" par ligne détenue)
-        self._order_prompt = None      # {"ticker": tk} en attente de saisie, ou None
-        self._order_kind = "stop"
-        self._order_price_str = ""
-        self._order_focus = False
-        self._order_kind_rects = {}
-        self._order_price_rect = None
-        self._order_confirm_rect = None
-        self._order_cancel_rect = None
+        # ordres conditionnels (stop-loss / take-profit) — mixin partagé avec
+        # l'app Portefeuille, cf. ui/order_prompt.py
+        self.init_order_prompt()
         self._twap_prompt = None       # {"ticker": tk, "side": "buy"|"sell"} ou None
         self._twap_steps_str = ""
         self._twap_focus = False
@@ -269,39 +260,8 @@ class TradingApp(DesktopApp):
             self.app.gs.save(config.AUTOSAVE_SLOT)
 
     # ---------------------------------------------- ordres conditionnels
-    def _open_order_prompt(self, tk):
-        price = self.market.price_of(tk)
-        self._order_prompt = {"ticker": tk}
-        self._order_kind = "stop"
-        self._order_price_str = f"{price:.2f}" if price is not None else ""
-        self._order_focus = True
-
-    def _confirm_order(self):
-        tk = self._order_prompt["ticker"]
-        try:
-            val = float(self._order_price_str)
-        except ValueError:
-            self.msg = "Valeur invalide."
-            return
-        if self._order_kind == "trailing":
-            r = CO.place_trailing(self.app.gs.player, self.market, tk, val)
-        else:
-            r = CO.place(self.app.gs.player, self.market, tk, self._order_kind, val)
-        if r["ok"]:
-            labels = {"stop": "Stop-loss", "target": "Take-profit", "trailing": "Trailing stop"}
-            label = labels.get(self._order_kind, "Ordre")
-            if self._order_kind == "trailing":
-                self.msg = f"{label} posé sur {tk} à {val:.1f}%."
-            else:
-                self.msg = f"{label} posé sur {tk} à {val:,.2f}."
-            self._order_prompt = None
-            self._order_focus = False
-        else:
-            self.msg = f"Ordre refusé ({r['reason']})."
-
-    def _cancel_conditional(self, order_id):
-        CO.cancel(self.app.gs.player, order_id)
-
+    # (_open_order_prompt/_confirm_order/_cancel_conditional/_handle_order_
+    # prompt_event/_draw_order_prompt : mixin ui/order_prompt.py)
     def _open_twap_prompt(self, tk, side):
         self._twap_prompt = {"ticker": tk, "side": side}
         self._twap_steps_str = "5"
@@ -398,6 +358,11 @@ class TradingApp(DesktopApp):
                 self.search = self.search[:-1]
                 self.scroll = 0
                 return True
+            from core import clipboard
+            if clipboard.is_paste_shortcut(event):
+                self.search += clipboard.paste().replace("\n", " ").strip()
+                self.scroll = 0
+                return True
             if event.unicode and event.unicode.isprintable():
                 self.search += event.unicode
                 self.scroll = 0
@@ -421,40 +386,6 @@ class TradingApp(DesktopApp):
                 return True
             if self._confirm_no_rect and self._confirm_no_rect.collidepoint(event.pos):
                 self._confirm_pending_cancel()
-                return True
-            return True
-        return False
-
-    def _handle_order_prompt_event(self, event):
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self._order_prompt = None
-            self._order_focus = False
-            return True
-        if self._order_focus and event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_BACKSPACE:
-                self._order_price_str = self._order_price_str[:-1]
-                return True
-            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-                self._confirm_order()
-                return True
-            if event.unicode and (event.unicode.isdigit() or event.unicode == "."):
-                self._order_price_str += event.unicode
-                return True
-            return True
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self._order_price_rect and self._order_price_rect.collidepoint(event.pos):
-                self._order_focus = True
-                return True
-            for kind, r in self._order_kind_rects.items():
-                if r.collidepoint(event.pos):
-                    self._order_kind = kind
-                    return True
-            if self._order_confirm_rect and self._order_confirm_rect.collidepoint(event.pos):
-                self._confirm_order()
-                return True
-            if self._order_cancel_rect and self._order_cancel_rect.collidepoint(event.pos):
-                self._order_prompt = None
-                self._order_focus = False
                 return True
             return True
         return False
@@ -558,8 +489,8 @@ class TradingApp(DesktopApp):
 
         # liste (rétrécie si des ordres conditionnels sont en cours, pour leur
         # réserver une bande visible sans qu'ils soient enterrés hors écran)
-        orders = getattr(p, "conditional_orders", None) or []
-        cond_h = min(COND_LIST_MAX_H, 18 + len(orders) * COND_ROW_H) if orders else 0
+        orders = self._cond_orders()
+        cond_h = self.cond_band_height(orders)
         list_top = qy + 30
         list_area = pygame.Rect(rect.x + pad, list_top, rect.w - 2 * pad,
                                 rect.bottom - list_top - 30 - cond_h - (6 if cond_h else 0))
@@ -586,39 +517,14 @@ class TradingApp(DesktopApp):
         self._max_scroll = max(0, content_h - body.h)
         self.scroll = min(self.scroll, self._max_scroll)
 
-        # ordres conditionnels en cours (stop-loss/take-profit)
-        self._cond_cancel_rects = {}
+        # ordres conditionnels en cours (stop-loss/take-profit) — bande
+        # factorisée dans ui/order_prompt.py (partagée avec le Portefeuille)
         if orders:
             cond_area = pygame.Rect(rect.x + pad, list_area.bottom + 6, rect.w - 2 * pad, cond_h)
-            style.draw_card(surf, cond_area, bg=config.COL_BG, border=config.COL_PRESTIGE,
-                            radius=style.RADIUS_MD)
-            widgets.draw_text(surf, f"ORDRES CONDITIONNELS ({len(orders)})",
-                              (cond_area.x + 6, cond_area.y + 2), fonts.tiny(bold=True), config.COL_PRESTIGE)
-            oy = cond_area.y + 16
-            for order in orders:
-                if oy + COND_ROW_H > cond_area.bottom:
-                    break
-                labels = {"stop": "Stop-loss", "target": "Take-profit", "trailing": "Trailing"}
-                label = labels.get(order["kind"], "Ordre")
-                short_tag = " (short)" if order.get("is_short") else ""
-                qty_txt = "tout" if order["qty"] == "ALL" else f"{order['qty']:g}"
-                if order["kind"] == "trailing":
-                    trig_txt = f"{order.get('distance_pct', 0):.1f}%"
-                else:
-                    trig_txt = f"{order['trigger']:,.2f}"
-                widgets.draw_text(surf,
-                                  f"{order['ticker']}{short_tag} · {label} @ {trig_txt} ({qty_txt})",
-                                  (cond_area.x + 6, oy), fonts.tiny(), config.COL_TEXT)
-                cx = pygame.Rect(cond_area.right - 20, oy, 14, 14)
-                self._cond_cancel_rects[order["id"]] = cx
-                hov = cx.collidepoint(pygame.mouse.get_pos())
-                pygame.draw.line(surf, config.COL_DOWN if hov else config.COL_TEXT_DIM,
-                                 (cx.x + 2, cx.y + 2), (cx.right - 2, cx.bottom - 2), 2)
-                pygame.draw.line(surf, config.COL_DOWN if hov else config.COL_TEXT_DIM,
-                                 (cx.x + 2, cx.bottom - 2), (cx.right - 2, cx.y + 2), 2)
-                oy += COND_ROW_H
+            self._draw_cond_orders_band(surf, cond_area, orders)
             msg_y = cond_area.bottom + 6
         else:
+            self._cond_cancel_rects = {}
             msg_y = list_area.bottom + 6
 
         # message d'erreur/info, sinon fil des derniers ordres exécutés
@@ -797,76 +703,3 @@ class TradingApp(DesktopApp):
             pygame.draw.rect(surf, config.COL_CYAN, tw, 1, border_radius=3)
             widgets.draw_text(surf, "TWAP", tw.center, fonts.tiny(bold=True), config.COL_CYAN, align="center")
 
-    def _draw_order_prompt(self, surf, rect):
-        """Boîte de dialogue modale (dans la fenêtre) pour poser un ordre
-        conditionnel (stop-loss/take-profit) sur la position sélectionnée."""
-        overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 160))
-        surf.blit(overlay, rect.topleft)
-        tk = self._order_prompt["ticker"]
-        box = pygame.Rect(0, 0, min(320, rect.w - 40), 184)
-        box.center = rect.center
-        style.draw_card(surf, box, bg=config.COL_PANEL, border=config.COL_PRESTIGE,
-                        radius=style.RADIUS_MD)
-        widgets.draw_text(surf, f"ORDRE CONDITIONNEL — {tk}", (box.x + 12, box.y + 8),
-                          fonts.small(bold=True), config.COL_PRESTIGE)
-        held = self._held(tk)
-        price = self.market.price_of(tk)
-        side = "SHORT" if held < 0 else "LONG"
-        pos_txt = f"Position {side} : {held:g}"
-        widgets.draw_text(surf, f"{pos_txt} · cours {price:,.2f}" if price is not None else pos_txt,
-                          (box.x + 12, box.y + 28), fonts.tiny(), config.COL_TEXT_DIM)
-
-        self._order_kind_rects = {}
-        x = box.x + 12
-        kind_opts = [("stop", "Stop-loss", config.COL_DOWN),
-                     ("target", "Take-profit", config.COL_UP),
-                     ("trailing", "Trailing", config.COL_CYAN)]
-        for kind, label, col in kind_opts:
-            w = 96
-            r = pygame.Rect(x, box.y + 48, w, 24)
-            self._order_kind_rects[kind] = r
-            active = (kind == self._order_kind)
-            pygame.draw.rect(surf, config.COL_PANEL_HEAD if active else config.COL_BG, r, border_radius=4)
-            pygame.draw.rect(surf, col if active else config.COL_BORDER, r, 2 if active else 1, border_radius=4)
-            widgets.draw_text(surf, label, r.center, fonts.tiny(bold=True), col, align="center")
-            x += w + 6
-
-        # sens de déclenchement selon le CÔTÉ de la position (sur un short,
-        # stop = couvre si le cours monte, target = couvre s'il baisse)
-        is_short = held < 0
-        act = "Couvre" if is_short else "Vend"
-        senses = {
-            "stop":     f"{act} si le cours passe {'AU-DESSUS' if is_short else 'SOUS'} le seuil.",
-            "target":   f"{act} si le cours passe {'SOUS' if is_short else 'AU-DESSUS'} le seuil.",
-            "trailing": (f"{act} si le cours rebondit de X% depuis son plus bas."
-                         if is_short else
-                         f"{act} si le cours retombe de X% depuis son plus haut."),
-        }
-        widgets.draw_text(surf, senses[self._order_kind], (box.x + 12, box.y + 76),
-                          fonts.tiny(), config.COL_TEXT)
-        if self._order_kind == "trailing":
-            hint = "Distance (% du cours) :"
-        else:
-            hint = "Seuil de déclenchement :"
-        widgets.draw_text(surf, hint, (box.x + 12, box.y + 94),
-                          fonts.tiny(), config.COL_TEXT_DIM)
-        self._order_price_rect = pygame.Rect(box.x + 12, box.y + 110, box.w - 24, 26)
-        pygame.draw.rect(surf, config.COL_BG, self._order_price_rect, border_radius=4)
-        pygame.draw.rect(surf, config.COL_CYAN if self._order_focus else config.COL_BORDER,
-                         self._order_price_rect, 1, border_radius=4)
-        cur = "_" if self._order_focus and pygame.time.get_ticks() % 1000 < 500 else ""
-        widgets.draw_text(surf, (self._order_price_str or "0") + cur,
-                          (self._order_price_rect.x + 8, self._order_price_rect.y + 5),
-                          fonts.small(), config.COL_TEXT)
-
-        self._order_confirm_rect = pygame.Rect(box.x + 12, box.bottom - 32, box.w - 88, 24)
-        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._order_confirm_rect, border_radius=4)
-        pygame.draw.rect(surf, config.COL_PRESTIGE, self._order_confirm_rect, 1, border_radius=4)
-        widgets.draw_text(surf, "POSER L'ORDRE", self._order_confirm_rect.center,
-                          fonts.tiny(bold=True), config.COL_PRESTIGE, align="center")
-        self._order_cancel_rect = pygame.Rect(self._order_confirm_rect.right + 6, box.bottom - 32, 60, 24)
-        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._order_cancel_rect, border_radius=4)
-        pygame.draw.rect(surf, config.COL_TEXT_DIM, self._order_cancel_rect, 1, border_radius=4)
-        widgets.draw_text(surf, "Annuler", self._order_cancel_rect.center,
-                          fonts.tiny(), config.COL_TEXT_DIM, align="center")

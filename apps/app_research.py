@@ -81,6 +81,11 @@ class ResearchApp(DesktopApp):
                 self.search = self.search[:-1]
                 self.scroll = 0
                 return True
+            from core import clipboard
+            if clipboard.is_paste_shortcut(event):
+                self.search += clipboard.paste().replace("\n", " ").strip()
+                self.scroll = 0
+                return True
             if event.unicode and event.unicode.isprintable():
                 self.search += event.unicode
                 self.scroll = 0

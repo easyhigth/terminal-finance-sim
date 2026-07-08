@@ -1039,14 +1039,14 @@ def test_back_button_closes_own_window_instead_of_forcing_terminal_open(app):
     app.gs.player.grade_index = 3
     app.scenes.go("desktop")
     desk = app.scenes.current
-    w = desk._open_scene_window("mission")
-    mission = w.app_obj.scene
-    assert mission.return_to == "terminal"
-    assert any(win.key == "scene:mission" for win in desk.wm.windows)
+    w = desk._open_scene_window("career")   # scène encore hébergée (mission est native)
+    hosted = w.app_obj.scene
+    assert hosted.return_to == "terminal"
+    assert any(win.key == "scene:career" for win in desk.wm.windows)
 
-    mission.app.scenes.back(mission.return_to)
+    hosted.app.scenes.back(hosted.return_to)
 
-    assert not any(win.key == "scene:mission" for win in desk.wm.windows)
+    assert not any(win.key == "scene:career" for win in desk.wm.windows)
     assert app.scenes.current_name == "desktop"   # jamais de bascule plein écran
 
 
@@ -1249,7 +1249,7 @@ def test_terminal_rail_is_gone(app):
 def test_quick_apps_open_matching_scene_windows(app):
     from scenes.scene_desktop import QUICK_APPS
     # apps NATIVES migrées (netteté) : clé nue, pas "scene:<nom>".
-    _NATIVE = {"book", "markethub", "dilemma", "review"}
+    _NATIVE = {"book", "markethub", "dilemma", "review", "mission"}
     app.scenes.go("desktop")
     desk = app.scenes.current
     desk.draw(app.screen)

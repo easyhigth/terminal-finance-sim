@@ -126,6 +126,66 @@ def test_book_popup_uses_window_relative_position(app):
     assert abs(pos[0] - 530) < 5 and abs(pos[1] - 330) < 5
 
 
+def test_book_ord_button_opens_conditional_order_prompt(app):
+    """Bouton ORD par ligne ACTION détenue (mixin ui/order_prompt.py, partagé
+    avec l'app Trading) : clic → boîte modale, saisie → ordre posé, bande
+    récapitulative visible, croix → annulation."""
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    p = app.gs.player
+    tk = app.market.top_companies(n=1)[0]["ticker"]
+    pf.buy(p, app.market, tk, 10)
+    w = desk._open_scene_window("book")
+    book = w.app_obj
+    rect = pygame.Rect(0, 0, 980, 600)
+    book.draw(app.screen, rect)
+    assert tk in book._order_rects
+    book.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1,
+                                          pos=book._order_rects[tk].center), rect)
+    assert book._order_prompt == {"ticker": tk}
+    book.draw(app.screen, rect)   # boîte modale sans exception
+
+    # pose un stop sous le cours courant
+    price = app.market.price_of(tk)
+    book._order_kind = "stop"
+    book._order_price_str = f"{price * 0.9:.2f}"
+    book._confirm_order()
+    assert book._order_prompt is None
+    orders = p.conditional_orders
+    assert len(orders) == 1 and orders[0]["ticker"] == tk
+
+    # la bande récapitulative s'affiche et la croix annule
+    book.draw(app.screen, rect)
+    assert orders[0]["id"] in book._cond_cancel_rects
+    cx = book._cond_cancel_rects[orders[0]["id"]]
+    book.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=cx.center), rect)
+    assert not p.conditional_orders
+
+
+def test_book_order_prompt_is_modal(app):
+    """Tant que la boîte d'ordre est ouverte, un clic ailleurs ne déclenche
+    rien d'autre dans la fenêtre (elle absorbe tout)."""
+    app.scenes.go("desktop")
+    desk = app.scenes.current
+    p = app.gs.player
+    tk = app.market.top_companies(n=1)[0]["ticker"]
+    pf.buy(p, app.market, tk, 10)
+    w = desk._open_scene_window("book")
+    book = w.app_obj
+    rect = pygame.Rect(0, 0, 980, 600)
+    book.draw(app.screen, rect)
+    book._open_order_prompt(tk)
+    book.draw(app.screen, rect)
+    consumed = book.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1,
+                                                     pos=(5, 5)), rect)
+    assert consumed is True
+    # Échap referme la boîte sans poser d'ordre
+    book.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE,
+                                          unicode="", mod=0), rect)
+    assert book._order_prompt is None
+    assert not getattr(p, "conditional_orders", [])
+
+
 # ---------------------------------------------------------------- MarketHub
 @pytest.mark.parametrize("tab", ["overview", "sectors", "topflop", "heatmap", "fx", "watchlist"])
 def test_markethub_draws_every_tab_without_crashing(app, tab):

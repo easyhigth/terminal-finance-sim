@@ -29,6 +29,7 @@ from core import portfolio as pf
 from core import securitisation as SEC
 from core import structured as S
 from ui import fonts, widgets
+from ui.order_prompt import ConditionalOrderMixin
 from ui.popups import PopupMixin
 
 KIND_CHIPS = ["Action", "ETF", "Obligation", "Commodity", "Crypto", "Structuré", "Crédit"]
@@ -42,7 +43,7 @@ KIND_COLOR = {"Action": config.COL_AMBER, "ETF": config.COL_PRESTIGE,
 ROW_H = 24
 
 
-class BookApp(DesktopApp, PopupMixin):
+class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
     title = "Portefeuille"
     icon_kind = "book"
     default_size = (980, 600)
@@ -82,6 +83,10 @@ class BookApp(DesktopApp, PopupMixin):
         self.side_mode = "sector"
         self._side_mode_rects = {}
         self._last_rect = pygame.Rect(0, 0, 1, 1)   # pour positionner les popups (cf. _popup_pos)
+        # ordres conditionnels (stop/target/trailing) — même mixin que l'app
+        # Trading (ui/order_prompt.py) : bouton ORD par ligne ACTION détenue
+        # + bande récapitulative sous la table.
+        self.init_order_prompt()
 
     # ------------------------------------------------------- popups (fiches)
     def _popup_pos(self):
@@ -109,6 +114,11 @@ class BookApp(DesktopApp, PopupMixin):
             return float(self.qty_text)
         except ValueError:
             return 0.0
+
+    def _held(self, tk):
+        """Titres détenus (négatif = short) — requis par ConditionalOrderMixin."""
+        pos = self.app.gs.player.portfolio.get(tk)
+        return pos["shares"] if pos else 0.0
 
     def _resolve_key(self, kind, key):
         if kind == "Action":
@@ -252,6 +262,9 @@ class BookApp(DesktopApp, PopupMixin):
     # ----------------------------------------------------------------- events
     def handle_event(self, event, rect):
         self._last_rect = rect
+        if self._order_prompt is not None:
+            # boîte d'ordre conditionnel MODALE : absorbe tout (cf. mixin)
+            return self._handle_order_prompt_event(event)
         if self.popups_handle_event(event):
             return True
         if event.type == pygame.KEYDOWN:
@@ -263,10 +276,13 @@ class BookApp(DesktopApp, PopupMixin):
                     return True
                 return False
             if self.text_focus == "key":
+                from core import clipboard
                 if event.key == pygame.K_BACKSPACE:
                     self.trade_key = self.trade_key[:-1]
                 elif event.key == pygame.K_TAB:
                     self.text_focus = "qty"
+                elif clipboard.is_paste_shortcut(event):
+                    self.trade_key += clipboard.paste().replace("\n", " ").strip()
                 elif event.unicode and event.unicode.isprintable():
                     self.trade_key += event.unicode
                 return True
@@ -336,6 +352,12 @@ class BookApp(DesktopApp, PopupMixin):
                 return True
             if self._sell_btn and self._sell_btn.collidepoint(event.pos):
                 self._do_sell()
+                return True
+            for tk, r in self._order_rects.items():
+                if r.collidepoint(event.pos):
+                    self._open_order_prompt(tk)
+                    return True
+            if self._handle_cond_cancel_click(event.pos):
                 return True
             self.text_focus = None
             for mode, r in self._side_mode_rects.items():
@@ -448,15 +470,20 @@ class BookApp(DesktopApp, PopupMixin):
         # ---- table des positions + panneau latéral ----
         table_top = bar_y2 + 44
         content_h = rect.bottom - pad - table_top
+        # bande « ORDRES CONDITIONNELS » sous la table (0 px si aucun ordre) —
+        # la table rétrécit dynamiquement, même principe que l'app Trading.
+        orders = self._cond_orders()
+        cond_h = self.cond_band_height(orders)
+        table_h = content_h - (cond_h + 6 if cond_h else 0)
         side_w = min(260, max(200, int(rect.w * 0.28)))
         table_w = rect.w - 2 * pad - side_w - 10
         if table_w < 340:   # fenêtre trop étroite pour 2 colonnes : empile
-            table = pygame.Rect(rect.x + pad, table_top, rect.w - 2 * pad, int(content_h * 0.62))
+            table = pygame.Rect(rect.x + pad, table_top, rect.w - 2 * pad, int(table_h * 0.62))
             side = pygame.Rect(rect.x + pad, table.bottom + 8, rect.w - 2 * pad,
-                               content_h - table.h - 8)
+                               table_h - table.h - 8)
         else:
-            table = pygame.Rect(rect.x + pad, table_top, table_w, content_h)
-            side = pygame.Rect(table.right + 10, table_top, side_w, content_h)
+            table = pygame.Rect(rect.x + pad, table_top, table_w, table_h)
+            side = pygame.Rect(table.right + 10, table_top, side_w, table_h)
 
         inner = widgets.draw_panel(surf, table, "Positions (toutes classes)", config.COL_CYAN)
         rows = analytics.holdings_table(p, m)
@@ -480,6 +507,7 @@ class BookApp(DesktopApp, PopupMixin):
             self._name_rects = {}
             self._chart_rects = {}
             self._row_cls = {}
+            self._order_rects = {}
             self._tooltip = None
             prev_clip = surf.get_clip()
             surf.set_clip(list_area)
@@ -508,8 +536,12 @@ class BookApp(DesktopApp, PopupMixin):
                     self._name_rects[label] = name_rect
                     self._row_cls[label] = r["cls"]
                     if is_stock:
+                        # bouton ORD (ordre conditionnel) tout à droite de la
+                        # ligne ; la zone cliquable du graphe s'arrête avant.
+                        ord_rect = pygame.Rect(inner.right - 30, y - 1, 34, ROW_H - 4)
+                        self._order_rects[label] = ord_rect
                         chart_rect = pygame.Rect(cols[5][1] - 20, y - 1,
-                                                 inner.right - cols[5][1] + 24, ROW_H - 2)
+                                                 ord_rect.x - (cols[5][1] - 20) - 2, ROW_H - 2)
                         self._chart_rects[label] = chart_rect
                     else:
                         chart_rect = None
@@ -537,6 +569,14 @@ class BookApp(DesktopApp, PopupMixin):
                                       (cols[5][1], y), fonts.tiny(), config.COL_TEXT)
                     widgets.draw_text(surf, f"{'+' if live_pnl>=0 else ''}{live_pnl_pct:+.1f}%",
                                       (cols[6][1], y), fonts.tiny(bold=True), pcol)
+                    if is_stock:
+                        ord_rect = self._order_rects[label]
+                        hov_ord = ord_rect.collidepoint(mp)
+                        pygame.draw.rect(surf, config.COL_PANEL if hov_ord else config.COL_PANEL_HEAD,
+                                         ord_rect, border_radius=3)
+                        pygame.draw.rect(surf, config.COL_PRESTIGE, ord_rect, 1, border_radius=3)
+                        widgets.draw_text(surf, "ORD", ord_rect.center, fonts.tiny(bold=True),
+                                          config.COL_PRESTIGE, align="center")
                 y += ROW_H
             surf.set_clip(prev_clip)
             content_h_rows = (y + self.scroll_positions) - list_top
@@ -545,9 +585,18 @@ class BookApp(DesktopApp, PopupMixin):
             self.scroll_positions = widgets.draw_scrollbar(surf, table, list_area, self.scroll_positions,
                                    self._positions_max_scroll, content_h_rows)
 
+        if cond_h:
+            # sous la table (2 colonnes) ou sous le panneau empilé (fenêtre étroite)
+            band_top = max(table.bottom, side.bottom if table_w < 340 else table.bottom) + 6
+            cond_area = pygame.Rect(table.x, band_top, table.w, cond_h)
+            self._draw_cond_orders_band(surf, cond_area, orders)
+        else:
+            self._cond_cancel_rects = {}
         self._draw_side_panel(surf, side)
         self._draw_key_suggestions(surf)
         self.popups_draw(surf)
+        if self._order_prompt is not None:
+            self._draw_order_prompt(surf, rect)
         if self._tooltip:
             widgets.draw_tooltip(surf, *self._tooltip)
 

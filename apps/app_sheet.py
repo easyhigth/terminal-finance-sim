@@ -639,6 +639,7 @@ class SheetApp(DesktopApp):
             return True
         if event.type == pygame.KEYDOWN:
             if self.editing:
+                from core import clipboard
                 if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                     self._commit()
                     self._move(0, 1)
@@ -646,6 +647,11 @@ class SheetApp(DesktopApp):
                     self.editing = False
                 elif event.key == pygame.K_BACKSPACE:
                     self.edit_buf = self.edit_buf[:-1]
+                elif clipboard.is_paste_shortcut(event):
+                    # Ctrl+V EN ÉDITION : colle du texte dans la formule en
+                    # cours (le Ctrl+V hors édition reste le collage de PLAGE,
+                    # cf. _paste_range plus haut — deux gestes distincts).
+                    self.edit_buf += clipboard.paste().replace("\n", " ").replace("\r", "")
                 elif event.unicode and event.unicode.isprintable():
                     self.edit_buf += event.unicode
                 return True

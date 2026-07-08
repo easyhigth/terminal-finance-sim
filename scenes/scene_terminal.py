@@ -344,6 +344,17 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             # comme avant (comportement historique, zéro régression) ; Échap
             # remonte au niveau bloc d'où l'on peut naviguer aux flèches.
             if self.zones.zone == "console" and self.zones.inside:
+                from core import clipboard
+                if clipboard.is_paste_shortcut(event):
+                    # Ctrl+V (libre ici : seul Ctrl+Shift+V est pris, cf.
+                    # MORE_SHORTCUTS) : colle le presse-papiers système dans la
+                    # ligne de commande — une seule ligne, les retours à la
+                    # ligne deviennent des espaces.
+                    pasted = clipboard.paste().replace("\n", " ").replace("\r", "")
+                    if pasted:
+                        self.cmd += pasted
+                        self.hist_pos = None
+                    return
                 if event.key == pygame.K_RETURN:
                     self._run_command(self.cmd.strip())
                     self.cmd = ""

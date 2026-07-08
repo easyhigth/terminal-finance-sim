@@ -136,6 +136,10 @@ class AlertsApp(DesktopApp):
             if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and self.text_focus == "price":
                 self._post_alert()
                 return True
+            from core import clipboard
+            if clipboard.is_paste_shortcut(event) and self.text_focus == "search":
+                self.search += clipboard.paste().replace("\n", " ").strip()
+                return True
             if event.unicode and event.unicode.isprintable():
                 if self.text_focus == "price":
                     allow_minus = self.kind == "pct"

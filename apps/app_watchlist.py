@@ -21,6 +21,9 @@ from ui import fonts, widgets
 ROW_H = 26
 TILE_W, TILE_H = 180, 92
 TILE_GAP = 8
+# une société qui publie dans ce nombre de pas (ou moins) mérite un rappel
+# visuel — au-delà, l'échéance est trop lointaine pour être actionnable.
+EARNINGS_SOON_STEPS = 2
 
 
 class WatchlistApp(DesktopApp):
@@ -39,6 +42,8 @@ class WatchlistApp(DesktopApp):
         self._del_rects = {}       # ticker -> Rect (× retirer)
         self._list_rect = None
         self._flash = widgets.TickFlash()   # flash vert/rouge du cours en direct
+        self._earnings_rects = {}  # ticker -> Rect (pastille "publie bientôt", tooltip au survol)
+        self._tooltip = None
 
     def _live_hist(self, tk):
         """Historique + point animé en direct (cf. core/intraday.py) — bouge
@@ -50,6 +55,19 @@ class WatchlistApp(DesktopApp):
         if len(hist) >= 2 and hist[-2]:
             return (hist[-1] / hist[-2] - 1.0) * 100.0
         return 0.0
+
+    def _earnings_days(self, tk):
+        """Jours avant la prochaine publication de résultats de `tk`, ou None
+        si elle n'est pas dans un futur proche (cf. EARNINGS_SOON_STEPS) —
+        réutilise `steps_to_earnings`, déjà calculé par `Market.metrics` pour
+        la fiche société, sans dupliquer la logique du moteur."""
+        mt = self.market.metrics(tk)
+        if not mt:
+            return None
+        steps = mt.get("steps_to_earnings")
+        if steps is None or steps > EARNINGS_SOON_STEPS:
+            return None
+        return steps * config.DAYS_PER_STEP
 
     def handle_event(self, event, rect):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -100,7 +118,8 @@ class WatchlistApp(DesktopApp):
         pygame.draw.rect(surf, config.COL_BG, area)
         pygame.draw.rect(surf, config.COL_BORDER, area, 1)
         self._list_rect = area
-        self._row_rects, self._del_rects = {}, {}
+        self._row_rects, self._del_rects, self._earnings_rects = {}, {}, {}
+        self._tooltip = None
         if not wl:
             widgets.draw_text(surf, "Aucune valeur suivie.", (area.x + 10, area.y + 12),
                               fonts.small(), config.COL_TEXT_DIM)
@@ -127,6 +146,14 @@ class WatchlistApp(DesktopApp):
             ccol = config.COL_UP if chg >= 0 else config.COL_DOWN
             flash_col = self._flash.tick(tk, price, config.COL_UP, config.COL_DOWN, config.COL_WHITE)
             widgets.draw_text(surf, tk, (r.x + 6, r.y + 4), fonts.small(bold=True), config.COL_AMBER)
+            days = self._earnings_days(tk)
+            if days is not None:
+                dot = pygame.Rect(r.x + 54, r.y + 8, 8, 8)
+                self._earnings_rects[tk] = dot
+                pygame.draw.circle(surf, config.COL_PRESTIGE, dot.center, 4)
+                if dot.inflate(6, 6).collidepoint(mp):
+                    label = "Publie aujourd'hui" if days == 0 else f"Publie dans {days} j"
+                    self._tooltip = (label, mp)
             name = self.market.companies[i]["name"]
             # largeur du nom : espace réel entre la colonne ticker (x+68) et le
             # début du cours (r.right-118 moins ~60 px de chiffres) — l'ancien
@@ -145,6 +172,8 @@ class WatchlistApp(DesktopApp):
             pygame.draw.line(surf, config.COL_DOWN if hov else config.COL_TEXT_DIM,
                              (dr.x + 3, dr.bottom - 3), (dr.right - 3, dr.y + 3), 2)
             y += ROW_H
+        if self._tooltip:
+            widgets.draw_tooltip(surf, *self._tooltip)
 
     def _draw_grid(self, surf, area, wl, mp):
         """Mode GRILLE : une tuile par valeur (ticker, cours en direct avec

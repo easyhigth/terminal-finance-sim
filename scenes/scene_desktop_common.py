@@ -13,6 +13,7 @@ import pygame
 from apps.app_alerts import AlertsApp
 from apps.app_book import BookApp
 from apps.app_calculator import CalculatorApp
+from apps.app_company import CompanyApp
 from apps.app_deals import DealsApp
 from apps.app_dilemma import DilemmaApp
 from apps.app_evaluation import EvaluationApp
@@ -23,6 +24,7 @@ from apps.app_mission import MissionApp
 from apps.app_notifications import NotificationCenterApp
 from apps.app_research import ResearchApp
 from apps.app_review import ReviewApp
+from apps.app_shop import ShopApp
 from apps.app_sheet import SheetApp
 from apps.app_trading import TradingApp
 from apps.app_watchlist import WatchlistApp
@@ -68,6 +70,8 @@ APPS = [
     ("tradejournal", "Journal de trading", "journal", JournalApp),
     ("evaluation", "Évaluation", "examcert", EvaluationApp),
     ("deals", "Deals", "deals", DealsApp),
+    ("company", "Fiche société", "research", CompanyApp),
+    ("shop", "Boutique", "shop", ShopApp),
 ]
 
 # Application supplémentaire propre à la VOIE (track) choisie par le joueur

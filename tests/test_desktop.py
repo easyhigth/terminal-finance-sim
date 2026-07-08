@@ -916,7 +916,7 @@ def test_research_analyse_link_opens_company_window(app):
     ra = desk._launch("research").app_obj
     ra.sel = app.market.companies[0]["ticker"]
     ra._do_action("analyse")
-    assert any(win.key == "scene:company" for win in desk.wm.windows)
+    assert any(win.key == "company" for win in desk.wm.windows)
 
 
 def test_research_action_bar_click_via_draw(app):
@@ -1026,7 +1026,7 @@ def test_terminal_internal_navigation_opens_desktop_window():
     term = desk._terminal_host.scene
     term.app.scenes.go("shop", return_to="terminal")
     assert a.scenes.current_name == "desktop"          # jamais de bascule plein écran
-    assert any(w.key == "scene:shop" for w in desk.wm.windows)
+    assert any(w.key == "shop" for w in desk.wm.windows)   # app native, cf. apps/app_shop.py
 
 
 def test_back_button_closes_own_window_instead_of_forcing_terminal_open(app):
@@ -1069,21 +1069,24 @@ def test_back_does_not_force_open_a_window_that_was_not_already_open(app):
 
 def test_deliberate_forward_navigation_to_terminal_still_opens_it(app):
     """Contrairement à un bouton retour, une navigation délibérée vers le
-    terminal (ex. « Acheter » depuis la fiche société, qui pré-remplit une
-    commande BUY) doit continuer à ouvrir/focaliser la fenêtre terminal SANS
-    fermer la fenêtre appelante — seul go(self.return_to) est requalifié en
-    back(), pas les go() explicites vers un autre nom de scène."""
+    terminal (ex. « Acheter » depuis les états financiers, qui pré-remplit
+    une commande BUY) doit continuer à ouvrir/focaliser la fenêtre terminal
+    SANS fermer la fenêtre appelante — seul go(self.return_to) est
+    requalifié en back(), pas les go() explicites vers un autre nom de
+    scène. (États financiers reste hébergé — Fiche société, elle, est
+    devenue une app native qui ouvre Trading plutôt que de taper une
+    commande, cf. apps/app_company.py::handle_event.)"""
     app.gs.player.grade_index = 9
     app.gs.player.cash = 5_000_000.0
     app.scenes.go("desktop")
     desk = app.scenes.current
     tk = app.market.top_companies(n=1)[0]["ticker"]
-    w = desk._open_scene_window("company", ticker=tk, return_to="markethub")
-    comp = w.app_obj.scene
-    comp.update(0.016)
-    comp.draw(app.screen)
-    comp.handle_event(_click(comp.buy_btn.rect.centerx, comp.buy_btn.rect.centery))
-    assert any(win.key == "scene:company" for win in desk.wm.windows)
+    w = desk._open_scene_window("financials", ticker=tk, return_to="markethub")
+    fin = w.app_obj.scene
+    fin.update(0.016)
+    fin.draw(app.screen)
+    fin.handle_event(_click(fin.buy_btn.rect.centerx, fin.buy_btn.rect.centery))
+    assert any(win.key == "scene:financials" for win in desk.wm.windows)
     assert any(win.key == "scene:terminal" for win in desk.wm.windows)
     term = desk._terminal_host.scene
     assert term.cmd.startswith(f"BUY {tk}")
@@ -1189,7 +1192,7 @@ def test_ticker_scenes_get_default_asset(app):
     desk = app.scenes.current
     w = desk._open_scene_window("company")   # sans ticker -> défaut fourni
     assert w is not None
-    assert "ticker" in w.app_obj._kwargs
+    assert w.app_obj.ticker   # app native : le ticker par défaut est déjà configuré
 
 
 # --------------------------------------------------------- app liée à la voie
@@ -1249,7 +1252,7 @@ def test_terminal_rail_is_gone(app):
 def test_quick_apps_open_matching_scene_windows(app):
     from scenes.scene_desktop import QUICK_APPS
     # apps NATIVES migrées (netteté) : clé nue, pas "scene:<nom>".
-    _NATIVE = {"book", "markethub", "dilemma", "review", "mission", "deals"}
+    _NATIVE = {"book", "markethub", "dilemma", "review", "mission", "deals", "shop"}
     app.scenes.go("desktop")
     desk = app.scenes.current
     desk.draw(app.screen)
@@ -2489,13 +2492,16 @@ def test_layout_snapshot_captures_rect_minimized_pinned(app):
 
 
 def test_layout_snapshot_captures_scene_window_kwargs(app):
+    # "financials" reste une scène HÉBERGÉE (contrairement à "company",
+    # devenue une app native sans kwargs de fenêtre à snapshotter — cf.
+    # apps/app_company.py) : c'est elle qui exerce ce chemin de sauvegarde.
     app.scenes.go("desktop")
     desk = app.scenes.current
     tk = app.market.top_companies(n=1)[0]["ticker"]
-    desk._open_scene_window("company", ticker=tk, return_to="markethub")
+    desk._open_scene_window("financials", ticker=tk, return_to="markethub")
     desk.update(0.016)
     layout = app.gs.player.flags["desktop_layout"]
-    entry = next(e for e in layout if e.get("kind") == "scene" and e.get("name") == "company")
+    entry = next(e for e in layout if e.get("kind") == "scene" and e.get("name") == "financials")
     assert entry["kwargs"].get("ticker") == tk
 
 

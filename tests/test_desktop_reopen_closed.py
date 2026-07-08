@@ -34,15 +34,31 @@ def _reopen_key():
 
 
 def test_reopens_a_closed_scene_window_with_its_context(desktop):
+    # "financials" reste une scène HÉBERGÉE (contrairement à "company",
+    # devenue une app native sans contexte de fenêtre à restaurer — la
+    # rouvrir retombe sur le ticker par défaut, cf. test dédié plus bas)
     tk = desktop.app.market.top_companies(n=1)[0]["ticker"]
-    w = desktop._open_scene_window("company", ticker=tk, return_to="markethub")
+    w = desktop._open_scene_window("financials", ticker=tk, return_to="markethub")
     desktop.wm.close(w)
-    assert not any(win.key == "scene:company" for win in desktop.wm.windows)
+    assert not any(win.key == "scene:financials" for win in desktop.wm.windows)
 
     desktop.handle_event(_reopen_key())
 
-    reopened = next(win for win in desktop.wm.windows if win.key == "scene:company")
+    reopened = next(win for win in desktop.wm.windows if win.key == "scene:financials")
     assert reopened.app_obj.scene.ticker == tk
+
+
+def test_reopens_a_closed_company_window_native(desktop):
+    """"company" est une app NATIVE : la rouvrir via CTRL+MAJ+Z ne perd
+    jamais la fenêtre (retombe sur le ticker par défaut, sans contexte
+    précis à restaurer — cf. apps/app_company.py)."""
+    w = desktop._launch("company")
+    desktop.wm.close(w)
+    assert not any(win.key == "company" for win in desktop.wm.windows)
+
+    desktop.handle_event(_reopen_key())
+
+    assert any(win.key == "company" for win in desktop.wm.windows)
 
 
 def test_reopens_a_closed_native_app(desktop):
@@ -57,13 +73,13 @@ def test_reopens_a_closed_native_app(desktop):
 
 def test_closing_terminal_is_never_tracked_for_reopen(desktop):
     tk = desktop.app.market.top_companies(n=1)[0]["ticker"]
-    w = desktop._open_scene_window("company", ticker=tk)
-    desktop.wm.close(w)   # dernier fermé = "company"
+    w = desktop._open_scene_window("financials", ticker=tk)
+    desktop.wm.close(w)   # dernier fermé = "financials"
 
     term = next(win for win in desktop.wm.windows if win.key == "scene:terminal")
     desktop.wm.close(term)   # ne doit PAS s'empiler sur _closed_stack
 
-    assert desktop._closed_stack[-1] == ("scene", "company", {"ticker": tk})
+    assert desktop._closed_stack[-1] == ("scene", "financials", {"ticker": tk})
 
 
 def test_reopen_is_a_noop_when_nothing_was_closed(desktop):

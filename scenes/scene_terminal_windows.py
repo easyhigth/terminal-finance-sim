@@ -78,11 +78,22 @@ class TerminalWindowsMixin:
 
     def _open_index_chart(self, name):
         """Ouvre l'historique d'un indice (clic souris ou Entrée au clavier sur
-        le bloc INDICES)."""
+        le bloc INDICES). Contrairement aux autres popups (cascade partant du
+        coin haut-gauche, cf. `_open_window`/`_open_company_popup`), celui-ci
+        démarre à droite du panneau INDICES lui-même (colonne gauche du
+        terminal, ~x:20-300 — cf. `col_l_w`/`gx` dans scene_terminal_render.py) :
+        une position de départ dans cette colonne ferait que la fenêtre
+        recouvre son propre panneau source — dès qu'un premier graphe est
+        ouvert, cliquer sur un AUTRE indice retomberait dans le corps de cette
+        fenêtre déjà ouverte (absorbé, aucun nouveau graphe ne s'ouvrirait) au
+        lieu d'atteindre `_index_rects`, puisque les LIGNES à cliquer et les
+        POPUPS ouverts occuperaient le même espace écran."""
         from ui.datawindow import DataWindow
+        offset = 16 * (len(self.datawins) % 6)
+        pos = (300 + offset, 90 + offset)
         self.datawins.append(DataWindow(
             f"{name} — historique", [], [],
-            pos=(config.MARGIN + 40, 100),
+            pos=pos,
             accent=config.COL_AMBER,
             chart=list(self.market.index_history(name)),
             resizable=True, min_size=(320, 220)))

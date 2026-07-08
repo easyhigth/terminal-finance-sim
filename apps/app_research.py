@@ -117,6 +117,9 @@ class ResearchApp(DesktopApp):
         elif kind == "analyse":
             self.desktop._open_scene_window("company", ticker=self.sel)
             audio.play("click")
+        elif kind == "alert":
+            self.desktop._open_scene_window("alerts", ticker=self.sel)
+            audio.play("click")
 
     # --------------------------------------------------------------- draw
     def draw(self, surf, rect):
@@ -251,7 +254,8 @@ class ResearchApp(DesktopApp):
         actions = [("watch", "Suivi" if watched else "Suivre", config.COL_PRESTIGE, watched),
                    ("trade", "Trader", config.COL_UP, False),
                    ("sheet", "→ Tableur", config.COL_CYAN, False),
-                   ("analyse", "Analyse", config.COL_AMBER, False)]
+                   ("analyse", "Analyse", config.COL_AMBER, False),
+                   ("alert", "Alerte", config.COL_WARN, False)]
         mp = pygame.mouse.get_pos()
         n = len(actions)
         gap = 6

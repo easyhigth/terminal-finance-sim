@@ -484,6 +484,34 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   `core/desktop_tutorial.py` repointés vers la clé `"mission"`). Verrouillé par
   `tests/test_desktop.py::test_desktop_never_shows_two_icons_with_the_same_label` et
   `test_evaluation_and_review_and_dilemma_are_factory_only_not_standing_icons`.
+  **Étape 22 (netteté, écrans les plus consultés) : Fiche société et Boutique.**
+  `apps/app_company.py` (`CompanyApp`) et `apps/app_shop.py` (`ShopApp`) migrent les deux
+  plus gros écrans encore hébergés — la fiche société (5 onglets : vue d'ensemble, états
+  financiers, graphique avancé, actualités, valorisation relative) et le guichet d'achat
+  universel. Particularité par rapport à Mission/Évaluation : PAS de règle « en cours
+  conservé » — `configure(**kwargs)` est appelé à CHAQUE `_open_scene_window(...)`, même
+  si la fenêtre existe déjà, pour reproduire le comportement de la scène hébergée d'origine
+  (`on_enter` réinitialisait toujours l'écran) : cliquer « Analyse » sur une autre société
+  depuis Recherche remplace le contenu de la fenêtre Fiche société déjà ouverte plutôt que
+  d'en ouvrir une seconde ou de laisser un contenu périmé ; de même, rouvrir la Boutique
+  avec une recherche/un filtre différents (ex. le lien retour de l'Explorateur) les applique
+  à la fenêtre existante. `configure()` absorbe silencieusement tout kwarg hérité de l'ancien
+  appel de scène (`return_to`…) via `**_kwargs`, jamais de `TypeError`. Les boutons ACHAT/
+  VENTE de la fiche société ouvrent désormais Trading pré-filtré (`desktop.open_trading`)
+  plutôt que de taper une commande dans le terminal cachée derrière la fenêtre. "company"
+  et "shop" rejoignent `_FACTORY_ONLY_APPS` (pas d'icône permanente — "company" n'en a
+  jamais eu, "shop" garde son icône historique via `QUICK_APPS`/`qshop`).
+- **Bouton « Alerte » dans Recherche** (`apps/app_research.py`) : la barre d'actions
+  (Trader/→Tableur/Analyse/Suivre) gagne un raccourci vers l'app Alertes pré-filtrée sur la
+  valeur consultée (`desktop._open_scene_window("alerts", ticker=...)`, déjà utilisé par les
+  notifications mais jamais exposé ailleurs) — plus besoin de rouvrir Alertes et retaper le
+  ticker à la main.
+- **Rappel « publie bientôt » dans la Watchlist** (`apps/app_watchlist.py`) : réutilise
+  `Market.metrics()["steps_to_earnings"]` (déjà calculé pour la fiche société) pour afficher
+  une pastille à côté du ticker quand une valeur suivie publie ses résultats dans les
+  `EARNINGS_SOON_STEPS` (2) prochains pas ; tooltip au survol (« Publie dans N j » /
+  « Publie aujourd'hui »). Referme la boucle avec la notification earnings de la watchlist
+  (étape précédente) : le rappel visuel est visible AVANT même la publication.
 - **Notifications de résultats (earnings) pour la watchlist** (`core/game_state.py::advance_step`) :
   le moteur publie déjà `market.last_earnings` à chaque pas (~1/4 des sociétés, cf.
   `Market._step_earnings`) mais rien ne le signalait — il fallait être sur la bonne fiche

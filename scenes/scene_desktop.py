@@ -830,6 +830,40 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 self.wm.focus(w)
                 self.start_open = False
             return w
+        if name == "company":
+            # Fiche société NATIVE (apps/app_company.py, netteté) — PAS de
+            # règle « en cours conservé » comme Mission/Évaluation : chaque
+            # appel RECONFIGURE la fenêtre existante sur le ticker demandé
+            # (`configure(**kwargs)`, même si la fenêtre était déjà ouverte
+            # sur une AUTRE société) — cliquer « Analyse » sur un autre
+            # ticker doit remplacer le contenu affiché, jamais rouvrir une
+            # fenêtre en double ni laisser une fiche périmée. Ticker par
+            # défaut = plus grosse capitalisation (même repli que l'ancien
+            # chemin hébergé, cf. _NEEDS_TICKER).
+            kw = dict(kwargs)
+            if "ticker" not in kw:
+                m = self.app.ensure_market()
+                top = m.top_companies(n=1)
+                if top:
+                    kw["ticker"] = top[0]["ticker"]
+            w = self._launch("company")
+            if w is not None:
+                w.app_obj.configure(**kw)
+                self.wm.focus(w)
+                self.start_open = False
+            return w
+        if name == "shop":
+            # Boutique NATIVE (apps/app_shop.py, netteté) — même règle que
+            # "company" : chaque appel RECONFIGURE la fenêtre existante
+            # (recherche/filtre pré-remplis si fournis, ex. le lien retour de
+            # l'Explorateur) plutôt que de la préserver en l'état, comme le
+            # faisait `on_enter` de la scène hébergée à chaque entrée.
+            w = self._launch("shop")
+            if w is not None:
+                w.app_obj.configure(**kwargs)
+                self.wm.focus(w)
+                self.start_open = False
+            return w
         if name in ("tradejournal", "deals"):
             # Journal de trading / Deals NATIFS (apps/app_journal.py,
             # apps/app_deals.py, netteté) — simple ouverture/focus, pas une
@@ -1010,8 +1044,11 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
     # joueur pourrait lancer un examen de promotion sans remplir les critères
     # vérifiés par `scene_examcert.py::_go_exam` (réputation, missions, deals)
     # avant de router vers "evaluation" ; "deals" a déjà son icône via
-    # QUICK_APPS ("qdeals") — une seconde ferait doublon.
-    _FACTORY_ONLY_APPS = {"dilemma", "review", "evaluation", "deals"}
+    # QUICK_APPS ("qdeals") — une seconde ferait doublon ; "company" n'a
+    # jamais eu d'icône (toujours ouverte avec un ticker précis depuis un
+    # contexte — Recherche, Portefeuille, notifications…) ; "shop" a déjà son
+    # icône via QUICK_APPS ("qshop") — une seconde ferait doublon.
+    _FACTORY_ONLY_APPS = {"dilemma", "review", "evaluation", "deals", "company", "shop"}
 
     def _icon_list(self):
         """Liste (clé, libellé, icon_kind, couleur accent) des icônes du

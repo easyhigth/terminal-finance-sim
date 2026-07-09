@@ -91,6 +91,39 @@ def performance_stats(player, group_by="regime"):
     return out
 
 
+def cumulative_realized_series(player):
+    """Série du P&L RÉALISÉ CUMULÉ au fil des trades clôturés (ordre
+    chronologique du journal) — pour la courbe de performance de l'app
+    Journal. Ignore les entrées sans P&L connu (achats/positions ouvertes).
+    Retourne une liste de flottants (vide si aucun trade clôturé)."""
+    out = []
+    total = 0.0
+    for e in player.trade_journal:
+        if e["realized"] is None:
+            continue
+        total += e["realized"]
+        out.append(total)
+    return out
+
+
+def export_csv(player, path):
+    """Exporte le journal complet en CSV à `path` (une ligne par trade,
+    colonnes stables). Retourne True si écrit, False sinon (chemin
+    inaccessible) — même politique best-effort que l'export du Tableur."""
+    import csv as _csv
+    fields = ["id", "day", "asset_class", "key", "label", "side", "qty",
+              "price", "fee", "notional", "realized", "regime", "reason", "comment"]
+    try:
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            w = _csv.writer(f)
+            w.writerow(fields)
+            for e in player.trade_journal:
+                w.writerow([e.get(k, "") if e.get(k) is not None else "" for k in fields])
+        return True
+    except OSError:
+        return False
+
+
 def discipline_score(player):
     """Score de discipline (0-100) du journal : moitié pour la part de trades
     clôturés documentés (raison renseignée), moitié pour leur taux de réussite

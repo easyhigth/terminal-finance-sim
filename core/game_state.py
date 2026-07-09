@@ -565,8 +565,13 @@ class GameState:
                     from core import notify_queue as _nq
                     for ev in triggered_alerts[:3]:
                         kind = "warn" if not ev["above"] else "info"
-                        _nq.push(p, _alerts.format_trigger(ev), kind,
-                                 action="trading", action_kwargs={"ticker": ev["ticker"]})
+                        if ev.get("is_index"):
+                            # indice : pas d'écran de trading dédié — le clic
+                            # ouvre le hub Marché (vue d'ensemble des indices)
+                            _nq.push(p, _alerts.format_trigger(ev), kind, action="markethub")
+                        else:
+                            _nq.push(p, _alerts.format_trigger(ev), kind,
+                                     action="trading", action_kwargs={"ticker": ev["ticker"]})
             # résultats trimestriels d'une société SUIVIE (watchlist) : le
             # moteur publie déjà `market.last_earnings` à chaque pas (~1/4 des
             # sociétés, cf. Market._step_earnings), mais rien ne le signalait

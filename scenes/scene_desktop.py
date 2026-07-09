@@ -123,7 +123,9 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self._start_tooltip = None  # (texte, pos souris) affiché par _draw_launcher
         self._launcher_list_rect = None
         self._menu_rect = None
+        self._gsearch_rect = None
         self._ambient_rect = None    # widget patrimoine (clic → portefeuille)
+        self._index_ticker_rect = None   # bande d'indices (clic → hub Marché)
         self._todo_rects = []        # lignes du widget « À faire » (clic → scène)
         self._calendar_rect = None   # widget calendrier macro (clic → calendrier)
         self._ctx_menu = None        # menu contextuel (clic droit) : dict ou None
@@ -621,6 +623,10 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         if self._ambient_rect and self._ambient_rect.collidepoint(pos):
             self._open_scene_window("book")
             return
+        # bande d'indices ambiante → ouvre le hub Marché en fenêtre
+        if self._index_ticker_rect and self._index_ticker_rect.collidepoint(pos):
+            self._open_scene_window("markethub")
+            return
         # pastille de risque (barre supérieure) → ouvre le portefeuille
         if self._risk_badge_rect and self._risk_badge_rect.collidepoint(pos):
             self._open_scene_window("book")
@@ -639,6 +645,12 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             return
         if self._menu_rect and self._menu_rect.collidepoint(pos):
             self.app.scenes.go("menu")
+            return
+        # loupe de la topbar : ouvre la recherche globale (équivalent Ctrl+/,
+        # jusqu'ici découvrable uniquement en connaissant le raccourci)
+        if self._gsearch_rect and self._gsearch_rect.collidepoint(pos):
+            if not self._blocking_card_pending():
+                self._open_search()
             return
         # pause/vitesse/⚙ : gérés par la bande d'onglets (simclock_widget), plus
         # de doublon dans la topbar du bureau.
@@ -864,10 +876,22 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 self.wm.focus(w)
                 self.start_open = False
             return w
-        if name in ("tradejournal", "deals"):
-            # Journal de trading / Deals NATIFS (apps/app_journal.py,
-            # apps/app_deals.py, netteté) — simple ouverture/focus, pas une
-            # popup forcée par le jeu.
+        if name == "explorer":
+            # Explorateur NATIF (apps/app_explorer.py, netteté) — même règle
+            # que "shop"/"company" : chaque appel RECONFIGURE la fenêtre
+            # existante (recherche/filtres pré-remplis si fournis, ex. le
+            # lien « → EXPLORATEUR » de la Boutique) plutôt que de la
+            # préserver en l'état.
+            w = self._launch("explorer")
+            if w is not None:
+                w.app_obj.configure(**kwargs)
+                self.wm.focus(w)
+                self.start_open = False
+            return w
+        if name in ("tradejournal", "deals", "analytics"):
+            # Journal de trading / Deals / Analyse du portefeuille NATIFS
+            # (apps/app_journal.py, apps/app_deals.py, apps/app_analytics.py,
+            # netteté) — simple ouverture/focus, pas une popup forcée par le jeu.
             w = self._launch(name)
             if w is not None:
                 self.wm.focus(w)
@@ -960,6 +984,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self._draw_wallpaper(surf)
         self._draw_desktop_icons(surf)
         self._draw_ambient(surf)
+        self._draw_index_ticker(surf)
         self._draw_todo(surf)
         self._draw_calendar_widget(surf)
         self._draw_checklist_widget(surf)
@@ -1048,7 +1073,11 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
     # jamais eu d'icône (toujours ouverte avec un ticker précis depuis un
     # contexte — Recherche, Portefeuille, notifications…) ; "shop" a déjà son
     # icône via QUICK_APPS ("qshop") — une seconde ferait doublon.
-    _FACTORY_ONLY_APPS = {"dilemma", "review", "evaluation", "deals", "company", "shop"}
+    # "analytics" n'a jamais eu d'icône non plus (accessible via PLUS et les
+    # boutons ANALYSE (PA) de Trading/Portefeuille) ; "explorer" a déjà son
+    # icône via QUICK_APPS ("qexplorer") — une seconde ferait doublon.
+    _FACTORY_ONLY_APPS = {"dilemma", "review", "evaluation", "deals", "company",
+                          "shop", "analytics", "explorer"}
 
     def _icon_list(self):
         """Liste (clé, libellé, icon_kind, couleur accent) des icônes du
@@ -1208,6 +1237,18 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         desktop_icons.draw(surf, (self._menu_rect.x + 16, self._menu_rect.centery), "menu", size=18)
         widgets.draw_text(surf, "Menu", (self._menu_rect.x + 28, self._menu_rect.y + 5),
                           fonts.small(bold=True), config.COL_AMBER)
+        # loupe : recherche globale (Ctrl+/) — dessinée en VECTORIEL (cercle +
+        # manche), même précaution que les icônes du bureau (pas de glyphe
+        # emoji, couverture non garantie par la police embarquée)
+        self._gsearch_rect = pygame.Rect(self._menu_rect.right + 6, 5, 26, TOPBAR_H - 10)
+        gh = self._gsearch_rect.collidepoint(pygame.mouse.get_pos())
+        pygame.draw.rect(surf, config.COL_PANEL if gh else config.COL_PANEL_HEAD,
+                         self._gsearch_rect, border_radius=4)
+        gc = self._gsearch_rect.center
+        lens_c = (gc[0] - 2, gc[1] - 2)
+        pygame.draw.circle(surf, config.COL_CYAN if gh else config.COL_TEXT_DIM, lens_c, 6, 2)
+        pygame.draw.line(surf, config.COL_CYAN if gh else config.COL_TEXT_DIM,
+                         (lens_c[0] + 4, lens_c[1] + 4), (gc[0] + 7, gc[1] + 7), 2)
 
         p = self.app.gs.player
         m = self.app.market

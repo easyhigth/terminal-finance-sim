@@ -35,9 +35,26 @@ def _ensure_lists(player):
         player.alerts_history = []
 
 
+def _match_index(market, name):
+    """Nom d'INDICE régional exact (insensible à la casse), ou None. Les
+    alertes marchent aussi sur les indices (« C&D 500 », « NKX 225 »…) —
+    ils étaient déjà affichés partout (bandeau du terminal, bande ambiante
+    du bureau) mais impossibles à surveiller sans garder l'écran ouvert."""
+    if market is None or not getattr(market, "index_region", None):
+        return None
+    up = name.upper()
+    for idx_name in market.index_region:
+        if idx_name.upper() == up:
+            return idx_name
+    return None
+
+
 def _normalize_ticker(market, ticker):
     if ticker is None:
         return None
+    idx = _match_index(market, ticker)
+    if idx is not None:
+        return idx
     tk = ticker.upper()
     if market and hasattr(market, "resolve"):
         return market.resolve(tk) or (tk if tk in getattr(market, "ticker_idx", {}) else None)
@@ -45,7 +62,11 @@ def _normalize_ticker(market, ticker):
 
 
 def _price(market, ticker):
-    if market is None or not hasattr(market, "price_of"):
+    if market is None:
+        return None
+    if _match_index(market, ticker) is not None:
+        return market.index_value(ticker)
+    if not hasattr(market, "price_of"):
         return None
     return market.price_of(ticker)
 
@@ -97,6 +118,9 @@ def place(player, market, ticker, kind, value, direction=None):
         "set_price": price,
         "set_step": getattr(market, "step_count", 0),
         "best_price": price,  # pour trailing
+        # indice régional (pas une action) : l'UI route le clic de la
+        # notification vers le hub Marché plutôt que Trading
+        "is_index": _match_index(market, tk) is not None,
     }
     player.alerts.append(order)
     if len(player.alerts) > MAX_ACTIVE:
@@ -173,6 +197,7 @@ def check(player, market):
                 "above": alert["above"],
                 "price": price,
                 "set_price": alert.get("set_price"),
+                "is_index": alert.get("is_index", False),
             }
             triggered.append(event)
             player.alerts_history.append(event)

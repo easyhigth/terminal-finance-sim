@@ -63,15 +63,24 @@ class AlertsApp(DesktopApp):
     def _build_dataset(self):
         m = self.market
         rows = []
+        # indices régionaux EN TÊTE (surveillables comme les actions depuis
+        # que core/alerts accepte un nom d'indice — cf. alerts._match_index)
+        from core import intraday
+        for name, region in getattr(m, "index_region", {}).items():
+            hist = m.index_history(name)
+            pct = intraday.window_pct(hist) if hist else 0.0
+            rows.append({"ticker": name, "name": f"Indice {region}", "sector": "Indice",
+                         "price": m.index_value(name), "change_pct": pct})
+        companies = []
         for c in m.companies:
             tk = c["ticker"]
             mt = m.metrics(tk)
             if not mt:
                 continue
-            rows.append({"ticker": tk, "name": mt["name"], "sector": mt["sector"],
-                         "price": mt["price"], "change_pct": mt["change_pct"]})
-        rows.sort(key=lambda r: r["name"].lower())
-        return rows
+            companies.append({"ticker": tk, "name": mt["name"], "sector": mt["sector"],
+                              "price": mt["price"], "change_pct": mt["change_pct"]})
+        companies.sort(key=lambda r: r["name"].lower())
+        return rows + companies
 
     def _filtered(self):
         q = self.search.strip().lower()

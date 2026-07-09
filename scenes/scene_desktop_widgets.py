@@ -382,6 +382,47 @@ class DesktopWidgetsMixin:
             widgets.draw_series(surf, spark, hist[-40:], gcol, baseline=False,
                                 show_extrema=False, y_fmt=None)
 
+    def _draw_index_ticker(self, surf):
+        """Bande ambiante des INDICES (bas du bureau, à gauche du widget
+        patrimoine, sous les fenêtres) : valeur EN DIRECT + variation « sur
+        la durée affichée » (core/intraday.window_pct, même mesure que les
+        bandeaux du terminal et du hub Marché) pour chaque indice régional —
+        le pouls des marchés reste visible toutes fenêtres fermées. Cliquer
+        ouvre le hub Marché."""
+        from core import intraday
+        m = self.app.market
+        self._index_ticker_rect = None
+        if m is None or not getattr(m, "index_region", None):
+            return
+        H = 24
+        W = config.SCREEN_WIDTH - 208 - 16 - 12 - 16   # s'arrête avant le widget patrimoine
+        x = 16
+        y = config.SCREEN_HEIGHT - TASKBAR_H - H - 12
+        r = pygame.Rect(x, y, W, H)
+        self._index_ticker_rect = r
+        hov = r.collidepoint(pygame.mouse.get_pos())
+        style.draw_glass_panel(surf, r, alpha=225,
+                               border_color=config.COL_CYAN if hov else config.COL_BORDER,
+                               radius=style.RADIUS_MD)
+        day = self.app.gs.player.day
+        tx = x + 10
+        for name in m.index_region:
+            hist = m.index_history(name, self.app.sim_clock, day)
+            if not hist:
+                continue
+            val = hist[-1]
+            pct = intraday.window_pct(hist)
+            col = config.COL_UP if pct >= 0 else config.COL_DOWN
+            seg = f"{name} {val:,.0f} "
+            seg_w = fonts.tiny(bold=True).size(seg)[0]
+            pct_txt = f"{pct:+.1f}%"
+            pct_w = fonts.tiny(bold=True).size(pct_txt)[0]
+            if tx + seg_w + pct_w + 18 > r.right - 8:
+                break   # bande pleine : on n'entasse pas
+            widgets.draw_text(surf, seg, (tx, y + 6), fonts.tiny(bold=True), config.COL_TEXT)
+            widgets.draw_text(surf, pct_txt, (tx + seg_w, y + 6), fonts.tiny(bold=True), col)
+            tx += seg_w + pct_w + 18
+
     # -------------------------------------------------- bilan du trimestre
     def _quarter_card_pending(self):
         """Dernier bilan de trimestre non encore acquitté (dict), ou None.

@@ -258,6 +258,102 @@ def cover(player, market, ticker, qty):
 
 
 # ---------------------------------------------------------------------------
+# Actions de portefeuille en un geste (rééquilibrage, liquidation)
+# ---------------------------------------------------------------------------
+def rebalance_equal_weights(player, market):
+    """Ramène les positions ACTIONS LONGUES à poids égaux (FACTORISÉ depuis
+    la commande REBALANCE du terminal, désormais partagé avec le bouton
+    « ÉQUIL. » de l'app Portefeuille). Retourne {"ok", "reason"|"lines"}."""
+    if len(player.portfolio) < 2:
+        return {"ok": False, "reason": "need2"}
+    pos_val = positions_value(player, market)
+    target = pos_val / len(player.portfolio)
+    for tk in list(player.portfolio.keys()):
+        price = market.price_of(tk)
+        if not price:
+            continue
+        cur = player.portfolio[tk]["shares"] * price
+        diff = target - cur
+        qty = int(abs(diff) // price)
+        if qty <= 0:
+            continue
+        if diff > 0:
+            buy(player, market, tk, qty)
+        else:
+            sell(player, market, tk, qty)
+    return {"ok": True, "lines": len(player.portfolio)}
+
+
+def liquidate_all(player, market):
+    """Liquide TOUTES les positions, toutes classes d'actifs : vend les
+    actions longues, couvre les shorts, vend ETF/obligations/matières
+    premières/crypto/structurés/crédit. Geste de crise (bouton « TOUT
+    VENDRE » du Portefeuille, derrière une confirmation) — chaque vente
+    passe par le chemin d'exécution normal (spread/impact/commissions),
+    aucune position n'est effacée gratuitement. Retourne un résumé
+    {"closed": n, "realized": P&L réalisé total des ventes}."""
+    from core import bonds as _bonds
+    from core import commodities as _cm
+    from core import crypto as _crypto
+    from core import etfs as _etf
+    from core import securitisation as _sec
+    from core import structured as _struct
+    closed = 0
+    realized = 0.0
+    for tk in list(player.portfolio.keys()):
+        pos = player.portfolio.get(tk)
+        if not pos:
+            continue
+        r = (sell(player, market, tk, "ALL") if pos["shares"] > 0
+             else cover(player, market, tk, "ALL"))
+        if r.get("ok"):
+            closed += 1
+            realized += r.get("realized", 0.0)
+    for key in list(getattr(player, "etfs", {}) or {}):
+        r = _etf.sell(player, market, key, player.etfs[key]["qty"])
+        if r.get("ok"):
+            closed += 1
+            realized += r.get("realized", 0.0)
+    for key in list(getattr(player, "bonds", {}) or {}):
+        r = _bonds.sell_bond(player, market, key, player.bonds[key]["qty"])
+        if r.get("ok"):
+            closed += 1
+            realized += r.get("realized", 0.0)
+    for key in list(getattr(player, "commodities", {}) or {}):
+        r = _cm.sell(player, market, key, player.commodities[key]["qty"])
+        if r.get("ok"):
+            closed += 1
+            realized += r.get("realized", 0.0)
+    for key in list(getattr(player, "crypto", {}) or {}):
+        r = _crypto.sell(player, market, key, player.crypto[key]["qty"])
+        if r.get("ok"):
+            closed += 1
+            realized += r.get("realized", 0.0)
+    # structurés / titrisation : positions en LISTES de souscriptions
+    # (player.structured / player.securitised), agrégées par identifiant de
+    # produit avant vente (sell_by_type / sell prennent un notional total)
+    struct_ids = {p.get("tpl_id", p.get("type")) for p in getattr(player, "structured", [])}
+    for key in struct_ids:
+        notional = _struct.held_notional(player, key)
+        if notional <= 0:
+            continue
+        r = _struct.sell_by_type(player, market, key, notional)
+        if r.get("ok"):
+            closed += 1
+            realized += r.get("realized", 0.0)
+    sec_ids = {p["id"] for p in getattr(player, "securitised", [])}
+    for key in sec_ids:
+        notional = _sec.held_notional(player, key)
+        if notional <= 0:
+            continue
+        r = _sec.sell(player, market, key, notional)
+        if r.get("ok"):
+            closed += 1
+            realized += r.get("realized", 0.0)
+    return {"closed": closed, "realized": realized}
+
+
+# ---------------------------------------------------------------------------
 # Appel de marge
 # ---------------------------------------------------------------------------
 def check_margin_call(player, market):

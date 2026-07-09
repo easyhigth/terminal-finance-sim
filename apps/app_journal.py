@@ -55,6 +55,8 @@ class JournalApp(DesktopApp):
         self._note_active = None
         self._note_text = ""
         self._t = 0.0
+        self._csv_rect = None
+        self.msg = ""
 
     def _filtered_sorted(self):
         entries = list(reversed(self.player.trade_journal))
@@ -105,6 +107,20 @@ class JournalApp(DesktopApp):
         self._note_active = None
         self._note_text = ""
 
+    def _export_csv(self):
+        """Bouton « CSV ↓ » : exporte le journal complet vers le dossier
+        personnel — même politique « pas de sélecteur de fichier natif » que
+        l'export du Tableur (apps/app_sheet.py)."""
+        import os as _os
+        if not self.player.trade_journal:
+            self.msg = "Journal vide : rien à exporter."
+            return
+        path = _os.path.join(_os.path.expanduser("~"), "journal_trading.csv")
+        if J.export_csv(self.player, path):
+            self.msg = f"Exporté vers « {path} »."
+        else:
+            self.msg = "Échec de l'export CSV (chemin inaccessible)."
+
     def _replicate(self, entry):
         """Ouvre Trading pré-filtré sur l'actif (achat de la quantité
         d'origine pré-rempli via la ligne de commande du terminal, comme la
@@ -152,6 +168,9 @@ class JournalApp(DesktopApp):
                 return True
             return False
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._csv_rect and self._csv_rect.collidepoint(event.pos):
+                self._export_csv()
+                return True
             if self._search_clear_rect and self._search_clear_rect.collidepoint(event.pos):
                 self.search = ""
                 return True
@@ -225,8 +244,18 @@ class JournalApp(DesktopApp):
         pad = 12
         widgets.draw_text(surf, "JOURNAL DE TRADING", (rect.x + pad, rect.y + 8),
                           fonts.head(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Filtrez, triez et reprenez vos trades passés. ✎ annote, ↻ réplique.",
-                          (rect.x + pad, rect.y + 34), fonts.tiny(), config.COL_TEXT_DIM)
+        sub = self.msg or "Filtrez, triez et reprenez vos trades passés. ✎ annote, ↻ réplique."
+        widgets.draw_text(surf, widgets.fit_text(sub, fonts.tiny(), rect.w - 2 * pad - 70),
+                          (rect.x + pad, rect.y + 34), fonts.tiny(),
+                          config.COL_WARN if self.msg else config.COL_TEXT_DIM)
+        # export CSV (coin haut-droit) — symétrique de l'export du Tableur
+        self._csv_rect = pygame.Rect(rect.right - pad - 60, rect.y + 8, 60, 22)
+        hov = self._csv_rect.collidepoint(pygame.mouse.get_pos())
+        pygame.draw.rect(surf, config.COL_PANEL if hov else config.COL_PANEL_HEAD,
+                         self._csv_rect, border_radius=3)
+        pygame.draw.rect(surf, config.COL_TEXT_DIM, self._csv_rect, 1, border_radius=3)
+        widgets.draw_text(surf, "CSV ↓", self._csv_rect.center, fonts.tiny(bold=True),
+                          config.COL_TEXT_DIM, align="center")
 
         p = self.player
         cur = self._cur()
@@ -317,9 +346,16 @@ class JournalApp(DesktopApp):
                               config.COL_AMBER if active else config.COL_TEXT_DIM, align="center")
             tx += w + 4
 
-        # ---- liste ----
+        # ---- liste (+ courbe de P&L cumulé à droite si la place le permet) ----
         ltop = sry + 30
-        panel = pygame.Rect(rect.x + pad, ltop, rect.w - 2 * pad, rect.bottom - pad - ltop)
+        pnl_series = J.cumulative_realized_series(p)
+        show_curve = rect.w >= 900 and len(pnl_series) >= 2
+        curve_w = 250 if show_curve else 0
+        panel = pygame.Rect(rect.x + pad, ltop, rect.w - 2 * pad - curve_w - (10 if curve_w else 0),
+                            rect.bottom - pad - ltop)
+        if show_curve:
+            curve_panel = pygame.Rect(panel.right + 10, ltop, curve_w, panel.h)
+            self._draw_pnl_curve(surf, curve_panel, pnl_series, cur)
         inner = widgets.draw_panel(surf, panel, "Trades", config.COL_CYAN)
         self._rows = self._filtered_sorted()
         self.row_cursor = min(self.row_cursor, len(self._rows) - 1) if self._rows else 0
@@ -407,6 +443,27 @@ class JournalApp(DesktopApp):
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov2 else config.COL_PANEL, nt, border_radius=3)
         pygame.draw.rect(surf, config.COL_AMBER, nt, 1, border_radius=3)
         widgets.draw_text(surf, "✎", nt.center, fonts.tiny(bold=True), config.COL_AMBER, align="center")
+
+    def _draw_pnl_curve(self, surf, panel, series, cur):
+        """Courbe du P&L réalisé CUMULÉ au fil des trades clôturés
+        (core/journal.cumulative_realized_series) — la table seule ne donne
+        aucune vue d'ensemble de la trajectoire."""
+        inner = widgets.draw_panel(surf, panel, "P&L cumulé", config.COL_PRESTIGE)
+        total = series[-1]
+        col = config.COL_UP if total >= 0 else config.COL_DOWN
+        widgets.draw_text(surf, f"{total:+,.0f} {cur}", (inner.x, inner.y),
+                          fonts.small(bold=True), col)
+        widgets.draw_text(surf, f"{len(series)} trades clôturés", (inner.x, inner.y + 18),
+                          fonts.tiny(), config.COL_TEXT_DIM)
+        chart = pygame.Rect(inner.x, inner.y + 40, inner.w, inner.h - 44)
+        if chart.h < 30:
+            return
+        lo, hi = min(series + [0.0]), max(series + [0.0])
+        y_fmt = lambda v: f"{v:+,.0f}"
+        widgets.draw_chart_axes(surf, chart, lo, hi, y_fmt=y_fmt, rows=3)
+        widgets.draw_series(surf, chart, series, color=col, baseline=True,
+                            mouse_pos=pygame.mouse.get_pos(), y_fmt=y_fmt,
+                            line_width=2)
 
     def _draw_note_dialog(self, surf, rect):
         entry = J.get_entry(self.player, self._note_active)

@@ -67,6 +67,13 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         self._pa_btn = None
         self._shop_btn = None
         self._journal_btn = None
+        self._rebalance_btn = None
+        self._liq_btn = None
+        # confirmation « TOUT VENDRE » (modale) : liquidation toutes classes,
+        # jamais exécutée sur un simple clic
+        self._liq_confirm = False
+        self._liq_yes_rect = None
+        self._liq_no_rect = None
         self.msg = ""
         self._t = 0.0
         self._key_suggest_rects = []
@@ -203,6 +210,83 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         else:
             self.msg = f"Vente refusée ({r['reason']})."
 
+    def _do_rebalance(self):
+        """Bouton « ÉQUIL. » : ramène les actions longues à poids égaux —
+        même logique que la commande REBALANCE du terminal (factorisée dans
+        core/portfolio.rebalance_equal_weights)."""
+        p = self.app.gs.player
+        r = pf.rebalance_equal_weights(p, self.market)
+        if not r["ok"]:
+            self.msg = "Rééquilibrage : au moins 2 positions actions nécessaires."
+            return
+        self.msg = f"Portefeuille rééquilibré à poids égaux ({r['lines']} lignes)."
+        if not p.hardcore:
+            self.app.gs.save(config.AUTOSAVE_SLOT)
+
+    def _count_positions(self):
+        p = self.app.gs.player
+        return (len(p.portfolio) + len(getattr(p, "etfs", {}) or {})
+                + len(getattr(p, "bonds", {}) or {})
+                + len(getattr(p, "commodities", {}) or {})
+                + len(getattr(p, "crypto", {}) or {})
+                + len(getattr(p, "structured", []) or [])
+                + len(getattr(p, "securitised", []) or []))
+
+    def _do_liquidate_all(self):
+        """Confirmation acceptée : liquide toutes les positions, toutes
+        classes (core/portfolio.liquidate_all) — geste de crise."""
+        p = self.app.gs.player
+        cur = config.CONTINENTS[p.continent]["currency"]
+        r = pf.liquidate_all(p, self.market)
+        self._liq_confirm = False
+        if r["closed"] == 0:
+            self.msg = "Aucune position à liquider."
+            return
+        self.msg = (f"{r['closed']} position(s) liquidée(s) — P&L réalisé "
+                    f"{widgets.format_money(r['realized'], cur)}.")
+        if not p.hardcore:
+            self.app.gs.save(config.AUTOSAVE_SLOT)
+
+    def _handle_liq_confirm_event(self, event):
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self._liq_confirm = False
+            return True
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._liq_yes_rect and self._liq_yes_rect.collidepoint(event.pos):
+                self._do_liquidate_all()
+                return True
+            if self._liq_no_rect and self._liq_no_rect.collidepoint(event.pos):
+                self._liq_confirm = False
+                return True
+            return True
+        return event.type == pygame.KEYDOWN
+
+    def _draw_liq_confirm(self, surf, rect):
+        overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 160))
+        surf.blit(overlay, rect.topleft)
+        box = pygame.Rect(0, 0, min(380, rect.w - 40), 130)
+        box.center = rect.center
+        pygame.draw.rect(surf, config.COL_PANEL, box, border_radius=6)
+        pygame.draw.rect(surf, config.COL_DOWN, box, 2, border_radius=6)
+        widgets.draw_text(surf, "TOUT VENDRE", (box.x + 14, box.y + 10),
+                          fonts.small(bold=True), config.COL_DOWN)
+        n = self._count_positions()
+        widgets.draw_text_wrapped(
+            surf, f"Liquider les {n} position(s) de toutes les classes d'actifs "
+            "aux conditions de marché actuelles (spread et impact inclus) ?",
+            (box.x + 14, box.y + 34), fonts.tiny(), config.COL_TEXT, box.w - 28)
+        self._liq_yes_rect = pygame.Rect(box.x + 14, box.bottom - 36, 130, 26)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._liq_yes_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_DOWN, self._liq_yes_rect, 1, border_radius=4)
+        widgets.draw_text(surf, "TOUT LIQUIDER", self._liq_yes_rect.center,
+                          fonts.tiny(bold=True), config.COL_DOWN, align="center")
+        self._liq_no_rect = pygame.Rect(self._liq_yes_rect.right + 8, box.bottom - 36, 90, 26)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._liq_no_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_TEXT_DIM, self._liq_no_rect, 1, border_radius=4)
+        widgets.draw_text(surf, "Annuler", self._liq_no_rect.center,
+                          fonts.tiny(), config.COL_TEXT_DIM, align="center")
+
     def _open_for(self, cls, label):
         kind = CLS_TO_KIND.get(cls)
         if kind == "Action":
@@ -263,6 +347,9 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
     # ----------------------------------------------------------------- events
     def handle_event(self, event, rect):
         self._last_rect = rect
+        if self._liq_confirm:
+            # confirmation « TOUT VENDRE » MODALE : absorbe tout
+            return self._handle_liq_confirm_event(event)
         if self._order_prompt is not None:
             # boîte d'ordre conditionnel MODALE : absorbe tout (cf. mixin)
             return self._handle_order_prompt_event(event)
@@ -311,6 +398,14 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
                 and self._journal_btn.collidepoint(event.pos):
             if self.desktop is not None:
                 self.desktop._open_scene_window("tradejournal")
+            return True
+        if self._rebalance_btn and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 \
+                and self._rebalance_btn.collidepoint(event.pos):
+            self._do_rebalance()
+            return True
+        if self._liq_btn and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 \
+                and self._liq_btn.collidepoint(event.pos):
+            self._liq_confirm = True
             return True
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
@@ -474,6 +569,19 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._buy_btn, border_radius=4)
         widgets.draw_text(surf, "ACHETER", self._buy_btn.center, fonts.tiny(bold=True),
                           config.COL_UP, align="center")
+        # actions de portefeuille en un geste, à droite de la barre de trading :
+        # « ÉQUIL. » (poids égaux, ex-commande REBALANCE) et « TOUT VENDRE »
+        # (liquidation toutes classes, derrière une confirmation)
+        self._liq_btn = pygame.Rect(rect.right - pad - 88, bar_y2, 88, 22)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._liq_btn, border_radius=4)
+        pygame.draw.rect(surf, config.COL_DOWN, self._liq_btn, 1, border_radius=4)
+        widgets.draw_text(surf, "TOUT VENDRE", self._liq_btn.center, fonts.tiny(bold=True),
+                          config.COL_DOWN, align="center")
+        self._rebalance_btn = pygame.Rect(self._liq_btn.x - 64, bar_y2, 58, 22)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._rebalance_btn, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN, self._rebalance_btn, 1, border_radius=4)
+        widgets.draw_text(surf, "ÉQUIL.", self._rebalance_btn.center, fonts.tiny(bold=True),
+                          config.COL_CYAN, align="center")
         if self.msg:
             widgets.draw_text(surf, widgets.fit_text(self.msg, fonts.tiny(), rect.w - 2 * pad),
                               (rect.x + pad, bar_y2 + 24), fonts.tiny(), config.COL_TEXT_DIM)
@@ -608,6 +716,8 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         self.popups_draw(surf)
         if self._order_prompt is not None:
             self._draw_order_prompt(surf, rect)
+        if self._liq_confirm:
+            self._draw_liq_confirm(surf, rect)
         if self._tooltip:
             widgets.draw_tooltip(surf, *self._tooltip)
 

@@ -404,27 +404,15 @@ class TerminalTradingMixin:
         self._after_trade()
 
     def _cmd_rebalance(self):
-        """REBALANCE : ramène les positions à poids égaux."""
+        """REBALANCE : ramène les positions à poids égaux (logique factorisée
+        dans core/portfolio.rebalance_equal_weights, partagée avec le bouton
+        « ÉQUIL. » de l'app Portefeuille)."""
         p = self.app.gs.player
-        if len(p.portfolio) < 2:
+        r = pf_mod.rebalance_equal_weights(p, self.market)
+        if not r["ok"]:
             self._log(_L("  Rééquilibrage : au moins 2 positions nécessaires.","  Rebalance: at least 2 positions required."))
             return
-        pos_val = pf_mod.positions_value(p, self.market)
-        target = pos_val / len(p.portfolio)
-        for tk in list(p.portfolio.keys()):
-            price = self.market.price_of(tk)
-            if not price:
-                continue
-            cur = p.portfolio[tk]["shares"] * price
-            diff = target - cur
-            qty = int(abs(diff) // price)
-            if qty <= 0:
-                continue
-            if diff > 0:
-                pf_mod.buy(p, self.market, tk, qty)
-            else:
-                pf_mod.sell(p, self.market, tk, qty)
-        self._log(_L(f"  Portefeuille rééquilibré à poids égaux ({len(p.portfolio)} lignes).", f"  Portfolio rebalanced to equal weights ({len(p.portfolio)} lines)."))
+        self._log(_L(f"  Portefeuille rééquilibré à poids égaux ({r['lines']} lignes).", f"  Portfolio rebalanced to equal weights ({r['lines']} lines)."))
         self._after_trade()
 
     def _cmd_trades(self, args):

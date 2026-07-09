@@ -11,12 +11,14 @@ l'écran bureau, pas réutilisable ailleurs dans le jeu).
 import pygame
 
 from apps.app_alerts import AlertsApp
+from apps.app_analytics import AnalyticsApp
 from apps.app_book import BookApp
 from apps.app_calculator import CalculatorApp
 from apps.app_company import CompanyApp
 from apps.app_deals import DealsApp
 from apps.app_dilemma import DilemmaApp
 from apps.app_evaluation import EvaluationApp
+from apps.app_explorer import ExplorerApp
 from apps.app_inbox import InboxApp
 from apps.app_journal import JournalApp
 from apps.app_markethub import MarketHubApp
@@ -76,6 +78,8 @@ APPS = [
     ("deals", "Deals", "deals", DealsApp),
     ("company", "Fiche société", "research", CompanyApp),
     ("shop", "Boutique", "shop", ShopApp),
+    ("analytics", "Analyse du portefeuille", "graph", AnalyticsApp),
+    ("explorer", "Explorateur", "explorer", ExplorerApp),
     # Applications financières avancées
     ("sharpe", "Sharpe Ratio", "graph", SharpeApp),
     ("zscore", "Z-Score", "graph", ZScoreApp),
@@ -117,6 +121,7 @@ QUICK_APPS = [
     ("qshop", "Shop", "shop", "shop"),
     ("qexplorer", "Explorateur", "explorer", "explorer"),
     ("qgraph", "Graphes", "graph", "graph"),
+    ("qachievements", "Succès", "star", "achievements"),
     ("save", "Sauver", "save", None),
     ("qcommands", "Aide", "help", "commands"),
 ]

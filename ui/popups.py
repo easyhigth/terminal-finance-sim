@@ -898,8 +898,16 @@ class PopupMixin:
             w.nav_request = None
             nav = dict(nav)
             target = nav.pop("to")
-            nav["return_to"] = getattr(self.app.scenes, "current_name", None) or "terminal"
-            self.app.scenes.go(target, **nav)
+            desk = getattr(self, "desktop", None)
+            if desk is not None:
+                # App NATIVE du bureau (Book/Marché/Analyse/Explorateur…) :
+                # `self.app` est ici le VRAI App global — `scenes.go`
+                # basculerait tout l'écran hors du bureau. On ouvre la cible
+                # EN FENÊTRE (même principe que DealsApp, cf. étape 21).
+                desk._open_scene_window(target, **nav)
+            else:
+                nav["return_to"] = getattr(self.app.scenes, "current_name", None) or "terminal"
+                self.app.scenes.go(target, **nav)
 
     def _popup_pos(self):
         n = len(self.popups)

@@ -501,6 +501,55 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   plutôt que de taper une commande dans le terminal cachée derrière la fenêtre. "company"
   et "shop" rejoignent `_FACTORY_ONLY_APPS` (pas d'icône permanente — "company" n'en a
   jamais eu, "shop" garde son icône historique via `QUICK_APPS`/`qshop`).
+  **Étape 23 (netteté, suite) : Analyse du portefeuille et Explorateur de marché.**
+  `apps/app_analytics.py` (`AnalyticsApp` — tuiles perf/risque, table de positions,
+  allocations, frontière efficiente + corrélations quand la fenêtre est assez large,
+  liens vers Portefeuille/Stress test/Boutique) et `apps/app_explorer.py` (`ExplorerApp`
+  — univers investissable complet actions/ETF/obligations/commodities/crypto/FX/
+  gouvernements, recherche/filtres/tri, sélection multiple Ctrl+clic/Shift+clic,
+  clic droit = ajout rapide à la liste de suivi, bouton « + AJOUTER (n) », lien SHOP
+  qui CONSERVE le contexte recherche/filtres) migrent `scenes/scene_analytics.py`/
+  `scenes/scene_explorer.py`. L'Explorateur suit la règle Boutique/Fiche société
+  (`configure(**kwargs)` à CHAQUE ouverture — le lien croisé Boutique ↔ Explorateur
+  garde recherche et filtres) ; l'Analyse est une simple ouverture/focus. Les deux
+  rejoignent `_FACTORY_ONLY_APPS` ("explorer" garde son icône via `QUICK_APPS`/
+  `qexplorer`, "analytics" reste accessible via PLUS et les boutons ANALYSE (PA)).
+  **Correction structurelle au passage** (`ui/popups.py::PopupMixin._consume_popup_signals`) :
+  un lien de navigation d'un popup (`nav_request` — nom/secteur/région/type cliqués sur
+  une fiche flottante) appelait `self.app.scenes.go(...)` ; or dans une app NATIVE,
+  `self.app` est le VRAI App global (pas le proxy `_Router` des scènes hébergées) — le
+  clic basculait TOUT l'écran hors du bureau. Le mixin route désormais via la back-ref
+  `desktop._open_scene_window(target, ...)` quand elle existe (Book/Marché/Analyse/
+  Explorateur), et garde `scenes.go` sinon (scènes plein écran / hébergées, inchangé).
+  Verrouillé par `tests/test_popup_navigation.py` et `tests/test_app_explorer.py`/
+  `test_app_analytics.py`.
+- **Découvrabilité du bureau (icônes/boutons)** : icône « Succès » (`QUICK_APPS`/
+  `qachievements` → scène achievements en fenêtre) ; **loupe de recherche globale** dans
+  la topbar du bureau (`DesktopScene._gsearch_rect`, dessin vectoriel — ouvre la même
+  recherche que Ctrl+/, jusqu'ici invisible sans connaître le raccourci).
+- **Actions de masse du Portefeuille** (`apps/app_book.py` + `core/portfolio.py`) :
+  bouton « ÉQUIL. » (rééquilibrage équipondéré des lignes ACTIONS longues,
+  `core/portfolio.rebalance_equal_weights` — factorisé avec la commande REBALANCE du
+  terminal, `scene_terminal_trading._cmd_rebalance` l'appelle désormais) et bouton
+  « TOUT VENDRE » (liquidation TOUTES classes — longs, shorts couverts, ETF/obligations/
+  commodities/crypto/structurés/titrisés — `core/portfolio.liquidate_all`, avec boîte de
+  CONFIRMATION modale : action destructrice, jamais en un clic).
+- **Journal de trading enrichi** (`core/journal.py` + `apps/app_journal.py`) : courbe de
+  **P&L réalisé cumulé** (`cumulative_realized_series`, panneau droit quand la fenêtre est
+  assez large) et **export CSV** (`journal.export_csv`, bouton « CSV ↓ » → fichier dans le
+  dossier personnel, mêmes conventions que l'export du Tableur).
+- **Mini-ticker d'indices ambiant** (`scenes/scene_desktop_widgets.py::_draw_index_ticker`) :
+  bande discrète au-dessus de la barre des tâches (sous les fenêtres, comme le widget
+  patrimoine) affichant chaque indice (`market.index_region`) avec valeur EN DIRECT
+  (`index_history` + intraday) et variation `window_pct` colorée ; cliquer ouvre le hub
+  Marché. Complète la « conscience ambiante » de l'étape 11.
+- **Alertes de prix sur les INDICES** (`core/alerts.py`) : `ALERTE <indice> > seuil`
+  accepte désormais un nom d'indice (`_match_index`, insensible à la casse, résolu AVANT
+  les tickers) ; `_price` route sur `market.index_value`. Les ordres/évènements portent
+  `is_index` : au déclenchement, le toast route vers le hub Marché (`action="markethub"`)
+  au lieu de Trading (un indice ne se trade pas) — cf. `core/game_state.py::advance_step`.
+  L'app Alertes (`apps/app_alerts.py::_build_dataset`) liste les indices en tête de sa
+  table (« Indice <région> »), sélectionnables comme une valeur.
 - **Bouton « Alerte » dans Recherche** (`apps/app_research.py`) : la barre d'actions
   (Trader/→Tableur/Analyse/Suivre) gagne un raccourci vers l'app Alertes pré-filtrée sur la
   valeur consultée (`desktop._open_scene_window("alerts", ticker=...)`, déjà utilisé par les

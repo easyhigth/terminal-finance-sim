@@ -1252,7 +1252,8 @@ def test_terminal_rail_is_gone(app):
 def test_quick_apps_open_matching_scene_windows(app):
     from scenes.scene_desktop import QUICK_APPS
     # apps NATIVES migrées (netteté) : clé nue, pas "scene:<nom>".
-    _NATIVE = {"book", "markethub", "dilemma", "review", "mission", "deals", "shop"}
+    _NATIVE = {"book", "markethub", "dilemma", "review", "mission", "deals", "shop",
+               "explorer"}
     app.scenes.go("desktop")
     desk = app.scenes.current
     desk.draw(app.screen)

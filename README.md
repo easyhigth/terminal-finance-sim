@@ -15,6 +15,7 @@ Prototype jouable — moteur de base + interface Bloomberg + modules financiers 
   Capital Market Line, ajustement des poids en direct.
 - **Module M&A** : modèle LBO (MOIC/IRR) + analyse accretion/dilution.
 - **Choix de voie** : Portfolio / M&A / Risk / Quant / Advisory.
+- **Applications financières avancées** : Sharpe Ratio, Z-Score, Couverture (Hedge)
 
 ### Moteur financier (core/finmath.py) — formules réelles, toutes testées
 - Valeur temps de l'argent : PV, FV, NPV, IRR
@@ -25,6 +26,11 @@ Prototype jouable — moteur de base + interface Bloomberg + modules financiers 
 - Risque : VaR historique, CVaR, VaR paramétrique
 - M&A : accretion/dilution, modèle LBO
 - Ratios : ROE, ROA, marge nette, D/E, current ratio, interest coverage...
+
+### Applications financières avancées
+- **Sharpe Ratio** : Calcule et visualise le ratio de Sharpe pour différentes stratégies de portefeuille (actuel, benchmark, optimisé)
+- **Z-Score** : Analyse statistique pour identifier les écarts significatifs dans les rendements, volatilité et corrélation
+- **Couverture (Hedge)** : Mise en place de stratégies de couverture delta, beta et statistique pour protéger un portefeuille
 
 ### Simulation de marché (core/market.py + data/companies.py)
 - **320 sociétés fictives** réparties USA / Europe / Asie, sur 14 secteurs.

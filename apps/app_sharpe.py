@@ -1,460 +1,310 @@
 """
-app_sharpe.py — Application « Sharpe Ratio » du bureau.
+app_sharpe.py — Application « Sharpe Ratio » du bureau (NATIVE).
 
-Calcule et visualise le ratio de Sharpe pour différentes stratégies de portefeuille :
-- Portefeuille actuel du joueur
-- Portefeuille benchmark (marché)
-- Portefeuilles optimisés (max Sharpe, min variance)
-- Comparaison avec des indices de référence
+Performance ajustée au risque du panier d'actions du joueur, avec de VRAIS
+chiffres (annualisés via core/quant_tools, benchmark = le VRAI indice
+régional du joueur) :
+- tuiles : Sharpe / rendement / volatilité annualisés, bêta et alpha de
+  Jensen vs l'indice ;
+- comparaison en barres : portefeuille, indice, min-variance et max-Sharpe
+  (optimisés sur les actions détenues — mêmes estimateurs que la frontière) ;
+- courbe de Sharpe GLISSANT (fenêtre ~1 trimestre) — voir la qualité de
+  gestion évoluer dans le temps ;
+- table par position (poids, rendement, vol, Sharpe individuels).
 
-Permet d'analyser la performance ajustée au risque sur différentes périodes.
+Tout est recalculé automatiquement quand le marché avance d'un pas (cache
+par step_count) — pas de bouton « Calculer », l'app est toujours à jour.
 """
 import pygame
-import numpy as np
 
 from apps.base import DesktopApp
-from core import config, finmath
-from ui import fonts, style, widgets
+from core import config
+from core import quant_tools as QT
+from ui import fonts, widgets
+
+PERIODS = ["3M", "1A", "3A", "5A"]     # fenêtres d'estimation proposées
+RF_MIN, RF_MAX, RF_STEP = 0.0, 0.10, 0.005
 
 
 class SharpeApp(DesktopApp):
-    title = "Sharpe Ratio — Performance ajustée au risque"
+    title = "Sharpe Ratio"
     icon_kind = "graph"
-    default_size = (800, 600)
-    min_size = (600, 400)
+    default_size = (980, 620)
+    min_size = (700, 460)
 
     def on_open(self):
         self.market = self.app.ensure_market()
-        self.period = "1Y"  # 1M, 3M, 1Y, 3Y, 5Y, MAX
-        self.rf_rate = 0.02  # taux sans risque (2% par défaut)
-        self.msg = ""
+        self.period = "1A"
+        self.rf = 0.02
+        self._cache_key = None
+        self._res = None
         self._period_rects = {}
-        self._rf_rect = None
-        self._compute_btn = None
-        self._results = None
-        self._scroll = 0
-        self._max_scroll = 0
+        self._rf_minus = None
+        self._rf_plus = None
+        self._frontier_btn = None
+        self._last_rect = pygame.Rect(0, 0, 1, 1)
 
-    def _compute_sharpe(self):
-        """Calcule les ratios de Sharpe pour différentes stratégies."""
-        try:
-            # Historique des prix sur la période choisie
-            hist_length = self._period_to_steps()
-            if hist_length is None:
-                self.msg = "Période invalide"
-                return
+    # ------------------------------------------------------------- calculs
+    def _ensure_computed(self):
+        key = (self.market.step_count, self.period, round(self.rf, 4),
+               len(self.app.gs.player.portfolio))
+        if key == self._cache_key:
+            return
+        self._cache_key = key
+        self._res = self._compute()
 
-            # Récupérer les données de marché
-            player = self.app.gs.player
-            portfolio = player.portfolio
-
-            # Si le portefeuille est vide
-            if not portfolio:
-                self.msg = "Portefeuille vide - impossible de calculer le Sharpe Ratio"
-                return
-
-            # Calculer les rendements du portefeuille
-            portfolio_returns = self._portfolio_returns(hist_length)
-            if len(portfolio_returns) < 2:
-                self.msg = "Données insuffisantes pour le calcul"
-                return
-
-            # Calculer le Sharpe Ratio du portefeuille
-            portfolio_vol = np.std(portfolio_returns)
-            portfolio_return = np.mean(portfolio_returns)
-            portfolio_sharpe = (portfolio_return - self.rf_rate) / portfolio_vol if portfolio_vol > 0 else 0.0
-
-            # Calculer le Sharpe Ratio du marché (indice large)
-            market_returns = self._market_returns(hist_length)
-            market_sharpe = 0.0
-            market_return = 0.0
-            market_vol = 0.0
-            if len(market_returns) >= 2:
-                market_vol = np.std(market_returns)
-                market_return = np.mean(market_returns)
-                market_sharpe = (market_return - self.rf_rate) / market_vol if market_vol > 0 else 0.0
-
-            # Calculer le portefeuille à variance minimale (si possible)
-            min_var_sharpe = 0.0
-            max_sharpe = 0.0
-            try:
-                if len(portfolio) > 1:
-                    # Pour simplifier, on prend les 5 premières positions
-                    tickers = list(portfolio.keys())[:5]
-                    returns_matrix = []
-                    valid_tickers = []
-                    for tk in tickers:
-                        hist = self.market.history_of(tk, hist_length)
-                        if hist and len(hist) >= 2:
-                            # Calculer les rendements
-                            rets = [(hist[i] / hist[i-1] - 1) for i in range(1, len(hist))]
-                            returns_matrix.append(rets)
-                            valid_tickers.append(tk)
-
-                    if len(returns_matrix) > 1 and all(len(r) == len(returns_matrix[0]) for r in returns_matrix):
-                        returns_array = np.array(returns_matrix)
-                        mean_returns = np.mean(returns_array, axis=1)
-                        cov_matrix = np.cov(returns_array)
-
-                        # Portefeuille à variance minimale
-                        min_var_weights = finmath.min_variance_portfolio(mean_returns, cov_matrix)
-                        min_var_returns = np.dot(returns_array.T, min_var_weights)
-                        min_var_vol = np.std(min_var_returns)
-                        min_var_return = np.mean(min_var_returns)
-                        min_var_sharpe = (min_var_return - self.rf_rate) / min_var_vol if min_var_vol > 0 else 0.0
-
-                        # Portefeuille max Sharpe
-                        max_sharpe_weights = finmath.max_sharpe_portfolio(mean_returns, cov_matrix, self.rf_rate)
-                        max_sharpe_returns = np.dot(returns_array.T, max_sharpe_weights)
-                        max_sharpe_vol = np.std(max_sharpe_returns)
-                        max_sharpe_return = np.mean(max_sharpe_returns)
-                        max_sharpe = (max_sharpe_return - self.rf_rate) / max_sharpe_vol if max_sharpe_vol > 0 else 0.0
-
-            except Exception as e:
-                self.msg = f"Erreur dans calculs avancés : {str(e)}"
-                pass  # En cas d'erreur, on continue avec 0.0
-
-            self._results = {
-                "portfolio": {
-                    "sharpe": portfolio_sharpe,
-                    "return": portfolio_return,
-                    "volatility": portfolio_vol,
-                    "count": len(portfolio)
-                },
-                "market": {
-                    "sharpe": market_sharpe,
-                    "return": market_return,
-                    "volatility": market_vol
-                },
-                "min_variance": {
-                    "sharpe": min_var_sharpe
-                },
-                "max_sharpe": {
-                    "sharpe": max_sharpe
-                }
-            }
-            self.msg = f"Sharpe Ratio calculé sur {hist_length} pas"
-
-        except Exception as e:
-            self.msg = f"Erreur de calcul : {str(e)}"
-
-    def _period_to_steps(self):
-        """Convertit la période en nombre de pas de marché."""
-        periods = {
-            "1M": 73,    # ~1 mois
-            "3M": 219,   # ~3 mois
-            "1Y": 365,   # ~1 an
-            "3Y": 1095,  # ~3 ans
-            "5Y": 1825,  # ~5 ans
-            "MAX": None
+    def _compute(self):
+        p = self.app.gs.player
+        m = self.market
+        steps = QT.PERIOD_STEPS[self.period]
+        port_r, tickers = QT.portfolio_step_returns(p, m, steps)
+        if len(port_r) < QT.MIN_POINTS:
+            return None
+        idx_name = QT.main_index(m, p)
+        bench_r = QT.index_returns(m, idx_name, steps)
+        res = {
+            "tickers": tickers,
+            "port": {"sharpe": QT.sharpe(port_r, self.rf),
+                     "ret": QT.ann_return(port_r), "vol": QT.ann_vol(port_r)},
+            "rolling": QT.rolling_sharpe(port_r, window=18, rf_annual=self.rf),
+            "index_name": idx_name,
+            "bench": None, "beta": 0.0, "alpha": 0.0,
+            "min_var": None, "max_sharpe": None,
+            "rows": [],
         }
-        return periods.get(self.period, 365)
-
-    def _portfolio_returns(self, steps):
-        """Calcule les rendements du portefeuille sur la période."""
-        player = self.app.gs.player
-        portfolio = player.portfolio
-
-        if not portfolio:
-            return []
-
-        # Historique des valeurs du portefeuille
-        values = []
-        current_step = self.market.step_count
-
-        # Nombre de pas à examiner
-        hist_steps = steps if steps else min(current_step, 365)  # MAX par défaut 1 an
-
-        # Pour chaque pas dans l'historique
-        for i in range(hist_steps):
-            step = current_step - (hist_steps - i)
-            if step < 0:
+        if len(bench_r) >= QT.MIN_POINTS:
+            b_ret, b_vol = QT.ann_return(bench_r), QT.ann_vol(bench_r)
+            res["bench"] = {"sharpe": QT.sharpe(bench_r, self.rf),
+                            "ret": b_ret, "vol": b_vol}
+            res["beta"] = QT.beta(port_r, bench_r)
+            # alpha de Jensen : rendement au-delà de ce que le bêta explique
+            res["alpha"] = (res["port"]["ret"] - self.rf
+                            - res["beta"] * (b_ret - self.rf))
+        fr = QT.frontier(m, tickers, n_points=25, lookback=steps,
+                         rf_annual=self.rf)
+        if fr:
+            for label, i in (("min_var", fr["i_min_var"]),
+                             ("max_sharpe", fr["i_max_sharpe"])):
+                ret, vol, sh = QT.point_stats(fr["weights"][i], fr["mean"], fr["cov"],
+                                              self.rf)
+                res[label] = {"sharpe": sh, "ret": ret, "vol": vol}
+        # table par position (poids par valeur longue)
+        w, _tot = QT.current_weights(p, m, tickers)
+        for tk, wi in zip(tickers, w):
+            r = QT.returns_of(m, tk, steps)
+            if len(r) < QT.MIN_POINTS:
                 continue
+            res["rows"].append({"ticker": tk, "weight": wi,
+                                "ret": QT.ann_return(r), "vol": QT.ann_vol(r),
+                                "sharpe": QT.sharpe(r, self.rf)})
+        res["rows"].sort(key=lambda x: x["sharpe"], reverse=True)
+        return res
 
-            # Recalculer la valeur du portefeuille à ce pas
-            total_value = 0.0
-            has_valid_prices = False
-
-            for ticker, pos in portfolio.items():
-                if pos["shares"] != 0:
-                    # Obtenir le prix à ce pas spécifique
-                    hist = self.market.history_of(ticker, hist_steps)
-                    if hist and len(hist) > i:
-                        price = hist[-(hist_steps - i)]
-                        if price and price > 0:
-                            total_value += pos["shares"] * price
-                            has_valid_prices = True
-
-            if has_valid_prices:
-                values.append(total_value)
-
-        # Calculer les rendements
-        if len(values) < 2:
-            return []
-
-        returns = [(values[i] / values[i-1] - 1) for i in range(1, len(values))]
-        return returns
-
-    def _market_returns(self, steps):
-        """Calcule les rendements de l'indice de marché."""
-        # Utiliser l'indice principal (par exemple, le premier indice)
-        indices = self.market.index_tickers()
-        if not indices:
-            return []
-
-        ticker = indices[0]  # Premier indice
-        hist = self.market.history_of(ticker, steps if steps else 365)
-
-        if not hist or len(hist) < 2:
-            return []
-
-        # Calculer les rendements
-        returns = [(hist[i] / hist[i-1] - 1) for i in range(1, len(hist))]
-        return returns
-
+    # -------------------------------------------------------------- events
     def handle_event(self, event, rect):
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            pos = event.pos
-
-            # Sélection de période
-            for period, rect_btn in self._period_rects.items():
-                if rect_btn and rect_btn.collidepoint(pos):
-                    self.period = period
-                    self._compute_sharpe()
-                    return True
-
-            # Changement de taux sans risque
-            if self._rf_rect and self._rf_rect.collidepoint(pos):
-                # Pour simplifier, on change le taux de ±0.5%
-                self.rf_rate += 0.005 if pygame.key.get_mods() & pygame.KMOD_SHIFT else -0.005
-                self.rf_rate = max(0.0, min(0.1, self.rf_rate))  # Borné entre 0% et 10%
-                self._compute_sharpe()
+        if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
+            return False
+        pos = event.pos
+        for period, r in self._period_rects.items():
+            if r.collidepoint(pos):
+                self.period = period
                 return True
-
-            # Bouton calculer
-            if self._compute_btn and self._compute_btn.collidepoint(pos):
-                self._compute_sharpe()
-                return True
+        if self._rf_minus and self._rf_minus.collidepoint(pos):
+            self.rf = max(RF_MIN, round(self.rf - RF_STEP, 4))
+            return True
+        if self._rf_plus and self._rf_plus.collidepoint(pos):
+            self.rf = min(RF_MAX, round(self.rf + RF_STEP, 4))
+            return True
+        if self._frontier_btn and self._frontier_btn.collidepoint(pos):
+            if self.desktop is not None:
+                self.desktop._open_scene_window("frontier")
+            return True
         return False
 
+    # ---------------------------------------------------------------- draw
     def draw(self, surf, rect):
-        # Fond
+        self._last_rect = rect
+        self._ensure_computed()
         surf.fill(config.COL_BG, rect)
-
-        # Titre
-        widgets.draw_text(surf, self.title, (rect.x + 20, rect.y + 20), fonts.ui_title(), config.COL_TEXT)
-
-        # Message d'état
-        if self.msg:
-            widgets.draw_text(surf, self.msg, (rect.x + 20, rect.y + 60), fonts.small(), config.COL_AMBER)
-
-        # Contrôles
-        y = rect.y + 90
-        widgets.draw_text(surf, "Période :", (rect.x + 20, y), fonts.small(bold=True), config.COL_TEXT)
-
-        # Boutons de période
-        x = rect.x + 100
-        periods = ["1M", "3M", "1Y", "3Y", "5Y", "MAX"]
+        pad = 14
+        widgets.draw_text(surf, "SHARPE RATIO — PERFORMANCE AJUSTÉE AU RISQUE",
+                          (rect.x + pad, rect.y + 8), fonts.head(bold=True),
+                          config.COL_AMBER)
+        # contrôles : période + taux sans risque + lien frontière
+        x = rect.x + pad
+        y = rect.y + 34
         self._period_rects = {}
-        for period in periods:
-            rect_btn = pygame.Rect(x, y, 60, 24)
-            self._period_rects[period] = rect_btn
-            color = config.COL_PRESTIGE if self.period == period else config.COL_PANEL
-            pygame.draw.rect(surf, color, rect_btn, border_radius=4)
-            widgets.draw_text(surf, period, rect_btn.center, fonts.small(), config.COL_TEXT, align="center")
-            x += 65
+        for period in PERIODS:
+            w = fonts.tiny(bold=True).size(period)[0] + 16
+            r = pygame.Rect(x, y, w, 20)
+            self._period_rects[period] = r
+            sel = period == self.period
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL,
+                             r, border_radius=3)
+            pygame.draw.rect(surf, config.COL_AMBER if sel else config.COL_BORDER,
+                             r, 1, border_radius=3)
+            widgets.draw_text(surf, period, r.center, fonts.tiny(bold=sel),
+                              config.COL_AMBER if sel else config.COL_TEXT_DIM,
+                              align="center")
+            x += w + 6
+        x += 12
+        widgets.draw_text(surf, f"Taux sans risque {self.rf * 100:.1f}%",
+                          (x, y + 3), fonts.tiny(), config.COL_TEXT_DIM)
+        x += fonts.tiny().size(f"Taux sans risque {self.rf * 100:.1f}%")[0] + 8
+        self._rf_minus = pygame.Rect(x, y, 20, 20)
+        self._rf_plus = pygame.Rect(x + 24, y, 20, 20)
+        for r, sym in ((self._rf_minus, "−"), (self._rf_plus, "+")):
+            pygame.draw.rect(surf, config.COL_PANEL, r, border_radius=3)
+            pygame.draw.rect(surf, config.COL_BORDER, r, 1, border_radius=3)
+            widgets.draw_text(surf, sym, r.center, fonts.small(bold=True),
+                              config.COL_TEXT, align="center")
+        fb_w = fonts.tiny(bold=True).size("→ FRONTIÈRE")[0] + 16
+        self._frontier_btn = pygame.Rect(rect.right - pad - fb_w, y, fb_w, 20)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._frontier_btn, border_radius=3)
+        pygame.draw.rect(surf, config.COL_CYAN, self._frontier_btn, 1, border_radius=3)
+        widgets.draw_text(surf, "→ FRONTIÈRE", self._frontier_btn.center,
+                          fonts.tiny(bold=True), config.COL_CYAN, align="center")
 
-        # Taux sans risque
-        y += 40
-        widgets.draw_text(surf, f"Taux sans risque : {self.rf_rate*100:.2f}%", (rect.x + 20, y),
-                         fonts.small(), config.COL_TEXT)
-        self._rf_rect = pygame.Rect(rect.x + 200, y, 120, 24)
-        pygame.draw.rect(surf, config.COL_PANEL, self._rf_rect, border_radius=4)
-        widgets.draw_text(surf, "Cliquer pour ±0.5%", self._rf_rect.center,
-                         fonts.tiny(), config.COL_TEXT_DIM, align="center")
-
-        # Bouton calculer
-        y += 40
-        self._compute_btn = pygame.Rect(rect.x + 20, y, 120, 30)
-        pygame.draw.rect(surf, config.COL_AMBER, self._compute_btn, border_radius=4)
-        widgets.draw_text(surf, "Calculer", self._compute_btn.center,
-                         fonts.small(bold=True), config.COL_BG, align="center")
-
-        # Résultats
-        if self._results:
-            y += 50
-            widgets.draw_text(surf, "Résultats du calcul :", (rect.x + 20, y),
-                             fonts.small(bold=True), config.COL_TEXT)
-
-            # Graphique de comparaison des Sharpe Ratios
-            y += 30
-            self._draw_sharpe_chart(surf, rect, y)
-            y += 120
-
-            # Portefeuille actuel
-            surf.blit(fonts.small(bold=True).render("Votre portefeuille :", True, config.COL_TEXT), (rect.x + 20, y))
-            y += 25
-            widgets.draw_text(surf, f"  Sharpe Ratio : {self._results['portfolio']['sharpe']:.3f}",
-                             (rect.x + 40, y), fonts.small(), config.COL_TEXT)
-            y += 20
-            widgets.draw_text(surf, f"  Rendement : {self._results['portfolio']['return']*100:.2f}%",
-                             (rect.x + 40, y), fonts.small(), config.COL_TEXT)
-            y += 20
-            widgets.draw_text(surf, f"  Volatilité : {self._results['portfolio']['volatility']*100:.2f}%",
-                             (rect.x + 40, y), fonts.small(), config.COL_TEXT)
-            y += 20
-            widgets.draw_text(surf, f"  Positions : {self._results['portfolio']['count']}",
-                             (rect.x + 40, y), fonts.small(), config.COL_TEXT)
-
-            y += 30
-            # Marché
-            surf.blit(fonts.small(bold=True).render("Marché (indice) :", True, config.COL_TEXT), (rect.x + 20, y))
-            y += 25
-            widgets.draw_text(surf, f"  Sharpe Ratio : {self._results['market']['sharpe']:.3f}",
-                             (rect.x + 40, y), fonts.small(), config.COL_TEXT)
-            y += 20
-            widgets.draw_text(surf, f"  Rendement : {self._results['market']['return']*100:.2f}%",
-                             (rect.x + 40, y), fonts.small(), config.COL_TEXT)
-            y += 20
-            widgets.draw_text(surf, f"  Volatilité : {self._results['market']['volatility']*100:.2f}%",
-                             (rect.x + 40, y), fonts.small(), config.COL_TEXT)
-
-            y += 30
-            # Portefeuille à variance minimale
-            surf.blit(fonts.small(bold=True).render("Portefeuille min variance :", True, config.COL_TEXT), (rect.x + 20, y))
-            y += 25
-            widgets.draw_text(surf, f"  Sharpe Ratio : {self._results['min_variance']['sharpe']:.3f}",
-                             (rect.x + 40, y), fonts.small(), config.COL_TEXT)
-
-            y += 30
-            # Portefeuille max Sharpe
-            surf.blit(fonts.small(bold=True).render("Portefeuille max Sharpe :", True, config.COL_TEXT), (rect.x + 20, y))
-            y += 25
-            widgets.draw_text(surf, f"  Sharpe Ratio : {self._results['max_sharpe']['sharpe']:.3f}",
-                             (rect.x + 40, y), fonts.small(), config.COL_TEXT)
-
-            # Comparaison et recommandations
-            y += 40
-            portfolio_sharpe = self._results['portfolio']['sharpe']
-            market_sharpe = self._results['market']['sharpe']
-            min_var_sharpe = self._results['min_variance']['sharpe']
-            max_sharpe_val = self._results['max_sharpe']['sharpe']
-
-            if portfolio_sharpe > market_sharpe:
-                comparison = "Surperformance vs marché"
-                comp_color = config.COL_UP
-            else:
-                comparison = "Sous-performance vs marché"
-                comp_color = config.COL_DOWN
-
-            widgets.draw_text(surf, f"Comparaison : {comparison}", (rect.x + 20, y),
-                             fonts.small(bold=True), comp_color)
-
-            y += 25
-            if max_sharpe_val > portfolio_sharpe:
-                recommendation = f"Potentiel d'amélioration : +{(max_sharpe_val - portfolio_sharpe):.3f} Sharpe possible"
-                rec_color = config.COL_AMBER
-            else:
-                recommendation = "Performance optimale atteinte"
-                rec_color = config.COL_UP
-
-            widgets.draw_text(surf, recommendation, (rect.x + 20, y),
-                             fonts.small(), rec_color)
-
-            # Interprétation
-            y += 35
-            if portfolio_sharpe > 1.0:
-                interpretation = "Excellent (Sharpe > 1.0)"
-                color = config.COL_UP
-            elif portfolio_sharpe > 0.5:
-                interpretation = "Bon (0.5 < Sharpe < 1.0)"
-                color = config.COL_AMBER
-            elif portfolio_sharpe > 0:
-                interpretation = "Moyen (0 < Sharpe < 0.5)"
-                color = config.COL_TEXT
-            else:
-                interpretation = "Faible (Sharpe < 0)"
-                color = config.COL_DOWN
-
-            widgets.draw_text(surf, f"Interprétation : {interpretation}", (rect.x + 20, y),
-                             fonts.small(bold=True), color)
-
-    def _draw_sharpe_chart(self, surf, rect, y):
-        """Dessine un graphique de comparaison des Sharpe Ratios."""
-        if not self._results:
+        top = y + 30
+        if self._res is None:
+            widgets.draw_text(surf, "Détenez au moins une action (avec assez "
+                              "d'historique) pour mesurer le Sharpe du portefeuille.",
+                              (rect.x + pad, top + 10), fonts.small(),
+                              config.COL_TEXT_DIM)
+            widgets.draw_text(surf, "Ouvrez Trading (icône du bureau) pour "
+                              "construire un panier, puis revenez ici.",
+                              (rect.x + pad, top + 32), fonts.small(),
+                              config.COL_TEXT_DIM)
             return
-
-        # Zone du graphique
-        chart_rect = pygame.Rect(rect.x + 20, y, rect.w - 40, 100)
-        pygame.draw.rect(surf, config.COL_PANEL, chart_rect, border_radius=4)
-        pygame.draw.rect(surf, config.COL_BORDER, chart_rect, 1, border_radius=4)
-
-        # Données à afficher
-        data = [
-            ("Portefeuille", self._results['portfolio']['sharpe']),
-            ("Marché", self._results['market']['sharpe']),
-            ("Min Var", self._results['min_variance']['sharpe']),
-            ("Max Sharpe", self._results['max_sharpe']['sharpe'])
+        res = self._res
+        # tuiles
+        tiles = [
+            ("SHARPE PORTEF.", f"{res['port']['sharpe']:+.2f}",
+             self._sharpe_color(res["port"]["sharpe"])),
+            ("REND. ANN.", f"{res['port']['ret'] * 100:+.1f}%",
+             config.COL_UP if res["port"]["ret"] >= 0 else config.COL_DOWN),
+            ("VOL. ANN.", f"{res['port']['vol'] * 100:.1f}%", config.COL_TEXT),
+            ("BÊTA vs INDICE", f"{res['beta']:.2f}", config.COL_TEXT),
+            ("ALPHA (JENSEN)", f"{res['alpha'] * 100:+.1f}%",
+             config.COL_UP if res["alpha"] >= 0 else config.COL_DOWN),
         ]
+        tw = min(180, (rect.w - 2 * pad - (len(tiles) - 1) * 8) // len(tiles))
+        tx = rect.x + pad
+        for label, val, col in tiles:
+            tr = pygame.Rect(tx, top, tw, 52)
+            pygame.draw.rect(surf, config.COL_PANEL, tr, border_radius=4)
+            pygame.draw.rect(surf, config.COL_BORDER, tr, 1, border_radius=4)
+            widgets.draw_text(surf, label, (tr.x + 8, tr.y + 6), fonts.tiny(),
+                              config.COL_TEXT_DIM)
+            widgets.draw_text(surf, val, (tr.x + 8, tr.y + 22),
+                              fonts.head(bold=True), col)
+            tx += tw + 8
 
-        # Filtrer les valeurs valides
-        valid_data = [(label, val) for label, val in data if not np.isnan(val) and np.isfinite(val)]
-        if not valid_data:
+        body_top = top + 62
+        col_w = (rect.w - 2 * pad - 12) // 2
+        left = pygame.Rect(rect.x + pad, body_top, col_w,
+                           rect.bottom - pad - body_top)
+        right = pygame.Rect(left.right + 12, body_top, col_w, left.h)
+        h_half = (left.h - 10) // 2
+        self._draw_bars(surf, pygame.Rect(left.x, left.y, left.w, h_half), res)
+        self._draw_rolling(surf, pygame.Rect(left.x, left.y + h_half + 10,
+                                             left.w, h_half), res)
+        self._draw_table(surf, right, res)
+
+    def _sharpe_color(self, s):
+        if s >= 1.0:
+            return config.COL_UP
+        if s >= 0.3:
+            return config.COL_AMBER
+        return config.COL_DOWN
+
+    def _draw_bars(self, surf, rect, res):
+        inner = widgets.draw_panel(surf, rect, "Comparaison (Sharpe annualisé)",
+                                   config.COL_CYAN)
+        data = [("Portef.", res["port"]["sharpe"], config.COL_AMBER)]
+        if res["bench"]:
+            data.append((res["index_name"], res["bench"]["sharpe"], config.COL_TEXT_DIM))
+        if res["min_var"]:
+            data.append(("Min var", res["min_var"]["sharpe"], config.COL_CYAN))
+        if res["max_sharpe"]:
+            data.append(("Max Sharpe", res["max_sharpe"]["sharpe"], config.COL_UP))
+        if not data:
             return
+        vals = [v for _l, v, _c in data]
+        lo, hi = min(min(vals), 0.0), max(max(vals), 0.0)
+        rng = (hi - lo) or 1.0
+        plot = inner.inflate(-8, -30)
+        plot.move_ip(0, 4)
+        zero_y = plot.bottom - int((0.0 - lo) / rng * plot.h)
+        pygame.draw.line(surf, config.COL_BORDER, (plot.x, zero_y),
+                         (plot.right, zero_y))
+        bw = max(24, (plot.w - (len(data) + 1) * 10) // len(data))
+        x = plot.x + 10
+        for label, v, col in data:
+            h = int(abs(v - 0.0) / rng * plot.h)
+            top = zero_y - h if v >= 0 else zero_y
+            pygame.draw.rect(surf, col, pygame.Rect(x, top, bw, max(2, h)),
+                             border_radius=2)
+            widgets.draw_text(surf, f"{v:+.2f}", (x + bw // 2, top - 14 if v >= 0
+                              else top + h + 2), fonts.tiny(bold=True), col,
+                              align="center")
+            widgets.draw_text(surf, widgets.fit_text(label, fonts.tiny(), bw + 8),
+                              (x + bw // 2, inner.bottom - 12), fonts.tiny(),
+                              config.COL_TEXT_DIM, align="center")
+            x += bw + 10
 
-        # Calculer les positions
-        n_items = len(valid_data)
-        if n_items == 0:
+    def _draw_rolling(self, surf, rect, res):
+        inner = widgets.draw_panel(surf, rect,
+                                   "Sharpe glissant (fenêtre ~1 trimestre)",
+                                   config.COL_UP)
+        series = res["rolling"]
+        if len(series) < 2:
+            widgets.draw_text(surf, "Historique insuffisant pour la fenêtre glissante.",
+                              (inner.x, inner.y + 6), fonts.tiny(), config.COL_TEXT_DIM)
             return
+        lo, hi = float(min(series.min(), 0.0)), float(max(series.max(), 0.0))
+        rng = (hi - lo) or 1.0
+        plot = inner.inflate(-8, -16)
+        pts = []
+        for i, v in enumerate(series):
+            px = plot.x + int(i / max(1, len(series) - 1) * plot.w)
+            py = plot.bottom - int((v - lo) / rng * plot.h)
+            pts.append((px, py))
+        zero_y = plot.bottom - int((0.0 - lo) / rng * plot.h)
+        pygame.draw.line(surf, config.COL_BORDER, (plot.x, zero_y),
+                         (plot.right, zero_y))
+        pygame.draw.aalines(surf, config.COL_UP, False, pts)
+        last = float(series[-1])
+        widgets.draw_text(surf, f"{last:+.2f}", (pts[-1][0] - 30, pts[-1][1] - 14),
+                          fonts.tiny(bold=True),
+                          config.COL_UP if last >= 0 else config.COL_DOWN)
 
-        bar_width = max(20, (chart_rect.w - 40) // (n_items + 1))
-        spacing = (chart_rect.w - bar_width * n_items) // (n_items + 1)
-
-        # Trouver les valeurs min/max pour l'échelle
-        values = [val for _, val in valid_data]
-        if not values:
-            return
-
-        min_val = min(min(values), 0)
-        max_val = max(max(values), 0)
-        range_val = max_val - min_val
-        if range_val == 0:
-            range_val = 1
-
-        # Dessiner les barres
-        for i, (label, value) in enumerate(valid_data):
-            x = chart_rect.x + spacing + i * (bar_width + spacing)
-
-            # Hauteur de la barre proportionnelle à la valeur
-            bar_height = int((value - min_val) / range_val * (chart_rect.h - 30))
-            bar_height = max(1, min(bar_height, chart_rect.h - 30))
-
-            # Position de la barre
-            bar_y = chart_rect.y + chart_rect.h - 20 - bar_height
-            bar_rect = pygame.Rect(x, bar_y, bar_width, bar_height)
-
-            # Couleur selon la valeur
-            if value > 0:
-                color = config.COL_UP
-            elif value < 0:
-                color = config.COL_DOWN
-            else:
-                color = config.COL_AMBER
-
-            pygame.draw.rect(surf, color, bar_rect, border_radius=2)
-
-            # Ligne de base (0)
-            zero_y = chart_rect.y + chart_rect.h - 20 - int((0 - min_val) / range_val * (chart_rect.h - 30))
-            if chart_rect.y + 20 <= zero_y <= chart_rect.y + chart_rect.h - 20:
-                pygame.draw.line(surf, config.COL_TEXT_DIM, (chart_rect.x + 10, zero_y),
-                                (chart_rect.right - 10, zero_y), 1)
-
-            # Label
-            label_y = chart_rect.y + chart_rect.h - 15
-            widgets.draw_text(surf, label, (x + bar_width // 2, label_y),
-                             fonts.tiny(), config.COL_TEXT, align="center")
-
-            # Valeur
-            value_y = bar_y - 15 if value >= 0 else bar_y + bar_height + 5
-            widgets.draw_text(surf, f"{value:.2f}", (x + bar_width // 2, value_y),
-                             fonts.tiny(), config.COL_TEXT, align="center")
+    def _draw_table(self, surf, rect, res):
+        inner = widgets.draw_panel(surf, rect, "Par position", config.COL_AMBER)
+        cols = [("TICKER", 0), ("POIDS", int(inner.w * 0.30)),
+                ("REND.", int(inner.w * 0.48)), ("VOL", int(inner.w * 0.66)),
+                ("SHARPE", int(inner.w * 0.84))]
+        for lbl, dx in cols:
+            widgets.draw_text(surf, lbl, (inner.x + dx, inner.y), fonts.tiny(bold=True),
+                              config.COL_TEXT_DIM)
+        y = inner.y + 18
+        for row in res["rows"]:
+            if y > inner.bottom - 14:
+                break
+            widgets.draw_text(surf, row["ticker"], (inner.x, y),
+                              fonts.small(bold=True), config.COL_TEXT)
+            widgets.draw_text(surf, f"{row['weight'] * 100:.0f}%",
+                              (inner.x + cols[1][1], y), fonts.small(), config.COL_TEXT)
+            rc = config.COL_UP if row["ret"] >= 0 else config.COL_DOWN
+            widgets.draw_text(surf, f"{row['ret'] * 100:+.0f}%",
+                              (inner.x + cols[2][1], y), fonts.small(), rc)
+            widgets.draw_text(surf, f"{row['vol'] * 100:.0f}%",
+                              (inner.x + cols[3][1], y), fonts.small(),
+                              config.COL_TEXT_DIM)
+            widgets.draw_text(surf, f"{row['sharpe']:+.2f}",
+                              (inner.x + cols[4][1], y), fonts.small(bold=True),
+                              self._sharpe_color(row["sharpe"]))
+            y += 19
+        widgets.draw_text(surf,
+                          "Sharpe = (rendement − taux sans risque) / volatilité, annualisé.",
+                          (inner.x, inner.bottom - 12), fonts.tiny(), config.COL_TEXT_DIM)

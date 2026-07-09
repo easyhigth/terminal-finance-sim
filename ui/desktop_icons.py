@@ -65,6 +65,8 @@ PALETTES = {
     "bell":      ((50, 40, 5),     (250, 204, 21)),
     "shield":    ((6, 40, 40),     (45, 212, 191)),   # sarcelle noir / teal
     "frontier":  ((10, 25, 70),    (129, 140, 248)),  # indigo noir / indigo
+    "greeks":    ((40, 15, 60),    (232, 121, 249)),  # violet noir / magenta
+    "rates":     ((50, 40, 5),     (250, 204, 21)),   # jaune sale / jaune vif
 }
 C_GENERIC = ((17, 24, 39), (148, 163, 184))
 
@@ -482,6 +484,25 @@ def _frontier(p):
     p.circle((-2.5, -6), 1.0)
 
 
+def _greeks(p):
+    """Profil de payoff d'option (hockey stick) + lettre delta."""
+    p.line((-10, 8.5), (10, 8.5), p.soft, 1.4)          # axe spot
+    p.lines([(-9, 3.5), (0, 3.5), (8.5, -8)], w=2.2)    # payoff call
+    p.circle((0, 3.5), 1.6, p.soft, w=0)
+    # petit triangle delta en haut à gauche
+    p.poly([(-8.5, -8.5), (-4.5, -8.5), (-6.5, -4)], w=1.6)
+
+
+def _rates(p):
+    """Courbe des taux pentue + marches de maturité."""
+    p.line((-10, 9), (10, 9), p.soft, 1.4)
+    p.line((-10, 9), (-10, -9), p.soft, 1.4)
+    pts = [(-8.5, 6.5), (-4, 2.5), (0.5, -0.5), (4.5, -2.5), (8.5, -3.8)]
+    p.lines(pts, w=2.2)
+    for x, y in pts[1:-1]:
+        p.circle((x, y), 1.3, w=0)
+
+
 # ---------------------------------------------------------------------------
 _PICTOS = {
     "research": _research, "trading": _trading, "sheet": _sheet,
@@ -493,6 +514,7 @@ _PICTOS = {
     "explorer": _explorer, "graph": _graph, "save": _save, "help": _help,
     "calc": _calc, "star": _star, "bell": _bell,
     "shield": _shield, "frontier": _frontier,
+    "greeks": _greeks, "rates": _rates,
 }
 # alias de compat (l'ancien registre s'appelait _ICONS)
 _ICONS = _PICTOS

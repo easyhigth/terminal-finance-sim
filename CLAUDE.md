@@ -567,6 +567,48 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   budget conservé, cible ATTEINTE après `apply_trades`), `tests/test_quant_apps.py`
   et `tests/test_app_frontier.py` (clic sur courbe → ordres → exécution réelle,
   confirmation modale, invalidation par pas de marché).
+- **Salle des marchés avancée (Desk Options / Risque VaR / Desk Taux).** Trois
+  desks « qui s'étudient », branchés sur les VRAIS systèmes du jeu (jamais des
+  maquettes), chacun avec son module PUR :
+  - `core/option_pricing.py` : la MÊME option pricée sous 5 modèles réellement
+    implémentés — Black-Scholes-Merton (référence `finmath.black_scholes`),
+    **arbre binomial CRR** (induction arrière, mode AMÉRICAIN → prime d'exercice
+    anticipé, nulle pour un call sans dividende : verrouillé par test),
+    **Monte-Carlo antithétique** (graine fixe, erreur-type affichée — on voit la
+    convergence vers BS), **Merton à sauts 1976** (série fermée, sauts calibrés
+    « crise » → prime sur les ailes, la vol implicite du prix à sauts LIT le
+    smile), **vol implicite** par bissection. `compare_models()` pour l'onglet
+    MODÈLES.
+  - `core/option_strategies.py` : paquets multi-jambes en prime débitée (call/
+    put secs, straddle, strangle, put protecteur — le jeu ne vend pas d'options
+    à découvert) sur le desk RÉEL `core/options.py` : profil de P&L à
+    l'échéance, points morts, grecques agrégées en CASH ; `execute_strategy`
+    est TOUT-OU-RIEN (prime totale et détention d'actions vérifiées AVANT la
+    première jambe) ; `book_greeks` réévalue le book d'options au marché du
+    jour (Δ/Γ cash, vega, theta/jour).
+  - `core/risk_advanced.py` : **VaR par position (allocation d'Euler)** —
+    contributions cov(P&L_i, total)/var(total)×VaR sommant à la VaR totale
+    (une contribution négative = une couverture), simulée sur le MÊME modèle à
+    facteurs que `core/risk.py` ; **backtest de Kupiec** (exceptions comptées
+    sur l'historique du panier, statistique LR_POF vs χ²(1) à 3,84).
+  - `core/rates_analytics.py` : courbe des taux souveraine (YTM par maturité),
+    book obligataire avec **DV01** par ligne + agrégats pondérés, **chocs de
+    courbe au 2e ordre** (ΔP ≈ V·(−D·Δy + ½·C·Δy²)) parallèles ET
+    pentification/aplatissement (Δy interpolé par maturité, pivots 2 a/10 a).
+  Apps (`apps/app_greeks.py` — 3 onglets STRATÉGIE (payoff cliquable + EXÉCUTER)
+  / MODÈLES (table comparative des 5 modèles) / BOOK (feuille de grecques) ;
+  `apps/app_vardesk.py` — tuiles VaR/CVaR 95/99, histogramme avec seuils,
+  contributions d'Euler en barres ± , panneau Kupiec, lien Stress test ;
+  `apps/app_rates.py` — courbe, book DV01, table de chocs, lien marché
+  obligataire). Icônes vectorielles `greeks`/`rates` ; gating `ICON_FEATURE` :
+  greeks→`options` (grade 6), rates→`trade` (grade 4), vardesk→libre ; la scène
+  plein écran "options" ouverte EN FENÊTRE est redirigée vers le Desk Options
+  (même bloc de redirection que hedge/frontier_lab). Verrouillé par
+  `tests/test_option_pricing.py` (convergence binomial→BS, parité call-put,
+  MC dans son intervalle d'erreur, smile de Merton, inversion de la vol
+  implicite), `tests/test_desk_modules.py` (Euler somme à la VaR, Kupiec
+  rejette un modèle faux, convexité : gain −100bp > perte +100bp) et
+  `tests/test_desk_apps.py`.
 - **Découvrabilité du bureau (icônes/boutons)** : icône « Succès » (`QUICK_APPS`/
   `qachievements` → scène achievements en fenêtre) ; **loupe de recherche globale** dans
   la topbar du bureau (`DesktopScene._gsearch_rect`, dessin vectoriel — ouvre la même

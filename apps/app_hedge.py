@@ -1,585 +1,457 @@
 """
-app_hedge.py — Application « Couverture (Hedge) » du bureau.
+app_hedge.py — Application « Couverture (Hedge) » du bureau (NATIVE).
 
-Permet de mettre en place des stratégies de couverture pour protéger un portefeuille :
-- Couverture delta (options)
-- Couverture beta (indices)
-- Couverture statistique (pairs trading)
-- Calcul des ratios de couverture optimaux
+Deux stratégies RÉELLES (exécutables, pas des maquettes) :
 
-Intègre les coûts de transaction et l'impact de marché.
+- PUT INDICE (portefeuille) : réutilise le desk de couverture existant
+  (`core/hedging.py` — put protecteur sur l'indice régional, prime
+  Black-Scholes, dénoué à l'échéance par le moteur). L'app ajoute le
+  DIMENSIONNEMENT au bêta : elle calcule le bêta du panier vs l'indice
+  (core/quant_tools.beta) et propose un notionnel = bêta × exposition
+  longue — la taille de put qui neutralise (au 1er ordre) le risque de
+  marché du book. Choix strike/maturité, prime affichée AVANT l'achat,
+  liste des puts en cours avec valeur mark-to-model.
+
+- PAIRE (position) : couvre UNE position longue par la vente à découvert
+  d'une action corrélée — ratio de couverture à variance minimale
+  h = cov/var (core/quant_tools.hedge_ratio), candidats suggérés par
+  corrélation décroissante, qualité affichée (corrélation, R², vol
+  résiduelle attendue). L'exécution passe par core/portfolio.short
+  (soumise au déblocage « leverage », comme la commande SHORT).
 """
 import pygame
-import numpy as np
 
 from apps.base import DesktopApp
-from core import config, finmath, portfolio as PF
+from core import config, unlocks
+from core import hedging as H
+from core import portfolio as pf
+from core import quant_tools as QT
 from ui import fonts, widgets
+
+NOTIONAL_STEPS = [0.5, 1.0]      # fractions du notionnel bêta proposées
 
 
 class HedgeApp(DesktopApp):
-    title = "Couverture — Protection de portefeuille"
+    title = "Couverture"
     icon_kind = "shield"
-    default_size = (850, 650)
-    min_size = (700, 500)
+    default_size = (980, 620)
+    min_size = (720, 480)
 
     def on_open(self):
         self.market = self.app.ensure_market()
-        self.player = self.app.gs.player
-        self.mode = "delta"  # delta, beta, statistical
-        self.ticker = ""  # actif à couvrir
-        self.hedge_ticker = ""  # actif de couverture
-        self.amount = ""  # montant à couvrir
+        self.mode = "put"                    # "put" | "pair"
+        self.strike_idx = 1                  # défaut -5 %
+        self.years_idx = 0                   # défaut 3 mois
+        self.notional_frac = 1.0             # × notionnel bêta
+        self.pair_ticker = None              # position à couvrir
+        self.pair_hedge = None               # instrument de couverture
         self.msg = ""
+        self.msg_col = config.COL_TEXT_DIM
+        self._cache_key = None
+        self._ctx = None
         self._mode_rects = {}
-        self._ticker_rect = None
-        self._hedge_ticker_rect = None
-        self._amount_rect = None
-        self._compute_btn = None
-        self._execute_btn = None
-        self._results = None
-        self._ticker_input_active = False
-        self._hedge_ticker_input_active = False
-        self._amount_input_active = False
-        self._selected_position = None
+        self._strike_rects = {}
+        self._years_rects = {}
+        self._frac_rects = {}
+        self._buy_btn = None
+        self._pos_rects = {}
+        self._cand_rects = {}
+        self._short_btn = None
 
-    def _compute_hedge(self):
-        """Calcule la stratégie de couverture optimale."""
-        try:
-            if not self.ticker:
-                self.msg = "Veuillez sélectionner un actif à couvrir"
-                return
-
-            if self.mode == "delta":
-                self._compute_delta_hedge()
-            elif self.mode == "beta":
-                self._compute_beta_hedge()
-            elif self.mode == "statistical":
-                self._compute_statistical_hedge()
-
-        except Exception as e:
-            self.msg = f"Erreur de calcul : {str(e)}"
-
-    def _compute_delta_hedge(self):
-        """Calcul de couverture delta avec des options."""
-        # Pour simplifier, on utilise une approximation basée sur la corrélation
-        # Dans un vrai système, on utiliserait les Greeks des options
-
-        if not self.hedge_ticker:
-            self.msg = "Veuillez sélectionner un actif de couverture"
+    # ------------------------------------------------------------ contexte
+    def _ensure_ctx(self):
+        p = self.app.gs.player
+        key = (self.market.step_count, self.mode, self.strike_idx,
+               self.years_idx, round(self.notional_frac, 2),
+               self.pair_ticker, self.pair_hedge, len(p.portfolio),
+               len(getattr(p, "hedges", []) or []))
+        if key == self._cache_key:
             return
+        self._cache_key = key
+        self._ctx = self._compute()
 
-        # Historique des deux actifs
-        hist_length = 252  # ~1 an
-        asset_hist = self.market.history_of(self.ticker, hist_length)
-        hedge_hist = self.market.history_of(self.hedge_ticker, hist_length)
-
-        if not asset_hist or not hedge_hist or len(asset_hist) < 30 or len(hedge_hist) < 30:
-            self.msg = "Données historiques insuffisantes"
-            return
-
-        # Calculer les rendements
-        asset_returns = [(asset_hist[i] / asset_hist[i-1] - 1) for i in range(1, len(asset_hist))]
-        hedge_returns = [(hedge_hist[i] / hedge_hist[i-1] - 1) for i in range(1, len(hedge_hist))]
-
-        # S'assurer que les séries ont la même longueur
-        min_len = min(len(asset_returns), len(hedge_returns))
-        if min_len < 30:
-            self.msg = "Données insuffisantes pour le calcul"
-            return
-
-        asset_returns = asset_returns[-min_len:]
-        hedge_returns = hedge_returns[-min_len:]
-
-        # Calculer la corrélation
-        correlation = np.corrcoef(asset_returns, hedge_returns)[0, 1] if len(asset_returns) > 1 else 0.0
-        correlation = correlation if not np.isnan(correlation) else 0.0
-
-        # Calculer les volatilités
-        asset_vol = np.std(asset_returns)
-        hedge_vol = np.std(hedge_returns)
-
-        # Ratio de couverture (hedge ratio)
-        hedge_ratio = (correlation * asset_vol / hedge_vol) if hedge_vol != 0 else 0.0
-
-        # Calculer le beta (alternative au hedge ratio)
-        if np.var(hedge_returns) != 0:
-            beta = np.cov(asset_returns, hedge_returns)[0, 1] / np.var(hedge_returns)
-            beta = beta if not np.isnan(beta) else 0.0
+    def _compute(self):
+        p = self.app.gs.player
+        m = self.market
+        ctx = {"gross": pf.gross_exposure(p, m),
+               "coverage": H.coverage_ratio(p, m),
+               "hedges": H.holdings(p, m)}
+        # bêta du panier vs l'indice régional
+        port_r, _tks = QT.portfolio_step_returns(p, m)
+        idx = QT.main_index(m, p)
+        bench_r = QT.index_returns(m, idx)
+        ctx["index"] = idx
+        ctx["beta"] = QT.beta(port_r, bench_r) if len(port_r) else 0.0
+        long_val = sum(h["value"] for h in pf.holdings(p, m) if not h["short"])
+        ctx["long_value"] = long_val
+        ctx["beta_notional"] = max(0.0, ctx["beta"]) * long_val
+        if self.mode == "put":
+            strike_pct = H.STRIKE_CHOICES[self.strike_idx]
+            years = H.MATURITY_CHOICES[self.years_idx]
+            try:
+                q = H.quote(p, m, strike_pct, years)
+            except Exception:
+                q = None
+            ctx["quote"] = q
+            notional = ctx["beta_notional"] * self.notional_frac
+            if notional <= 0:
+                notional = long_val * self.notional_frac
+            ctx["notional"] = notional
+            ctx["premium"] = (notional * q["premium_rate"]) if q else 0.0
         else:
-            beta = 0.0
+            held = [h for h in pf.holdings(p, m) if not h["short"]]
+            ctx["held"] = held
+            if self.pair_ticker is None and held:
+                self.pair_ticker = held[0]["ticker"]
+            if self.pair_ticker:
+                cands = QT.hedge_candidates(m, self.pair_ticker, n=5)
+                ctx["candidates"] = cands
+                if self.pair_hedge is None and cands:
+                    self.pair_hedge = cands[0][0]
+                if self.pair_hedge:
+                    a = QT.returns_of(m, self.pair_ticker)
+                    h = QT.returns_of(m, self.pair_hedge)
+                    ctx["hr"] = QT.hedge_ratio(a, h)
+                    pos = p.portfolio.get(self.pair_ticker)
+                    val = (pos["shares"] * (m.price_of(self.pair_ticker) or 0.0)
+                           if pos else 0.0)
+                    ctx["pos_value"] = max(0.0, val)
+                    hp = m.price_of(self.pair_hedge) or 0.0
+                    ctx["hedge_price"] = hp
+                    ctx["hedge_qty"] = (int(round(ctx["hr"]["ratio"] * ctx["pos_value"] / hp))
+                                        if hp > 0 else 0)
+        return ctx
 
-        # Montant à couvrir
-        try:
-            amount_to_hedge = float(self.amount) if self.amount else 0.0
-        except ValueError:
-            amount_to_hedge = 0.0
-
-        # Position actuelle dans l'actif à couvrir
-        portfolio = self.player.portfolio
-        position = portfolio.get(self.ticker, {"shares": 0.0})
-        current_shares = position["shares"]
-        current_value = current_shares * self.market.price_of(self.ticker) if self.market.price_of(self.ticker) else 0.0
-
-        # Calculer le nombre de titres de couverture nécessaires
-        hedge_price = self.market.price_of(self.hedge_ticker)
-        hedge_shares = -(hedge_ratio * amount_to_hedge / hedge_price) if hedge_price and hedge_price > 0 else 0.0
-
-        # Coût estimé de la couverture
-        commission = 0.001  # 10 bps
-        hedge_cost = abs(hedge_shares * hedge_price * commission) if hedge_price else 0.0
-
-        # Efficacité de la couverture
-        if abs(correlation) > 0.8:
-            effectiveness = "Élevée"
-        elif abs(correlation) > 0.5:
-            effectiveness = "Moyenne"
-        else:
-            effectiveness = "Faible"
-
-        self._results = {
-            "type": "Couverture Delta",
-            "correlation": correlation,
-            "beta": beta,
-            "hedge_ratio": hedge_ratio,
-            "current_position": current_shares,
-            "current_value": current_value,
-            "hedge_shares": hedge_shares,
-            "hedge_value": abs(hedge_shares * hedge_price) if hedge_price else 0.0,
-            "hedge_cost": hedge_cost,
-            "effectiveness": effectiveness,
-            "explanation": f"Pour chaque € de {self.ticker}, couvrir avec {abs(hedge_ratio):.2f}€ de {self.hedge_ticker}"
-        }
-        self.msg = f"Couverture delta calculée (corrélation: {correlation:.2f}, efficacité: {effectiveness})"
-
-    def _compute_beta_hedge(self):
-        """Calcul de couverture beta avec un indice."""
-        # Utiliser l'indice principal comme benchmark
-        indices = self.market.index_tickers()
-        if not indices:
-            self.msg = "Aucun indice disponible pour la couverture"
-            return
-
-        self.hedge_ticker = indices[0]  # Premier indice
-
-        # Historique
-        hist_length = 252  # ~1 an
-        asset_hist = self.market.history_of(self.ticker, hist_length)
-        index_hist = self.market.history_of(self.hedge_ticker, hist_length)
-
-        if not asset_hist or not index_hist or len(asset_hist) < 30 or len(index_hist) < 30:
-            self.msg = "Données historiques insuffisantes"
-            return
-
-        # Calculer les rendements
-        asset_returns = [(asset_hist[i] / asset_hist[i-1] - 1) for i in range(1, len(asset_hist))]
-        index_returns = [(index_hist[i] / index_hist[i-1] - 1) for i in range(1, len(index_hist))]
-
-        # S'assurer que les séries ont la même longueur
-        min_len = min(len(asset_returns), len(index_returns))
-        if min_len < 30:
-            self.msg = "Données insuffisantes pour le calcul"
-            return
-
-        asset_returns = asset_returns[-min_len:]
-        index_returns = index_returns[-min_len:]
-
-        # Calculer le beta
-        if np.var(index_returns) == 0:
-            beta = 0.0
-        else:
-            beta = np.cov(asset_returns, index_returns)[0, 1] / np.var(index_returns)
-            beta = beta if not np.isnan(beta) else 0.0
-
-        # Montant à couvrir
-        try:
-            amount_to_hedge = float(self.amount) if self.amount else 0.0
-        except ValueError:
-            amount_to_hedge = 0.0
-
-        # Position actuelle
-        portfolio = self.player.portfolio
-        position = portfolio.get(self.ticker, {"shares": 0.0})
-        current_shares = position["shares"]
-        current_value = current_shares * self.market.price_of(self.ticker) if self.market.price_of(self.ticker) else 0.0
-
-        # Calculer le nombre de titres de l'indice nécessaires
-        index_price = self.market.price_of(self.hedge_ticker)
-        hedge_shares = -(beta * amount_to_hedge / index_price) if index_price and index_price > 0 else 0.0
-
-        # Coût estimé
-        commission = 0.001
-        hedge_cost = abs(hedge_shares * index_price * commission) if index_price else 0.0
-
-        self._results = {
-            "type": "Couverture Beta",
-            "beta": beta,
-            "hedge_ratio": beta,
-            "current_position": current_shares,
-            "current_value": current_value,
-            "hedge_shares": hedge_shares,
-            "hedge_value": abs(hedge_shares * index_price) if index_price else 0.0,
-            "hedge_cost": hedge_cost,
-            "explanation": f"Beta de {self.ticker} vs {self.hedge_ticker} = {beta:.2f}"
-        }
-        self.msg = f"Couverture beta calculée (beta: {beta:.2f})"
-
-    def _compute_statistical_hedge(self):
-        """Calcul de couverture statistique (pairs trading)."""
-        if not self.hedge_ticker:
-            self.msg = "Veuillez sélectionner un actif de couverture"
-            return
-
-        # Historique
-        hist_length = 252  # ~1 an
-        asset1_hist = self.market.history_of(self.ticker, hist_length)
-        asset2_hist = self.market.history_of(self.hedge_ticker, hist_length)
-
-        if not asset1_hist or not asset2_hist or len(asset1_hist) < 30 or len(asset2_hist) < 30:
-            self.msg = "Données historiques insuffisantes"
-            return
-
-        # S'assurer que les séries ont la même longueur
-        min_len = min(len(asset1_hist), len(asset2_hist))
-        if min_len < 30:
-            self.msg = "Données insuffisantes pour le calcul"
-            return
-
-        asset1_hist = asset1_hist[-min_len:]
-        asset2_hist = asset2_hist[-min_len:]
-
-        # Calculer le ratio de couverture par régression linéaire
-        # asset1 = alpha + beta * asset2 + epsilon
-        x = np.array(asset2_hist)
-        y = np.array(asset1_hist)
-
-        # Calculer beta (slope) et alpha (intercept)
-        if np.var(x) == 0:
-            beta = 0.0
-            alpha = np.mean(y)
-        else:
-            beta = np.cov(x, y)[0, 1] / np.var(x)
-            beta = beta if not np.isnan(beta) else 0.0
-            alpha = np.mean(y) - beta * np.mean(x)
-
-        # Calculer le spread
-        spread = y - (alpha + beta * x)
-        spread_mean = np.mean(spread)
-        spread_std = np.std(spread)
-
-        # Montant à couvrir
-        try:
-            amount_to_hedge = float(self.amount) if self.amount else 0.0
-        except ValueError:
-            amount_to_hedge = 0.0
-
-        # Position actuelle
-        portfolio = self.player.portfolio
-        position1 = portfolio.get(self.ticker, {"shares": 0.0})
-        position2 = portfolio.get(self.hedge_ticker, {"shares": 0.0})
-        current_shares1 = position1["shares"]
-        current_shares2 = position2["shares"]
-
-        current_price1 = self.market.price_of(self.ticker)
-        current_price2 = self.market.price_of(self.hedge_ticker)
-        current_value1 = current_shares1 * current_price1 if current_price1 else 0.0
-        current_value2 = current_shares2 * current_price2 if current_price2 else 0.0
-
-        # Calculer le nombre de titres nécessaires pour la couverture
-        hedge_shares2 = -(beta * amount_to_hedge / current_price2) if current_price2 and current_price2 > 0 else 0.0
-
-        # Coût estimé
-        commission = 0.001
-        hedge_cost = abs(hedge_shares2 * current_price2 * commission) if current_price2 else 0.0
-
-        self._results = {
-            "type": "Couverture Statistique",
-            "alpha": alpha,
-            "beta": beta,
-            "hedge_ratio": beta,
-            "spread_mean": spread_mean,
-            "spread_std": spread_std,
-            "current_position1": current_shares1,
-            "current_position2": current_shares2,
-            "current_value1": current_value1,
-            "current_value2": current_value2,
-            "hedge_shares": hedge_shares2,
-            "hedge_value": abs(hedge_shares2 * current_price2) if current_price2 else 0.0,
-            "hedge_cost": hedge_cost,
-            "explanation": f"Ratio: 1 unité de {self.ticker} = {beta:.2f} unités de {self.hedge_ticker}"
-        }
-        self.msg = f"Couverture statistique calculée (beta: {beta:.2f})"
-
-    def _execute_hedge(self):
-        """Exécute la stratégie de couverture calculée."""
-        if not self._results:
-            self.msg = "Veuillez d'abord calculer une stratégie de couverture"
-            return
-
-        try:
-            hedge_shares = self._results.get("hedge_shares", 0.0)
-            if abs(hedge_shares) < 0.01:
-                self.msg = "Pas de couverture nécessaire"
-                return
-
-            # Acheter/vendre l'actif de couverture
-            if hedge_shares > 0:
-                # Acheter
-                result = PF.buy(self.player, self.market, self.hedge_ticker, hedge_shares)
-                if result["ok"]:
-                    self.msg = f"Couverture exécutée : acheté {hedge_shares:.2f} {self.hedge_ticker}"
-                else:
-                    self.msg = f"Échec de l'achat : {result.get('reason', 'erreur inconnue')}"
-            else:
-                # Vendre (ou short si on n'en possède pas)
-                abs_shares = abs(hedge_shares)
-                position = self.player.portfolio.get(self.hedge_ticker, {"shares": 0.0})
-                held_shares = position["shares"]
-
-                if held_shares >= abs_shares:
-                    # Vendre les titres détenus
-                    result = PF.sell(self.player, self.market, self.hedge_ticker, abs_shares)
-                    if result["ok"]:
-                        self.msg = f"Couverture exécutée : vendu {abs_shares:.2f} {self.hedge_ticker}"
-                    else:
-                        self.msg = f"Échec de la vente : {result.get('reason', 'erreur inconnue')}"
-                else:
-                    # Vendre les titres détenus + short le reste
-                    if held_shares > 0:
-                        # Vendre les titres détenus
-                        PF.sell(self.player, self.market, self.hedge_ticker, held_shares)
-
-                    # Short le reste
-                    short_amount = abs_shares - held_shares
-                    result = PF.short(self.player, self.market, self.hedge_ticker, short_amount)
-                    if result["ok"]:
-                        self.msg = f"Couverture exécutée : shorté {short_amount:.2f} {self.hedge_ticker}"
-                    else:
-                        self.msg = f"Échec du short : {result.get('reason', 'erreur inconnue')}"
-
-        except Exception as e:
-            self.msg = f"Erreur d'exécution : {str(e)}"
-
-    def _select_position(self):
-        """Sélectionne automatiquement une position du portefeuille."""
-        portfolio = self.player.portfolio
-        if portfolio:
-            # Prendre la première position
-            ticker = next(iter(portfolio))
-            self.ticker = ticker
-            # Estimer le montant à couvrir
-            position = portfolio[ticker]
-            price = self.market.price_of(ticker)
-            if price:
-                value = abs(position["shares"] * price)
-                self.amount = f"{value:.0f}"
-
+    # -------------------------------------------------------------- events
     def handle_event(self, event, rect):
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            pos = event.pos
-
-            # Sélection du mode
-            for mode, rect_btn in self._mode_rects.items():
-                if rect_btn and rect_btn.collidepoint(pos):
-                    self.mode = mode
+        if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
+            return False
+        pos = event.pos
+        for mode, r in self._mode_rects.items():
+            if r.collidepoint(pos):
+                self.mode = mode
+                self.msg = ""
+                return True
+        if self.mode == "put":
+            for i, r in self._strike_rects.items():
+                if r.collidepoint(pos):
+                    self.strike_idx = i
                     return True
-
-            # Zones de saisie
-            if self._ticker_rect and self._ticker_rect.collidepoint(pos):
-                self._ticker_input_active = True
-                self._hedge_ticker_input_active = False
-                self._amount_input_active = False
+            for i, r in self._years_rects.items():
+                if r.collidepoint(pos):
+                    self.years_idx = i
+                    return True
+            for f, r in self._frac_rects.items():
+                if r.collidepoint(pos):
+                    self.notional_frac = f
+                    return True
+            if self._buy_btn and self._buy_btn.collidepoint(pos):
+                self._buy_put()
                 return True
-            elif self._hedge_ticker_rect and self._hedge_ticker_rect.collidepoint(pos):
-                self._ticker_input_active = False
-                self._hedge_ticker_input_active = True
-                self._amount_input_active = False
-                return True
-            elif self._amount_rect and self._amount_rect.collidepoint(pos):
-                self._ticker_input_active = False
-                self._hedge_ticker_input_active = False
-                self._amount_input_active = True
-                return True
-            else:
-                # Clic en dehors des zones de saisie
-                self._ticker_input_active = False
-                self._hedge_ticker_input_active = False
-                self._amount_input_active = False
-
-            # Sélection automatique d'une position
-            if self._selected_position and self._selected_position.collidepoint(pos):
-                self._select_position()
-                return True
-
-            # Bouton calculer
-            if self._compute_btn and self._compute_btn.collidepoint(pos):
-                self._compute_hedge()
-                return True
-
-            # Bouton exécuter
-            if self._execute_btn and self._execute_btn.collidepoint(pos):
-                self._execute_hedge()
-                return True
-
-        elif event.type == pygame.KEYDOWN:
-            # Saisie du ticker
-            if self._ticker_input_active:
-                if event.key == pygame.K_BACKSPACE:
-                    self.ticker = self.ticker[:-1]
-                elif event.key == pygame.K_RETURN:
-                    self._ticker_input_active = False
-                elif event.unicode.isalnum() or event.unicode in ".-":
-                    if len(self.ticker) < 10:
-                        self.ticker += event.unicode.upper()
-                return True
-
-            # Saisie du ticker de couverture
-            if self._hedge_ticker_input_active:
-                if event.key == pygame.K_BACKSPACE:
-                    self.hedge_ticker = self.hedge_ticker[:-1]
-                elif event.key == pygame.K_RETURN:
-                    self._hedge_ticker_input_active = False
-                elif event.unicode.isalnum() or event.unicode in ".-":
-                    if len(self.hedge_ticker) < 10:
-                        self.hedge_ticker += event.unicode.upper()
-                return True
-
-            # Saisie du montant
-            if self._amount_input_active:
-                if event.key == pygame.K_BACKSPACE:
-                    self.amount = self.amount[:-1]
-                elif event.key == pygame.K_RETURN:
-                    self._amount_input_active = False
-                elif event.unicode.isdigit() or event.unicode == ".":
-                    if len(self.amount) < 15:
-                        self.amount += event.unicode
+        else:
+            for tk, r in self._pos_rects.items():
+                if r.collidepoint(pos):
+                    self.pair_ticker = tk
+                    self.pair_hedge = None
+                    return True
+            for tk, r in self._cand_rects.items():
+                if r.collidepoint(pos):
+                    self.pair_hedge = tk
+                    return True
+            if self._short_btn and self._short_btn.collidepoint(pos):
+                self._exec_pair()
                 return True
         return False
 
+    def _buy_put(self):
+        p = self.app.gs.player
+        if not unlocks.unlocked(p, "hedge"):
+            g = unlocks.effective_required_grade(p, "hedge")
+            self._say(f"Couverture verrouillée (débloquée au grade {config.GRADES[g]}).",
+                      config.COL_DOWN)
+            return
+        ctx = self._ctx or {}
+        notional = ctx.get("notional", 0.0)
+        if notional <= 0:
+            self._say("Rien à couvrir : aucune exposition longue.", config.COL_DOWN)
+            return
+        r = H.buy_put(p, self.market, notional,
+                      H.STRIKE_CHOICES[self.strike_idx],
+                      H.MATURITY_CHOICES[self.years_idx])
+        if r.get("ok"):
+            self._say(f"Put souscrit : {widgets.format_money(notional, self._cur())} "
+                      f"couverts, prime {widgets.format_money(r['premium'], self._cur())}.",
+                      config.COL_UP)
+            self._cache_key = None
+        else:
+            reason = {"cash": "trésorerie insuffisante pour la prime",
+                      "notional": "notionnel invalide"}.get(r.get("reason"),
+                                                            r.get("reason", "?"))
+            self._say(f"Refusé : {reason}.", config.COL_DOWN)
+
+    def _exec_pair(self):
+        p = self.app.gs.player
+        if not unlocks.unlocked(p, "leverage"):
+            g = unlocks.effective_required_grade(p, "leverage")
+            self._say(f"Vente à découvert verrouillée (grade {config.GRADES[g]}).",
+                      config.COL_DOWN)
+            return
+        ctx = self._ctx or {}
+        qty = ctx.get("hedge_qty", 0)
+        if qty < 1 or not self.pair_hedge:
+            self._say("Ratio trop faible : rien à shorter.", config.COL_DOWN)
+            return
+        r = pf.short(p, self.market, self.pair_hedge, qty)
+        if r.get("ok"):
+            self._say(f"Couverture posée : short {qty} × {self.pair_hedge} "
+                      f"(ratio {ctx['hr']['ratio']:.2f}).", config.COL_UP)
+            self._cache_key = None
+        else:
+            self._say(f"Short refusé : {r.get('reason', '?')}.", config.COL_DOWN)
+
+    def _say(self, text, col):
+        self.msg, self.msg_col = text, col
+
+    def _cur(self):
+        return config.CONTINENTS[self.app.gs.player.continent]["currency"]
+
+    # ---------------------------------------------------------------- draw
     def draw(self, surf, rect):
-        # Fond
+        self._ensure_ctx()
         surf.fill(config.COL_BG, rect)
-
-        # Titre
-        widgets.draw_text(surf, self.title, (rect.x + 20, rect.y + 20), fonts.ui_title(), config.COL_TEXT)
-
-        # Message d'état
-        if self.msg:
-            widgets.draw_text(surf, self.msg, (rect.x + 20, rect.y + 60), fonts.small(), config.COL_AMBER)
-
-        # Modes de couverture
-        y = rect.y + 90
-        widgets.draw_text(surf, "Mode de couverture :", (rect.x + 20, y), fonts.small(bold=True), config.COL_TEXT)
-
-        x = rect.x + 200
-        modes = [("delta", "Delta"), ("beta", "Beta"), ("statistical", "Statistique")]
+        pad = 14
+        cur = self._cur()
+        ctx = self._ctx or {}
+        widgets.draw_text(surf, "COUVERTURE — PROTECTION DU PORTEFEUILLE",
+                          (rect.x + pad, rect.y + 8), fonts.head(bold=True),
+                          config.COL_AMBER)
+        # tuiles d'exposition
+        tiles = [
+            ("EXPOSITION LONGUE", widgets.format_money(ctx.get("long_value", 0.0), cur)),
+            (f"BÊTA vs {ctx.get('index', '—')}", f"{ctx.get('beta', 0.0):.2f}"),
+            ("DÉJÀ COUVERT", f"{ctx.get('coverage', 0.0) * 100:.0f}%"),
+        ]
+        tx, ty = rect.x + pad, rect.y + 34
+        for label, val in tiles:
+            tw = max(150, fonts.small(bold=True).size(val)[0] + 24)
+            tr = pygame.Rect(tx, ty, tw, 44)
+            pygame.draw.rect(surf, config.COL_PANEL, tr, border_radius=4)
+            pygame.draw.rect(surf, config.COL_BORDER, tr, 1, border_radius=4)
+            widgets.draw_text(surf, label, (tr.x + 8, tr.y + 5), fonts.tiny(),
+                              config.COL_TEXT_DIM)
+            widgets.draw_text(surf, val, (tr.x + 8, tr.y + 20),
+                              fonts.small(bold=True), config.COL_TEXT)
+            tx += tw + 8
+        # onglets
         self._mode_rects = {}
-        for mode, label in modes:
-            rect_btn = pygame.Rect(x, y, 100, 24)
-            self._mode_rects[mode] = rect_btn
-            color = config.COL_PRESTIGE if self.mode == mode else config.COL_PANEL
-            pygame.draw.rect(surf, color, rect_btn, border_radius=4)
-            widgets.draw_text(surf, label, rect_btn.center, fonts.small(), config.COL_TEXT, align="center")
-            x += 110
+        mx = rect.x + pad
+        my = ty + 54
+        for mode, lbl in (("put", "PUT INDICE (portefeuille)"),
+                          ("pair", "PAIRE (position)")):
+            w = fonts.tiny(bold=True).size(lbl)[0] + 18
+            r = pygame.Rect(mx, my, w, 22)
+            self._mode_rects[mode] = r
+            sel = mode == self.mode
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL,
+                             r, border_radius=3)
+            pygame.draw.rect(surf, config.COL_AMBER if sel else config.COL_BORDER,
+                             r, 1, border_radius=3)
+            widgets.draw_text(surf, lbl, r.center, fonts.tiny(bold=sel),
+                              config.COL_AMBER if sel else config.COL_TEXT_DIM,
+                              align="center")
+            mx += w + 8
+        if self.msg:
+            widgets.draw_text(surf, widgets.fit_text(self.msg, fonts.tiny(),
+                                                     rect.right - pad - mx - 6),
+                              (mx + 6, my + 5), fonts.tiny(), self.msg_col)
+        body = pygame.Rect(rect.x + pad, my + 30, rect.w - 2 * pad,
+                           rect.bottom - pad - my - 30)
+        if self.mode == "put":
+            self._draw_put(surf, body, ctx, cur)
+        else:
+            self._draw_pair(surf, body, ctx, cur)
 
-        # Sélection automatique d'une position
-        self._selected_position = pygame.Rect(rect.x + 20, y + 30, 200, 24)
-        pygame.draw.rect(surf, config.COL_PANEL, self._selected_position, border_radius=4)
-        widgets.draw_text(surf, "Sélectionner une position", self._selected_position.center,
-                         fonts.small(), config.COL_TEXT, align="center")
-
-        # Saisie des paramètres
-        y += 70
-        widgets.draw_text(surf, "Actif à couvrir :", (rect.x + 20, y), fonts.small(bold=True), config.COL_TEXT)
-        self._ticker_rect = pygame.Rect(rect.x + 150, y-5, 100, 30)
-        pygame.draw.rect(surf, config.COL_WHITE if self._ticker_input_active else config.COL_PANEL,
-                        self._ticker_rect, border_radius=4)
-        widgets.draw_text(surf, self.ticker, (rect.x + 155, y+2), fonts.small(), config.COL_TEXT)
-
-        y += 40
-        widgets.draw_text(surf, "Actif de couverture :", (rect.x + 20, y), fonts.small(bold=True), config.COL_TEXT)
-        self._hedge_ticker_rect = pygame.Rect(rect.x + 180, y-5, 100, 30)
-        pygame.draw.rect(surf, config.COL_WHITE if self._hedge_ticker_input_active else config.COL_PANEL,
-                        self._hedge_ticker_rect, border_radius=4)
-        widgets.draw_text(surf, self.hedge_ticker, (rect.x + 185, y+2), fonts.small(), config.COL_TEXT)
-
-        y += 40
-        widgets.draw_text(surf, "Montant à couvrir (€) :", (rect.x + 20, y), fonts.small(bold=True), config.COL_TEXT)
-        self._amount_rect = pygame.Rect(rect.x + 200, y-5, 120, 30)
-        pygame.draw.rect(surf, config.COL_WHITE if self._amount_input_active else config.COL_PANEL,
-                        self._amount_rect, border_radius=4)
-        widgets.draw_text(surf, self.amount, (rect.x + 205, y+2), fonts.small(), config.COL_TEXT)
-
-        # Bouton calculer
-        y += 50
-        self._compute_btn = pygame.Rect(rect.x + 20, y, 120, 30)
-        pygame.draw.rect(surf, config.COL_AMBER, self._compute_btn, border_radius=4)
-        widgets.draw_text(surf, "Calculer", self._compute_btn.center,
-                         fonts.small(bold=True), config.COL_BG, align="center")
-
-        # Résultats
-        if self._results:
-            y += 60
-            widgets.draw_text(surf, f"Stratégie : {self._results['type']}", (rect.x + 20, y),
-                             fonts.small(bold=True), config.COL_TEXT)
-
+    # ----------------------------------------------------------- mode put
+    def _draw_put(self, surf, body, ctx, cur):
+        col_w = (body.w - 12) // 2
+        left = pygame.Rect(body.x, body.y, col_w, body.h)
+        right = pygame.Rect(left.right + 12, body.y, col_w, body.h)
+        inner = widgets.draw_panel(surf, left, "Nouveau put protecteur",
+                                   config.COL_CYAN)
+        y = inner.y + 2
+        widgets.draw_text(surf, "Strike (% de l'indice) :", (inner.x, y),
+                          fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        x = inner.x + 150
+        self._strike_rects = {}
+        for i, spct in enumerate(H.STRIKE_CHOICES):
+            lbl = f"{spct * 100:.0f}%"
+            w = fonts.tiny(bold=True).size(lbl)[0] + 14
+            r = pygame.Rect(x, y - 3, w, 20)
+            self._strike_rects[i] = r
+            sel = i == self.strike_idx
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL,
+                             r, border_radius=3)
+            pygame.draw.rect(surf, config.COL_CYAN if sel else config.COL_BORDER,
+                             r, 1, border_radius=3)
+            widgets.draw_text(surf, lbl, r.center, fonts.tiny(bold=sel),
+                              config.COL_CYAN if sel else config.COL_TEXT_DIM,
+                              align="center")
+            x += w + 6
+        y += 28
+        widgets.draw_text(surf, "Maturité :", (inner.x, y), fonts.tiny(bold=True),
+                          config.COL_TEXT_DIM)
+        x = inner.x + 150
+        self._years_rects = {}
+        for i, yr in enumerate(H.MATURITY_CHOICES):
+            lbl = f"{int(yr * 12)} mois" if yr < 1 else f"{yr:.0f} an"
+            w = fonts.tiny(bold=True).size(lbl)[0] + 14
+            r = pygame.Rect(x, y - 3, w, 20)
+            self._years_rects[i] = r
+            sel = i == self.years_idx
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL,
+                             r, border_radius=3)
+            pygame.draw.rect(surf, config.COL_CYAN if sel else config.COL_BORDER,
+                             r, 1, border_radius=3)
+            widgets.draw_text(surf, lbl, r.center, fonts.tiny(bold=sel),
+                              config.COL_CYAN if sel else config.COL_TEXT_DIM,
+                              align="center")
+            x += w + 6
+        y += 28
+        widgets.draw_text(surf, "Taille (× notionnel bêta) :", (inner.x, y),
+                          fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        x = inner.x + 150
+        self._frac_rects = {}
+        for f in NOTIONAL_STEPS:
+            lbl = f"{f:.0%}"
+            w = fonts.tiny(bold=True).size(lbl)[0] + 14
+            r = pygame.Rect(x, y - 3, w, 20)
+            self._frac_rects[f] = r
+            sel = abs(f - self.notional_frac) < 1e-9
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL,
+                             r, border_radius=3)
+            pygame.draw.rect(surf, config.COL_CYAN if sel else config.COL_BORDER,
+                             r, 1, border_radius=3)
+            widgets.draw_text(surf, lbl, r.center, fonts.tiny(bold=sel),
+                              config.COL_CYAN if sel else config.COL_TEXT_DIM,
+                              align="center")
+            x += w + 6
+        y += 30
+        q = ctx.get("quote")
+        if q:
+            widgets.draw_text(surf, f"Indice {q['underlying']} : {q['spot']:,.0f} — "
+                              f"strike {q['strike']:,.0f} · vol {q['sigma'] * 100:.0f}% "
+                              f"· taux {q['rate'] * 100:.1f}%",
+                              (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+            y += 20
+            widgets.draw_text(surf, f"Notionnel couvert : "
+                              f"{widgets.format_money(ctx.get('notional', 0.0), cur)}",
+                              (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
+            y += 22
+            widgets.draw_text(surf, f"Prime à payer : "
+                              f"{widgets.format_money(ctx.get('premium', 0.0), cur)} "
+                              f"({q['premium_rate'] * 100:.2f}% du notionnel)",
+                              (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
             y += 30
-            # Afficher les résultats
-            widgets.draw_text(surf, f"Ratio de couverture : {self._results['hedge_ratio']:.3f}", (rect.x + 40, y),
-                             fonts.small(), config.COL_TEXT)
-            y += 25
-
-            if "correlation" in self._results:
-                widgets.draw_text(surf, f"Corrélation : {self._results['correlation']:.3f}", (rect.x + 40, y),
-                                 fonts.small(), config.COL_TEXT)
-                y += 25
-
-            if "beta" in self._results:
-                widgets.draw_text(surf, f"Beta : {self._results['beta']:.3f}", (rect.x + 40, y),
-                                 fonts.small(), config.COL_TEXT)
-                y += 25
-
-            widgets.draw_text(surf, f"Position actuelle : {self._results['current_position']:.2f}", (rect.x + 40, y),
-                             fonts.small(), config.COL_TEXT)
-            y += 25
-
-            widgets.draw_text(surf, f"Titres de couverture nécessaires : {self._results['hedge_shares']:.2f}", (rect.x + 40, y),
-                             fonts.small(), config.COL_TEXT)
-            y += 25
-
-            widgets.draw_text(surf, f"Coût estimé : {self._results['hedge_cost']:.2f}€", (rect.x + 40, y),
-                             fonts.small(), config.COL_TEXT)
-            y += 25
-
-            if "effectiveness" in self._results:
-                eff_color = config.COL_UP if self._results['effectiveness'] == "Élevée" else (config.COL_AMBER if self._results['effectiveness'] == "Moyenne" else config.COL_DOWN)
-                widgets.draw_text(surf, f"Efficacité attendue : {self._results['effectiveness']}", (rect.x + 40, y),
-                                 fonts.small(), eff_color)
-                y += 25
-
-            y += 10
-            widgets.draw_text(surf, self._results['explanation'], (rect.x + 20, y),
-                             fonts.small(), config.COL_TEXT_DIM)
-
-            # Recommandations
-            y += 35
-            if "effectiveness" in self._results:
-                if self._results['effectiveness'] == "Élevée":
-                    recommendation = "Couverture recommandée - corrélation forte"
-                    rec_color = config.COL_UP
-                elif self._results['effectiveness'] == "Moyenne":
-                    recommendation = "Couverture possible - surveiller la corrélation"
-                    rec_color = config.COL_AMBER
-                else:
-                    recommendation = "Couverture peu efficace - envisager alternatives"
-                    rec_color = config.COL_DOWN
-
-                widgets.draw_text(surf, f"Recommandation : {recommendation}", (rect.x + 20, y),
-                                 fonts.small(bold=True), rec_color)
-
-            # Bouton exécuter
+        self._buy_btn = pygame.Rect(inner.x, y, 190, 26)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._buy_btn, border_radius=4)
+        pygame.draw.rect(surf, config.COL_UP, self._buy_btn, 1, border_radius=4)
+        widgets.draw_text(surf, "SOUSCRIRE LE PUT", self._buy_btn.center,
+                          fonts.small(bold=True), config.COL_UP, align="center")
+        widgets.draw_text(surf, "Si l'indice finit sous le strike à l'échéance, le put "
+                          "paie la différence — la prime est le coût de l'assurance.",
+                          (inner.x, inner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
+        # puts en cours
+        rinner = widgets.draw_panel(surf, right, "Couvertures en cours",
+                                    config.COL_AMBER)
+        hedges = ctx.get("hedges", [])
+        if not hedges:
+            widgets.draw_text(surf, "Aucun put en cours.", (rinner.x, rinner.y + 4),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+        y = rinner.y + 2
+        for hpos in hedges[:10]:
+            if y > rinner.bottom - 30:
+                break
+            col = config.COL_UP if hpos["in_money"] else config.COL_TEXT_DIM
+            widgets.draw_text(surf, f"{hpos['underlying']} · strike "
+                              f"{hpos['strike_pct'] * 100:.0f}% · "
+                              f"{widgets.format_money(hpos['notional'], cur)}",
+                              (rinner.x, y), fonts.small(bold=True), config.COL_TEXT)
+            widgets.draw_text(surf, f"indice {hpos['perf']:+.1f}% depuis l'achat · "
+                              f"échéance dans {hpos['steps_left']} pas · "
+                              + ("DANS LA MONNAIE" if hpos["in_money"] else "hors monnaie"),
+                              (rinner.x + 10, y + 17), fonts.tiny(), col)
             y += 40
-            self._execute_btn = pygame.Rect(rect.x + 20, y, 120, 30)
-            pygame.draw.rect(surf, config.COL_UP, self._execute_btn, border_radius=4)
-            widgets.draw_text(surf, "Exécuter", self._execute_btn.center,
-                             fonts.small(bold=True), config.COL_BG, align="center")
+
+    # ---------------------------------------------------------- mode pair
+    def _draw_pair(self, surf, body, ctx, cur):
+        col_w = (body.w - 12) // 2
+        left = pygame.Rect(body.x, body.y, col_w, body.h)
+        right = pygame.Rect(left.right + 12, body.y, col_w, body.h)
+        inner = widgets.draw_panel(surf, left, "Position à couvrir", config.COL_CYAN)
+        held = ctx.get("held", [])
+        self._pos_rects = {}
+        if not held:
+            widgets.draw_text(surf, "Aucune position longue à couvrir.",
+                              (inner.x, inner.y + 4), fonts.tiny(), config.COL_TEXT_DIM)
+        y = inner.y + 2
+        for h in held[:12]:
+            if y > inner.bottom - 20:
+                break
+            r = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 20)
+            self._pos_rects[h["ticker"]] = r
+            sel = h["ticker"] == self.pair_ticker
+            if sel:
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, r, border_radius=3)
+            widgets.draw_text(surf, h["ticker"], (inner.x, y), fonts.small(bold=True),
+                              config.COL_AMBER if sel else config.COL_TEXT)
+            widgets.draw_text(surf, widgets.format_money(h["value"], cur),
+                              (inner.x + 90, y), fonts.small(), config.COL_TEXT_DIM)
+            y += 21
+        # candidats + qualité + exécution
+        rinner = widgets.draw_panel(surf, right, "Instrument de couverture (short)",
+                                    config.COL_AMBER)
+        cands = ctx.get("candidates", [])
+        self._cand_rects = {}
+        y = rinner.y + 2
+        if not cands:
+            widgets.draw_text(surf, "Sélectionnez une position à gauche.",
+                              (rinner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+        for tk, corr in cands:
+            r = pygame.Rect(rinner.x - 4, y - 2, rinner.w + 8, 20)
+            self._cand_rects[tk] = r
+            sel = tk == self.pair_hedge
+            if sel:
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, r, border_radius=3)
+            widgets.draw_text(surf, tk, (rinner.x, y), fonts.small(bold=True),
+                              config.COL_AMBER if sel else config.COL_TEXT)
+            widgets.draw_text(surf, f"corr {corr:+.2f}", (rinner.x + 90, y),
+                              fonts.small(), config.COL_TEXT_DIM)
+            y += 21
+        hr = ctx.get("hr")
+        if hr and self.pair_hedge:
+            y += 8
+            widgets.draw_text(surf, f"Ratio min-variance h = {hr['ratio']:.2f} · "
+                              f"R² = {hr['r2'] * 100:.0f}%",
+                              (rinner.x, y), fonts.small(bold=True), config.COL_TEXT)
+            y += 20
+            widgets.draw_text(surf, f"Vol résiduelle attendue : "
+                              f"{hr['resid_vol_pct']:.0f}% de la vol d'origine",
+                              (rinner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+            y += 22
+            qty = ctx.get("hedge_qty", 0)
+            widgets.draw_text(surf, f"Ordre : SHORT {qty} × {self.pair_hedge} "
+                              f"(≈ {widgets.format_money(qty * ctx.get('hedge_price', 0.0), cur)})",
+                              (rinner.x, y), fonts.small(bold=True), config.COL_DOWN)
+            y += 26
+            self._short_btn = pygame.Rect(rinner.x, y, 190, 26)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._short_btn,
+                             border_radius=4)
+            pygame.draw.rect(surf, config.COL_DOWN, self._short_btn, 1, border_radius=4)
+            widgets.draw_text(surf, "EXÉCUTER LE SHORT", self._short_btn.center,
+                              fonts.small(bold=True), config.COL_DOWN, align="center")
+        else:
+            self._short_btn = None
+        widgets.draw_text(surf, "Plus la corrélation est forte, plus le short "
+                          "compense les variations de la position couverte.",
+                          (rinner.x, rinner.bottom - 14), fonts.tiny(),
+                          config.COL_TEXT_DIM)

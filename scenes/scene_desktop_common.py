@@ -19,6 +19,7 @@ from apps.app_deals import DealsApp
 from apps.app_dilemma import DilemmaApp
 from apps.app_evaluation import EvaluationApp
 from apps.app_explorer import ExplorerApp
+from apps.app_frontier import FrontierApp
 from apps.app_inbox import InboxApp
 from apps.app_journal import JournalApp
 from apps.app_markethub import MarketHubApp
@@ -80,10 +81,11 @@ APPS = [
     ("shop", "Boutique", "shop", ShopApp),
     ("analytics", "Analyse du portefeuille", "graph", AnalyticsApp),
     ("explorer", "Explorateur", "explorer", ExplorerApp),
-    # Applications financières avancées
+    # Outils quantitatifs (socle core/quant_tools.py)
     ("sharpe", "Sharpe Ratio", "graph", SharpeApp),
     ("zscore", "Z-Score", "graph", ZScoreApp),
     ("hedge", "Couverture", "shield", HedgeApp),
+    ("frontier", "Frontière efficiente", "frontier", FrontierApp),
 ]
 
 # Application supplémentaire propre à la VOIE (track) choisie par le joueur
@@ -134,6 +136,7 @@ ICON_FEATURE = {
     "trading": "trade",
     "qmandates": "mandates",
     "qdeals": "deals",
+    "hedge": "hedge",        # la couverture arrive au même grade que PROTECT
 }
 
 # Raccourcis Ctrl+<lettre> des icônes du bureau — mêmes mnémoniques que les
@@ -155,10 +158,12 @@ DESKTOP_SHORTCUTS = {
     pygame.K_b: "qshop",
     pygame.K_s: "save",
     pygame.K_h: "qcommands",
-    # Raccourcis pour les applications financières avancées
+    # Raccourcis des outils quantitatifs. Ctrl+C (copier) et Ctrl+Z (annuler)
+    # sont des conventions universelles — jamais réutilisés ici pour ne pas
+    # intercepter le copier/annuler d'une app qui ne consomme pas l'évènement.
     pygame.K_r: "sharpe",    # Ratio de Sharpe
-    pygame.K_z: "zscore",    # Z-Score
-    pygame.K_c: "hedge",     # Couverture (Hedge)
+    pygame.K_g: "hedge",     # Couverture (hedGe)
+    pygame.K_e: "frontier",  # Frontière Efficiente
 }
 # icône -> libellé de raccourci (tooltip au survol)
 _ICON_SHORTCUT = {icon: "Ctrl+" + pygame.key.name(k).upper()

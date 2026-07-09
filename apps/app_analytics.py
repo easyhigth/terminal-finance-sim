@@ -132,7 +132,13 @@ class AnalyticsApp(DesktopApp, PopupMixin):
                     self.open_chart(tk, kind="change")
                     return True
             if self._frontier_rect and self._frontier_rect.collidepoint(event.pos):
-                self.app.pages.open_popup("frontier_lab", return_to="analytics")
+                # frontière INTERACTIVE en fenêtre (apps/app_frontier.py) —
+                # `self.app` d'une app native est le VRAI App, open_popup
+                # ouvrirait un popup-page par-dessus tout l'écran.
+                if self.desktop is not None:
+                    self.desktop._open_scene_window("frontier")
+                else:
+                    self.app.pages.open_popup("frontier_lab", return_to="analytics")
                 return True
             if self._corr_rect and self._corr_rect.collidepoint(event.pos):
                 p, m = self.app.gs.player, self.market

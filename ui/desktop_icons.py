@@ -63,6 +63,8 @@ PALETTES = {
     "calc":      ((30, 41, 59),    (203, 213, 225)),
     "star":      ((50, 40, 5),     (250, 204, 21)),
     "bell":      ((50, 40, 5),     (250, 204, 21)),
+    "shield":    ((6, 40, 40),     (45, 212, 191)),   # sarcelle noir / teal
+    "frontier":  ((10, 25, 70),    (129, 140, 248)),  # indigo noir / indigo
 }
 C_GENERIC = ((17, 24, 39), (148, 163, 184))
 
@@ -462,6 +464,24 @@ def _bell(p):
 
 # ---------------------------------------------------------------------------
 # Registre, cache et API
+def _shield(p):
+    """Bouclier (couverture / protection du portefeuille)."""
+    body = [(0, -10), (8.5, -6.5), (8.5, 1), (0, 10), (-8.5, 1), (-8.5, -6.5)]
+    p.poly(body, p.soft)
+    p.poly(body, w=1.8)
+    p.lines([(-3.6, 0.2), (-1, 3.2), (4.2, -3.6)], w=2.2)
+
+
+def _frontier(p):
+    """Courbe de frontière efficiente + point cible (optimisation)."""
+    p.line((-10, 9), (10, 9), p.soft, 1.4)      # axe risque
+    p.line((-10, 9), (-10, -10), p.soft, 1.4)   # axe rendement
+    pts = [(-8.5, 7), (-7.5, 1.5), (-5.5, -3), (-2.5, -6), (1.5, -8), (7.5, -9)]
+    p.lines(pts, w=2.0)
+    p.circle((-2.5, -6), 2.6, w=1.8)            # point cible cerclé
+    p.circle((-2.5, -6), 1.0)
+
+
 # ---------------------------------------------------------------------------
 _PICTOS = {
     "research": _research, "trading": _trading, "sheet": _sheet,
@@ -472,6 +492,7 @@ _PICTOS = {
     "decide": _decide, "examcert": _examcert, "wall": _wall, "shop": _shop,
     "explorer": _explorer, "graph": _graph, "save": _save, "help": _help,
     "calc": _calc, "star": _star, "bell": _bell,
+    "shield": _shield, "frontier": _frontier,
 }
 # alias de compat (l'ancien registre s'appelait _ICONS)
 _ICONS = _PICTOS

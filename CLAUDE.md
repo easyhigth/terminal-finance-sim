@@ -523,6 +523,50 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   Explorateur), et garde `scenes.go` sinon (scènes plein écran / hébergées, inchangé).
   Verrouillé par `tests/test_popup_navigation.py` et `tests/test_app_explorer.py`/
   `test_app_analytics.py`.
+- **`core/quant_tools.py` + apps quantitatives (Sharpe / Z-Score / Couverture /
+  Frontière efficiente INTERACTIVE).** Socle PUR partagé (annualisation via
+  `market.STEPS_PER_YEAR`, périodes = même barème que `scene_graph.STEP_PERIODS`,
+  benchmark = le VRAI indice régional via `market.index_history` — jamais un proxy) :
+  rendements/vol/Sharpe annualisés (+ glissants), bêta, z-scores glissants
+  (prix/rendement/vol/corrélation), ratio de couverture min-variance (cov/var, ddof
+  cohérent), candidats de couverture par corrélation, et surtout `frontier()` — la
+  frontière efficiente AVEC les poids de chaque point (`finmath.efficient_frontier`),
+  `target_trades()` (ordres entiers, ventes d'abord, poussières ignorées ; budget =
+  valeur longue de l'univers, sinon 80 % du cash) et `apply_trades()` (exécution
+  best-effort via `core/portfolio`). « Projection 1 an » = quantiles ANALYTIQUES
+  lognormaux (déterministe, pas de Monte-Carlo tiré au hasard). Les trois apps
+  semées par le joueur (PR hors-bande, calculs approximatifs : périodes fausses —
+  365 pas ≠ 1 an —, API inexistante `market.index_tickers()` avalée par des
+  try/except larges) ont été RÉÉCRITES dessus, avec recalcul AUTOMATIQUE quand
+  `market.step_count` change (cache, pas de bouton « Calculer ») :
+  `apps/app_sharpe.py` (tuiles annualisées + bêta/alpha de Jensen vs l'indice,
+  barres portefeuille/indice/min-var/max-Sharpe, Sharpe glissant, table par
+  position), `apps/app_zscore.py` (chips détenues+watchlist+recherche, 4 lectures,
+  courbe du z DANS LE TEMPS avec bandes ±1σ/±2σ, boutons TRADER/ALERTE),
+  `apps/app_hedge.py` (onglet PUT INDICE branché sur le VRAI desk `core/hedging` —
+  prime Black-Scholes, notionnel dimensionné au bêta du book, liste des puts en
+  cours ; onglet PAIRE — short corrélé au ratio min-variance via `pf.short`,
+  verrous `hedge`/`leverage` respectés). **`apps/app_frontier.py` (nouvelle,
+  vedette)** : la frontière SE TRADE — univers cochable (détenues ✶ + candidates
+  `analytics.diversification_candidates`), chaque point de la courbe est CLIQUABLE
+  (capture au rayon `SNAP_PX`, ←/→ pour glisser, boutons MAX SHARPE/MIN VAR),
+  le panneau cible affiche rendement/vol/Sharpe attendus, poids actuels→cibles en
+  barres, la LISTE D'ORDRES exacte et un bouton APPLIQUER (confirmation modale →
+  ordres réels, frais/slippage du jeu) ; le point ACTUEL et la courbe se
+  recalculent à chaque pas — remplace le labo en lecture seule (`frontier_lab`
+  redirigé vers l'app en fenêtre, scène plein écran conservée). Câblage : icônes
+  vectorielles `shield`/`frontier` (`ui/desktop_icons.py`), icône « Couverture »
+  gated par le déblocage `hedge` (`ICON_FEATURE`), raccourcis Ctrl+R/G/E (JAMAIS
+  Ctrl+C/Ctrl+Z — conventions copier/annuler), scène "hedge" en fenêtre redirigée
+  vers l'app native, lien frontière de `app_analytics` repointé sur l'app.
+  **Bug corrigé au passage** : le quick-launch de la barre des tâches listait
+  TOUTES les entrées `APPS` — dont « Évaluation » (contournement des critères de
+  promotion, même faille que celle corrigée pour les icônes à l'étape 21) — et
+  débordait de l'écran ; il exclut désormais `_FACTORY_ONLY_APPS`. Verrouillé par
+  `tests/test_quant_tools.py` (chiffres : annualisation, poids sommant à 1,
+  budget conservé, cible ATTEINTE après `apply_trades`), `tests/test_quant_apps.py`
+  et `tests/test_app_frontier.py` (clic sur courbe → ordres → exécution réelle,
+  confirmation modale, invalidation par pas de marché).
 - **Découvrabilité du bureau (icônes/boutons)** : icône « Succès » (`QUICK_APPS`/
   `qachievements` → scène achievements en fenêtre) ; **loupe de recherche globale** dans
   la topbar du bureau (`DesktopScene._gsearch_rect`, dessin vectoriel — ouvre la même

@@ -888,6 +888,18 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 self.wm.focus(w)
                 self.start_open = False
             return w
+        if name in ("frontier_lab", "hedge", "frontier", "sharpe", "zscore"):
+            # Outils quantitatifs NATIFS (apps/app_frontier.py, app_hedge.py,
+            # app_sharpe.py, app_zscore.py) : le labo de frontière (lecture
+            # seule) est remplacé par la frontière INTERACTIVE, et le desk de
+            # couverture plein écran (scene_hedge) par l'app Couverture qui
+            # réutilise la même logique core/hedging. Simple ouverture/focus.
+            key = "frontier" if name == "frontier_lab" else name
+            w = self._launch(key)
+            if w is not None:
+                self.wm.focus(w)
+                self.start_open = False
+            return w
         if name in ("tradejournal", "deals", "analytics"):
             # Journal de trading / Deals / Analyse du portefeuille NATIFS
             # (apps/app_journal.py, apps/app_deals.py, apps/app_analytics.py,
@@ -1300,11 +1312,16 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                           fonts.small(bold=True), config.COL_BG if active else config.COL_AMBER)
         pygame.draw.line(surf, config.COL_BORDER, (self._start_rect.right + 4, bar.y + 4),
                          (self._start_rect.right + 4, bar.bottom - 4), 1)
-        # quick-launch (à gauche) : apps natives + Terminal
+        # quick-launch (à gauche) : apps natives + Terminal. Les clés
+        # _FACTORY_ONLY_APPS en sont EXCLUES comme des icônes du bureau —
+        # même raison (cf. commentaire de _FACTORY_ONLY_APPS) : un bouton
+        # « Évaluation » ici aurait contourné les critères de promotion, et
+        # « Décision »/« Revue » ouvriraient des écrans vides hors popup.
         self._launch_rects = {}
         x = self._start_rect.right + 10
         quick = [(k, kind) for k, _l, kind, _cls in APPS
-                 if self._icon_visible(k)] + [("terminal", "terminal")]
+                 if k not in self._FACTORY_ONLY_APPS and self._icon_visible(k)]
+        quick.append(("terminal", "terminal"))
         for key, kind in quick:
             r = pygame.Rect(x, bar.y + 4, 26, TASKBAR_H - 8)
             self._launch_rects[key] = r

@@ -28,9 +28,9 @@ Prototype jouable — moteur de base + interface Bloomberg + modules financiers 
 - Ratios : ROE, ROA, marge nette, D/E, current ratio, interest coverage...
 
 ### Applications financières avancées
-- **Sharpe Ratio** : Calcule et visualise le ratio de Sharpe pour différentes stratégies de portefeuille (actuel, benchmark, optimisé)
-- **Z-Score** : Analyse statistique pour identifier les écarts significatifs dans les rendements, volatilité et corrélation
-- **Couverture (Hedge)** : Mise en place de stratégies de couverture delta, beta et statistique pour protéger un portefeuille
+- **Sharpe Ratio** : Calcule et visualise le ratio de Sharpe pour différentes stratégies de portefeuille (actuel, benchmark, optimisé) avec graphiques comparatifs
+- **Z-Score** : Analyse statistique avancée pour identifier les écarts significatifs dans les rendements, volatilité et corrélation avec tendances et confiance
+- **Couverture (Hedge)** : Mise en place de stratégies de couverture delta, beta et statistique pour protéger un portefeuille avec évaluations d'efficacité
 
 ### Simulation de marché (core/market.py + data/companies.py)
 - **320 sociétés fictives** réparties USA / Europe / Asie, sur 14 secteurs.

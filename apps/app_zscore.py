@@ -90,6 +90,16 @@ class ZScoreApp(DesktopApp):
         last_return = returns[-1] if returns else 0.0
         z_score = (last_return - mean_return) / std_return if std_return != 0 else 0.0
 
+        # Z-scores des rendements précédents pour tendance
+        if len(returns) >= 5:
+            recent_z_scores = []
+            for i in range(1, min(6, len(returns))):
+                z = (returns[-i] - mean_return) / std_return
+                recent_z_scores.append(z)
+            trend = "haut" if np.mean(recent_z_scores) > 0 else "bas"
+        else:
+            trend = "indéterminé"
+
         # Interprétation
         if abs(z_score) > 2:
             interpretation = "Écart significatif (> 2σ)"
@@ -108,9 +118,11 @@ class ZScoreApp(DesktopApp):
             "std": std_return,
             "last_value": last_return,
             "interpretation": interpretation,
-            "status": status
+            "status": status,
+            "trend": trend,
+            "confidence": "Haute" if abs(z_score) > 2 else ("Moyenne" if abs(z_score) > 1 else "Faible")
         }
-        self.msg = f"Z-score calculé : {z_score:.2f}"
+        self.msg = f"Z-score rendements : {z_score:.2f}"
 
     def _compute_volatility_zscore(self, hist):
         """Calcule le Z-score de volatilité."""
@@ -146,6 +158,14 @@ class ZScoreApp(DesktopApp):
         last_vol = volatilities[-1] if volatilities else 0.0
         z_score = (last_vol - mean_vol) / std_vol if std_vol != 0 else 0.0
 
+        # Tendance de la volatilité
+        if len(volatilities) >= 5:
+            recent_avg = np.mean(volatilities[-5:])
+            historical_avg = np.mean(volatilities[:-5]) if len(volatilities) > 5 else mean_vol
+            vol_trend = "haut" if recent_avg > historical_avg * 1.1 else ("bas" if recent_avg < historical_avg * 0.9 else "stable")
+        else:
+            vol_trend = "indéterminé"
+
         # Interprétation
         if abs(z_score) > 2:
             interpretation = "Volatilité anormalement élevée/basse"
@@ -164,9 +184,11 @@ class ZScoreApp(DesktopApp):
             "std": std_vol,
             "last_value": last_vol,
             "interpretation": interpretation,
-            "status": status
+            "status": status,
+            "trend": vol_trend,
+            "confidence": "Haute" if abs(z_score) > 2 else ("Moyenne" if abs(z_score) > 1 else "Faible")
         }
-        self.msg = f"Z-score de volatilité calculé : {z_score:.2f}"
+        self.msg = f"Z-score volatilité : {z_score:.2f}"
 
     def _compute_correlation_zscore(self, hist):
         """Calcule le Z-score de corrélation avec l'indice de marché."""
@@ -380,9 +402,36 @@ class ZScoreApp(DesktopApp):
             widgets.draw_text(surf, f"Dernière valeur : {self._results['last_value']:.4f}", (rect.x + 40, y),
                              fonts.small(), config.COL_TEXT)
 
+            # Tendance et confiance
+            if "trend" in self._results:
+                y += 25
+                trend_text = f"Tendance : {self._results['trend']}"
+                widgets.draw_text(surf, trend_text, (rect.x + 40, y),
+                                 fonts.small(), config.COL_TEXT_DIM)
+
+            if "confidence" in self._results:
+                y += 20
+                conf_text = f"Confiance : {self._results['confidence']}"
+                conf_color = config.COL_UP if self._results['confidence'] == "Haute" else (config.COL_AMBER if self._results['confidence'] == "Moyenne" else config.COL_TEXT_DIM)
+                widgets.draw_text(surf, conf_text, (rect.x + 40, y),
+                                 fonts.small(), conf_color)
+
             y += 30
             widgets.draw_text(surf, f"Interprétation : {self._results['interpretation']}", (rect.x + 20, y),
                              fonts.small(bold=True), color)
+
+            # Recommandations
+            y += 30
+            if self._results['status'] == "alert":
+                if self.analysis_type == "returns":
+                    recommendation = "Rendement anormal détecté - surveiller la tendance"
+                elif self.analysis_type == "volatility":
+                    recommendation = "Volatilité anormale - envisager une couverture"
+                else:  # correlation
+                    recommendation = "Changement de corrélation significatif - réévaluer le risque"
+
+                widgets.draw_text(surf, f"Recommandation : {recommendation}", (rect.x + 20, y),
+                                 fonts.small(), config.COL_AMBER)
 
             # Information supplémentaire pour la corrélation
             if self.analysis_type == "correlation" and "benchmark" in self._results:

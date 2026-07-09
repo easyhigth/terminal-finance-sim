@@ -60,35 +60,36 @@ class SharpeApp(DesktopApp):
                 return
 
             # Calculer le Sharpe Ratio du portefeuille
-            portfolio_sharpe = finmath.sharpe_ratio(
-                np.array([1.0]),  # poids unitaire pour un seul portefeuille
-                np.array([np.mean(portfolio_returns)]),  # rendement moyen
-                np.array([[np.var(portfolio_returns)]]),  # matrice de covariance
-                self.rf_rate
-            )
+            portfolio_vol = np.std(portfolio_returns)
+            portfolio_return = np.mean(portfolio_returns)
+            portfolio_sharpe = (portfolio_return - self.rf_rate) / portfolio_vol if portfolio_vol > 0 else 0.0
 
             # Calculer le Sharpe Ratio du marché (indice large)
             market_returns = self._market_returns(hist_length)
-            market_sharpe = finmath.sharpe_ratio(
-                np.array([1.0]),
-                np.array([np.mean(market_returns)]),
-                np.array([[np.var(market_returns)]]),
-                self.rf_rate
-            ) if len(market_returns) >= 2 else 0.0
+            market_sharpe = 0.0
+            market_return = 0.0
+            market_vol = 0.0
+            if len(market_returns) >= 2:
+                market_vol = np.std(market_returns)
+                market_return = np.mean(market_returns)
+                market_sharpe = (market_return - self.rf_rate) / market_vol if market_vol > 0 else 0.0
 
             # Calculer le portefeuille à variance minimale (si possible)
             min_var_sharpe = 0.0
+            max_sharpe = 0.0
             try:
                 if len(portfolio) > 1:
                     # Pour simplifier, on prend les 5 premières positions
                     tickers = list(portfolio.keys())[:5]
                     returns_matrix = []
+                    valid_tickers = []
                     for tk in tickers:
                         hist = self.market.history_of(tk, hist_length)
                         if hist and len(hist) >= 2:
                             # Calculer les rendements
                             rets = [(hist[i] / hist[i-1] - 1) for i in range(1, len(hist))]
                             returns_matrix.append(rets)
+                            valid_tickers.append(tk)
 
                     if len(returns_matrix) > 1 and all(len(r) == len(returns_matrix[0]) for r in returns_matrix):
                         returns_array = np.array(returns_matrix)
@@ -98,26 +99,38 @@ class SharpeApp(DesktopApp):
                         # Portefeuille à variance minimale
                         min_var_weights = finmath.min_variance_portfolio(mean_returns, cov_matrix)
                         min_var_returns = np.dot(returns_array.T, min_var_weights)
-                        min_var_sharpe = finmath.sharpe_ratio(
-                            min_var_weights, mean_returns, cov_matrix, self.rf_rate
-                        )
-            except Exception:
+                        min_var_vol = np.std(min_var_returns)
+                        min_var_return = np.mean(min_var_returns)
+                        min_var_sharpe = (min_var_return - self.rf_rate) / min_var_vol if min_var_vol > 0 else 0.0
+
+                        # Portefeuille max Sharpe
+                        max_sharpe_weights = finmath.max_sharpe_portfolio(mean_returns, cov_matrix, self.rf_rate)
+                        max_sharpe_returns = np.dot(returns_array.T, max_sharpe_weights)
+                        max_sharpe_vol = np.std(max_sharpe_returns)
+                        max_sharpe_return = np.mean(max_sharpe_returns)
+                        max_sharpe = (max_sharpe_return - self.rf_rate) / max_sharpe_vol if max_sharpe_vol > 0 else 0.0
+
+            except Exception as e:
+                self.msg = f"Erreur dans calculs avancés : {str(e)}"
                 pass  # En cas d'erreur, on continue avec 0.0
 
             self._results = {
                 "portfolio": {
                     "sharpe": portfolio_sharpe,
-                    "return": np.mean(portfolio_returns) if portfolio_returns else 0.0,
-                    "volatility": np.std(portfolio_returns) if portfolio_returns else 0.0,
+                    "return": portfolio_return,
+                    "volatility": portfolio_vol,
                     "count": len(portfolio)
                 },
                 "market": {
                     "sharpe": market_sharpe,
-                    "return": np.mean(market_returns) if market_returns else 0.0,
-                    "volatility": np.std(market_returns) if market_returns else 0.0
+                    "return": market_return,
+                    "volatility": market_vol
                 },
                 "min_variance": {
                     "sharpe": min_var_sharpe
+                },
+                "max_sharpe": {
+                    "sharpe": max_sharpe
                 }
             }
             self.msg = f"Sharpe Ratio calculé sur {hist_length} pas"
@@ -152,21 +165,28 @@ class SharpeApp(DesktopApp):
         # Nombre de pas à examiner
         hist_steps = steps if steps else min(current_step, 365)  # MAX par défaut 1 an
 
+        # Pour chaque pas dans l'historique
         for i in range(hist_steps):
             step = current_step - (hist_steps - i)
             if step < 0:
                 continue
 
             # Recalculer la valeur du portefeuille à ce pas
-            # (simplification : on utilise les prix actuels pour l'instant)
             total_value = 0.0
+            has_valid_prices = False
+
             for ticker, pos in portfolio.items():
                 if pos["shares"] != 0:
-                    price = self.market.price_of(ticker)
-                    if price:
-                        total_value += pos["shares"] * price
+                    # Obtenir le prix à ce pas spécifique
+                    hist = self.market.history_of(ticker, hist_steps)
+                    if hist and len(hist) > i:
+                        price = hist[-(hist_steps - i)]
+                        if price and price > 0:
+                            total_value += pos["shares"] * price
+                            has_valid_prices = True
 
-            values.append(total_value)
+            if has_valid_prices:
+                values.append(total_value)
 
         # Calculer les rendements
         if len(values) < 2:
@@ -266,7 +286,11 @@ class SharpeApp(DesktopApp):
             widgets.draw_text(surf, "Résultats du calcul :", (rect.x + 20, y),
                              fonts.small(bold=True), config.COL_TEXT)
 
+            # Graphique de comparaison des Sharpe Ratios
             y += 30
+            self._draw_sharpe_chart(surf, rect, y)
+            y += 120
+
             # Portefeuille actuel
             surf.blit(fonts.small(bold=True).render("Votre portefeuille :", True, config.COL_TEXT), (rect.x + 20, y))
             y += 25
@@ -302,16 +326,50 @@ class SharpeApp(DesktopApp):
             widgets.draw_text(surf, f"  Sharpe Ratio : {self._results['min_variance']['sharpe']:.3f}",
                              (rect.x + 40, y), fonts.small(), config.COL_TEXT)
 
-            # Interprétation
+            y += 30
+            # Portefeuille max Sharpe
+            surf.blit(fonts.small(bold=True).render("Portefeuille max Sharpe :", True, config.COL_TEXT), (rect.x + 20, y))
+            y += 25
+            widgets.draw_text(surf, f"  Sharpe Ratio : {self._results['max_sharpe']['sharpe']:.3f}",
+                             (rect.x + 40, y), fonts.small(), config.COL_TEXT)
+
+            # Comparaison et recommandations
             y += 40
-            sharpe = self._results['portfolio']['sharpe']
-            if sharpe > 1.0:
+            portfolio_sharpe = self._results['portfolio']['sharpe']
+            market_sharpe = self._results['market']['sharpe']
+            min_var_sharpe = self._results['min_variance']['sharpe']
+            max_sharpe_val = self._results['max_sharpe']['sharpe']
+
+            if portfolio_sharpe > market_sharpe:
+                comparison = "Surperformance vs marché"
+                comp_color = config.COL_UP
+            else:
+                comparison = "Sous-performance vs marché"
+                comp_color = config.COL_DOWN
+
+            widgets.draw_text(surf, f"Comparaison : {comparison}", (rect.x + 20, y),
+                             fonts.small(bold=True), comp_color)
+
+            y += 25
+            if max_sharpe_val > portfolio_sharpe:
+                recommendation = f"Potentiel d'amélioration : +{(max_sharpe_val - portfolio_sharpe):.3f} Sharpe possible"
+                rec_color = config.COL_AMBER
+            else:
+                recommendation = "Performance optimale atteinte"
+                rec_color = config.COL_UP
+
+            widgets.draw_text(surf, recommendation, (rect.x + 20, y),
+                             fonts.small(), rec_color)
+
+            # Interprétation
+            y += 35
+            if portfolio_sharpe > 1.0:
                 interpretation = "Excellent (Sharpe > 1.0)"
                 color = config.COL_UP
-            elif sharpe > 0.5:
+            elif portfolio_sharpe > 0.5:
                 interpretation = "Bon (0.5 < Sharpe < 1.0)"
                 color = config.COL_AMBER
-            elif sharpe > 0:
+            elif portfolio_sharpe > 0:
                 interpretation = "Moyen (0 < Sharpe < 0.5)"
                 color = config.COL_TEXT
             else:
@@ -320,3 +378,83 @@ class SharpeApp(DesktopApp):
 
             widgets.draw_text(surf, f"Interprétation : {interpretation}", (rect.x + 20, y),
                              fonts.small(bold=True), color)
+
+    def _draw_sharpe_chart(self, surf, rect, y):
+        """Dessine un graphique de comparaison des Sharpe Ratios."""
+        if not self._results:
+            return
+
+        # Zone du graphique
+        chart_rect = pygame.Rect(rect.x + 20, y, rect.w - 40, 100)
+        pygame.draw.rect(surf, config.COL_PANEL, chart_rect, border_radius=4)
+        pygame.draw.rect(surf, config.COL_BORDER, chart_rect, 1, border_radius=4)
+
+        # Données à afficher
+        data = [
+            ("Portefeuille", self._results['portfolio']['sharpe']),
+            ("Marché", self._results['market']['sharpe']),
+            ("Min Var", self._results['min_variance']['sharpe']),
+            ("Max Sharpe", self._results['max_sharpe']['sharpe'])
+        ]
+
+        # Filtrer les valeurs valides
+        valid_data = [(label, val) for label, val in data if not np.isnan(val) and np.isfinite(val)]
+        if not valid_data:
+            return
+
+        # Calculer les positions
+        n_items = len(valid_data)
+        if n_items == 0:
+            return
+
+        bar_width = max(20, (chart_rect.w - 40) // (n_items + 1))
+        spacing = (chart_rect.w - bar_width * n_items) // (n_items + 1)
+
+        # Trouver les valeurs min/max pour l'échelle
+        values = [val for _, val in valid_data]
+        if not values:
+            return
+
+        min_val = min(min(values), 0)
+        max_val = max(max(values), 0)
+        range_val = max_val - min_val
+        if range_val == 0:
+            range_val = 1
+
+        # Dessiner les barres
+        for i, (label, value) in enumerate(valid_data):
+            x = chart_rect.x + spacing + i * (bar_width + spacing)
+
+            # Hauteur de la barre proportionnelle à la valeur
+            bar_height = int((value - min_val) / range_val * (chart_rect.h - 30))
+            bar_height = max(1, min(bar_height, chart_rect.h - 30))
+
+            # Position de la barre
+            bar_y = chart_rect.y + chart_rect.h - 20 - bar_height
+            bar_rect = pygame.Rect(x, bar_y, bar_width, bar_height)
+
+            # Couleur selon la valeur
+            if value > 0:
+                color = config.COL_UP
+            elif value < 0:
+                color = config.COL_DOWN
+            else:
+                color = config.COL_AMBER
+
+            pygame.draw.rect(surf, color, bar_rect, border_radius=2)
+
+            # Ligne de base (0)
+            zero_y = chart_rect.y + chart_rect.h - 20 - int((0 - min_val) / range_val * (chart_rect.h - 30))
+            if chart_rect.y + 20 <= zero_y <= chart_rect.y + chart_rect.h - 20:
+                pygame.draw.line(surf, config.COL_TEXT_DIM, (chart_rect.x + 10, zero_y),
+                                (chart_rect.right - 10, zero_y), 1)
+
+            # Label
+            label_y = chart_rect.y + chart_rect.h - 15
+            widgets.draw_text(surf, label, (x + bar_width // 2, label_y),
+                             fonts.tiny(), config.COL_TEXT, align="center")
+
+            # Valeur
+            value_y = bar_y - 15 if value >= 0 else bar_y + bar_height + 5
+            widgets.draw_text(surf, f"{value:.2f}", (x + bar_width // 2, value_y),
+                             fonts.tiny(), config.COL_TEXT, align="center")

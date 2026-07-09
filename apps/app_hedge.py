@@ -102,6 +102,13 @@ class HedgeApp(DesktopApp):
         # Ratio de couverture (hedge ratio)
         hedge_ratio = (correlation * asset_vol / hedge_vol) if hedge_vol != 0 else 0.0
 
+        # Calculer le beta (alternative au hedge ratio)
+        if np.var(hedge_returns) != 0:
+            beta = np.cov(asset_returns, hedge_returns)[0, 1] / np.var(hedge_returns)
+            beta = beta if not np.isnan(beta) else 0.0
+        else:
+            beta = 0.0
+
         # Montant à couvrir
         try:
             amount_to_hedge = float(self.amount) if self.amount else 0.0
@@ -122,18 +129,28 @@ class HedgeApp(DesktopApp):
         commission = 0.001  # 10 bps
         hedge_cost = abs(hedge_shares * hedge_price * commission) if hedge_price else 0.0
 
+        # Efficacité de la couverture
+        if abs(correlation) > 0.8:
+            effectiveness = "Élevée"
+        elif abs(correlation) > 0.5:
+            effectiveness = "Moyenne"
+        else:
+            effectiveness = "Faible"
+
         self._results = {
             "type": "Couverture Delta",
             "correlation": correlation,
+            "beta": beta,
             "hedge_ratio": hedge_ratio,
             "current_position": current_shares,
             "current_value": current_value,
             "hedge_shares": hedge_shares,
             "hedge_value": abs(hedge_shares * hedge_price) if hedge_price else 0.0,
             "hedge_cost": hedge_cost,
+            "effectiveness": effectiveness,
             "explanation": f"Pour chaque € de {self.ticker}, couvrir avec {abs(hedge_ratio):.2f}€ de {self.hedge_ticker}"
         }
-        self.msg = f"Couverture delta calculée (corrélation: {correlation:.2f})"
+        self.msg = f"Couverture delta calculée (corrélation: {correlation:.2f}, efficacité: {effectiveness})"
 
     def _compute_beta_hedge(self):
         """Calcul de couverture beta avec un indice."""
@@ -532,10 +549,33 @@ class HedgeApp(DesktopApp):
 
             widgets.draw_text(surf, f"Coût estimé : {self._results['hedge_cost']:.2f}€", (rect.x + 40, y),
                              fonts.small(), config.COL_TEXT)
-            y += 30
+            y += 25
 
+            if "effectiveness" in self._results:
+                eff_color = config.COL_UP if self._results['effectiveness'] == "Élevée" else (config.COL_AMBER if self._results['effectiveness'] == "Moyenne" else config.COL_DOWN)
+                widgets.draw_text(surf, f"Efficacité attendue : {self._results['effectiveness']}", (rect.x + 40, y),
+                                 fonts.small(), eff_color)
+                y += 25
+
+            y += 10
             widgets.draw_text(surf, self._results['explanation'], (rect.x + 20, y),
                              fonts.small(), config.COL_TEXT_DIM)
+
+            # Recommandations
+            y += 35
+            if "effectiveness" in self._results:
+                if self._results['effectiveness'] == "Élevée":
+                    recommendation = "Couverture recommandée - corrélation forte"
+                    rec_color = config.COL_UP
+                elif self._results['effectiveness'] == "Moyenne":
+                    recommendation = "Couverture possible - surveiller la corrélation"
+                    rec_color = config.COL_AMBER
+                else:
+                    recommendation = "Couverture peu efficace - envisager alternatives"
+                    rec_color = config.COL_DOWN
+
+                widgets.draw_text(surf, f"Recommandation : {recommendation}", (rect.x + 20, y),
+                                 fonts.small(bold=True), rec_color)
 
             # Bouton exécuter
             y += 40

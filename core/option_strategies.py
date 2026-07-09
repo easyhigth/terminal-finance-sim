@@ -145,6 +145,38 @@ def execute_strategy(player, market, ticker, strat_id, years, contracts=1):
             "label": q["label"]}
 
 
+def vol_edge(player, market):
+    """LA leçon du trading d'options : on gagne si la volatilité RÉALISÉE
+    depuis l'achat dépasse la volatilité IMPLICITE payée à l'entrée.
+    Pour chaque position du book : vol implicite d'entrée (inversion de
+    Black-Scholes sur la prime réellement payée, au spot d'entrée) vs vol
+    réalisée du sous-jacent depuis l'achat (annualisée à la convention du
+    desk, 52). Renvoie [{ticker, type, entry_iv, realized, edge}] — edge
+    positif = le marché a bougé PLUS que ce qu'on a payé."""
+    from core import option_pricing as OP
+    out = []
+    r = opt.risk_free_rate(market)
+    for pos in getattr(player, "options", []) or []:
+        entry_step = pos["maturity_step"] - int(round(pos["years"]
+                                                      * opt.STEPS_PER_YEAR))
+        held_steps = max(2, market.step_count - entry_step)
+        hist = market.history_of(pos["ticker"], held_steps + 1)
+        s = np.asarray([v for v in hist if v], dtype=float)
+        if len(s) < 3:
+            continue
+        rets = s[1:] / s[:-1] - 1.0
+        realized = float(rets.std(ddof=1)) * float(np.sqrt(opt.STEPS_PER_YEAR))
+        entry_iv = OP.implied_vol(pos["premium_per_unit"], pos["start_spot"],
+                                  pos["strike"], pos["years"], r,
+                                  option=pos["option_type"])
+        if entry_iv is None:
+            continue
+        out.append({"ticker": pos["ticker"], "type": pos["option_type"],
+                    "entry_iv": entry_iv, "realized": realized,
+                    "edge": realized - entry_iv})
+    return out
+
+
 def book_greeks(player, market):
     """Grecques AGRÉGÉES du book d'options du joueur, réévaluées aujourd'hui
     (spot, vol et temps restant courants). Renvoie {rows, totals} — rows par

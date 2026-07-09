@@ -609,6 +609,60 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   implicite), `tests/test_desk_modules.py` (Euler somme à la VaR, Kupiec
   rejette un modèle faux, convexité : gain −100bp > perte +100bp) et
   `tests/test_desk_apps.py`.
+- **Analyse de gérant & stratégies de marché (lot « fais tout » 1/2).**
+  - `core/brinson.py` (distinct de core/attribution.py, qui ventile le P&L du
+    DERNIER pas) : **Brinson-Fachler** sur une fenêtre — écart vs le marché
+    entier pondéré capi, décomposé par secteur en allocation/sélection/
+    interaction, avec l'INVARIANT allocation+sélection+interaction = écart
+    total (test) ; **régression factorielle** — facteurs OBSERVABLES
+    reconstruits de la coupe transversale (`market.price_hist_all` : monde
+    pondéré capi, secteur−monde, région−monde), moindres carrés → bêtas,
+    alpha annualisé, R². App `apps/app_attribution.py` (onglets BRINSON /
+    FACTEURS, gating `trade`).
+  - `core/pairs.py` : **pairs trading complet** — cointégration
+    d'Engle-Granger sur log-prix (OLS puis ADF sans retards sur le résidu,
+    seuil −3,0 ≈ valeur critique 5 %), half-life AR(1), z-score du spread,
+    signaux ±2σ/0, `best_pairs` (scan des grosses capis) et `execute_pair`
+    (long + short dimensionné par β en valeur, via core/portfolio). App
+    `apps/app_pairs.py` (scanner cliquable, spread avec bandes, exécution au
+    signal, gating `leverage`).
+  - **Surface de volatilité** (`option_pricing.vol_surface`) : grille
+    strike×maturité pricée sous Merton à sauts puis INVERSÉE en vols BS — le
+    smile/skew et sa term structure, onglet SURFACE du Desk Options (heatmap).
+  - **Edge de vol** (`option_strategies.vol_edge`) : par option du book, vol
+    implicite PAYÉE à l'entrée (inversion BS sur la prime réellement payée)
+    vs vol RÉALISÉE depuis l'achat — affiché dans l'onglet BOOK. Verrouillé
+    par `tests/test_brinson_pairs.py` (invariant Brinson, paire fabriquée
+    détectée cointégrée vs marches indépendantes rejetées, smile) et
+    `tests/test_manager_apps.py`.
+- **Crédit, taux avancé, labo de crise (lot « fais tout » 2/2).**
+  - `core/credit_risk.py` : **modèle de Merton (1974)** — les actions comme
+    call sur les actifs (V = capi + dette du bilan simulé
+    core/financials.balance_sheet, σ_V = σ_E·E/V dé-leviérée), distance au
+    défaut, PD = N(−DD), spread implicite (LGD 60 %) ; `pd_vs_equity_curve`
+    (le lien actions ↔ spreads) et `market_scan` (roster classé par PD).
+  - **Waterfall de titrisation** : app interactive sur les VRAIES tranches
+    du jeu (`core/securitisation.TRANCHES`/`tranche_loss_fraction`) — un
+    curseur de perte de pool, la cascade equity→mezzanine→senior visualisée,
+    la perte attendue macro marquée sur la jauge. Les deux dans
+    `apps/app_creditdesk.py` (onglets MERTON / WATERFALL, gating `credit`).
+  - `core/rates_analytics.py` étendu : **forwards implicites**
+    (f = (y₂t₂−y₁t₁)/(t₂−t₁), affichés sous la courbe), **rotation de courbe
+    DV01-neutre** (`dv01_rotation_plan`/`execute_rotation` — le jeu ne shorte
+    pas d'obligation, on fait TOURNER le book court↔long à DV01 apparié,
+    boutons RACCOURCIR/ALLONGER du Desk Taux) et onglet **FUTURES** (courbes
+    par terme de `commodities.curve`, contango/backwardation + roll yield).
+  - `core/crisis_lab.py` + `apps/app_crisislab.py` : **simulateur de crise
+    interactif** — curseurs actions (0/−40 %) et taux (−100/+300 bp),
+    interrupteur « CORRÉLATIONS → 1 » (chaque titre encaisse le choc PLEIN,
+    β ignoré, +10 pts de vol implicite) ; book réévalué ligne par ligne
+    (actions β-pondérées, obligations duration+convexité, options et puts
+    de couverture re-pricés Black-Scholes au spot choqué/vol bumpée — les
+    protections gagnent par le vega) ; affiche le « coût de l'illusion de
+    diversification » (écart crunch vs normal). Déterministe. Verrouillé par
+    `tests/test_credit_crisis.py` (PD monotone au cours, ordre de la cascade,
+    forwards exacts, rotation DV01 appariée, put qui amortit le krach) et
+    `tests/test_credit_crisis_apps.py`.
 - **Découvrabilité du bureau (icônes/boutons)** : icône « Succès » (`QUICK_APPS`/
   `qachievements` → scène achievements en fenêtre) ; **loupe de recherche globale** dans
   la topbar du bureau (`DesktopScene._gsearch_rect`, dessin vectoriel — ouvre la même

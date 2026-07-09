@@ -14,13 +14,17 @@ from apps.app_alerts import AlertsApp
 from apps.app_analytics import AnalyticsApp
 from apps.app_book import BookApp
 from apps.app_calculator import CalculatorApp
+from apps.app_creditdesk import CreditDeskApp
+from apps.app_crisislab import CrisisLabApp
 from apps.app_company import CompanyApp
 from apps.app_deals import DealsApp
 from apps.app_dilemma import DilemmaApp
 from apps.app_evaluation import EvaluationApp
 from apps.app_explorer import ExplorerApp
+from apps.app_attribution import AttributionApp
 from apps.app_frontier import FrontierApp
 from apps.app_greeks import GreeksApp
+from apps.app_pairs import PairsApp
 from apps.app_rates import RatesApp
 from apps.app_vardesk import VarDeskApp
 from apps.app_inbox import InboxApp
@@ -92,6 +96,10 @@ APPS = [
     ("greeks", "Desk Options", "greeks", GreeksApp),
     ("vardesk", "Risque (VaR)", "risk", VarDeskApp),
     ("rates", "Desk Taux", "rates", RatesApp),
+    ("attribution", "Attribution (Brinson)", "graph", AttributionApp),
+    ("pairs", "Pairs Trading", "trading", PairsApp),
+    ("creditdesk", "Desk Crédit", "quant", CreditDeskApp),
+    ("crisislab", "Labo de crise", "alert", CrisisLabApp),
 ]
 
 # Application supplémentaire propre à la VOIE (track) choisie par le joueur
@@ -145,6 +153,9 @@ ICON_FEATURE = {
     "hedge": "hedge",        # la couverture arrive au même grade que PROTECT
     "greeks": "options",     # le desk options arrive avec la commande OPTIONS
     "rates": "trade",        # le desk taux arrive quand on peut investir
+    "attribution": "trade",  # juger sa gestion suppose de pouvoir investir
+    "pairs": "leverage",     # la paire exige la vente à découvert
+    "creditdesk": "credit",  # le desk crédit arrive avec la titrisation
 }
 
 # Raccourcis Ctrl+<lettre> des icônes du bureau — mêmes mnémoniques que les

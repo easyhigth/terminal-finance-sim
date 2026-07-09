@@ -140,6 +140,36 @@ def implied_vol(price, S, K, T, r, option="call", lo=1e-4, hi=4.0, tol=1e-6):
     return 0.5 * (lo + hi)
 
 
+SURFACE_STRIKES = (0.80, 0.90, 0.95, 1.00, 1.05, 1.10, 1.20)
+SURFACE_MATURITIES = (0.25, 0.5, 1.0)
+
+
+def vol_surface(S, r, sigma, strikes_pct=SURFACE_STRIKES,
+                maturities=SURFACE_MATURITIES,
+                lam=JUMP_INTENSITY, mu_j=JUMP_MEAN, sigma_j=JUMP_VOL):
+    """SURFACE DE VOLATILITÉ IMPLICITE : pour chaque (strike, maturité), on
+    price l'option sous Merton à sauts (le « vrai » modèle avec crises) puis
+    on INVERSE Black-Scholes — la vol implicite obtenue n'est PAS plate :
+    c'est le smile/skew (ailes plus chères, surtout le put OTM avec des
+    sauts négatifs), qui s'atténue avec la maturité (term structure).
+    Renvoie {strikes_pct, maturities, iv: grille [maturité][strike] en
+    décimal (None si inversion impossible)}."""
+    grid = []
+    for T in maturities:
+        row = []
+        for k in strikes_pct:
+            K = S * k
+            # put pour les strikes bas, call pour les hauts (OTM des deux
+            # côtés : plus liquide et mieux conditionné pour l'inversion)
+            option = "put" if k <= 1.0 else "call"
+            price = merton_jump_price(S, K, T, r, sigma, option,
+                                      lam=lam, mu_j=mu_j, sigma_j=sigma_j)
+            row.append(implied_vol(price, S, K, T, r, option))
+        grid.append(row)
+    return {"strikes_pct": list(strikes_pct), "maturities": list(maturities),
+            "iv": grid}
+
+
 def compare_models(S, K, T, r, sigma, option="call"):
     """Price la même option sous chaque modèle. Renvoie une liste ordonnée de
     lignes {id, label, price, note} + extras (stderr MC, prime d'exercice

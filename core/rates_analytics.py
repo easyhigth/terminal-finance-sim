@@ -98,6 +98,61 @@ def shock_pnl(lines, dy_short, dy_long):
     return pnl
 
 
+def forward_rates(curve):
+    """Taux FORWARDS implicites entre points consécutifs de la courbe :
+    f(t1,t2) = (y2·t2 − y1·t1)/(t2 − t1) — « ce que le marché price » pour
+    la période future [t1, t2] (le taux qui rend indifférent entre placer
+    long ou rouler court). [(t1, t2, fwd)]."""
+    out = []
+    for (t1, y1), (t2, y2) in zip(curve, curve[1:]):
+        if t2 > t1:
+            out.append((t1, t2, (y2 * t2 - y1 * t1) / (t2 - t1)))
+    return out
+
+
+def dv01_rotation_plan(player, market, direction, fraction=0.25):
+    """Plan de ROTATION de courbe du book (le jeu ne permet pas de shorter
+    une obligation, on fait donc tourner le book) : `direction` =
+    "shorten" (vendre du long terme, acheter du court — parier sur la
+    pentification / se protéger d'une hausse des taux longs) ou "lengthen"
+    (l'inverse). Les quantités sont appariées en DV01 (le risque de taux
+    déplacé est le même des deux côtés). Renvoie None si rien à tourner,
+    sinon {sell: {id, name, qty, dv01}, buy: {id, name, qty, dv01}}."""
+    from core import bonds as B
+    lines = book_lines(player, market)
+    if not lines:
+        return None
+    lines_sorted = sorted(lines, key=lambda x: x["years"])
+    sell_line = lines_sorted[-1] if direction == "shorten" else lines_sorted[0]
+    quotes = sorted(B.sovereign_quotes(market), key=lambda q: q["years"])
+    buy_q = quotes[0] if direction == "shorten" else quotes[-1]
+    if buy_q["id"] == sell_line["id"]:
+        return None
+    dv01_unit_sell = sell_line["dv01"] / sell_line["qty"]
+    qty_sell = max(1, int(round(sell_line["qty"] * fraction)))
+    dv01_moved = qty_sell * dv01_unit_sell
+    dv01_unit_buy = buy_q["price"] * buy_q["mod_duration"] * 1e-4
+    if dv01_unit_buy <= 0:
+        return None
+    qty_buy = max(1, int(round(dv01_moved / dv01_unit_buy)))
+    return {"sell": {"id": sell_line["id"], "name": sell_line["name"],
+                     "qty": qty_sell, "dv01": dv01_moved},
+            "buy": {"id": buy_q["id"], "name": buy_q["name"],
+                    "qty": qty_buy, "dv01": qty_buy * dv01_unit_buy}}
+
+
+def execute_rotation(player, market, plan):
+    """Exécute un plan de rotation (vente puis achat, core/bonds)."""
+    from core import bonds as B
+    r1 = B.sell_bond(player, market, plan["sell"]["id"], plan["sell"]["qty"])
+    if not r1.get("ok"):
+        return {"ok": False, "reason": r1.get("reason", "?"), "leg": "sell"}
+    r2 = B.buy_bond(player, market, plan["buy"]["id"], plan["buy"]["qty"])
+    if not r2.get("ok"):
+        return {"ok": False, "reason": r2.get("reason", "?"), "leg": "buy"}
+    return {"ok": True}
+
+
 def scenario_table(player, market):
     """Table des scénarios de courbe appliqués au book du joueur.
     Renvoie {lines, totals, scenarios: [{name, pnl, pnl_pct}]}."""

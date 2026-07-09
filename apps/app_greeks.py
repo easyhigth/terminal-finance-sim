@@ -30,7 +30,8 @@ from core import option_strategies as OS
 from core import options as opt
 from ui import fonts, widgets
 
-TABS = [("strat", "STRATÉGIE"), ("models", "MODÈLES"), ("book", "BOOK")]
+TABS = [("strat", "STRATÉGIE"), ("models", "MODÈLES"),
+        ("surface", "SURFACE"), ("book", "BOOK")]
 MATURITIES = opt.MATURITY_CHOICES          # 0.25 / 0.5 / 1.0
 GREEK_HELP = [
     ("Δ delta", "exposition directionnelle (équivalent actions)"),
@@ -59,6 +60,8 @@ class GreeksApp(DesktopApp):
         self._q = None
         self._models = None
         self._book = None
+        self._surface = None
+        self._edge = []
         self._tab_rects = {}
         self._chip_rects = {}
         self._strat_rects = {}
@@ -92,8 +95,12 @@ class GreeksApp(DesktopApp):
             self._models = OP.compare_models(
                 leg["spot"], leg["strike"], years, leg["rate"], leg["sigma"],
                 option=leg["option_type"])
+        if self.tab == "surface" and self._q:
+            leg = self._q["legs"][0]
+            self._surface = OP.vol_surface(leg["spot"], leg["rate"], leg["sigma"])
         if self.tab == "book":
             self._book = OS.book_greeks(p, self.market)
+            self._edge = OS.vol_edge(p, self.market)
 
     # -------------------------------------------------------------- events
     def handle_event(self, event, rect):
@@ -191,6 +198,8 @@ class GreeksApp(DesktopApp):
             self._draw_strat(surf, body)
         elif self.tab == "models":
             self._draw_models(surf, body)
+        elif self.tab == "surface":
+            self._draw_surface(surf, body)
         else:
             self._draw_book(surf, body)
 
@@ -387,6 +396,60 @@ class GreeksApp(DesktopApp):
                               (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
             y += 15
 
+    # ----------------------------------------------------- onglet SURFACE
+    def _draw_surface(self, surf, body):
+        if self._surface is None:
+            widgets.draw_text(surf, "Cotation indisponible.", (body.x, body.y + 8),
+                              fonts.small(), config.COL_TEXT_DIM)
+            return
+        sf = self._surface
+        inner = widgets.draw_panel(
+            surf, body, f"Surface de volatilité implicite — {self.ticker} "
+            "(modèle à sauts inversé en vols BS)", config.COL_CYAN)
+        widgets.draw_text(surf, "Chaque cellule : la vol qu'il FAUT mettre dans "
+                          "Black-Scholes pour retrouver le prix du modèle à "
+                          "sauts — les ailes coûtent plus cher (smile/skew), "
+                          "l'effet s'estompe avec la maturité.",
+                          (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
+        grid_top = inner.y + 34
+        strikes = sf["strikes_pct"]
+        mats = sf["maturities"]
+        vals = [v for row in sf["iv"] for v in row if v is not None]
+        if not vals:
+            return
+        vmin, vmax = min(vals), max(vals)
+        rng = (vmax - vmin) or 1.0
+        label_w = 74
+        cell_w = (inner.w - label_w) // len(strikes)
+        cell_h = min(56, (inner.bottom - grid_top - 40) // len(mats))
+        for j, k in enumerate(strikes):
+            widgets.draw_text(surf, f"{k * 100:.0f}%",
+                              (inner.x + label_w + j * cell_w + cell_w // 2,
+                               grid_top - 14),
+                              fonts.tiny(bold=True), config.COL_TEXT_DIM,
+                              align="center")
+        for i, T in enumerate(mats):
+            yy = grid_top + i * cell_h
+            widgets.draw_text(surf, f"{int(T * 12)} mois", (inner.x, yy + cell_h // 2 - 6),
+                              fonts.tiny(bold=True), config.COL_TEXT_DIM)
+            for j, _k in enumerate(strikes):
+                iv = sf["iv"][i][j]
+                r0 = pygame.Rect(inner.x + label_w + j * cell_w, yy,
+                                 cell_w - 3, cell_h - 3)
+                if iv is None:
+                    pygame.draw.rect(surf, config.COL_PANEL, r0, border_radius=3)
+                    continue
+                t = (iv - vmin) / rng
+                col = (int(30 + t * 200), int(60 + (1 - t) * 120), int(90 + (1 - t) * 100))
+                pygame.draw.rect(surf, col, r0, border_radius=3)
+                widgets.draw_text(surf, f"{iv * 100:.1f}%", r0.center,
+                                  fonts.tiny(bold=True), config.COL_WHITE,
+                                  align="center")
+        widgets.draw_text(surf, "strike (% du spot) → · plus c'est ROUGE, plus "
+                          "la vol implicite est haute (queues de crise pricées).",
+                          (inner.x, inner.bottom - 12), fonts.tiny(),
+                          config.COL_TEXT_DIM)
+
     # -------------------------------------------------------- onglet BOOK
     def _draw_book(self, surf, body):
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
@@ -451,3 +514,20 @@ class GreeksApp(DesktopApp):
                 widgets.draw_text(surf, f"{row[g]:+.2f}", (inner.x + dx, y),
                                   fonts.small(), config.COL_CYAN)
             y += 18
+        # l'edge de vol : implicite payée vs réalisée depuis l'achat
+        if self._edge and y < inner.bottom - 40:
+            y += 6
+            widgets.draw_text(surf, "VOL PAYÉE vs RÉALISÉE (gagne-t-on en vol ?) :",
+                              (inner.x, y), fonts.tiny(bold=True),
+                              config.COL_TEXT_DIM)
+            y += 16
+            for e in self._edge:
+                if y > inner.bottom - 14:
+                    break
+                col = config.COL_UP if e["edge"] >= 0 else config.COL_DOWN
+                widgets.draw_text(surf, f"{e['type'].upper()} {e['ticker']} — payé "
+                                  f"{e['entry_iv'] * 100:.0f}% impl., réalisé "
+                                  f"{e['realized'] * 100:.0f}% → edge "
+                                  f"{e['edge'] * 100:+.0f} pts",
+                                  (inner.x, y), fonts.tiny(), col)
+                y += 15

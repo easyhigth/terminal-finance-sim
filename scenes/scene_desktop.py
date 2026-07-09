@@ -888,13 +888,17 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                 self.wm.focus(w)
                 self.start_open = False
             return w
-        if name in ("frontier_lab", "hedge", "frontier", "sharpe", "zscore"):
+        if name in ("frontier_lab", "hedge", "frontier", "sharpe", "zscore",
+                    "options", "greeks", "vardesk", "rates"):
             # Outils quantitatifs NATIFS (apps/app_frontier.py, app_hedge.py,
-            # app_sharpe.py, app_zscore.py) : le labo de frontière (lecture
-            # seule) est remplacé par la frontière INTERACTIVE, et le desk de
-            # couverture plein écran (scene_hedge) par l'app Couverture qui
-            # réutilise la même logique core/hedging. Simple ouverture/focus.
-            key = "frontier" if name == "frontier_lab" else name
+            # app_sharpe.py, app_zscore.py, app_greeks.py, app_vardesk.py,
+            # app_rates.py) : le labo de frontière (lecture seule) est
+            # remplacé par la frontière INTERACTIVE, le desk de couverture
+            # plein écran (scene_hedge) par l'app Couverture (même logique
+            # core/hedging), et le desk d'options plein écran (scene_options)
+            # par le Desk Options (mêmes achats core/options + stratégies
+            # multi-jambes/modèles/grecques). Simple ouverture/focus.
+            key = {"frontier_lab": "frontier", "options": "greeks"}.get(name, name)
             w = self._launch(key)
             if w is not None:
                 self.wm.focus(w)

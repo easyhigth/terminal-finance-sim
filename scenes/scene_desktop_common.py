@@ -20,6 +20,9 @@ from apps.app_dilemma import DilemmaApp
 from apps.app_evaluation import EvaluationApp
 from apps.app_explorer import ExplorerApp
 from apps.app_frontier import FrontierApp
+from apps.app_greeks import GreeksApp
+from apps.app_rates import RatesApp
+from apps.app_vardesk import VarDeskApp
 from apps.app_inbox import InboxApp
 from apps.app_journal import JournalApp
 from apps.app_markethub import MarketHubApp
@@ -86,6 +89,9 @@ APPS = [
     ("zscore", "Z-Score", "graph", ZScoreApp),
     ("hedge", "Couverture", "shield", HedgeApp),
     ("frontier", "Frontière efficiente", "frontier", FrontierApp),
+    ("greeks", "Desk Options", "greeks", GreeksApp),
+    ("vardesk", "Risque (VaR)", "risk", VarDeskApp),
+    ("rates", "Desk Taux", "rates", RatesApp),
 ]
 
 # Application supplémentaire propre à la VOIE (track) choisie par le joueur
@@ -137,6 +143,8 @@ ICON_FEATURE = {
     "qmandates": "mandates",
     "qdeals": "deals",
     "hedge": "hedge",        # la couverture arrive au même grade que PROTECT
+    "greeks": "options",     # le desk options arrive avec la commande OPTIONS
+    "rates": "trade",        # le desk taux arrive quand on peut investir
 }
 
 # Raccourcis Ctrl+<lettre> des icônes du bureau — mêmes mnémoniques que les

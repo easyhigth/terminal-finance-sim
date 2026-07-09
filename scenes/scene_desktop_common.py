@@ -30,6 +30,10 @@ from apps.app_shop import ShopApp
 from apps.app_sheet import SheetApp
 from apps.app_trading import TradingApp
 from apps.app_watchlist import WatchlistApp
+# Applications financières avancées
+from apps.app_sharpe import SharpeApp
+from apps.app_zscore import ZScoreApp
+from apps.app_hedge import HedgeApp
 from core.app_catalog import SECTIONS
 
 TOPBAR_H = 36
@@ -76,6 +80,10 @@ APPS = [
     ("shop", "Boutique", "shop", ShopApp),
     ("analytics", "Analyse du portefeuille", "graph", AnalyticsApp),
     ("explorer", "Explorateur", "explorer", ExplorerApp),
+    # Applications financières avancées
+    ("sharpe", "Sharpe Ratio", "graph", SharpeApp),
+    ("zscore", "Z-Score", "graph", ZScoreApp),
+    ("hedge", "Couverture", "shield", HedgeApp),
 ]
 
 # Application supplémentaire propre à la VOIE (track) choisie par le joueur
@@ -147,6 +155,10 @@ DESKTOP_SHORTCUTS = {
     pygame.K_b: "qshop",
     pygame.K_s: "save",
     pygame.K_h: "qcommands",
+    # Raccourcis pour les applications financières avancées
+    pygame.K_r: "sharpe",    # Ratio de Sharpe
+    pygame.K_z: "zscore",    # Z-Score
+    pygame.K_c: "hedge",     # Couverture (Hedge)
 }
 # icône -> libellé de raccourci (tooltip au survol)
 _ICON_SHORTCUT = {icon: "Ctrl+" + pygame.key.name(k).upper()

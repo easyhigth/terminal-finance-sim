@@ -241,10 +241,13 @@ class FundingApp(DesktopApp):
             pygame.draw.rect(surf, config.COL_UP, self._open_btn, 1, border_radius=4)
             widgets.draw_text(surf, "METTRE EN PENSION", self._open_btn.center,
                               fonts.small(bold=True), config.COL_UP, align="center")
-        widgets.draw_text(surf, "En crise, haircut ET taux repo montent — l'appel "
-                          "de marge liquide au pire moment (LTCM, 2008).",
-                          (inner.x, inner.bottom - 12), fonts.tiny(),
-                          config.COL_TEXT_DIM)
+        repo_hint = ("En crise, haircut ET taux repo montent — l'appel de "
+                    "marge liquide au pire moment (LTCM, 2008).")
+        repo_font = fonts.tiny()
+        repo_lines = len(widgets.wrap_text_lines(repo_hint, repo_font, inner.w))
+        repo_h = repo_lines * (repo_font.get_height() + 3)
+        widgets.draw_text_wrapped(surf, repo_hint, (inner.x, inner.bottom - repo_h),
+                                  repo_font, config.COL_TEXT_DIM, inner.w, line_gap=3)
         # positions en cours
         rinner = widgets.draw_panel(surf, right, "Pensions en cours", config.COL_AMBER)
         self._close_rects = {}
@@ -280,16 +283,18 @@ class FundingApp(DesktopApp):
                                    "Prêt-emprunt de titres (le short se paie)",
                                    config.COL_CYAN)
         on = bool(p.flags.get("sec_lending"))
-        self._lend_toggle = pygame.Rect(inner.x, inner.y, 260, 22)
+        lend_label = ("[x] " if on else "[ ] ") + "PRÊTER MES TITRES " \
+            f"(part prêteur {SL.LENDER_SPLIT * 100:.0f}%)"
+        lend_font = fonts.tiny(bold=on)
+        lend_w = lend_font.size(lend_label)[0] + 16
+        self._lend_toggle = pygame.Rect(inner.x, inner.y, lend_w, 22)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if on else config.COL_PANEL,
                          self._lend_toggle, border_radius=3)
         pygame.draw.rect(surf, config.COL_UP if on else config.COL_BORDER,
                          self._lend_toggle, 1, border_radius=3)
-        widgets.draw_text(surf, ("[x] " if on else "[ ] ") + "PRÊTER MES TITRES "
-                          f"(part prêteur {SL.LENDER_SPLIT * 100:.0f}%)",
+        widgets.draw_text(surf, lend_label,
                           (self._lend_toggle.x + 8, self._lend_toggle.y + 5),
-                          fonts.tiny(bold=on),
-                          config.COL_UP if on else config.COL_TEXT_DIM)
+                          lend_font, config.COL_UP if on else config.COL_TEXT_DIM)
         y = inner.y + 32
         rows = SL.table(p, self.market)
         if not rows:
@@ -326,10 +331,13 @@ class FundingApp(DesktopApp):
         widgets.draw_text(surf, f"FLUX NET ≈ {widgets.format_money(total, cur)}/an "
                           "(couru à chaque pas)", (inner.x, y),
                           fonts.small(bold=True), tcol)
-        widgets.draw_text(surf, "Petite capi = « hard to borrow » : rare au prêt, "
-                          "chère à shorter — et tout s'élargit en crise.",
-                          (inner.x, inner.bottom - 12), fonts.tiny(),
-                          config.COL_TEXT_DIM)
+        htb_hint = ("Petite capi = « hard to borrow » : rare au prêt, chère "
+                   "à shorter — et tout s'élargit en crise.")
+        htb_font = fonts.tiny()
+        htb_lines = len(widgets.wrap_text_lines(htb_hint, htb_font, inner.w))
+        htb_h = htb_lines * (htb_font.get_height() + 3)
+        widgets.draw_text_wrapped(surf, htb_hint, (inner.x, inner.bottom - htb_h),
+                                  htb_font, config.COL_TEXT_DIM, inner.w, line_gap=3)
 
     # ------------------------------------------------------------------ cash
     def _draw_cash(self, surf, body):
@@ -342,16 +350,18 @@ class FundingApp(DesktopApp):
                                    config.COL_CYAN)
         y = inner.y + 2
         on = bool(p.flags.get("mm_sweep"))
-        self._sweep_toggle = pygame.Rect(inner.x, y, 300, 22)
+        sweep_label = ("[x] " if on else "[ ] ") + "SWEEP AU JOUR LE JOUR " \
+            f"({MM.sweep_rate(self.market) * 100:.2f}%/an, liquide)"
+        sweep_font = fonts.tiny(bold=on)
+        sweep_w = sweep_font.size(sweep_label)[0] + 16
+        self._sweep_toggle = pygame.Rect(inner.x, y, sweep_w, 22)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if on else config.COL_PANEL,
                          self._sweep_toggle, border_radius=3)
         pygame.draw.rect(surf, config.COL_UP if on else config.COL_BORDER,
                          self._sweep_toggle, 1, border_radius=3)
-        widgets.draw_text(surf, ("[x] " if on else "[ ] ") + "SWEEP AU JOUR LE JOUR "
-                          f"({MM.sweep_rate(self.market) * 100:.2f}%/an, liquide)",
+        widgets.draw_text(surf, sweep_label,
                           (self._sweep_toggle.x + 8, self._sweep_toggle.y + 5),
-                          fonts.tiny(bold=on),
-                          config.COL_UP if on else config.COL_TEXT_DIM)
+                          sweep_font, config.COL_UP if on else config.COL_TEXT_DIM)
         y += 30
         widgets.draw_text(surf, f"(cash balayé au-delà du coussin de "
                           f"{widgets.format_money(MM.SWEEP_BUFFER, cur)})",
@@ -376,10 +386,13 @@ class FundingApp(DesktopApp):
         pygame.draw.rect(surf, config.COL_UP, self._dep_btn, 1, border_radius=4)
         widgets.draw_text(surf, "OUVRIR LE DÉPÔT", self._dep_btn.center,
                           fonts.small(bold=True), config.COL_UP, align="center")
-        widgets.draw_text(surf, "La liquidité a un prix : le terme paie plus que "
-                          "le jour le jour — mais bloque.",
-                          (inner.x, inner.bottom - 12), fonts.tiny(),
-                          config.COL_TEXT_DIM)
+        liq_hint = ("La liquidité a un prix : le terme paie plus que le jour "
+                   "le jour — mais bloque.")
+        liq_font = fonts.tiny()
+        liq_lines = len(widgets.wrap_text_lines(liq_hint, liq_font, inner.w))
+        liq_h = liq_lines * (liq_font.get_height() + 3)
+        widgets.draw_text_wrapped(surf, liq_hint, (inner.x, inner.bottom - liq_h),
+                                  liq_font, config.COL_TEXT_DIM, inner.w, line_gap=3)
         rinner = widgets.draw_panel(surf, right, "Dépôts en cours", config.COL_AMBER)
         hh = MM.holdings(p, self.market)
         if not hh:

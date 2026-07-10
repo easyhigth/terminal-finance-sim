@@ -235,6 +235,7 @@ class SharpeApp(DesktopApp):
         rng = (hi - lo) or 1.0
         plot = inner.inflate(-8, -30)
         plot.move_ip(0, 4)
+        plot.height -= 14  # réserve la place sous les barres pour les étiquettes
         zero_y = plot.bottom - int((0.0 - lo) / rng * plot.h)
         pygame.draw.line(surf, config.COL_BORDER, (plot.x, zero_y),
                          (plot.right, zero_y))

@@ -49,7 +49,8 @@ def _z_score(confidence):
 def component_var(player, market, confidence=0.95, n=8000, seed=7):
     """VaR totale décomposée par ligne (allocation d'Euler, cf. docstring).
     Renvoie None sans position, sinon {var, cvar, lines: [{label, value,
-    contrib, pct}]} — pertes en positif, contribs sommant à var (±1 %)."""
+    contrib, pct}]} — pertes en positif (EN MILLIONS, même convention que
+    core/risk.py::simulate), contribs sommant à var (±1 %)."""
     eq = _equity_positions(player, market)
     bonds = _bond_positions(player, market)
     if not eq and not bonds:
@@ -58,7 +59,7 @@ def component_var(player, market, confidence=0.95, n=8000, seed=7):
     cols, labels, values = [], [], []
     if eq:
         idx = np.array([i for i, _ in eq])
-        val = np.array([v for _, v in eq])
+        val = np.array([v for _, v in eq]) / 1e6
         beta = market.beta[idx]
         bsec = market.b_sector[idx]
         breg = market.b_region[idx]
@@ -75,13 +76,14 @@ def component_var(player, market, confidence=0.95, n=8000, seed=7):
         for k, (i, v) in enumerate(eq):
             cols.append(pnl_eq[:, k])
             labels.append(market.companies[i]["ticker"])
-            values.append(v)
+            values.append(v / 1e6)
     if bonds:
         dy = rng.normal(0.0, RATE_VOL_WEEKLY, n)
         for j, (v, d) in enumerate(bonds):
-            cols.append(-(v * d) * dy)
+            v_m = v / 1e6
+            cols.append(-(v_m * d) * dy)
             labels.append(f"OBLIG {j + 1}")
-            values.append(v)
+            values.append(v_m)
     P = np.column_stack(cols)                         # (n, lignes)
     total = P.sum(axis=1)
     var_total = finmath.value_at_risk(total, confidence)

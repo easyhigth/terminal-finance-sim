@@ -139,16 +139,16 @@ class CrisisLabApp(DesktopApp):
         widgets.draw_text(surf, "P&L DU SCÉNARIO", (tx, rect.y + 40),
                           fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, widgets.format_money(res["total"], cur),
-                          (tx, rect.y + 56), fonts.title(bold=True), tcol)
+                          (tx, rect.y + 56), fonts.head(bold=True), tcol)
         widgets.draw_text(surf, f"{res['net_worth_pct']:+.1f}% du patrimoine",
-                          (tx, rect.y + 84), fonts.small(), tcol)
+                          (tx, rect.y + 88), fonts.small(), tcol)
         if self.crunch:
             gap = res["total"] - res["total_normal"]
             widgets.draw_text(surf, widgets.fit_text(
                 f"Coût de l'illusion de diversification : "
                 f"{widgets.format_money(gap, cur)} (vs corrélations normales)",
                 fonts.tiny(), rect.right - pad - tx),
-                (tx, rect.y + 104), fonts.tiny(), config.COL_AMBER)
+                (tx, rect.y + 108), fonts.tiny(), config.COL_AMBER)
         # table des lignes
         body = pygame.Rect(rect.x + pad, y + 34, rect.w - 2 * pad,
                            rect.bottom - pad - y - 34)

@@ -221,9 +221,17 @@ class FrontierApp(DesktopApp):
         self._universe_rect = inner
         held = {h["ticker"] for h in pf.holdings(self.app.gs.player, self.market)
                 if not h["short"]}
+        # réserve la place du conseil « ✶ = détenue... » en bas AVANT de
+        # calculer la zone de défilement des lignes (sinon la dernière ligne
+        # visible peut se dessiner par-dessus ce texte, cf. capture tutoriel).
+        univ_hint = "✶ = détenue · clic = inclure/exclure"
+        univ_font = fonts.tiny()
+        univ_lines = len(widgets.wrap_text_lines(univ_hint, univ_font, inner.w))
+        univ_h = univ_lines * (univ_font.get_height() + 3)
+        rows_area = pygame.Rect(inner.x, inner.y, inner.w, inner.h - univ_h - 4)
         prev_clip = surf.get_clip()
-        surf.set_clip(inner)
-        y = inner.y - self.scroll
+        surf.set_clip(rows_area)
+        y = rows_area.y - self.scroll
         for tk in self.universe:
             row = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, ROW_H - 2)
             self._row_rects[tk] = row
@@ -237,14 +245,13 @@ class FrontierApp(DesktopApp):
                               config.COL_WHITE if checked else config.COL_TEXT_DIM)
             y += ROW_H
         surf.set_clip(prev_clip)
-        content_h = (y + self.scroll) - inner.y
-        self._max_scroll = max(0, content_h - inner.h)
+        content_h = (y + self.scroll) - rows_area.y
+        self._max_scroll = max(0, content_h - rows_area.h)
         self.scroll = max(0, min(self._max_scroll, self.scroll))
-        self.scroll = widgets.draw_scrollbar(surf, rect, inner, self.scroll,
+        self.scroll = widgets.draw_scrollbar(surf, rect, rows_area, self.scroll,
                                              self._max_scroll, content_h)
-        widgets.draw_text(surf, "✶ = détenue · clic = inclure/exclure",
-                          (inner.x, inner.bottom - 12), fonts.tiny(),
-                          config.COL_TEXT_DIM)
+        widgets.draw_text_wrapped(surf, univ_hint, (inner.x, inner.bottom - univ_h),
+                                  univ_font, config.COL_TEXT_DIM, inner.w, line_gap=3)
 
     def _draw_chart(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Rendement attendu vs risque (annualisés)",
@@ -280,6 +287,7 @@ class FrontierApp(DesktopApp):
         sy = (hi_y - lo_y) or 1.0
         plot = inner.inflate(-46, -34)
         plot.move_ip(16, 2)
+        plot.height -= 16  # réserve la place sous l'axe X pour l'étiquette + le conseil
         self._chart_plot = plot.inflate(SNAP_PX * 2, SNAP_PX * 2)
 
         def px(v, r):
@@ -322,7 +330,7 @@ class FrontierApp(DesktopApp):
             widgets.draw_text(surf, "CIBLE", (tp[0] + 8, tp[1] - 14),
                               fonts.tiny(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, "Cliquez la courbe pour poser la CIBLE.",
-                          (inner.x, inner.bottom - 12), fonts.tiny(),
+                          (inner.x, plot.bottom + 18), fonts.tiny(),
                           config.COL_TEXT_DIM)
 
     def _quick_btn(self, surf, label, x, y, col, right=False):

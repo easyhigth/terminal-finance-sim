@@ -153,9 +153,12 @@ class PairsApp(DesktopApp):
             widgets.draw_text(surf, f"ADF {adf:.2f} · z {z:+.1f}",
                               (inner.x + 8, y + 16), fonts.tiny(), zcol)
             y += 36
-        widgets.draw_text(surf, "ADF < −3 ⇒ spread stationnaire (cointégré).",
-                          (inner.x, inner.bottom - 12), fonts.tiny(),
-                          config.COL_TEXT_DIM)
+        scan_hint = "ADF < −3 ⇒ spread stationnaire (cointégré)."
+        scan_font = fonts.tiny()
+        scan_lines = len(widgets.wrap_text_lines(scan_hint, scan_font, inner.w))
+        scan_h = scan_lines * (scan_font.get_height() + 3)
+        widgets.draw_text_wrapped(surf, scan_hint, (inner.x, inner.bottom - scan_h),
+                                  scan_font, config.COL_TEXT_DIM, inner.w, line_gap=3)
 
     def _draw_spread(self, surf, rect):
         title = (f"Spread ln({self.pair[0]}) − β·ln({self.pair[1]})"

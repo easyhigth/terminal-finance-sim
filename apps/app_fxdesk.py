@@ -155,10 +155,13 @@ class FxDeskApp(DesktopApp):
                               (inner.x + cols[4][1], y), fonts.small(),
                               config.COL_TEXT)
             y += 20
-        widgets.draw_text(surf, "Points de terme ≈ −carry × τ : la parité "
-                          "couverte rend le carry non-arbitrable sans risque.",
-                          (inner.x, inner.bottom - 12), fonts.tiny(),
-                          config.COL_TEXT_DIM)
+        fwd_hint = ("Points de terme ≈ −carry × τ : la parité couverte rend "
+                   "le carry non-arbitrable sans risque.")
+        fwd_font = fonts.tiny()
+        fwd_lines = len(widgets.wrap_text_lines(fwd_hint, fwd_font, inner.w))
+        fwd_h = fwd_lines * (fwd_font.get_height() + 3)
+        widgets.draw_text_wrapped(surf, fwd_hint, (inner.x, inner.bottom - fwd_h),
+                                  fwd_font, config.COL_TEXT_DIM, inner.w, line_gap=3)
 
     def _draw_panel(self, surf, rect, cur):
         inner = widgets.draw_panel(surf, rect, "Exécution & positions",
@@ -173,10 +176,11 @@ class FxDeskApp(DesktopApp):
                               (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
             y += 18
             ratio = abs(carry) / vol if vol > 0 else 0.0
-            widgets.draw_text(surf, f"Carry/vol = {ratio:.2f} — le portage paie-t-il "
-                              "le risque de décrochage ?",
-                              (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
-            y += 22
+            ratio_txt = (f"Carry/vol = {ratio:.2f} — le portage paie-t-il le "
+                        "risque de décrochage ?")
+            ratio_font = fonts.tiny()
+            y += widgets.draw_text_wrapped(surf, ratio_txt, (inner.x, y), ratio_font,
+                                           config.COL_TEXT_DIM, inner.w) + 4
         self._notional_rects = {}
         x = inner.x
         for v in NOTIONALS:

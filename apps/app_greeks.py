@@ -31,7 +31,7 @@ from core import options as opt
 from ui import fonts, widgets
 
 TABS = [("strat", "STRATÉGIE"), ("models", "MODÈLES"),
-        ("surface", "SURFACE"), ("book", "BOOK")]
+        ("surface", "SURFACE"), ("book", "BOOK"), ("dhedge", "Δ-HEDGE")]
 MATURITIES = opt.MATURITY_CHOICES          # 0.25 / 0.5 / 1.0
 GREEK_HELP = [
     ("Δ delta", "exposition directionnelle (équivalent actions)"),
@@ -101,6 +101,12 @@ class GreeksApp(DesktopApp):
         if self.tab == "book":
             self._book = OS.book_greeks(p, self.market)
             self._edge = OS.vol_edge(p, self.market)
+        if self.tab == "dhedge":
+            from core import delta_hedge as DH
+            self._dh_rows = DH.book_delta_by_underlying(p, self.market)
+            self._dh_plan = DH.flatten_plan(p, self.market)
+            self._dh_decomp = [(pos, DH.pnl_decomposition(p, self.market, pos))
+                               for pos in (getattr(p, "options", []) or [])]
 
     # -------------------------------------------------------------- events
     def handle_event(self, event, rect):
@@ -132,6 +138,19 @@ class GreeksApp(DesktopApp):
             return True
         if self._exec_btn and self._exec_btn.collidepoint(pos):
             self._execute()
+            return True
+        if getattr(self, "_flatten_btn", None) and self._flatten_btn.collidepoint(pos):
+            from core import delta_hedge as DH
+            plan = DH.flatten_plan(self.app.gs.player, self.market)
+            if not plan:
+                self._say("Delta déjà plat (ou pas d'options).", config.COL_TEXT_DIM)
+            else:
+                r = DH.execute_flatten(self.app.gs.player, self.market, plan)
+                col = config.COL_UP if not r["failed"] else config.COL_AMBER
+                self._say(f"Delta aplati : {r['done']} ordre(s)"
+                          + (f", {len(r['failed'])} refusé(s)" if r["failed"] else "")
+                          + " — il ne reste que Γ contre Θ.", col)
+                self._cache_key = None
             return True
         return False
 
@@ -200,6 +219,8 @@ class GreeksApp(DesktopApp):
             self._draw_models(surf, body)
         elif self.tab == "surface":
             self._draw_surface(surf, body)
+        elif self.tab == "dhedge":
+            self._draw_dhedge(surf, body)
         else:
             self._draw_book(surf, body)
 
@@ -447,6 +468,83 @@ class GreeksApp(DesktopApp):
                                   align="center")
         widgets.draw_text(surf, "strike (% du spot) → · plus c'est ROUGE, plus "
                           "la vol implicite est haute (queues de crise pricées).",
+                          (inner.x, inner.bottom - 12), fonts.tiny(),
+                          config.COL_TEXT_DIM)
+
+    # ----------------------------------------------------- onglet Δ-HEDGE
+    def _draw_dhedge(self, surf, body):
+        cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
+        inner = widgets.draw_panel(surf, body,
+                                   "Couverture dynamique — gamma scalping",
+                                   config.COL_UP)
+        rows = getattr(self, "_dh_rows", [])
+        self._flatten_btn = None
+        if not rows:
+            widgets.draw_text(surf, "Pas d'options au book — achetez un straddle "
+                              "(onglet STRATÉGIE) puis revenez aplatir son delta.",
+                              (inner.x, inner.y + 6), fonts.small(),
+                              config.COL_TEXT_DIM)
+            return
+        y = inner.y + 2
+        widgets.draw_text(surf, "Delta net par sous-jacent (options + actions, en titres) :",
+                          (inner.x, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        y += 16
+        for r in rows[:6]:
+            ncol = (config.COL_TEXT_DIM if abs(r["net_shares"]) < 1
+                    else config.COL_AMBER)
+            widgets.draw_text(surf, f"{r['ticker']} : Δ options "
+                              f"{r['delta_shares']:+.0f} + actions "
+                              f"{r['stock_shares']:+.0f} = NET {r['net_shares']:+.0f}",
+                              (inner.x, y), fonts.small(), ncol)
+            y += 18
+        plan = getattr(self, "_dh_plan", [])
+        y += 6
+        if plan:
+            txt = " · ".join(f"{'ACHETER' if t['trade'] > 0 else 'VENDRE/SHORT'} "
+                             f"{abs(t['trade'])} {t['ticker']}" for t in plan[:4])
+            widgets.draw_text(surf, widgets.fit_text(f"Plan : {txt}", fonts.tiny(),
+                                                     inner.w),
+                              (inner.x, y), fonts.tiny(), config.COL_TEXT)
+            y += 18
+            self._flatten_btn = pygame.Rect(inner.x, y, 200, 24)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._flatten_btn,
+                             border_radius=4)
+            pygame.draw.rect(surf, config.COL_UP, self._flatten_btn, 1,
+                             border_radius=4)
+            widgets.draw_text(surf, "APLATIR LE DELTA", self._flatten_btn.center,
+                              fonts.small(bold=True), config.COL_UP, align="center")
+            y += 32
+        else:
+            widgets.draw_text(surf, "Delta plat — votre P&L ne dépend plus de la "
+                              "direction : Γ contre Θ.", (inner.x, y),
+                              fonts.small(bold=True), config.COL_UP)
+            y += 22
+        # décomposition ex-post par position
+        widgets.draw_text(surf, "P&L décomposé depuis l'achat (chemin réel rejoué) :",
+                          (inner.x, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        y += 16
+        cols = [("POSITION", 0), ("Δ dir.", int(inner.w * 0.34)),
+                ("Γ scalp", int(inner.w * 0.48)), ("Θ temps", int(inner.w * 0.62)),
+                ("résidu", int(inner.w * 0.76)), ("RÉEL", int(inner.w * 0.89))]
+        for lbl, dx in cols:
+            widgets.draw_text(surf, lbl, (inner.x + dx, y), fonts.tiny(bold=True),
+                              config.COL_TEXT_DIM)
+        y += 15
+        for pos, dec in getattr(self, "_dh_decomp", []):
+            if dec is None or y > inner.bottom - 28:
+                continue
+            widgets.draw_text(surf, f"{pos['contracts']:.0f} "
+                              f"{pos['option_type'].upper()} {pos['ticker']}",
+                              (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
+            for (lbl, dx), key in zip(cols[1:], ("delta", "gamma", "theta",
+                                                 "residual", "actual")):
+                v = dec[key]
+                col = config.COL_UP if v >= 0 else config.COL_DOWN
+                widgets.draw_text(surf, f"{v:+,.0f}", (inner.x + dx, y),
+                                  fonts.small(), col)
+            y += 18
+        widgets.draw_text(surf, "Hedgé : le Δ directionnel disparaît — on gagne "
+                          "si le Γ encaissé bat le Θ payé (vol réalisée > implicite).",
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)
 

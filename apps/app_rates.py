@@ -29,7 +29,12 @@ class RatesApp(DesktopApp):
 
     def on_open(self):
         self.market = self.app.ensure_market()
-        self.tab = "rates"                    # "rates" | "futures"
+        self.tab = "rates"                    # "rates" | "futures" | "immun"
+        self.liability = 500_000.0
+        self.horizon = 5
+        self._liab_rects = {}
+        self._horizon_rects = {}
+        self._immun_btn = None
         self.msg = ""
         self.msg_col = config.COL_TEXT_DIM
         self._cache_key = None
@@ -68,6 +73,32 @@ class RatesApp(DesktopApp):
             if btn and btn.collidepoint(pos):
                 self._rotate(direction)
                 return True
+        for v, r in self._liab_rects.items():
+            if r.collidepoint(pos):
+                self.liability = v
+                return True
+        for h, r in self._horizon_rects.items():
+            if r.collidepoint(pos):
+                self.horizon = h
+                return True
+        if self._immun_btn and self._immun_btn.collidepoint(pos):
+            plan = RT.immunize_plan(self.app.gs.player, self.market,
+                                    self.liability, self.horizon)
+            if plan is None:
+                self.msg, self.msg_col = ("Univers insuffisant pour encadrer "
+                                          "cet horizon.", config.COL_DOWN)
+            else:
+                r = RT.execute_immunization(self.app.gs.player, self.market, plan)
+                if r.get("ok"):
+                    self.msg = (f"Barbell immunisant acheté : "
+                                f"{plan['short']['qty']} × {plan['short']['name']} + "
+                                f"{plan['long']['qty']} × {plan['long']['name']}")
+                    self.msg_col = config.COL_UP
+                    self._cache_key = None
+                else:
+                    self.msg, self.msg_col = (f"Refusé : {r.get('reason', '?')}.",
+                                              config.COL_DOWN)
+            return True
         return False
 
     def _rotate(self, direction):
@@ -107,7 +138,8 @@ class RatesApp(DesktopApp):
         # onglets TAUX / FUTURES
         x, ty = rect.x + pad, rect.y + 36
         self._tab_rects = {}
-        for tab, lbl in (("rates", "TAUX"), ("futures", "FUTURES (commodities)")):
+        for tab, lbl in (("rates", "TAUX"), ("futures", "FUTURES (commodities)"),
+                         ("immun", "IMMUNISATION")):
             w = fonts.tiny(bold=True).size(lbl)[0] + 18
             r = pygame.Rect(x, ty, w, 20)
             self._tab_rects[tab] = r
@@ -128,6 +160,9 @@ class RatesApp(DesktopApp):
                            rect.bottom - pad - ty - 26)
         if self.tab == "futures":
             self._draw_futures(surf, body, cur)
+            return
+        if self.tab == "immun":
+            self._draw_immunization(surf, body, cur)
             return
         col_w = (body.w - 12) // 2
         left = pygame.Rect(body.x, body.y, col_w, body.h)
@@ -291,6 +326,93 @@ class RatesApp(DesktopApp):
                               config.COL_AMBER, align="center")
         widgets.draw_text(surf, "DV01 = P&L d'une hausse d'1 point de base — "
                           "rotation court↔long à DV01 apparié.",
+                          (inner.x, inner.bottom - 12), fonts.tiny(),
+                          config.COL_TEXT_DIM)
+
+    def _draw_immunization(self, surf, body, cur):
+        """Immunisation classique : financer un passif futur avec un barbell
+        obligataire dont la DURATION égale l'horizon — au 1er ordre, le choc
+        de taux ne perce pas la couverture (rates_analytics.immunize_plan)."""
+        inner = widgets.draw_panel(surf, body,
+                                   "Immuniser un passif (duration matching)",
+                                   config.COL_CYAN)
+        y = inner.y + 2
+        widgets.draw_text(surf, "Passif à financer :", (inner.x, y + 3),
+                          fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        x = inner.x + 120
+        self._liab_rects = {}
+        for v in (250_000.0, 500_000.0, 1_000_000.0):
+            lbl = widgets.format_money(v, cur)
+            w = fonts.tiny(bold=True).size(lbl)[0] + 14
+            r = pygame.Rect(x, y, w, 20)
+            self._liab_rects[v] = r
+            sel = abs(v - self.liability) < 1e-9
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL,
+                             r, border_radius=3)
+            pygame.draw.rect(surf, config.COL_CYAN if sel else config.COL_BORDER,
+                             r, 1, border_radius=3)
+            widgets.draw_text(surf, lbl, r.center, fonts.tiny(bold=sel),
+                              config.COL_CYAN if sel else config.COL_TEXT_DIM,
+                              align="center")
+            x += w + 6
+        x += 14
+        widgets.draw_text(surf, "Horizon :", (x, y + 3), fonts.tiny(bold=True),
+                          config.COL_TEXT_DIM)
+        x += 62
+        self._horizon_rects = {}
+        for h in (3, 5, 7):
+            lbl = f"{h} ans"
+            w = fonts.tiny(bold=True).size(lbl)[0] + 14
+            r = pygame.Rect(x, y, w, 20)
+            self._horizon_rects[h] = r
+            sel = h == self.horizon
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL,
+                             r, border_radius=3)
+            pygame.draw.rect(surf, config.COL_AMBER if sel else config.COL_BORDER,
+                             r, 1, border_radius=3)
+            widgets.draw_text(surf, lbl, r.center, fonts.tiny(bold=sel),
+                              config.COL_AMBER if sel else config.COL_TEXT_DIM,
+                              align="center")
+            x += w + 6
+        y += 32
+        plan = RT.immunize_plan(self.app.gs.player, self.market,
+                                self.liability, self.horizon)
+        if plan is None:
+            widgets.draw_text(surf, "L'univers souverain n'encadre pas cet horizon.",
+                              (inner.x, y), fonts.small(), config.COL_TEXT_DIM)
+            self._immun_btn = None
+            return
+        widgets.draw_text(surf, f"Valeur actuelle du passif : "
+                          f"{widgets.format_money(plan['pv'], cur)} "
+                          f"(actualisé à {plan['y_h'] * 100:.2f}%)",
+                          (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
+        y += 22
+        for leg, lbl in ((plan["short"], "Jambe courte"),
+                         (plan["long"], "Jambe longue")):
+            widgets.draw_text(surf, f"{lbl} : {leg['qty']} × {leg['name']} "
+                              f"(poids {leg['weight'] * 100:.0f}%, duration "
+                              f"{leg['dur']:.2f})",
+                              (inner.x, y), fonts.small(), config.COL_TEXT)
+            y += 19
+        y += 4
+        widgets.draw_text(surf, f"Duration du barbell = {plan['dur_target']:.1f} "
+                          "= l'horizon — c'est l'immunisation.",
+                          (inner.x, y), fonts.tiny(bold=True), config.COL_AMBER)
+        y += 20
+        chk = RT.immunization_check(plan, dy=0.01)
+        widgets.draw_text(surf, f"Vérif +100 bp : actifs "
+                          f"{widgets.format_money(chk['d_assets'], cur)} vs passif "
+                          f"{widgets.format_money(chk['d_liability'], cur)} → écart "
+                          f"{widgets.format_money(chk['mismatch'], cur)}",
+                          (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+        y += 26
+        self._immun_btn = pygame.Rect(inner.x, y, 220, 26)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._immun_btn, border_radius=4)
+        pygame.draw.rect(surf, config.COL_UP, self._immun_btn, 1, border_radius=4)
+        widgets.draw_text(surf, "ACHETER LE BARBELL", self._immun_btn.center,
+                          fonts.small(bold=True), config.COL_UP, align="center")
+        widgets.draw_text(surf, "Le prix perd ce que le réinvestissement gagne "
+                          "(et réciproquement) — le passif reste financé.",
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)
 

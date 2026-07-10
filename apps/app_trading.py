@@ -599,7 +599,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         t = self._twap_prompt
         tk = t["ticker"]
         side_label = "ACHAT" if t["side"] == "buy" else "VENTE"
-        box = pygame.Rect(0, 0, min(300, rect.w - 40), 150)
+        box = pygame.Rect(0, 0, min(340, rect.w - 40), 172)
         box.center = rect.center
         style.draw_card(surf, box, bg=config.COL_PANEL, border=config.COL_CYAN,
                         radius=style.RADIUS_MD)
@@ -609,9 +609,19 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         steps = int(self._twap_steps_str) if self._twap_steps_str.isdigit() else 1
         widgets.draw_text(surf, f"Qté totale : {qty:g}  ·  tranche ≈ {qty / max(1, steps):.0f}",
                           (box.x + 12, box.y + 32), fonts.tiny(), config.COL_TEXT_DIM)
-        widgets.draw_text(surf, "Répartir sur combien de pas ?", (box.x + 12, box.y + 54),
+        # devis d'impact (microstructure) : bloc vs tranches — la raison
+        # d'être du TWAP, chiffrée sur le vrai modèle Almgren-Chriss du jeu
+        est = ORDERS.compare_cost(self.market, tk, qty, t["side"], max(1, steps))
+        if est and est["savings"] > 0:
+            cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
+            widgets.draw_text(surf, f"Impact estimé : bloc "
+                              f"{widgets.format_money(est['block_cost'], cur)} → "
+                              f"tranches {widgets.format_money(est['sliced_cost'], cur)} "
+                              f"(≈ −{widgets.format_money(est['savings'], cur)})",
+                              (box.x + 12, box.y + 50), fonts.tiny(), config.COL_UP)
+        widgets.draw_text(surf, "Répartir sur combien de pas ?", (box.x + 12, box.y + 72),
                           fonts.tiny(), config.COL_TEXT_DIM)
-        self._twap_price_rect = pygame.Rect(box.x + 12, box.y + 74, box.w - 24, 26)
+        self._twap_price_rect = pygame.Rect(box.x + 12, box.y + 92, box.w - 24, 26)
         pygame.draw.rect(surf, config.COL_BG, self._twap_price_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN if self._twap_focus else config.COL_BORDER,
                          self._twap_price_rect, 1, border_radius=4)

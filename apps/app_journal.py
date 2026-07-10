@@ -354,8 +354,13 @@ class JournalApp(DesktopApp):
         panel = pygame.Rect(rect.x + pad, ltop, rect.w - 2 * pad - curve_w - (10 if curve_w else 0),
                             rect.bottom - pad - ltop)
         if show_curve:
-            curve_panel = pygame.Rect(panel.right + 10, ltop, curve_w, panel.h)
+            # colonne droite : P&L cumulé en haut, sizing de Kelly en bas
+            half = (panel.h - 10) // 2
+            curve_panel = pygame.Rect(panel.right + 10, ltop, curve_w, half)
             self._draw_pnl_curve(surf, curve_panel, pnl_series, cur)
+            kelly_panel = pygame.Rect(panel.right + 10, ltop + half + 10,
+                                      curve_w, panel.h - half - 10)
+            self._draw_kelly(surf, kelly_panel, cur)
         inner = widgets.draw_panel(surf, panel, "Trades", config.COL_CYAN)
         self._rows = self._filtered_sorted()
         self.row_cursor = min(self.row_cursor, len(self._rows) - 1) if self._rows else 0
@@ -464,6 +469,63 @@ class JournalApp(DesktopApp):
         widgets.draw_series(surf, chart, series, color=col, baseline=True,
                             mouse_pos=pygame.mouse.get_pos(), y_fmt=y_fmt,
                             line_width=2)
+
+    def _draw_kelly(self, surf, panel, cur):
+        """Sizing de Kelly sur les stats RÉELLES du journal (core/kelly) :
+        f* = p − (1−p)/b, la courbe croissance(f) qui culmine à f* et chute
+        au-delà — sur-risquer un edge positif suffit à ruiner."""
+        from core import kelly as K
+        from core import portfolio as pf
+        inner = widgets.draw_panel(surf, panel, "Sizing (critère de Kelly)",
+                                   config.COL_AMBER)
+        p = self.player
+        nw = p.cash + sum(h["value"] for h in pf.holdings(p, self.market))
+        reco = K.recommendation(p, nw)
+        if reco is None:
+            widgets.draw_text(surf, "Aucun trade clôturé — Kelly a besoin de "
+                              "votre historique.", (inner.x, inner.y + 4),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+            return
+        st = reco["stats"]
+        widgets.draw_text(surf, f"p = {st['p'] * 100:.0f}% · b = {st['b']:.2f} "
+                          f"({st['n']} trades)", (inner.x, inner.y),
+                          fonts.tiny(), config.COL_TEXT_DIM)
+        fcol = config.COL_UP if reco["f_star"] > 0 else config.COL_DOWN
+        widgets.draw_text(surf, f"Kelly f* = {reco['f_star'] * 100:.0f}% · "
+                          f"½-Kelly = {reco['f_half'] * 100:.0f}%",
+                          (inner.x, inner.y + 16), fonts.small(bold=True), fcol)
+        widgets.draw_text(surf, f"Mise ½-Kelly ≈ {widgets.format_money(reco['stake_half'], cur)}",
+                          (inner.x, inner.y + 34), fonts.tiny(), config.COL_TEXT)
+        # courbe g(f) : le sommet à f*, la chute au-delà
+        chart = pygame.Rect(inner.x, inner.y + 54, inner.w,
+                            inner.h - 58 - (14 if reco["warning"] else 0))
+        if chart.h >= 26 and reco["curve"]:
+            gs = [g for _f, g in reco["curve"] if g > float("-inf")]
+            if gs:
+                lo, hi = min(gs + [0.0]), max(gs + [0.0])
+                rng = (hi - lo) or 1.0
+                fmax = reco["curve"][-1][0] or 1.0
+                pts = []
+                for f, g in reco["curve"]:
+                    if g == float("-inf"):
+                        continue
+                    x0 = chart.x + int(f / fmax * chart.w)
+                    y0 = chart.bottom - int((g - lo) / rng * chart.h)
+                    pts.append((x0, y0))
+                zero_y = chart.bottom - int((0.0 - lo) / rng * chart.h)
+                pygame.draw.line(surf, config.COL_BORDER, (chart.x, zero_y),
+                                 (chart.right, zero_y))
+                if len(pts) >= 2:
+                    pygame.draw.aalines(surf, config.COL_AMBER, False, pts)
+                if reco["f_star"] > 0:
+                    fx = chart.x + int(min(1.0, reco["f_star"] / fmax) * chart.w)
+                    pygame.draw.line(surf, config.COL_UP, (fx, chart.y),
+                                     (fx, chart.bottom), 1)
+        if reco["warning"]:
+            widgets.draw_text(surf, widgets.fit_text(reco["warning"], fonts.tiny(),
+                                                     inner.w),
+                              (inner.x, inner.bottom - 12), fonts.tiny(),
+                              config.COL_WARN)
 
     def _draw_note_dialog(self, surf, rect):
         entry = J.get_entry(self.player, self._note_active)

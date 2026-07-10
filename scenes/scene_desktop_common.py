@@ -37,6 +37,9 @@ from apps.app_review import ReviewApp
 from apps.app_shop import ShopApp
 from apps.app_sheet import SheetApp
 from apps.app_trading import TradingApp
+from apps.app_valuation import ValuationApp
+from apps.app_fxdesk import FxDeskApp
+from apps.app_vollab import VolLabApp
 from apps.app_watchlist import WatchlistApp
 # Applications financières avancées
 from apps.app_sharpe import SharpeApp
@@ -100,6 +103,9 @@ APPS = [
     ("pairs", "Pairs Trading", "trading", PairsApp),
     ("creditdesk", "Desk Crédit", "quant", CreditDeskApp),
     ("crisislab", "Labo de crise", "alert", CrisisLabApp),
+    ("valuation", "Valorisation", "research", ValuationApp),
+    ("fxdesk", "Desk FX (carry)", "market", FxDeskApp),
+    ("vollab", "Labo de vol", "quant", VolLabApp),
 ]
 
 # Application supplémentaire propre à la VOIE (track) choisie par le joueur
@@ -156,6 +162,9 @@ ICON_FEATURE = {
     "attribution": "trade",  # juger sa gestion suppose de pouvoir investir
     "pairs": "leverage",     # la paire exige la vente à découvert
     "creditdesk": "credit",  # le desk crédit arrive avec la titrisation
+    "valuation": "trade",    # valoriser suppose de pouvoir investir
+    "fxdesk": "trade",       # le carry s'exécute : même palier que le spot FX
+    "vollab": "options",     # le labo de vol dialogue avec le desk options
 }
 
 # Raccourcis Ctrl+<lettre> des icônes du bureau — mêmes mnémoniques que les

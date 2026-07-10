@@ -153,6 +153,70 @@ def execute_rotation(player, market, plan):
     return {"ok": True}
 
 
+def immunize_plan(player, market, liability, horizon_years):
+    """IMMUNISATION classique : financer un passif de `liability` (valeur à
+    l'échéance) dû dans `horizon_years`, avec un BARBELL de deux souverains
+    encadrant l'horizon, pondérés pour que la DURATION des actifs égale
+    l'horizon — au 1er ordre, un choc de taux laisse la couverture intacte
+    (le prix perd ce que le réinvestissement gagne, et réciproquement).
+    Renvoie None si l'univers n'encadre pas l'horizon, sinon
+    {pv, y_h, short:{id,name,qty,weight,dur}, long:{...}, dur_target}."""
+    from core import bonds as B
+    quotes = sorted(B.sovereign_quotes(market), key=lambda q: q["years"])
+    shorts = [q for q in quotes if q["mod_duration"] < horizon_years]
+    longs = [q for q in quotes if q["mod_duration"] > horizon_years]
+    if not shorts or not longs or liability <= 0:
+        return None
+    qs = shorts[-1]                                   # le plus proche en-dessous
+    ql = longs[0]                                     # le plus proche au-dessus
+    # taux à l'horizon (interpolation de la courbe) → valeur actuelle du passif
+    curve = yield_curve(market)
+    y_h = curve[0][1]
+    for (t1, y1), (t2, y2) in zip(curve, curve[1:]):
+        if t1 <= horizon_years <= t2:
+            w = (horizon_years - t1) / (t2 - t1) if t2 > t1 else 0.0
+            y_h = y1 + w * (y2 - y1)
+            break
+    else:
+        y_h = curve[-1][1]
+    pv = liability / (1.0 + y_h) ** horizon_years
+    # barbell : w_s·D_s + w_l·D_l = horizon, w_s + w_l = 1
+    d_s, d_l = qs["mod_duration"], ql["mod_duration"]
+    w_s = (d_l - horizon_years) / (d_l - d_s)
+    w_l = 1.0 - w_s
+    qty_s = max(1, int(round(pv * w_s / qs["price"])))
+    qty_l = max(1, int(round(pv * w_l / ql["price"])))
+    return {"pv": pv, "y_h": y_h, "dur_target": horizon_years,
+            "short": {"id": qs["id"], "name": qs["name"], "qty": qty_s,
+                      "weight": w_s, "dur": d_s, "price": qs["price"]},
+            "long": {"id": ql["id"], "name": ql["name"], "qty": qty_l,
+                     "weight": w_l, "dur": d_l, "price": ql["price"]}}
+
+
+def execute_immunization(player, market, plan):
+    """Achète les deux jambes du barbell (core/bonds.buy_bond)."""
+    from core import bonds as B
+    for leg in (plan["short"], plan["long"]):
+        r = B.buy_bond(player, market, leg["id"], leg["qty"])
+        if not r.get("ok"):
+            return {"ok": False, "reason": r.get("reason", "?"),
+                    "leg": leg["id"]}
+    return {"ok": True}
+
+
+def immunization_check(plan, dy=0.01):
+    """Vérification pédagogique : sous un choc parallèle ±dy, la variation
+    des ACTIFS (duration) vs celle du PASSIF actualisé — l'écart résiduel
+    doit être petit devant le choc. {d_assets, d_liability, mismatch}."""
+    pv = plan["pv"]
+    h = plan["dur_target"]
+    d_assets = -(plan["short"]["weight"] * plan["short"]["dur"]
+                 + plan["long"]["weight"] * plan["long"]["dur"]) * dy * pv
+    d_liability = -h * dy * pv                        # même sensibilité visée
+    return {"d_assets": d_assets, "d_liability": d_liability,
+            "mismatch": d_assets - d_liability}
+
+
 def scenario_table(player, market):
     """Table des scénarios de courbe appliqués au book du joueur.
     Renvoie {lines, totals, scenarios: [{name, pnl, pnl_pct}]}."""

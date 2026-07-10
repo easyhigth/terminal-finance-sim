@@ -86,6 +86,27 @@ def place_twap(player, market, asset_class, key, side, total_qty, steps, label=N
     return {"ok": True, "order": order}
 
 
+def compare_cost(market, ticker, qty, side, steps):
+    """DEVIS d'exécution (microstructure) : coût vs mid d'un ordre ACTION
+    exécuté en un seul bloc vs en `steps` tranches égales. Le modèle
+    d'impact du jeu est non-linéaire (Almgren-Chriss, cf.
+    core/portfolio.fill_price) : découper réduit l'impact PAR tranche —
+    c'est la raison d'être du TWAP. Renvoie None si ticker inconnu, sinon
+    {block_cost, sliced_cost, savings, block_px, slice_px, mid} (coûts
+    totaux en devise, toujours ≥ 0)."""
+    from core import portfolio as pf
+    mid = market.price_of(ticker)
+    if mid is None or qty < 1 or steps < 1:
+        return None
+    block_px = pf.fill_price(market, ticker, qty, side)
+    slice_px = pf.fill_price(market, ticker, qty / steps, side)
+    sign = 1.0 if side == "buy" else -1.0
+    return {"block_cost": sign * (block_px - mid) * qty,
+            "sliced_cost": sign * (slice_px - mid) * qty,
+            "savings": sign * (block_px - slice_px) * qty,
+            "block_px": block_px, "slice_px": slice_px, "mid": mid}
+
+
 def cancel(player, order_id):
     """Annule un ordre TWAP en attente."""
     _ensure_pending(player)

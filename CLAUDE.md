@@ -663,6 +663,62 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
     `tests/test_credit_crisis.py` (PD monotone au cours, ordre de la cascade,
     forwards exacts, rotation DV01 appariée, put qui amortit le krach) et
     `tests/test_credit_crisis_apps.py`.
+- **Investisseur fondamental & exécution (lot v2 A).**
+  - `core/valuation.py` : **DCF** (FCF ≈ NOPAT documenté, croissance explicite
+    5 ans + Gordon, garde WACC > g∞, EV→equity→par action vs cours, table de
+    sensibilité WACC×g∞ avec cases « compatibles cours » encadrées) ; **SML/
+    CAPM** (bêta de chaque société vs le facteur monde observable, alpha =
+    écart à la droite de marché) ; **pont d'IRR LBO** (décomposition EXACTE
+    croissance + expansion de multiple + désendettement = gain de fonds
+    propres — invariant testé, cash sweep paramétrable). App
+    `apps/app_valuation.py` (3 onglets, gating `trade` ; clic SML → DCF).
+  - **Devis d'impact TWAP** : le système TWAP existait déjà en entier
+    (`core/orders.py`, `player.pending_orders`, exécuté par `advance_step`,
+    bouton dans Trading) — ajout de `orders.compare_cost` (bloc vs tranches
+    sur le VRAI modèle Almgren-Chriss de `fill_price`) affiché dans la boîte
+    TWAP du Trading (l'économie d'impact chiffrée AVANT de poser l'ordre).
+  - `core/kelly.py` : **critère de Kelly** sur les stats RÉELLES du Journal
+    (f* = p − (1−p)/b, courbe de croissance g(f) qui culmine à f* et retombe
+    à zéro au double — sur-risquer ruine), garde-fous (< 10 trades = bruit,
+    espérance ≤ 0 = « ne pariez pas ») ; panneau « Sizing » dans le Journal
+    (sous la courbe de P&L, fenêtre large).
+- **Hedge dynamique & économétrie (lot v2 B).**
+  - `core/delta_hedge.py` : **gamma scalping** — delta agrégé du book
+    d'options PAR sous-jacent, `flatten_plan`/`execute_flatten` (position
+    action cible = −Δ, rachat de short avant achat), et **décomposition
+    ex-post du P&L** en Δ (directionnel)/Γ (gain du scalpeur, ≥ 0)/Θ (coût
+    du temps, ≤ 0)/résidu en REJOUANT le chemin de clôtures réel — la somme
+    retombe exactement sur le P&L mark-to-model (testé). Onglet **Δ-HEDGE**
+    du Desk Options (bouton APLATIR LE DELTA).
+  - `core/fx_carry.py` : **carry trade FX** — taux par devise (directeur
+    macro + écarts structurels JPY/CHF négatifs, ZAR/BRL positifs), **parité
+    des taux couverte** (forward théorique, points de terme ≈ −carry×τ),
+    `carry_table`, et `accrue` **câblé dans advance_step** (le portage couru
+    est un vrai revenu/coût quotidien sur les positions fx_positions). App
+    `apps/app_fxdesk.py` (table triée par carry, LONG/SHORT réels via
+    fx.open_spot, positions avec carry affiché, gating `trade`).
+  - `core/garch.py` : **GARCH(1,1)** par vraisemblance sur grille (variance
+    ciblée, déterministe), prévision convergente vers le long terme à
+    vitesse (α+β)^h, verdict vol chère/bon marché vs la vol que PRICE le
+    desk d'options. `core/regime_inference.py` : **filtre bayésien 2 états**
+    (émissions calibrées sur l'historique, transitions collantes 0,95) sur
+    les rendements de l'indice — P(stress) dans le temps + comparaison à la
+    VÉRITÉ du moteur (market.regime ∈ {Expansion, Calme, Volatil,
+    Récession}). App `apps/app_vollab.py` (onglets GARCH / RÉGIMES, lien
+    Desk Options, gating `options`).
+  - `core/rates_analytics.py` : **immunisation** (`immunize_plan` — barbell
+    de deux souverains encadrant l'horizon, poids résolus pour duration =
+    horizon EXACTEMENT, passif actualisé au taux interpolé de la courbe ;
+    `immunization_check` ±100 bp ; onglet IMMUNISATION du Desk Taux avec
+    achat réel du barbell).
+  - **Bug d'échelle corrigé** : le quick-launch de la barre des tâches est
+    désormais BORNÉ à ~40 % de la barre (le bureau gagne des apps à chaque
+    version ; au-delà, menu Démarrer/icônes — la place des fenêtres ouvertes
+    est préservée). Verrouillé par `tests/test_valuation_sizing.py`,
+    `test_valuation_app.py`, `test_advanced_lab.py` (décomposition Δ/Γ/Θ
+    exacte, parité couverte, GARCH retrouve les grappes d'une série
+    fabriquée, filtre de régime voit un stress synthétique, duration du
+    barbell = horizon exact) et `test_advanced_lab_apps.py`.
 - **Découvrabilité du bureau (icônes/boutons)** : icône « Succès » (`QUICK_APPS`/
   `qachievements` → scène achievements en fenêtre) ; **loupe de recherche globale** dans
   la topbar du bureau (`DesktopScene._gsearch_rect`, dessin vectoriel — ouvre la même

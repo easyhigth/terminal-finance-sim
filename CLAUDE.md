@@ -1014,6 +1014,60 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   binaires/composites comme « avoir un titre » ou « être n°1 » où une jauge n'aurait pas de
   sens) ; les badges à enjeu (`STREAK_BADGES`) réutilisent directement leur `streak_flag`/`target`
   existants comme progression. Accessible aussi depuis le hub PLUS (« Succès (badges) »).
+- **Lot intégration A (pédagogie + limites de risque + P&L Explain).** Rattrapage pédagogique
+  des desks avancés des lots précédents : 21 leçons FR/EN (`data/lessons.py`/`lessons_en.py`,
+  ex. repo/CDS/IRS/convertibles/Kelly/GARCH/régimes/Brinson/component VaR/Kupiec/gamma
+  scalping/carry/immunisation/cointégration/surface de vol), 29 termes de glossaire FR/EN
+  (`data/glossary_data.py`/`glossary_en.py` — attention aux DOUBLONS de clé si un terme existe
+  déjà sous une autre catégorie ailleurs dans le fichier : un dict literal garde SILENCIEUSEMENT
+  la dernière occurrence, verrouillé par l'absence de clé dupliquée dans les tests d'intégrité),
+  20 questions d'examen `adv01`-`adv20` (`data/question_bank.py`/`question_bank_en.py`).
+  **`core/risklimits.py`** gagne une limite de VaR IMPOSÉE PAR LA FIRME (`FIRM_VAR_LIMITS_M`
+  par grade, `firm_var_check`/`firm_var_enforce`) : au-delà du budget de risque du grade,
+  escalade par pas consécutifs de dépassement — avertissement (1) → réputation −3 (3) →
+  RÉDUCTION FORCÉE (5, vend 30 % de la plus grosse position longue, remet le compteur à
+  zéro) — câblée dans `GameState.advance_step`, notifiée par toast bilingue. **P&L Explain**
+  (`apps/app_pnlexplain.py`, icône bureau « trade ») : `advance_step` dépose un instantané
+  `player.flags["pnl_explain"]` (`nw`/`nw_prev`/`passive`/`net`) à CHAQUE pas ; l'app décompose
+  Δ patrimoine en REVENUS PASSIFS (dividendes/coupons/carry/repo/prêt-titres/sweep/dérivés,
+  déjà agrégés dans `dividends` par advance_step) + PRIX & RESTE, ventile l'effet prix par
+  secteur (`core/attribution.sector_attribution` — renvoie un **dict** `secteur → pnl`, pas
+  une liste de dicts) et affiche la jauge de VaR de la firme.
+- **Lot intégration B (missions réelles, crises historiques, backtester, fonctions tableur).**
+  (1) **Missions « état réel du portefeuille »** (`core/portfolio_missions.py`) : au tier
+  "portfolio" (VP+), `missions.generate(..., player=...)` remplace 2 des `MAX_ITEMS` questions
+  de banque par des items MCQ Oui/Non dont la bonne réponse est calculée EN DIRECT contre le
+  VRAI book du joueur (diversification sectorielle ≥ 3 secteurs, levier ≤ 1,5x, coussin de
+  cash ≥ 10 %, détention d'une obligation, couverture en place) — réutilise le rendu MCQ
+  existant d'`apps/app_mission.py`, aucune UI dédiée. `player` optionnel : les appelants qui
+  ne le passent pas gardent l'ancien comportement 100 % banque de questions.
+  (2) **Scénarios historiques** (`core/scenarios.py::HISTORIC_IDS` — `hist1987`/`hist2000`/
+  `hist2008`/`hist2020`, poids 0 : jamais tirés par `maybe_trigger`, uniquement déclenchables
+  à la demande via `CRISIS <id>` en mode bac à sable) calibrés sur l'ARC réel de chaque crise
+  (Black Monday = choc bref et violent ; dot-com = déclin sectoriel Tech long et progressif ;
+  GFC = choc profond et long centré Finance/Immobilier ; COVID = krach le plus rapide de
+  l'histoire). EN mirrors dans `data/scenarios_en.py`.
+  (3) **Rivaux qui tradent** (`core/rivals.py::step_trading`, déjà existant AVANT ce lot —
+  panier de positions réel par style, MTM chaque pas, câblé dans
+  `scenes/scene_terminal_time.py`) : rien à ajouter, la demande initiale était déjà satisfaite.
+  **Piège rencontré** : re-découvrir une fonctionnalité déjà implémentée EN COURS DE ROUTE
+  (`step()` avait l'air d'être la seule logique de scoring des rivaux, mais `step_trading` vit
+  plus loin dans le même fichier et utilise le même champ `positions` avec un schéma
+  `{"qty","entry"}` différent) — toujours `grep -n "^def "` un module en entier avant d'y
+  ajouter une fonctionnalité qui semble manquante.
+  (4) **Backtester** (`core/backtester.py`, pur — `sma_crossover`/`momentum`/
+  `mean_reversion`/`buy_hold`, signal décidé en `t` appliqué au rendement `t→t+1` : AUCUN
+  regard vers le futur) rejoué sur l'historique RÉEL d'un titre — préhistoire de carrière
+  incluse (`market.history_of`, ~5 ans) — via `backtest_ticker()` : total return vs buy&hold,
+  Sharpe annualisé, drawdown max, exposition. App `apps/app_backtester.py` (icône bureau,
+  chips positions/watchlist + recherche libre, courbe de capital).
+  (5) **Fonctions de desk EN DIRECT au Tableur** (`apps/app_sheet.py::_market_fn`) :
+  `=YTM("id")`/`=REPO_RATE()`/`=CDS_SPREAD("MVC",années)`/`=PD("MVC",années)`/
+  `=IV("MVC",strike_pct,années,prime,["call"|"put"])`, mêmes conventions que
+  PRICE/INDEX/FX (invalidation au pas de marché, `"#N/A"` si résolution impossible, jamais
+  d'exception). **Bug corrigé au passage** (`core/spreadsheet_engine.py::tokenize`) : le
+  scanner d'identifiants n'acceptait pas `_` dans un nom de fonction/référence — `REPO_RATE`,
+  `CDS_SPREAD` levaient `ValueError: Caractère inattendu : '_'` avant cette correction.
 - **`data/companies.py`** : roster fictif déterministe (320 sociétés, `ROSTER_SEED` fixe,
   noms déformés exprès : LVMH→LWNH, NVIDIA→MVC…).
 - **`core/`** : systèmes de jeu (career, portfolio, bonds, commodities, crypto, structured,

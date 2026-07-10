@@ -119,7 +119,38 @@ SCENARIOS = [
      "weight": 2, "sev_min": 0.5, "sev_max": 1.6,
      "story": "Un rappel de produits à grande échelle révèle des défauts de fabrication : "
               "le secteur Santé chute sur des craintes de litiges en cascade."},
+    # ------------------------------------------------------------------
+    # SCÉNARIOS HISTORIQUES — calibrés sur l'ARC réel de 4 crises célèbres
+    # (poids 0 : JAMAIS tirés par maybe_trigger, uniquement déclenchables à la
+    # demande via CRISIS <id> en mode bac à sable, cf. scene_terminal_career.py
+    # ::_cmd_crisis — « étudier » une crise précise plutôt que la subir au
+    # hasard). sev_min == sev_max == 1.0 : reproductibles à l'identique.
+    {"id": "hist1987", "name": "Krach de 1987 (« Black Monday »)", "kind": "bad",
+     "steps": 2, "world": -0.11, "sectors": {"Finance": -0.02}, "vol": 3.6,
+     "weight": 0, "sev_min": 1.0, "sev_max": 1.0, "historic": True,
+     "story": "Un krach éclair mondial sans déclencheur macro clair — le trading "
+              "programmé amplifie la panique en quelques séances (19 octobre 1987)."},
+    {"id": "hist2000", "name": "Éclatement de la bulle Internet (2000)", "kind": "bad",
+     "steps": 16, "world": -0.006, "sectors": {"Tech": -0.032, "Semicon": -0.038},
+     "vol": 2.1, "weight": 0, "sev_min": 1.0, "sev_max": 1.0, "historic": True,
+     "story": "Les valorisations spéculatives de la tech se dégonflent sur une longue "
+              "période, sans krach unique mais sans répit non plus (2000-2002)."},
+    {"id": "hist2008", "name": "Crise financière mondiale (2008)", "kind": "bad",
+     "steps": 10, "world": -0.042, "sectors": {"Finance": -0.058, "Immobilier": -0.05},
+     "vol": 2.9, "weight": 0, "sev_min": 1.0, "sev_max": 1.0, "historic": True,
+     "story": "L'effondrement du crédit hypothécaire gèle le système financier mondial : "
+              "un choc long et profond, centré sur banques et immobilier."},
+    {"id": "hist2020", "name": "Krach sanitaire (COVID, 2020)", "kind": "bad",
+     "steps": 3, "world": -0.075, "sectors": {"Energie": -0.03, "Conso": -0.02},
+     "vol": 3.4, "weight": 0, "sev_min": 1.0, "sev_max": 1.0, "historic": True,
+     "story": "L'arrêt brutal de l'économie mondiale déclenche le krach le plus rapide "
+              "de l'histoire — aussi bref que violent (février-mars 2020)."},
 ]
+
+# Sous-ensemble de SCENARIOS marqué "historic" — les 4 scénarios ci-dessus,
+# jamais tirés au hasard (weight=0). Exposé pour l'UI (liste dédiée, ex.
+# commande CRISIS) sans avoir à filtrer SCENARIOS à chaque appel.
+HISTORIC_IDS = [s["id"] for s in SCENARIOS if s.get("historic")]
 
 TRIGGER_PROBABILITY = 0.06   # par tour
 

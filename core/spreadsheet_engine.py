@@ -283,7 +283,7 @@ def tokenize(s):
                     continue
                 raise ValueError("Référence invalide après '$'")
             j = i
-            while j < n and s[j].isalnum():
+            while j < n and (s[j].isalnum() or s[j] == '_'):
                 j += 1
             word = s[i:j]
             # référence cellule = lettres puis chiffres (ex A1, AB12)

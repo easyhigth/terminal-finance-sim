@@ -24,7 +24,8 @@ class MissionScene(Scene):
         self.t = 0.0
         p = self.app.gs.player
         market = self.app.ensure_market()
-        self.mission = M.generate(p.grade_index, market, region=p.continent, track=p.track)
+        self.mission = M.generate(p.grade_index, market, region=p.continent, track=p.track,
+                                  player=p)
         self.idx = 0
         self.score = 0
         self.state = "intro"

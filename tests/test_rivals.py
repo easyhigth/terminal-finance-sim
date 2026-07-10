@@ -309,3 +309,4 @@ def test_recent_activity_respects_limit():
     out = rivals.recent_activity(p, limit=3)
     assert len(out) == 3
     assert out[0]["text"] == f"{name} agit (9)."
+

@@ -189,6 +189,105 @@ GLOSSARY = {
     "Volcker Rule": ("Réglementation",
         "Disposition de Dodd-Frank limitant le trading pour compte propre "
         "(proprietary trading) des banques de dépôt."),
+    # --- Salle des marchés avancée (desks du bureau) -----------------------
+    "Hard to borrow": ("Marché",
+        "Titre rare au prêt (petite capi, short crowdé) : son taux d'emprunt "
+        "est élevé, ce qui renchérit la vente à découvert."),
+    "Prime de terme": ("Taux",
+        "Supplément de rendement d'un placement long vs le jour le jour : le "
+        "prix de la liquidité abandonnée."),
+    "Distance au défaut": ("Crédit",
+        "Modèle de Merton : à combien d'écarts-types les actifs de la société "
+        "sont du point de défaut (la dette). PD = N(−DD)."),
+    "LGD": ("Crédit",
+        "Loss Given Default : perte en cas de défaut, 1 − taux de "
+        "recouvrement. Convention marché ≈ 60 % sur du senior unsecured."),
+    "Évènement de crédit": ("Crédit",
+        "Déclencheur du paiement d'un CDS (défaut, restructuration…). Dans le "
+        "jeu : action sous 25 % de son niveau d'entrée."),
+    "DV01": ("Taux",
+        "Valeur d'un point de base : P&L d'une hausse de 0,01 % des taux. "
+        "L'unité de compte d'un desk de taux (≈ valeur × duration × 0,0001)."),
+    "Obligation convertible": ("Crédit",
+        "Obligation + call sur l'action : plancher obligataire à la baisse, "
+        "participation à la hausse, coupon réduit. Prix = plancher + ratio × "
+        "call Black-Scholes."),
+    "Arbitrage convertible": ("Crédit",
+        "Long la convertible / short delta actions : neutralise la direction "
+        "pour porter le coupon et le gamma. Stratégie classique de hedge fund."),
+    "TWAP": ("Marché",
+        "Time-Weighted Average Price : exécution d'un ordre en tranches égales "
+        "réparties dans le temps, pour réduire l'impact de marché."),
+    "Profondeur de carnet": ("Marché",
+        "Quantités disponibles aux différents niveaux de prix (L2). Un gros "
+        "ordre « mange » le carnet : le coût croît avec la taille."),
+    "Vol crush": ("Dérivés",
+        "Effondrement de la volatilité implicite juste après un évènement "
+        "attendu (résultats) : la prime d'incertitude disparaît d'un coup."),
+    "Critère de Kelly": ("Performance",
+        "Fraction du capital maximisant la croissance géométrique : "
+        "f* = p − (1−p)/b. Sur-risquer au-delà détruit la croissance ; le "
+        "demi-Kelly est la pratique prudente."),
+    "GARCH": ("Risque",
+        "Modèle de variance conditionnelle : σ²(t) = ω + α·r²(t−1) + β·σ²(t−1). "
+        "Capture les grappes de volatilité ; α+β mesure leur persistance."),
+    "Grappes de volatilité": ("Risque",
+        "Fait stylisé des marchés : les jours agités se suivent. Motive les "
+        "modèles GARCH et la gestion par régimes."),
+    "Attribution Brinson": ("Performance",
+        "Décomposition de l'écart vs benchmark en effet d'ALLOCATION "
+        "(pondérations sectorielles) et de SÉLECTION (choix des titres), "
+        "sommant exactement à l'écart total."),
+    "Alpha (factoriel)": ("Performance",
+        "Rendement restant une fois retirés les paris factoriels (marché, "
+        "secteurs, régions) par régression. Le « vrai » talent, si R² modéré."),
+    "VaR par position": ("Risque",
+        "Allocation d'Euler : contribution de chaque ligne à la VaR totale via "
+        "cov(ligne, total)/var(total) × VaR. Somme = VaR totale ; contribution "
+        "négative = couverture."),
+    "Test de Kupiec": ("Risque",
+        "Backtest de VaR : le nombre d'exceptions observées est-il compatible "
+        "avec le niveau de confiance ? Rapport de vraisemblance vs χ²(1), "
+        "seuil 3,84 à 95 %."),
+    "Exception de VaR": ("Risque",
+        "Jour où la perte réalisée dépasse la VaR. À 95 %, on en attend ~5 "
+        "pour 100 jours — ni beaucoup plus, ni beaucoup moins."),
+    "Gamma scalping": ("Dérivés",
+        "P&L d'un book d'options delta-hedgé : gains de gamma (re-hedge qui "
+        "achète bas / vend haut) contre coût de theta. Gagne si la vol "
+        "réalisée dépasse l'implicite payée."),
+    "Delta-hedge": ("Dérivés",
+        "Neutraliser le delta d'un book d'options en détenant −Δ actions : le "
+        "P&L ne dépend plus de la direction, seulement de la vol."),
+    "Parité des taux couverte": ("Macro",
+        "F = S×(1+r_cotée·τ)/(1+r_base·τ) : couvert par forward, le carry "
+        "disparaît — pas d'arbitrage sans risque entre devises."),
+    "Points de terme": ("Macro",
+        "Écart forward − spot d'une paire de devises, reflet du différentiel "
+        "de taux (≈ −carry × durée)."),
+    "Immunisation": ("Taux",
+        "Apparier la DURATION des actifs à l'horizon d'un passif : au premier "
+        "ordre, les chocs de taux ne percent plus la couverture (prix vs "
+        "réinvestissement se compensent)."),
+    "Barbell": ("Taux",
+        "Book obligataire concentré sur deux maturités extrêmes (courte + "
+        "longue), pondérées pour atteindre une duration cible. Plus convexe "
+        "qu'un bullet de même duration."),
+    "Cointégration": ("Marché",
+        "Deux séries non stationnaires dont une combinaison linéaire est "
+        "stationnaire : leur spread « tient par un élastique ». Base du pairs "
+        "trading (test d'Engle-Granger)."),
+    "Half-life": ("Marché",
+        "Temps de retour à la moitié de l'écart pour un processus de retour à "
+        "la moyenne (AR(1)) : dit si un spread revient assez vite pour être "
+        "tradé."),
+    "Surface de volatilité": ("Dérivés",
+        "Vol implicite par strike et maturité. Le smile (ailes plus chères) "
+        "price les queues grasses ; sa pente (skew) la peur du krach."),
+    "Sweep (trésorerie)": ("Taux",
+        "Placement automatique au jour le jour du cash oisif au-delà d'un "
+        "coussin : liquide, mais moins payé qu'un dépôt à terme."),
+
 }
 
 # ===========================================================================

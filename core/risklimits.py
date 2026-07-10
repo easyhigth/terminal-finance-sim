@@ -105,3 +105,75 @@ def check_limits(player, market, limits=None):
                               "value": pct, "limit": lim["illiquid_pct"]})
 
     return {"ok": not breaches, "breaches": breaches}
+
+
+# ---------------------------------------------------------------------------
+# Limite de VaR IMPOSÉE PAR LA FIRME (par grade) — contrairement aux profils
+# ci-dessus (choisis par le joueur), celle-ci ne se négocie pas : un jeune
+# trader a un petit budget de risque, un MD un gros. Vérifiée à chaque pas
+# par advance_step avec ESCALADE : avertissement → perte de réputation →
+# RÉDUCTION FORCÉE du book (la firme coupe la position la plus grosse),
+# comme dans une vraie salle. VaR 95 % à 1 pas, en millions (convention
+# core/risk.simulate).
+# ---------------------------------------------------------------------------
+FIRM_VAR_LIMITS_M = [0.06, 0.10, 0.16, 0.25, 0.40, 0.65, 1.00, 1.60, 2.60, 4.00]
+FIRM_WARN_STREAK = 1        # 1er pas en dépassement : avertissement
+FIRM_REP_STREAK = 3         # 3 pas : la réputation trinque
+FIRM_CUT_STREAK = 5         # 5 pas : réduction forcée
+
+
+def firm_var_limit(player):
+    """Limite de VaR (en M) du grade courant."""
+    g = max(0, min(len(FIRM_VAR_LIMITS_M) - 1,
+                   getattr(player, "grade_index", 0)))
+    return FIRM_VAR_LIMITS_M[g]
+
+
+def firm_var_check(player, market, n=4000):
+    """VaR courante vs limite du grade. {'var', 'limit', 'ratio', 'breach'}.
+    VaR nulle (book vide) = jamais de breach."""
+    limit = firm_var_limit(player)
+    if not player.portfolio and not getattr(player, "bonds", None):
+        return {"var": 0.0, "limit": limit, "ratio": 0.0, "breach": False}
+    from core import risk
+    var = risk.simulate(player, market, confidence=0.95, n=n)["var"]
+    return {"var": var, "limit": limit, "ratio": var / limit if limit else 0.0,
+            "breach": var > limit}
+
+
+def firm_var_enforce(player, market):
+    """Escalade de la firme (appelée chaque pas par advance_step) :
+    renvoie None ou un évènement {'level': 'warn'|'rep'|'cut', 'var',
+    'limit', 'cut_ticker', 'cut_qty'} pour notification. La réduction
+    forcée vend 30 % de la plus grosse position action longue."""
+    chk = firm_var_check(player, market)
+    if not chk["breach"]:
+        player.flags["firm_var_streak"] = 0
+        return None
+    streak = player.flags.get("firm_var_streak", 0) + 1
+    player.flags["firm_var_streak"] = streak
+    ev = {"var": chk["var"], "limit": chk["limit"], "level": "warn",
+          "cut_ticker": None, "cut_qty": 0}
+    if streak >= FIRM_CUT_STREAK:
+        from core import portfolio as pf
+        longs = [(tk, pos) for tk, pos in player.portfolio.items()
+                 if pos["shares"] > 0]
+        if longs:
+            tk, pos = max(longs,
+                          key=lambda x: x[1]["shares"]
+                          * (market.price_of(x[0]) or 0.0))
+            qty = max(1, int(pos["shares"] * 0.30))
+            r = pf.sell(player, market, tk, qty)
+            if r.get("ok"):
+                ev.update({"level": "cut", "cut_ticker": tk, "cut_qty": qty})
+                player.flags["firm_var_streak"] = 0
+                return ev
+        ev["level"] = "rep"          # rien à couper côté actions : sanction
+    elif streak >= FIRM_REP_STREAK:
+        ev["level"] = "rep"
+    if ev["level"] == "rep":
+        from core.i18n import get_lang
+        reason = ("Firm VaR limit breach" if get_lang() == "en"
+                  else "Dépassement de la limite de VaR de la firme")
+        player.adjust_reputation(-3, reason=reason)
+    return ev

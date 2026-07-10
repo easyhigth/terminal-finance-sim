@@ -83,4 +83,24 @@ SCENARIOS_EN = {
         "story": "A large-scale product recall reveals manufacturing defects: the Health "
                  "sector falls on fears of cascading litigation.",
     },
+    "hist1987": {
+        "name": "1987 crash (\"Black Monday\")",
+        "story": "A global flash crash with no clear macro trigger — programme trading "
+                 "amplifies the panic within a few sessions (October 19, 1987).",
+    },
+    "hist2000": {
+        "name": "Dot-com bust (2000)",
+        "story": "Speculative tech valuations deflate over a long stretch — no single "
+                 "crash, but no respite either (2000-2002).",
+    },
+    "hist2008": {
+        "name": "Global financial crisis (2008)",
+        "story": "The mortgage credit collapse freezes the global financial system: a "
+                 "long, deep shock centred on banks and real estate.",
+    },
+    "hist2020": {
+        "name": "COVID crash (2020)",
+        "story": "The sudden global economic shutdown triggers the fastest crash in "
+                 "history — as brief as it is violent (February-March 2020).",
+    },
 }

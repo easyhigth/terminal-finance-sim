@@ -12,6 +12,7 @@ import pygame
 
 from apps.app_alerts import AlertsApp
 from apps.app_analytics import AnalyticsApp
+from apps.app_backtester import BacktesterApp
 from apps.app_book import BookApp
 from apps.app_calculator import CalculatorApp
 from apps.app_creditdesk import CreditDeskApp
@@ -25,6 +26,7 @@ from apps.app_attribution import AttributionApp
 from apps.app_frontier import FrontierApp
 from apps.app_greeks import GreeksApp
 from apps.app_pairs import PairsApp
+from apps.app_pnlexplain import PnlExplainApp
 from apps.app_rates import RatesApp
 from apps.app_vardesk import VarDeskApp
 from apps.app_inbox import InboxApp
@@ -108,6 +110,8 @@ APPS = [
     ("fxdesk", "Desk FX (carry)", "market", FxDeskApp),
     ("vollab", "Labo de vol", "quant", VolLabApp),
     ("funding", "Desk Financement", "book", FundingApp),
+    ("pnlexplain", "P&L Explain", "graph", PnlExplainApp),
+    ("backtester", "Backtester", "graph", BacktesterApp),
 ]
 
 # Application supplémentaire propre à la VOIE (track) choisie par le joueur
@@ -168,6 +172,8 @@ ICON_FEATURE = {
     "fxdesk": "trade",       # le carry s'exécute : même palier que le spot FX
     "vollab": "options",     # le labo de vol dialogue avec le desk options
     "funding": "leverage",   # repo/prêt-titres = levier et shorts
+    "pnlexplain": "trade",   # expliquer le P&L suppose de pouvoir investir
+    "backtester": "trade",  # tester une stratégie suppose de pouvoir investir
 }
 
 # Raccourcis Ctrl+<lettre> des icônes du bureau — mêmes mnémoniques que les

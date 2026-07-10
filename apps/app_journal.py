@@ -35,6 +35,7 @@ class JournalApp(DesktopApp):
 
     def on_open(self):
         self.player = self.app.gs.player
+        self.market = self.app.ensure_market()
         self.search = ""
         self.asset_filter = None
         self.side_filter = None

@@ -387,4 +387,71 @@ GLOSSARY_EN = {
         "information that confirms an existing view, ignoring contrary signals."),
     "Régime de marché": ("Behavioural", "Market regime: a phase with stable properties "
         "— low vol/trend, high vol/uncertainty, or trendless range. Regimes alternate."),
+    # --- Advanced trading floor (desk apps) -------------------------------
+    "Hard to borrow": ("Market", "A stock scarce to lend (small-cap, crowded short): "
+        "its borrow fee is high, which raises the cost of shorting it."),
+    "Prime de terme": ("Rates", "Term premium: the extra yield of a long-dated "
+        "investment over overnight — the price of giving up liquidity."),
+    "Distance au défaut": ("Credit", "Merton model: how many standard deviations the "
+        "firm's assets are from the default point (its debt). PD = N(-DD)."),
+    "LGD": ("Credit", "Loss Given Default: the loss on default, 1 minus the recovery "
+        "rate. Market convention ~60% on senior unsecured debt."),
+    "Évènement de crédit": ("Credit", "The trigger that pays out a CDS (default, "
+        "restructuring...). In the game: the stock falling below 25% of its entry level."),
+    "DV01": ("Rates", "Dollar Value of 01: the P&L of a 1bp rise in rates. The unit of "
+        "account of a rates desk (~= value x duration x 0.0001)."),
+    "Obligation convertible": ("Credit", "Bond + call on the stock: a bond floor on the "
+        "downside, upside participation, reduced coupon. Price = floor + ratio x "
+        "Black-Scholes call."),
+    "Arbitrage convertible": ("Credit", "Long the convertible / short delta shares: "
+        "neutralises direction to harvest the coupon and gamma. A classic hedge fund strategy."),
+    "TWAP": ("Market", "Time-Weighted Average Price: executing an order in equal "
+        "slices spread over time, to reduce market impact."),
+    "Profondeur de carnet": ("Market", "The quantities available at each price level "
+        "(L2). A large order 'eats through' the book: cost grows with size."),
+    "Vol crush": ("Derivatives", "The collapse of implied volatility right after an "
+        "expected event (earnings): the uncertainty premium vanishes at once."),
+    "Critère de Kelly": ("Performance", "The capital fraction maximising geometric "
+        "growth: f* = p - (1-p)/b. Over-betting past it destroys growth; half-Kelly is "
+        "the cautious practice."),
+    "GARCH": ("Risk", "Conditional variance model: sigma^2(t) = omega + alpha*r^2(t-1) "
+        "+ beta*sigma^2(t-1). Captures volatility clustering; alpha+beta measures its persistence."),
+    "Grappes de volatilité": ("Risk", "Volatility clustering: a stylised fact of markets "
+        "— turbulent days follow turbulent days. Motivates GARCH and regime-based models."),
+    "Attribution Brinson": ("Performance", "Decomposes the gap to benchmark into an "
+        "ALLOCATION effect (sector weights) and a SELECTION effect (stock picking), "
+        "summing exactly to the total gap."),
+    "Alpha (factoriel)": ("Performance", "The return left once market/sector/region "
+        "factor bets are stripped out by regression. The 'true' skill, if R^2 is moderate."),
+    "VaR par position": ("Risk", "Euler allocation: each position's contribution to "
+        "total VaR via cov(position, total)/var(total) x VaR. Sums to total VaR; a "
+        "negative contribution is a hedge."),
+    "Test de Kupiec": ("Risk", "A VaR backtest: is the observed number of exceptions "
+        "consistent with the confidence level? Likelihood-ratio statistic versus "
+        "chi-squared(1), threshold 3.84 at 95%."),
+    "Exception de VaR": ("Risk", "A day where the realised loss exceeds VaR. At 95%, "
+        "about 5 are expected per 100 days — not much more, not much less."),
+    "Gamma scalping": ("Derivatives", "The P&L of a delta-hedged options book: gamma "
+        "gains (re-hedging buys low / sells high) against theta cost. Wins if realised "
+        "vol exceeds the implied vol paid."),
+    "Delta-hedge": ("Derivatives", "Neutralising an options book's delta by holding "
+        "-Delta shares: P&L no longer depends on direction, only on volatility."),
+    "Parité des taux couverte": ("Macro", "F = S x (1+r_quote*tau)/(1+r_base*tau): once "
+        "hedged by a forward, the carry disappears — no riskless arbitrage between currencies."),
+    "Points de terme": ("Macro", "Forward points: the forward-minus-spot gap of a "
+        "currency pair, reflecting the rate differential (~= -carry x tenor)."),
+    "Immunisation": ("Rates", "Matching asset DURATION to a liability's horizon: to "
+        "first order, rate shocks no longer pierce the hedge (price and reinvestment "
+        "effects offset)."),
+    "Barbell": ("Rates", "A bond book concentrated on two extreme maturities (short + "
+        "long), weighted to hit a target duration. More convex than a bullet of the same duration."),
+    "Cointégration": ("Market", "Two non-stationary series whose linear combination is "
+        "stationary: their spread is 'tied by an elastic band'. The basis of pairs "
+        "trading (Engle-Granger test)."),
+    "Half-life": ("Market", "The time to revert halfway back for a mean-reverting "
+        "(AR(1)) process: tells whether a spread reverts fast enough to be traded."),
+    "Surface de volatilité": ("Derivatives", "Implied vol by strike and maturity. The "
+        "smile (pricier wings) prices fat tails; its slope (skew) prices crash fear."),
+    "Sweep (trésorerie)": ("Rates", "Automatic overnight sweep of idle cash beyond a "
+        "buffer: liquid, but paid less than a term deposit."),
 }

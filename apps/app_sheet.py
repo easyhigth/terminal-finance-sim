@@ -59,6 +59,13 @@ FUNCTION_CATALOG = [
                             ("SHARES", "Actions détenues d'un titre"),
                             ("NETWORTH", "Patrimoine net (sans arg)"),
                             ("CASH", "Trésorerie (sans arg)")]),
+    ("Desks (en direct)", [
+        ("YTM", 'Rendement à échéance d\'une obligation ("id" — cf. Desk Taux)'),
+        ("REPO_RATE", "Taux repo courant (sans arg, annuel)"),
+        ("CDS_SPREAD", 'Spread CDS théorique en bps ("MVC"; années)'),
+        ("PD", 'Probabilité de défaut de Merton ("MVC"; [années=3])'),
+        ("IV", 'Vol implicite ("MVC"; strike en % du spot; années; prime; ["call"|"put"])'),
+    ]),
 ]
 
 CHART_TYPES = [("line", "Ligne"), ("bar", "Barres"), ("scatter", "Nuage")]
@@ -74,7 +81,8 @@ UNDO_LIMIT = 50
 # Fonctions de marché EN DIRECT (cf. _market_fn) : une cellule dont la formule
 # en appelle une clignote vert/rouge au mouvement (cf. TickFlash), comme un
 # vrai terminal — repère visuel qu'elle est vivante, pas figée.
-_LIVE_FN_NAMES = ("PRICE", "INDEX", "FX", "NETWORTH", "CASH")
+_LIVE_FN_NAMES = ("PRICE", "INDEX", "FX", "NETWORTH", "CASH",
+                  "YTM", "REPO_RATE", "CDS_SPREAD", "PD", "IV")
 
 
 def _split_ref(ref):
@@ -211,6 +219,52 @@ class SheetApp(DesktopApp):
             return float(pm.net_worth(p, m))
         if name == "CASH":
             return float(p.cash)
+        if name == "YTM":
+            if not args or m is None:
+                return "#N/A"
+            from core import bonds as bonds_mod
+            try:
+                return float(bonds_mod.ytm(m, str(args[0])))
+            except Exception:
+                return "#N/A"
+        if name == "REPO_RATE":
+            if m is None:
+                return "#N/A"
+            from core import repo as repo_mod
+            return float(repo_mod.repo_rate(m))
+        if name == "CDS_SPREAD":
+            if not args or m is None:
+                return "#N/A"
+            from core import cds as cds_mod
+            years = float(args[1]) if len(args) > 1 else 3.0
+            q = cds_mod.quote(m, str(args[0]).upper(), years)
+            return float(q["spread_bps"]) if q else "#N/A"
+        if name == "PD":
+            if not args or m is None:
+                return "#N/A"
+            from core import credit_risk as cr_mod
+            years = float(args[1]) if len(args) > 1 else 3.0
+            f = cr_mod.merton_credit(m, str(args[0]).upper(), horizon=years)
+            return float(f["pd"]) if f else "#N/A"
+        if name == "IV":
+            if not args or len(args) < 4 or m is None:
+                return "#N/A"
+            from core import option_pricing as op_mod
+            from core import options as opt_mod
+            tk = str(args[0]).upper()
+            spot = m.price_of(tk)
+            if spot is None:
+                return "#N/A"
+            strike_pct = float(args[1])
+            years = float(args[2])
+            premium = float(args[3])
+            kind = str(args[4]).lower() if len(args) > 4 else "call"
+            r = opt_mod.risk_free_rate(m)
+            try:
+                return float(op_mod.implied_vol(premium, spot, spot * strike_pct,
+                                                 years, r, option=kind))
+            except Exception:
+                return "#N/A"
         return None
 
     def _sync_market(self):

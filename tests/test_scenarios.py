@@ -382,3 +382,44 @@ def test_fx_emergent_targets_only_emerging_region_pool():
         if len(seen_regions) == 2:
             break
     assert seen_regions, "fx_emergent ne s'est jamais déclenché sur 20000 tirages"
+
+
+# ----------------------------------------------- scénarios historiques
+def test_historic_scenarios_have_weight_zero():
+    for sid in scenarios.HISTORIC_IDS:
+        s = next(x for x in scenarios.SCENARIOS if x["id"] == sid)
+        assert s["weight"] == 0
+
+
+def test_historic_scenarios_never_fire_via_maybe_trigger():
+    m = _setup()
+    m.crises = []
+    rng = random.Random(7)
+    for _ in range(400):
+        m.step()
+        ev = scenarios.maybe_trigger(m, rng=rng)
+        if ev is not None:
+            assert ev["id"] not in scenarios.HISTORIC_IDS
+
+
+def test_all_four_historic_ids_present():
+    assert set(scenarios.HISTORIC_IDS) == {"hist1987", "hist2000", "hist2008", "hist2020"}
+
+
+def test_trigger_by_id_fires_a_historic_scenario_deterministically():
+    m1 = _setup()
+    m2 = _setup()
+    r1 = scenarios.trigger_by_id(m1, "hist2008")
+    r2 = scenarios.trigger_by_id(m2, "hist2008")
+    assert r1["id"] == "hist2008"
+    assert r1["severity"] == pytest.approx(r2["severity"]) == 1.0
+    assert m1.crises and m1.crises[-1].world == pytest.approx(m2.crises[-1].world)
+
+
+def test_historic_scenarios_have_english_story_and_name():
+    from data import scenarios_en as en_mod
+    for sid in scenarios.HISTORIC_IDS:
+        assert sid in en_mod.SCENARIOS_EN
+        loc = scenarios.localized("en")
+        s = next(x for x in loc if x["id"] == sid)
+        assert s["name"] == en_mod.SCENARIOS_EN[sid]["name"]

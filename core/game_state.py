@@ -689,6 +689,29 @@ class GameState:
             # grade) : utilisé par career.risk_profile() pour moduler les mandats proposés.
             if portfolio.leverage(p, market) >= 2.5:
                 p.flags["high_leverage_steps"] = p.flags.get("high_leverage_steps", 0) + 1
+            # limite de VaR IMPOSÉE PAR LA FIRME (par grade) : avertissement,
+            # puis réputation, puis RÉDUCTION FORCÉE (cf. risklimits.firm_var_*)
+            from core import risklimits as _rl
+            _firm_ev = _rl.firm_var_enforce(p, market)
+            if _firm_ev is not None:
+                from core import notify_queue as _nq
+                if _firm_ev["level"] == "cut":
+                    _nq.push(p, _L("RISQUE : la firme a COUPÉ ",
+                                   "RISK: the firm CUT ")
+                             + f"{_firm_ev['cut_qty']} × {_firm_ev['cut_ticker']}"
+                             + _L(" (VaR au-dessus de la limite du grade)",
+                                  " (VaR above grade limit)"), "warn")
+                elif _firm_ev["level"] == "rep":
+                    _nq.push(p, _L("RISQUE : dépassement persistant de la limite "
+                                   "de VaR de la firme (réputation −3)",
+                                   "RISK: persistent firm VaR limit breach "
+                                   "(reputation −3)"), "warn")
+                else:
+                    _nq.push(p, _L("Avertissement risque : VaR ",
+                                   "Risk warning: VaR ")
+                             + f"{_firm_ev['var']:.2f} M > "
+                             + _L("limite ", "limit ")
+                             + f"{_firm_ev['limit']:.2f} M", "warn")
             # dépassement persistant des limites de risque (cf. core/risklimits.py,
             # scenes/scene_risk.py) : un dépassement isolé ne coûte rien, mais le
             # laisser filer pénalise la réputation (mandataire qui tolère le
@@ -853,6 +876,18 @@ class GameState:
         logger.debug(
             "advance_step: day=%s quarter=%s cash=%.2f net_worth=%.2f game_over=%s",
             p.day, p.quarter, p.cash, nw, p.game_over)
+
+        # instantané « P&L Explain » du pas (lu par apps/app_pnlexplain.py) :
+        # Δ patrimoine = effet PRIX (positions) + REVENUS PASSIFS (dividendes,
+        # coupons, carry, repo, prêt-titres, sweep, dérivés — tous agrégés
+        # dans `dividends` au fil de ce pas) + le reste (salaire/frais...).
+        if market is not None:
+            p.flags["pnl_explain"] = {
+                "step": market.step_count, "day": p.day,
+                "nw": nw, "nw_prev": p.flags.get("pnl_explain", {}).get("nw", nw),
+                "passive": dividends,
+                "net": net,
+            }
 
         return {
             "events": evts,

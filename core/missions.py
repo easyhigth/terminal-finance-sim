@@ -99,15 +99,29 @@ _TIER_BRIEFS = {
 # ---------------------------------------------------------------------------
 # API
 # ---------------------------------------------------------------------------
-def generate(grade_index, market, rng=None, region=None, track="General"):
+def generate(grade_index, market, rng=None, region=None, track="General", player=None):
     """Génère une mission adaptée au grade courant : un tirage de questions
     de la banque d'examens (jusqu'à MAX_ITEMS), thématisé par mission_tier().
-    `track` inclut les questions de la voie du joueur en plus du tronc commun."""
+    `track` inclut les questions de la voie du joueur en plus du tronc commun.
+
+    Au tier "portfolio" (VP et au-delà), si `player` est fourni, 2 des
+    MAX_ITEMS questions sont remplacées par des vérifications de l'ÉTAT RÉEL
+    du book (core/portfolio_missions.py) — diversification, levier, coussin
+    de cash, détention d'obligations, couverture — plutôt qu'un quiz
+    générique : à ce niveau, on juge un gérant sur son portefeuille, pas
+    seulement sur sa culture générale. `player` omis (ex. appelants existants
+    qui ne le passaient pas) : comportement inchangé, 100% banque de questions."""
     rng = rng or random
     tier = mission_tier(grade_index)
     title = _L(*_TIER_TITLES[tier])
     brief = _L(*_TIER_BRIEFS[tier])
-    items = _bank_items(grade_index, rng, MAX_ITEMS, track=track)
+    if tier == "portfolio" and player is not None:
+        from core import portfolio_missions as PM
+        n_practical = min(2, MAX_ITEMS)
+        items = PM.practical_items(player, market, count=n_practical, rng=rng)
+        items += _bank_items(grade_index, rng, MAX_ITEMS - n_practical, track=track)
+    else:
+        items = _bank_items(grade_index, rng, MAX_ITEMS, track=track)
     return {"grade": grade_index, "kind": tier, "title": title, "brief": brief,
             "items": items, "reward_rep": _rep_base(grade_index), "reward_cash": 0,
             "charts": {}}

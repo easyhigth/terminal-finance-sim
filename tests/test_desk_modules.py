@@ -104,6 +104,21 @@ def test_component_var_sums_to_total(market, player):
     assert total_contrib == pytest.approx(comp["var"], rel=0.05)  # Euler
 
 
+def test_component_var_is_in_millions_like_risk_simulate(market, player):
+    """Même convention d'unité que core/risk.py::simulate (docstring 'en M') :
+    une position de quelques centaines de milliers ne doit pas produire une
+    contribution de plusieurs milliers de « M » (bug d'échelle historique —
+    values non divisées par 1e6 avant le calcul de l'allocation d'Euler)."""
+    from core import risk as R
+    tk = _tk(market)
+    pf.buy(player, market, tk, 80)
+    comp = RA.component_var(player, market, n=6000)
+    sim = R.simulate(player, market, n=6000)
+    assert comp["var"] == pytest.approx(sim["var"], rel=0.25)
+    for line in comp["lines"]:
+        assert abs(line["contrib"]) < 50.0  # quelques M, jamais des milliers
+
+
 def test_component_var_flags_hedge_as_negative(market, player):
     tk = _tk(market)
     pf.buy(player, market, tk, 100)

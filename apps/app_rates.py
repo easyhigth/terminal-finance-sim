@@ -222,6 +222,7 @@ class RatesApp(DesktopApp):
         rng = (hi - lo) or 1.0
         plot = inner.inflate(-30, -26)
         plot.move_ip(10, 2)
+        plot.height -= 16  # réserve la place sous l'axe X pour l'étiquette + le résumé
         pygame.draw.line(surf, config.COL_BORDER, plot.bottomleft, plot.bottomright)
         pygame.draw.line(surf, config.COL_BORDER, plot.topleft, plot.bottomleft)
         xmax = max(years)
@@ -245,9 +246,9 @@ class RatesApp(DesktopApp):
                  else "plate")
         fwd_txt = " · ".join(f"{t1:.0f}→{t2:.0f}a {f * 100:.1f}%"
                              for t1, t2, f in self._forwards[:3])
-        widgets.draw_text(surf, f"Courbe {shape} · forwards implicites : {fwd_txt}",
-                          (inner.x, inner.bottom - 12), fonts.tiny(),
-                          config.COL_TEXT_DIM)
+        widgets.draw_text(surf, widgets.fit_text(
+            f"Courbe {shape} · forwards implicites : {fwd_txt}", fonts.tiny(), inner.w),
+            (inner.x, plot.bottom + 16), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_scenarios(self, surf, rect, cur):
         inner = widgets.draw_panel(surf, rect,
@@ -349,7 +350,12 @@ class RatesApp(DesktopApp):
         # rotation de courbe DV01-neutre (le jeu ne shorte pas d'obligation :
         # on fait TOURNER le book, risque de taux déplacé identique des deux
         # côtés — cf. rates_analytics.dv01_rotation_plan)
-        by = inner.bottom - 44
+        dv01_hint = ("DV01 = P&L d'une hausse d'1 point de base — rotation "
+                    "court↔long à DV01 apparié.")
+        dv01_font = fonts.tiny()
+        dv01_lines = len(widgets.wrap_text_lines(dv01_hint, dv01_font, inner.w))
+        dv01_h = dv01_lines * (dv01_font.get_height() + 3)
+        by = inner.bottom - dv01_h - 30
         self._shorten_btn = pygame.Rect(inner.x, by, 150, 24)
         self._lengthen_btn = pygame.Rect(inner.x + 158, by, 150, 24)
         for r, lbl in ((self._shorten_btn, "↤ RACCOURCIR"),
@@ -358,10 +364,8 @@ class RatesApp(DesktopApp):
             pygame.draw.rect(surf, config.COL_AMBER, r, 1, border_radius=4)
             widgets.draw_text(surf, lbl, r.center, fonts.tiny(bold=True),
                               config.COL_AMBER, align="center")
-        widgets.draw_text(surf, "DV01 = P&L d'une hausse d'1 point de base — "
-                          "rotation court↔long à DV01 apparié.",
-                          (inner.x, inner.bottom - 12), fonts.tiny(),
-                          config.COL_TEXT_DIM)
+        widgets.draw_text_wrapped(surf, dv01_hint, (inner.x, inner.bottom - dv01_h),
+                                  dv01_font, config.COL_TEXT_DIM, inner.w, line_gap=3)
 
     def _draw_immunization(self, surf, body, cur):
         """Immunisation classique : financer un passif futur avec un barbell

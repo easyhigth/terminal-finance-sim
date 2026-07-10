@@ -286,9 +286,11 @@ class ZScoreApp(DesktopApp):
             name = mt["name"]
         widgets.draw_text(surf, f"{self.ticker} — {name}", (rect.x + pad, top),
                           fonts.small(bold=True), config.COL_TEXT)
-        widgets.draw_text(surf, f"z = {res['z']:+.2f}", (rect.x + pad, top + 20),
-                          fonts.title(bold=True), res["col"])
-        widgets.draw_text(surf, res["verdict"], (rect.x + pad + 130, top + 28),
+        z_label = f"z = {res['z']:+.2f}"
+        z_font = fonts.title(bold=True)
+        widgets.draw_text(surf, z_label, (rect.x + pad, top + 20), z_font, res["col"])
+        z_w = z_font.size(z_label)[0]
+        widgets.draw_text(surf, res["verdict"], (rect.x + pad + z_w + 16, top + 28),
                           fonts.small(bold=True), res["col"])
         widgets.draw_text(surf, f"Mesure : {res['desc']} (fenêtre {WINDOW} pas).",
                           (rect.x + pad, top + 52), fonts.tiny(), config.COL_TEXT_DIM)

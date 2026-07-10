@@ -221,10 +221,13 @@ class VarDeskApp(DesktopApp):
             widgets.draw_text(surf, "Aucune ligne.", (inner.x, inner.y + 6),
                               fonts.tiny(), config.COL_TEXT_DIM)
             return
-        widgets.draw_text(surf, "Les contributions SOMMENT à la VaR totale — une "
-                          "contribution négative est une couverture.",
-                          (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
-        y = inner.y + 20
+        hint = ("Les contributions SOMMENT à la VaR totale — une contribution "
+               "négative est une couverture.")
+        hint_font = fonts.tiny()
+        hint_lines = widgets.wrap_text_lines(hint, hint_font, inner.w)
+        widgets.draw_text_wrapped(surf, hint, (inner.x, inner.y), hint_font,
+                                  config.COL_TEXT_DIM, inner.w, line_gap=2)
+        y = inner.y + len(hint_lines) * (hint_font.get_height() + 2) + 6
         cmax = max(abs(x["contrib"]) for x in comp["lines"]) or 1.0
         bar_w = inner.w - 210
         for line in comp["lines"]:

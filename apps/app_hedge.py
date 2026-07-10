@@ -357,9 +357,13 @@ class HedgeApp(DesktopApp):
         pygame.draw.rect(surf, config.COL_UP, self._buy_btn, 1, border_radius=4)
         widgets.draw_text(surf, "SOUSCRIRE LE PUT", self._buy_btn.center,
                           fonts.small(bold=True), config.COL_UP, align="center")
-        widgets.draw_text(surf, "Si l'indice finit sous le strike à l'échéance, le put "
-                          "paie la différence — la prime est le coût de l'assurance.",
-                          (inner.x, inner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
+        hint = ("Si l'indice finit sous le strike à l'échéance, le put paie la "
+               "différence — la prime est le coût de l'assurance.")
+        hint_font = fonts.tiny()
+        n_lines = len(widgets.wrap_text_lines(hint, hint_font, inner.w))
+        hint_h = n_lines * (hint_font.get_height() + 4)
+        widgets.draw_text_wrapped(surf, hint, (inner.x, inner.bottom - hint_h),
+                                  hint_font, config.COL_TEXT_DIM, inner.w)
         # puts en cours
         rinner = widgets.draw_panel(surf, right, "Couvertures en cours",
                                     config.COL_AMBER)
@@ -451,7 +455,10 @@ class HedgeApp(DesktopApp):
                               fonts.small(bold=True), config.COL_DOWN, align="center")
         else:
             self._short_btn = None
-        widgets.draw_text(surf, "Plus la corrélation est forte, plus le short "
-                          "compense les variations de la position couverte.",
-                          (rinner.x, rinner.bottom - 14), fonts.tiny(),
-                          config.COL_TEXT_DIM)
+        pair_hint = ("Plus la corrélation est forte, plus le short compense les "
+                    "variations de la position couverte.")
+        pair_font = fonts.tiny()
+        pair_lines = len(widgets.wrap_text_lines(pair_hint, pair_font, rinner.w))
+        pair_h = pair_lines * (pair_font.get_height() + 4)
+        widgets.draw_text_wrapped(surf, pair_hint, (rinner.x, rinner.bottom - pair_h),
+                                  pair_font, config.COL_TEXT_DIM, rinner.w)

@@ -64,16 +64,18 @@ class PnlExplainApp(DesktopApp):
                               "premier instantané tombera au prochain pas.",
                               (rect.x + pad, y), fonts.small(), config.COL_TEXT_DIM)
             self._draw_firm_gauge(surf, pygame.Rect(rect.x + pad, y + 40,
-                                                    rect.w - 2 * pad, 70), cur)
+                                                    rect.w - 2 * pad, 90), cur)
             return
         delta = snap["nw"] - snap["nw_prev"]
         passive = snap.get("passive", 0.0)
         price_and_rest = delta - passive
         dcol = config.COL_UP if delta >= 0 else config.COL_DOWN
-        widgets.draw_text(surf, f"Dernier pas (jour {snap['day']}) : "
-                          f"Δ patrimoine {widgets.format_money(delta, cur)}",
-                          (rect.x + pad, y), fonts.title(bold=True), dcol)
-        y += 34
+        title_font = fonts.head(bold=True)
+        widgets.draw_text(surf, widgets.fit_text(
+            f"Dernier pas (jour {snap['day']}) : Δ patrimoine "
+            f"{widgets.format_money(delta, cur)}", title_font, rect.w - 2 * pad),
+            (rect.x + pad, y), title_font, dcol)
+        y += title_font.get_height() + 10
         rows = [
             ("REVENUS PASSIFS (dividendes, coupons, carry, repo, prêt-titres, "
              "sweep, dérivés)", passive, config.COL_UP if passive >= 0
@@ -99,7 +101,7 @@ class PnlExplainApp(DesktopApp):
         y += 8
         # ventilation PRIX par secteur (attribution du dernier pas)
         body = pygame.Rect(rect.x + pad, y, rect.w - 2 * pad,
-                           rect.bottom - pad - y - 84)
+                           rect.bottom - pad - y - 104)
         inner = widgets.draw_panel(surf, body,
                                    "Effet prix du pas, par secteur "
                                    "(core/attribution)", config.COL_CYAN)
@@ -131,8 +133,8 @@ class PnlExplainApp(DesktopApp):
                 widgets.draw_text(surf, widgets.format_money(v, cur),
                                   (bx + sbar + 8, yy), fonts.tiny(bold=True), col)
                 yy += 18
-        self._draw_firm_gauge(surf, pygame.Rect(rect.x + pad, rect.bottom - pad - 74,
-                                                rect.w - 2 * pad, 70), cur)
+        self._draw_firm_gauge(surf, pygame.Rect(rect.x + pad, rect.bottom - pad - 94,
+                                                rect.w - 2 * pad, 90), cur)
 
     def _draw_firm_gauge(self, surf, rect, cur):
         """Jauge de la limite de VaR de la firme : votre budget de risque de
@@ -143,7 +145,11 @@ class PnlExplainApp(DesktopApp):
         if f is None:
             return
         ratio = min(1.5, f["ratio"])
-        gauge = pygame.Rect(inner.x, inner.y + 4, inner.w - 240, 12)
+        label = f"VaR {f['var']:.2f} M / limite du grade {f['limit']:.2f} M"
+        label_font = fonts.small(bold=True)
+        label_w = label_font.size(label)[0] + 12
+        gauge = pygame.Rect(inner.x, inner.y + 4,
+                            max(60, inner.w - label_w), 12)
         pygame.draw.rect(surf, config.COL_PANEL, gauge, border_radius=4)
         col = (config.COL_DOWN if f["breach"]
                else config.COL_AMBER if ratio > 0.75 else config.COL_UP)
@@ -154,11 +160,12 @@ class PnlExplainApp(DesktopApp):
         lim_x = gauge.x + int(gauge.w / 1.5)
         pygame.draw.line(surf, config.COL_WHITE, (lim_x, gauge.y - 3),
                          (lim_x, gauge.bottom + 3), 2)
-        widgets.draw_text(surf, f"VaR {f['var']:.2f} M / limite du grade "
-                          f"{f['limit']:.2f} M",
-                          (gauge.right + 12, gauge.y - 1), fonts.small(bold=True),
-                          col)
-        widgets.draw_text(surf, "Au-delà : avertissement → réputation → la firme "
-                          "COUPE votre plus grosse ligne (5 pas de dépassement).",
-                          (inner.x, inner.bottom - 12), fonts.tiny(),
-                          config.COL_TEXT_DIM)
+        widgets.draw_text(surf, label, (gauge.right + 12, gauge.y - 1),
+                          label_font, col)
+        hint = ("Au-delà : avertissement → réputation → la firme COUPE votre "
+               "plus grosse ligne (5 pas de dépassement).")
+        hint_font = fonts.tiny()
+        hint_lines = len(widgets.wrap_text_lines(hint, hint_font, inner.w))
+        hint_h = hint_lines * (hint_font.get_height() + 3)
+        widgets.draw_text_wrapped(surf, hint, (inner.x, inner.bottom - hint_h),
+                                  hint_font, config.COL_TEXT_DIM, inner.w, line_gap=3)

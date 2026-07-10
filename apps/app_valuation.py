@@ -229,7 +229,7 @@ class ValuationApp(DesktopApp):
         upcol = config.COL_UP if d["upside"] >= 0 else config.COL_DOWN
         widgets.draw_text(surf, f"{d['per_share']:,.2f} / action",
                           (inner.x, yy), fonts.title(bold=True), upcol)
-        yy += 30
+        yy += 46
         verdict = ("SOUS-ÉVALUÉE" if d["upside"] > 0.10 else
                    "SURÉVALUÉE" if d["upside"] < -0.10 else "proche du cours")
         widgets.draw_text(surf, f"Cours {d['price']:,.2f} → potentiel "
@@ -295,10 +295,13 @@ class ValuationApp(DesktopApp):
                     pygame.draw.rect(surf, config.COL_WHITE, r0, 1, border_radius=3)
                 widgets.draw_text(surf, f"{v:,.0f}", r0.center, fonts.tiny(bold=True),
                                   config.COL_WHITE, align="center")
-        widgets.draw_text(surf, "Cadre blanc = cases compatibles avec le cours "
-                          "actuel (±5 %) — ce que le marché « price ».",
-                          (rinner.x, rinner.bottom - 12), fonts.tiny(),
-                          config.COL_TEXT_DIM)
+        sens_hint = ("Cadre blanc = cases compatibles avec le cours actuel "
+                    "(±5 %) — ce que le marché « price ».")
+        sens_font = fonts.tiny()
+        sens_lines = len(widgets.wrap_text_lines(sens_hint, sens_font, rinner.w))
+        sens_h = sens_lines * (sens_font.get_height() + 3)
+        widgets.draw_text_wrapped(surf, sens_hint, (rinner.x, rinner.bottom - sens_h),
+                                  sens_font, config.COL_TEXT_DIM, rinner.w, line_gap=3)
 
     # ------------------------------------------------------------------ SML
     def _draw_sml(self, surf, body):

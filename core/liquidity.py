@@ -57,6 +57,31 @@ def fill_price(mid, order_value, depth, tier, side, stress_level=0.0):
     return mid * (1 + cost_frac) if side == "buy" else mid * (1 - cost_frac)
 
 
+DEPTH_CLIPS = (10e3, 50e3, 250e3, 1e6, 5e6)     # tailles d'ordre (en devise)
+
+
+def depth_ladder(market, ticker, clips=DEPTH_CLIPS):
+    """PROFONDEUR DE CARNET simulée : le modèle de microstructure du jeu
+    (spread par tier + impact Almgren-Chriss, cf. core/portfolio.fill_price)
+    rendu VISIBLE — pour chaque taille d'ordre cumulée, le prix d'exécution
+    à l'achat (ask) et à la vente (bid), et le coût en points de base. Un
+    gros ordre « mange » le carnet ; le carnet est plus mince sur une
+    petite capi et en crise. None si ticker inconnu."""
+    from core import portfolio as pf
+    mid = market.price_of(ticker)
+    if mid is None or mid <= 0:
+        return None
+    rows = []
+    for clip in clips:
+        qty = clip / mid
+        ask = pf.fill_price(market, ticker, qty, "buy")
+        bid = pf.fill_price(market, ticker, qty, "sell")
+        rows.append({"clip": clip, "ask": ask, "bid": bid,
+                     "cost_bps": (ask - mid) / mid * 1e4})
+    return {"mid": mid, "tier": equity_tier(market, ticker), "rows": rows,
+            "stress": min(1.0, max(0.0, getattr(market, "last_stress_level", 0.0)))}
+
+
 def equity_tier(market, ticker):
     """Tier de liquidité actions, dérivé de la capitalisation (profondeur)."""
     i = market.ticker_idx.get(ticker)
@@ -67,9 +92,15 @@ def equity_tier(market, ticker):
 
 
 def equity_tier_for_cap(cap):
-    if cap >= 20e9:
+    """Tier par capitalisation. UNITÉ : les capitalisations du jeu
+    (`market.price × market.shares`, `metrics()['mktcap']`) sont en
+    MILLIONS — les seuils aussi (20e3 = 20 Md, 3e3 = 3 Md). Les anciens
+    seuils étaient exprimés en unités (20e9/3e9) : × 10⁶ trop hauts, TOUTES
+    les actions du roster tombaient en « Illiquide » (spread max pour tout
+    le monde, même les méga-capis)."""
+    if cap >= 20e3:
         return "Liquide"
-    if cap >= 3e9:
+    if cap >= 3e3:
         return "Peu liquide"
     return "Illiquide"
 

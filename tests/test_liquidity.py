@@ -40,9 +40,21 @@ def test_illiquid_tier_widens_spread_for_same_order():
 
 
 def test_equity_tier_for_cap_thresholds():
-    assert liq.equity_tier_for_cap(50e9) == "Liquide"
-    assert liq.equity_tier_for_cap(5e9) == "Peu liquide"
-    assert liq.equity_tier_for_cap(1e9) == "Illiquide"
+    # unité : MILLIONS (comme market.price × market.shares / metrics mktcap)
+    assert liq.equity_tier_for_cap(50e3) == "Liquide"      # 50 Md
+    assert liq.equity_tier_for_cap(5e3) == "Peu liquide"   # 5 Md
+    assert liq.equity_tier_for_cap(1e3) == "Illiquide"     # 1 Md
+
+
+def test_equity_tier_spans_the_actual_roster():
+    """Régression : les anciens seuils (en unités, pas en millions) étaient
+    ×10⁶ trop hauts — TOUT le roster tombait en « Illiquide », spread max
+    même pour les méga-capis. Les trois tiers doivent exister sur le vrai
+    marché."""
+    from core.market import Market
+    m = Market(seed=29)
+    tiers = {liq.equity_tier(m, c["ticker"]) for c in m.companies}
+    assert tiers == {"Liquide", "Peu liquide", "Illiquide"}
 
 
 def test_bond_tier_sovereign_vs_high_yield():

@@ -59,6 +59,8 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         # l'app Portefeuille, cf. ui/order_prompt.py
         self.init_order_prompt()
         self._twap_prompt = None       # {"ticker": tk, "side": "buy"|"sell"} ou None
+        self._depth_ticker = None      # profondeur de carnet affichée (overlay)
+        self._depth_rects = {}
         self._twap_steps_str = ""
         self._twap_focus = False
         self._twap_price_rect = None
@@ -298,6 +300,13 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
 
     # --------------------------------------------------------------- events
     def handle_event(self, event, rect):
+        if self._depth_ticker is not None:
+            # overlay profondeur : tout clic / Échap le referme
+            if event.type == pygame.MOUSEBUTTONDOWN or (
+                    event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                self._depth_ticker = None
+                return True
+            return event.type == pygame.KEYDOWN
         if self._confirm_pending is not None:
             return self._handle_confirm_event(event)
         if self._twap_prompt is not None:
@@ -348,6 +357,10 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
                     held = self._held(tk)
                     side = "sell" if held > 0 else "buy"
                     self._open_twap_prompt(tk, side)
+                    return True
+            for tk, r in self._depth_rects.items():
+                if r.collidepoint(event.pos):
+                    self._depth_ticker = tk
                     return True
             for oid, r in self._cond_cancel_rects.items():
                 if r.collidepoint(event.pos):
@@ -549,6 +562,8 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
             self._draw_order_prompt(surf, rect)
         if self._twap_prompt is not None:
             self._draw_twap_prompt(surf, rect)
+        if self._depth_ticker is not None:
+            self._draw_depth(surf, rect)
         if self._confirm_pending is not None:
             self._draw_confirm_dialog(surf, rect)
 
@@ -590,6 +605,52 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         pygame.draw.rect(surf, config.COL_TEXT_DIM, self._confirm_no_rect, 1, border_radius=4)
         widgets.draw_text(surf, "Annuler", self._confirm_no_rect.center,
                           fonts.tiny(), config.COL_TEXT_DIM, align="center")
+
+    def _draw_depth(self, surf, rect):
+        """Profondeur de carnet simulée (core/liquidity.depth_ladder) : la
+        microstructure du jeu rendue visible — spread par tier, impact qui
+        grossit avec la taille de l'ordre, carnet aminci en crise. Se ferme
+        au clic ou sur Échap (routé dans handle_event via _depth_ticker)."""
+        from core import liquidity
+        ladder = liquidity.depth_ladder(self.market, self._depth_ticker)
+        overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 160))
+        surf.blit(overlay, rect.topleft)
+        box = pygame.Rect(0, 0, min(440, rect.w - 40), 236)
+        box.center = rect.center
+        style.draw_card(surf, box, bg=config.COL_PANEL, border=config.COL_WARN,
+                        radius=style.RADIUS_MD)
+        widgets.draw_text(surf, f"PROFONDEUR — {self._depth_ticker}",
+                          (box.x + 12, box.y + 8), fonts.small(bold=True),
+                          config.COL_WARN)
+        if ladder is None:
+            return
+        widgets.draw_text(surf, f"mid {ladder['mid']:,.2f} · {ladder['tier']} · "
+                          f"stress {ladder['stress'] * 100:.0f}%",
+                          (box.x + 12, box.y + 28), fonts.tiny(),
+                          config.COL_TEXT_DIM)
+        y = box.y + 48
+        cols = [("TAILLE", 0), ("BID", 110), ("ASK", 210), ("COÛT (bp)", 320)]
+        for lbl, dx in cols:
+            widgets.draw_text(surf, lbl, (box.x + 14 + dx, y), fonts.tiny(bold=True),
+                              config.COL_TEXT_DIM)
+        y += 16
+        for row in ladder["rows"]:
+            widgets.draw_text(surf, f"{row['clip']:,.0f}", (box.x + 14, y),
+                              fonts.small(), config.COL_TEXT)
+            widgets.draw_text(surf, f"{row['bid']:,.2f}", (box.x + 14 + cols[1][1], y),
+                              fonts.small(), config.COL_DOWN)
+            widgets.draw_text(surf, f"{row['ask']:,.2f}", (box.x + 14 + cols[2][1], y),
+                              fonts.small(), config.COL_UP)
+            bcol = (config.COL_DOWN if row["cost_bps"] > 40
+                    else config.COL_AMBER if row["cost_bps"] > 15 else config.COL_UP)
+            widgets.draw_text(surf, f"{row['cost_bps']:.0f}",
+                              (box.x + 14 + cols[3][1], y), fonts.small(bold=True),
+                              bcol)
+            y += 19
+        widgets.draw_text(surf, "Un gros ordre mange le carnet — d'où le TWAP. "
+                          "Clic pour fermer.", (box.x + 12, box.bottom - 20),
+                          fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_twap_prompt(self, surf, rect):
         """Boîte de dialogue pour poser un ordre TWAP (fractionné sur N pas)."""
@@ -723,4 +784,11 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
             pygame.draw.rect(surf, config.COL_PANEL if hovt else config.COL_PANEL_HEAD, tw, border_radius=3)
             pygame.draw.rect(surf, config.COL_CYAN, tw, 1, border_radius=3)
             widgets.draw_text(surf, "TWAP", tw.center, fonts.tiny(bold=True), config.COL_CYAN, align="center")
+            # profondeur de carnet (microstructure rendue visible)
+            l2 = pygame.Rect(tw.x - 34, r.y, 28, ROW_H - 4)
+            self._depth_rects[tk] = l2
+            hov2 = l2.collidepoint(pygame.mouse.get_pos())
+            pygame.draw.rect(surf, config.COL_PANEL if hov2 else config.COL_PANEL_HEAD, l2, border_radius=3)
+            pygame.draw.rect(surf, config.COL_WARN, l2, 1, border_radius=3)
+            widgets.draw_text(surf, "L2", l2.center, fonts.tiny(bold=True), config.COL_WARN, align="center")
 

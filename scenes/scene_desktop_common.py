@@ -38,6 +38,7 @@ from apps.app_shop import ShopApp
 from apps.app_sheet import SheetApp
 from apps.app_trading import TradingApp
 from apps.app_valuation import ValuationApp
+from apps.app_funding import FundingApp
 from apps.app_fxdesk import FxDeskApp
 from apps.app_vollab import VolLabApp
 from apps.app_watchlist import WatchlistApp
@@ -106,6 +107,7 @@ APPS = [
     ("valuation", "Valorisation", "research", ValuationApp),
     ("fxdesk", "Desk FX (carry)", "market", FxDeskApp),
     ("vollab", "Labo de vol", "quant", VolLabApp),
+    ("funding", "Desk Financement", "book", FundingApp),
 ]
 
 # Application supplémentaire propre à la VOIE (track) choisie par le joueur
@@ -165,6 +167,7 @@ ICON_FEATURE = {
     "valuation": "trade",    # valoriser suppose de pouvoir investir
     "fxdesk": "trade",       # le carry s'exécute : même palier que le spot FX
     "vollab": "options",     # le labo de vol dialogue avec le desk options
+    "funding": "leverage",   # repo/prêt-titres = levier et shorts
 }
 
 # Raccourcis Ctrl+<lettre> des icônes du bureau — mêmes mnémoniques que les

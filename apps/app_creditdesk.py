@@ -25,8 +25,10 @@ from core import credit_risk as CR
 from core import securitisation as SEC
 from ui import fonts, widgets
 
-TABS = [("merton", "MERTON (la dette comme option)"),
-        ("waterfall", "WATERFALL (titrisation)")]
+TABS = [("merton", "MERTON"), ("cdsdesk", "CDS"),
+        ("convert", "CONVERTIBLES"), ("waterfall", "WATERFALL")]
+CDS_NOTIONALS = [100_000.0, 250_000.0, 500_000.0]
+CONV_QTYS = [10, 25, 50]
 
 
 class CreditDeskApp(DesktopApp):
@@ -48,6 +50,19 @@ class CreditDeskApp(DesktopApp):
         self._scan_rects = {}
         self._slider_rect = None
         self._dragging = False
+        self.cds_tenor = 3.0
+        self.cds_notional = CDS_NOTIONALS[1]
+        self.conv_qty = CONV_QTYS[1]
+        self.msg = ""
+        self.msg_col = config.COL_TEXT_DIM
+        self._cds_tenor_rects = {}
+        self._cds_notional_rects = {}
+        self._cds_buy_btn = None
+        self._cds_close_rects = {}
+        self._conv_qty_rects = {}
+        self._conv_buy_btn = None
+        self._conv_sell_rects = {}
+        self._conv_arb_rects = {}
 
     # ------------------------------------------------------------- calculs
     def _ensure_computed(self):
@@ -86,7 +101,91 @@ class CreditDeskApp(DesktopApp):
             self._dragging = True
             self._set_loss_from_x(pos[0])
             return True
+        for t, r in self._cds_tenor_rects.items():
+            if r.collidepoint(pos):
+                self.cds_tenor = t
+                return True
+        for v, r in self._cds_notional_rects.items():
+            if r.collidepoint(pos):
+                self.cds_notional = v
+                return True
+        if self._cds_buy_btn and self._cds_buy_btn.collidepoint(pos):
+            from core import cds as CDS
+            r = CDS.buy_protection(self.app.gs.player, self.market, self.ticker,
+                                   self.cds_notional, self.cds_tenor)
+            if r.get("ok"):
+                self.msg = (f"Protection achetée : {r['quote']['spread_bps']:.0f} bp/an "
+                            "courus chaque pas — la peur du défaut se trade en MTM.")
+                self.msg_col = config.COL_UP
+            else:
+                self.msg, self.msg_col = f"Refusé : {r.get('reason', '?')}.", config.COL_DOWN
+            return True
+        for pid, r in self._cds_close_rects.items():
+            if r.collidepoint(pos):
+                from core import cds as CDS
+                res = CDS.close(self.app.gs.player, self.market, pid)
+                if res.get("ok"):
+                    self.msg = f"Protection dénouée — MTM {res['mtm']:+,.0f}."
+                    self.msg_col = (config.COL_UP if res["mtm"] >= 0
+                                    else config.COL_DOWN)
+                return True
+        for q, r in self._conv_qty_rects.items():
+            if r.collidepoint(pos):
+                self.conv_qty = q
+                return True
+        if self._conv_buy_btn and self._conv_buy_btn.collidepoint(pos):
+            from core import convertibles as CONV
+            r = CONV.buy(self.app.gs.player, self.market, self.ticker, self.conv_qty)
+            if r.get("ok"):
+                q = r["quote"]
+                self.msg = (f"Convertible achetée : plancher {q['bond_floor']:,.0f} "
+                            f"+ option {q['option_value']:,.0f} = {q['price']:,.0f}/titre.")
+                self.msg_col = config.COL_UP
+            else:
+                self.msg, self.msg_col = f"Refusé : {r.get('reason', '?')}.", config.COL_DOWN
+            return True
+        for pid, r in self._conv_sell_rects.items():
+            if r.collidepoint(pos):
+                from core import convertibles as CONV
+                res = CONV.sell(self.app.gs.player, self.market, pid)
+                if res.get("ok"):
+                    self.msg = f"Convertible revendue — P&L {res['pnl']:+,.0f}."
+                    self.msg_col = (config.COL_UP if res["pnl"] >= 0
+                                    else config.COL_DOWN)
+                return True
+        for pid, r in self._conv_arb_rects.items():
+            if r.collidepoint(pos):
+                self._conv_arb(pid)
+                return True
         return False
+
+    def _conv_arb(self, pos_id):
+        """Arbitrage convertible : short delta actions (core/portfolio.short,
+        soumis au déblocage leverage comme tout short)."""
+        from core import convertibles as CONV
+        from core import portfolio as pf
+        from core import unlocks
+        p = self.app.gs.player
+        pos = next((c for c in getattr(p, "convertibles", []) or []
+                    if c["id"] == pos_id), None)
+        if pos is None:
+            return
+        if not unlocks.unlocked(p, "leverage"):
+            g = unlocks.effective_required_grade(p, "leverage")
+            self.msg = f"Short verrouillé (grade {config.GRADES[g]})."
+            self.msg_col = config.COL_DOWN
+            return
+        plan = CONV.arb_plan(self.market, pos)
+        if plan is None:
+            self.msg, self.msg_col = "Delta trop petit pour l'arbitrage.", config.COL_TEXT_DIM
+            return
+        r = pf.short(p, self.market, plan["ticker"], plan["shares"])
+        if r.get("ok"):
+            self.msg = (f"Arb posé : short {plan['shares']} × {plan['ticker']} — "
+                        "direction neutralisée, on porte le coupon.")
+            self.msg_col = config.COL_UP
+        else:
+            self.msg, self.msg_col = f"Short refusé : {r.get('reason', '?')}.", config.COL_DOWN
 
     def _set_loss_from_x(self, x):
         r = self._slider_rect
@@ -119,10 +218,207 @@ class CreditDeskApp(DesktopApp):
             x += w + 8
         body = pygame.Rect(rect.x + pad, y + 30, rect.w - 2 * pad,
                            rect.bottom - pad - y - 30)
+        if self.msg:
+            widgets.draw_text(surf, widgets.fit_text(self.msg, fonts.tiny(),
+                                                     rect.w - 2 * pad),
+                              (rect.x + pad, body.y - 6), fonts.tiny(),
+                              self.msg_col)
         if self.tab == "merton":
             self._draw_merton(surf, body)
+        elif self.tab == "cdsdesk":
+            self._draw_cds(surf, body)
+        elif self.tab == "convert":
+            self._draw_convertibles(surf, body)
         else:
             self._draw_waterfall(surf, body)
+
+    def _chips(self, surf, items, current, x, y, accent, rects):
+        for key, lbl in items:
+            w = fonts.tiny(bold=True).size(lbl)[0] + 14
+            r = pygame.Rect(x, y, w, 20)
+            rects[key] = r
+            sel = key == current
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL,
+                             r, border_radius=3)
+            pygame.draw.rect(surf, accent if sel else config.COL_BORDER,
+                             r, 1, border_radius=3)
+            widgets.draw_text(surf, lbl, r.center, fonts.tiny(bold=sel),
+                              accent if sel else config.COL_TEXT_DIM, align="center")
+            x += w + 6
+        return x
+
+    # ----------------------------------------------------------------- CDS
+    def _draw_cds(self, surf, body):
+        from core import cds as CDS
+        cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
+        col_w = (body.w - 12) // 2
+        left = pygame.Rect(body.x, body.y, col_w, body.h)
+        right = pygame.Rect(left.right + 12, body.y, col_w, body.h)
+        inner = widgets.draw_panel(surf, left,
+                                   f"Protection sur {self.ticker or '—'}",
+                                   config.COL_CYAN)
+        # scanner réutilisé (sélection de la société, PD décroissante)
+        self._scan_rects = {}
+        y = inner.y + 2
+        for row in self._scan[:6]:
+            r = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 19)
+            self._scan_rects[row["ticker"]] = r
+            sel = row["ticker"] == self.ticker
+            if sel:
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, r, border_radius=3)
+            widgets.draw_text(surf, f"{row['ticker']} — PD {row['pd'] * 100:.1f}%",
+                              (inner.x, y), fonts.small(bold=True),
+                              config.COL_AMBER if sel else config.COL_TEXT)
+            y += 20
+        y += 6
+        self._cds_tenor_rects = {}
+        self._chips(surf, [(t, f"{t:.0f} an{'s' if t > 1 else ''}")
+                           for t in CDS.TENORS],
+                    self.cds_tenor, inner.x, y, config.COL_CYAN,
+                    self._cds_tenor_rects)
+        y += 26
+        self._cds_notional_rects = {}
+        self._chips(surf, [(v, widgets.format_money(v, cur))
+                           for v in CDS_NOTIONALS],
+                    self.cds_notional, inner.x, y, config.COL_AMBER,
+                    self._cds_notional_rects)
+        y += 28
+        q = (CDS.quote(self.market, self.ticker, self.cds_tenor)
+             if self.ticker else None)
+        self._cds_buy_btn = None
+        if q:
+            widgets.draw_text(surf, f"Prime : {q['spread_bps']:.0f} bp/an "
+                              f"(Merton + {CDS.MARKET_SPREAD_BPS:.0f} bp de marge) "
+                              f"≈ {widgets.format_money(q['spread_bps'] / 1e4 * self.cds_notional, cur)}/an",
+                              (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
+            y += 24
+            self._cds_buy_btn = pygame.Rect(inner.x, y, 220, 26)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._cds_buy_btn,
+                             border_radius=4)
+            pygame.draw.rect(surf, config.COL_UP, self._cds_buy_btn, 1,
+                             border_radius=4)
+            widgets.draw_text(surf, "ACHETER LA PROTECTION",
+                              self._cds_buy_btn.center, fonts.small(bold=True),
+                              config.COL_UP, align="center")
+        widgets.draw_text(surf, "Évènement de crédit du jeu : action sous "
+                          f"{CDS.TRIGGER_FRAC * 100:.0f}% du niveau d'entrée → "
+                          f"paie {(1 - CDS.RECOVERY) * 100:.0f}% du notionnel.",
+                          (inner.x, inner.bottom - 12), fonts.tiny(),
+                          config.COL_TEXT_DIM)
+        rinner = widgets.draw_panel(surf, right, "Protections en cours (MTM)",
+                                    config.COL_AMBER)
+        self._cds_close_rects = {}
+        hh = CDS.holdings(self.app.gs.player, self.market)
+        if not hh:
+            widgets.draw_text(surf, "Aucune.", (rinner.x, rinner.y + 4),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+        y = rinner.y + 2
+        for h in hh:
+            if y > rinner.bottom - 36:
+                break
+            mcol = config.COL_UP if h["mtm"] >= 0 else config.COL_DOWN
+            widgets.draw_text(surf, f"{h['ticker']} · "
+                              f"{widgets.format_money(h['notional'], cur)} · "
+                              f"payé {h['entry_spread_bps']:.0f} bp",
+                              (rinner.x, y), fonts.small(bold=True), config.COL_TEXT)
+            cur_s = (f"{h['cur_spread_bps']:.0f}" if h["cur_spread_bps"]
+                     else "—")
+            widgets.draw_text(surf, f"spread {cur_s} bp · MTM {h['mtm']:+,.0f} · "
+                              f"{h['steps_left']} pas",
+                              (rinner.x + 8, y + 16), fonts.tiny(), mcol)
+            xr = pygame.Rect(rinner.right - 22, y, 18, 18)
+            self._cds_close_rects[h["id"]] = xr
+            pygame.draw.rect(surf, config.COL_PANEL, xr, border_radius=3)
+            widgets.draw_text(surf, "×", xr.center, fonts.small(bold=True),
+                              config.COL_DOWN, align="center")
+            y += 36
+
+    # -------------------------------------------------------- convertibles
+    def _draw_convertibles(self, surf, body):
+        from core import convertibles as CONV
+        cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
+        col_w = (body.w - 12) // 2
+        left = pygame.Rect(body.x, body.y, col_w, body.h)
+        right = pygame.Rect(left.right + 12, body.y, col_w, body.h)
+        inner = widgets.draw_panel(surf, left,
+                                   f"Convertible sur {self.ticker or '—'} "
+                                   "(émise au spot)", config.COL_CYAN)
+        self._scan_rects = {}
+        y = inner.y + 2
+        for c in self.market.top_companies(n=6):
+            tk = c["ticker"]
+            r = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 19)
+            self._scan_rects[tk] = r
+            sel = tk == self.ticker
+            if sel:
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, r, border_radius=3)
+            widgets.draw_text(surf, tk, (inner.x, y), fonts.small(bold=True),
+                              config.COL_AMBER if sel else config.COL_TEXT)
+            y += 20
+        y += 6
+        self._conv_qty_rects = {}
+        self._chips(surf, [(q, str(q)) for q in CONV_QTYS], self.conv_qty,
+                    inner.x, y, config.COL_AMBER, self._conv_qty_rects)
+        y += 28
+        q = CONV.quote(self.market, self.ticker) if self.ticker else None
+        self._conv_buy_btn = None
+        if q:
+            lines = [
+                (f"Plancher obligataire {q['bond_floor']:,.0f} + option "
+                 f"{q['option_value']:,.0f} = {q['price']:,.0f}", config.COL_TEXT),
+                (f"Coupon {q['coupon'] * 100:.2f}% (réduit : le droit de "
+                 f"conversion se paie) · strike {q['strike']:,.1f}",
+                 config.COL_TEXT_DIM),
+                (f"Delta {q['delta']:.2f} action/titre · prime sur parité "
+                 f"{q['premium_over_parity'] * 100:+.0f}%", config.COL_AMBER),
+            ]
+            for txt, col in lines:
+                widgets.draw_text(surf, widgets.fit_text(txt, fonts.tiny(), inner.w),
+                                  (inner.x, y), fonts.tiny(), col)
+                y += 16
+            y += 8
+            self._conv_buy_btn = pygame.Rect(inner.x, y, 220, 26)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._conv_buy_btn,
+                             border_radius=4)
+            pygame.draw.rect(surf, config.COL_UP, self._conv_buy_btn, 1,
+                             border_radius=4)
+            widgets.draw_text(surf, f"ACHETER ({widgets.format_money(q['price'] * self.conv_qty, cur)})",
+                              self._conv_buy_btn.center, fonts.small(bold=True),
+                              config.COL_UP, align="center")
+        widgets.draw_text(surf, "Δ ≈ 0 : c'est une obligation · Δ ≈ ratio : "
+                          "c'est une action — le plancher + le kicker.",
+                          (inner.x, inner.bottom - 12), fonts.tiny(),
+                          config.COL_TEXT_DIM)
+        rinner = widgets.draw_panel(surf, right, "Convertibles détenues",
+                                    config.COL_AMBER)
+        self._conv_sell_rects = {}
+        self._conv_arb_rects = {}
+        hh = CONV.holdings(self.app.gs.player, self.market)
+        if not hh:
+            widgets.draw_text(surf, "Aucune.", (rinner.x, rinner.y + 4),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+        y = rinner.y + 2
+        for h in hh:
+            if y > rinner.bottom - 40:
+                break
+            pcol = config.COL_UP if h["pnl"] >= 0 else config.COL_DOWN
+            widgets.draw_text(surf, f"{h['qty']} × {h['ticker']} — "
+                              f"{widgets.format_money(h['value'], cur)}",
+                              (rinner.x, y), fonts.small(bold=True), config.COL_TEXT)
+            widgets.draw_text(surf, f"P&L {h['pnl']:+,.0f} · Δ {h['quote']['delta']:.2f}",
+                              (rinner.x + 8, y + 16), fonts.tiny(), pcol)
+            ar = pygame.Rect(rinner.right - 84, y, 56, 18)
+            self._conv_arb_rects[h["id"]] = ar
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD, ar, border_radius=3)
+            pygame.draw.rect(surf, config.COL_PRESTIGE, ar, 1, border_radius=3)
+            widgets.draw_text(surf, "ARB Δ", ar.center, fonts.tiny(bold=True),
+                              config.COL_PRESTIGE, align="center")
+            xr = pygame.Rect(rinner.right - 22, y, 18, 18)
+            self._conv_sell_rects[h["id"]] = xr
+            pygame.draw.rect(surf, config.COL_PANEL, xr, border_radius=3)
+            widgets.draw_text(surf, "×", xr.center, fonts.small(bold=True),
+                              config.COL_DOWN, align="center")
+            y += 38
 
     # -------------------------------------------------------------- Merton
     def _draw_merton(self, surf, body):

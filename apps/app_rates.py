@@ -35,6 +35,8 @@ class RatesApp(DesktopApp):
         self._liab_rects = {}
         self._horizon_rects = {}
         self._immun_btn = None
+        self._hedge_swap_btn = None
+        self._swap_close_rects = {}
         self.msg = ""
         self.msg_col = config.COL_TEXT_DIM
         self._cache_key = None
@@ -80,6 +82,35 @@ class RatesApp(DesktopApp):
         for h, r in self._horizon_rects.items():
             if r.collidepoint(pos):
                 self.horizon = h
+                return True
+        if self._hedge_swap_btn and self._hedge_swap_btn.collidepoint(pos):
+            from core import irs as IRS
+            p = self.app.gs.player
+            dv01 = IRS.portfolio_dv01(p, self.market)
+            if dv01 <= 1e-9:
+                self.msg, self.msg_col = ("DV01 net déjà nul ou négatif — rien "
+                                          "à couvrir.", config.COL_TEXT_DIM)
+            else:
+                notional = IRS.hedge_notional(dv01, years=5.0)
+                r = IRS.enter_swap(p, self.market, "payer", notional, 5.0)
+                if r.get("ok"):
+                    self.msg = (f"Swap payeur 5 ans, notionnel "
+                                f"{notional:,.0f} — le DV01 du book est "
+                                "neutralisé sans vendre une obligation.")
+                    self.msg_col = config.COL_UP
+                    self._cache_key = None
+                else:
+                    self.msg, self.msg_col = (f"Refusé : {r.get('reason', '?')}.",
+                                              config.COL_DOWN)
+            return True
+        for pid, r in self._swap_close_rects.items():
+            if r.collidepoint(pos):
+                from core import irs as IRS
+                res = IRS.close(self.app.gs.player, self.market, pid)
+                if res.get("ok"):
+                    self.msg = f"Swap dénoué — MTM {res['mtm']:+,.0f}."
+                    self.msg_col = (config.COL_UP if res["mtm"] >= 0
+                                    else config.COL_DOWN)
                 return True
         if self._immun_btn and self._immun_btn.collidepoint(pos):
             plan = RT.immunize_plan(self.app.gs.player, self.market,
@@ -139,7 +170,7 @@ class RatesApp(DesktopApp):
         x, ty = rect.x + pad, rect.y + 36
         self._tab_rects = {}
         for tab, lbl in (("rates", "TAUX"), ("futures", "FUTURES (commodities)"),
-                         ("immun", "IMMUNISATION")):
+                         ("immun", "IMMUNISATION"), ("swaps", "SWAPS (IRS)")):
             w = fonts.tiny(bold=True).size(lbl)[0] + 18
             r = pygame.Rect(x, ty, w, 20)
             self._tab_rects[tab] = r
@@ -163,6 +194,9 @@ class RatesApp(DesktopApp):
             return
         if self.tab == "immun":
             self._draw_immunization(surf, body, cur)
+            return
+        if self.tab == "swaps":
+            self._draw_swaps(surf, body, cur)
             return
         col_w = (body.w - 12) // 2
         left = pygame.Rect(body.x, body.y, col_w, body.h)
@@ -413,6 +447,70 @@ class RatesApp(DesktopApp):
                           fonts.small(bold=True), config.COL_UP, align="center")
         widgets.draw_text(surf, "Le prix perd ce que le réinvestissement gagne "
                           "(et réciproquement) — le passif reste financé.",
+                          (inner.x, inner.bottom - 12), fonts.tiny(),
+                          config.COL_TEXT_DIM)
+
+    def _draw_swaps(self, surf, body, cur):
+        """Swaps de taux (core/irs.py) : le payeur de fixe a un DV01 négatif
+        — LA couverture du book obligataire sans le vendre. Flux net réglé
+        chaque pas, MTM à la sortie."""
+        from core import irs as IRS
+        p = self.app.gs.player
+        inner = widgets.draw_panel(surf, body,
+                                   "Swaps de taux — couvrir le DV01 sans vendre",
+                                   config.COL_CYAN)
+        y = inner.y + 2
+        book_dv01 = RT.book_totals(RT.book_lines(p, self.market))["dv01"]
+        net = IRS.portfolio_dv01(p, self.market)
+        ncol = (config.COL_UP if abs(net) < abs(book_dv01) * 0.2 + 1e-9
+                else config.COL_AMBER)
+        widgets.draw_text(surf, f"DV01 du book obligataire : "
+                          f"{widgets.format_money(book_dv01, cur)} · DV01 NET "
+                          f"(book + swaps) : {widgets.format_money(net, cur)}",
+                          (inner.x, y), fonts.small(bold=True), ncol)
+        y += 22
+        widgets.draw_text(surf, f"Taux fixe 5 ans « à la monnaie » : "
+                          f"{IRS.par_rate(self.market, 5.0) * 100:.2f}% — le "
+                          "payeur gagne si les taux montent.",
+                          (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+        y += 22
+        self._hedge_swap_btn = pygame.Rect(inner.x, y, 260, 26)
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._hedge_swap_btn,
+                         border_radius=4)
+        pygame.draw.rect(surf, config.COL_UP, self._hedge_swap_btn, 1,
+                         border_radius=4)
+        widgets.draw_text(surf, "COUVRIR LE DV01 (swap payeur 5a)",
+                          self._hedge_swap_btn.center, fonts.small(bold=True),
+                          config.COL_UP, align="center")
+        y += 36
+        widgets.draw_text(surf, "SWAPS EN COURS :", (inner.x, y),
+                          fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        y += 16
+        self._swap_close_rects = {}
+        hh = IRS.holdings(p, self.market)
+        if not hh:
+            widgets.draw_text(surf, "Aucun.", (inner.x, y), fonts.tiny(),
+                              config.COL_TEXT_DIM)
+        for h in hh:
+            if y > inner.bottom - 36:
+                break
+            mcol = config.COL_UP if h["mtm"] >= 0 else config.COL_DOWN
+            lbl = "PAYEUR" if h["direction"] == "payer" else "RECEVEUR"
+            widgets.draw_text(surf, f"{lbl} fixe {h['fixed_rate'] * 100:.2f}% · "
+                              f"notionnel {h['notional']:,.0f} · "
+                              f"{h['steps_left']} pas",
+                              (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
+            widgets.draw_text(surf, f"MTM {h['mtm']:+,.0f} · DV01 "
+                              f"{widgets.format_money(h['dv01'], cur)}",
+                              (inner.x + 8, y + 16), fonts.tiny(), mcol)
+            xr = pygame.Rect(inner.right - 22, y, 18, 18)
+            self._swap_close_rects[h["id"]] = xr
+            pygame.draw.rect(surf, config.COL_PANEL, xr, border_radius=3)
+            widgets.draw_text(surf, "×", xr.center, fonts.small(bold=True),
+                              config.COL_DOWN, align="center")
+            y += 36
+        widgets.draw_text(surf, "Aucun cash à l'entrée : le flux net "
+                          "(variable − fixe) est réglé à chaque pas.",
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)
 

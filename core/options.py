@@ -24,22 +24,45 @@ MATURITY_CHOICES = [0.25, 0.5, 1.0]      # années proposées au joueur
 STRIKE_CHOICES = [0.90, 1.00, 1.10]      # % du spot courant (ITM call/OTM put, ATM, OTM call/ITM put
 
 
+EARNINGS_VOL_BUMP = 0.35     # +35 % de vol implicite la veille des résultats
+EARNINGS_WINDOW = 3          # pas avant publication où la vol commence à gonfler
+
+
+def earnings_vol_mult(market, ticker):
+    """GONFLEMENT DE VOL PRÉ-EARNINGS : la vol implicite monte à l'approche
+    d'une publication de résultats (l'incertitude de l'évènement se price),
+    puis s'effondre juste après — le « vol crush ». Multiplicateur ∈
+    [1, 1+EARNINGS_VOL_BUMP], linéaire sur les EARNINGS_WINDOW derniers pas.
+    Acheter un straddle la veille des résultats, c'est payer cette prime —
+    le marché bouge souvent MOINS que ce que la vol gonflée impliquait."""
+    try:
+        mt = market.metrics(ticker)
+        steps = mt.get("steps_to_earnings") if mt else None
+    except Exception:
+        return 1.0
+    if steps is None or steps >= EARNINGS_WINDOW:
+        return 1.0
+    return 1.0 + EARNINGS_VOL_BUMP * (EARNINGS_WINDOW - steps) / EARNINGS_WINDOW
+
+
 def _stock_vol(market, ticker, lookback=26):
-    """Volatilité hebdo récente de l'action, annualisée (proxy pour le pricing).
+    """Volatilité hebdo récente de l'action, annualisée (proxy pour le pricing),
+    × le gonflement pré-earnings (cf. earnings_vol_mult — le smile d'évènement).
     Repli sur la vol idiosyncratique statique (data/companies.py) si l'historique
     est insuffisant."""
+    mult = earnings_vol_mult(market, ticker)
     hist = market.history_of(ticker, lookback + 1)
     if len(hist) >= 3:
         h = np.asarray(hist, dtype=float)
         rets = np.diff(h) / h[:-1]
         if len(rets) >= 2:
             sigma = float(np.std(rets, ddof=1)) * math.sqrt(STEPS_PER_YEAR)
-            return max(MIN_VOL, sigma)
+            return max(MIN_VOL, sigma) * mult
     i = market.ticker_idx.get(ticker)
     if i is not None:
         sigma_step = float(market.companies[i]["sigma"])
-        return max(MIN_VOL, sigma_step * math.sqrt(STEPS_PER_YEAR))
-    return MIN_VOL
+        return max(MIN_VOL, sigma_step * math.sqrt(STEPS_PER_YEAR)) * mult
+    return MIN_VOL * mult
 
 
 def risk_free_rate(market):

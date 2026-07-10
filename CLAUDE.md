@@ -719,6 +719,66 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
     exacte, parité couverte, GARCH retrouve les grappes d'une série
     fabriquée, filtre de régime voit un stress synthétique, duration du
     barbell = horizon exact) et `test_advanced_lab_apps.py`.
+- **Desk de FINANCEMENT (repo / prêt-titres / trésorerie) + plomberie.**
+  - `core/repo.py` : **pension livrée** — achat d'obligations à levier (cash
+    débité = haircut seulement, le reste emprunté au taux repo roulé chaque
+    pas), coupons du collatéral nets (convention bonds.coupons), haircut ET
+    taux élargis par le stress (`market.last_stress_level`), **appel de
+    marge** (equity < haircut/2 → liquidation forcée, notifiée) — câblé dans
+    `advance_step`. Positions auto-contenues (`player.repo_positions`,
+    jamais mélangées à `player.bonds`).
+  - `core/seclending.py` : **frais d'emprunt des shorts** (tiers de
+    `core/liquidity` + stress — « hard to borrow » sur les petites capis) et
+    **revenu de prêt des longs** (opt-in `flags['sec_lending']`, part
+    prêteur 40 %), courus chaque pas.
+  - `core/money_market.py` : **dépôts à terme** (prime de terme, principal
+    bloqué, échéance créditée par advance_step) et **sweep au jour le jour**
+    (opt-in `flags['mm_sweep']`, cash oisif au-delà d'un coussin de 50 k).
+  - App `apps/app_funding.py` (onglets REPO / PRÊT-TITRES / TRÉSORERIE,
+    gating `leverage`). `net_worth` agrège l'equity repo et les dépôts.
+  - **Bug d'unités corrigé au passage** (`core/liquidity.equity_tier_for_cap`) :
+    les seuils de tiers étaient en unités (20e9/3e9) alors que les
+    capitalisations du jeu (`price×shares`, `metrics()['mktcap']`) sont en
+    MILLIONS — TOUT le roster tombait en « Illiquide » (spread max même pour
+    les méga-capis) depuis l'introduction des tiers. Seuils recalés en
+    millions (20e3/3e3), verrouillé par
+    `tests/test_liquidity.py::test_equity_tier_spans_the_actual_roster`.
+- **Dérivés de crédit/taux & structure de marché.**
+  - `core/cds.py` : **CDS** sur le roster — prime = spread THÉORIQUE de
+    Merton (core/credit_risk) + marge, fixée à l'entrée et courue chaque
+    pas ; **MTM** = (spread courant − payé) × duration risquée × notionnel
+    (on trade la PEUR du défaut) ; **évènement de crédit** conventionnel du
+    jeu (action < 25 % du niveau d'entrée → paie (1−40 %) du notionnel,
+    `evaluate_due` dans advance_step) ; expiration sans valeur sinon.
+  - `core/irs.py` : **swaps de taux** fixe/variable (distincts des swaps de
+    DEVISES core/swaps.py) — le payeur de fixe a un DV01 NÉGATIF : bouton
+    « COUVRIR LE DV01 » de l'onglet SWAPS (IRS) du Desk Taux
+    (`hedge_notional` dimensionne le notionnel qui annule le DV01 du book,
+    `portfolio_dv01` = book + swaps). Flux net réglé chaque pas, MTM à la
+    sortie, dénouement à l'échéance dans `accrue`.
+  - `core/convertibles.py` : **obligations convertibles** — prix = plancher
+    obligataire (PV coupons+pair au rendement corporate) + ratio × call
+    Black-Scholes ; coupon réduit (le droit de conversion se paie), delta
+    entre 0 et le ratio (« bond floor + equity kicker »), **arbitrage
+    convertible** (`arb_plan` : short delta actions, exécuté via pf.short).
+    Émission au spot à l'achat, mark-to-model, coupons courus.
+    Onglets **CDS** et **CONVERTIBLES** ajoutés au Desk Crédit
+    (apps/app_creditdesk.py). Les trois classes comptent dans `net_worth`.
+  - `core/liquidity.depth_ladder` + bouton **L2** du Trading : la
+    **profondeur de carnet** simulée (bid/ask/coût en bp pour 5 tailles
+    d'ordre cumulées, sur le vrai modèle spread+impact) — la microstructure
+    rendue visible, complément du devis TWAP.
+  - **Vol d'earnings** (`options.earnings_vol_mult`, appliqué dans
+    `_stock_vol`) : la vol implicite GONFLE à l'approche d'une publication
+    (+35 % à la veille, fenêtre 3 pas, via `metrics()['steps_to_earnings']`)
+    puis s'effondre après — le « vol crush » : acheter un straddle la veille
+    des résultats, c'est payer cette prime. Affecte les primes du desk
+    options (achat ET valorisation), pas l'exercice.
+  Verrouillé par `tests/test_funding.py` (appel de marge forcé, haircut/
+  stress, sweep au-delà du coussin, save/load des positions) et
+  `tests/test_credit_derivs.py` (évènement de crédit payé, payeur gagne
+  quand les taux montent, DV01 neutralisé à ±5 %, plancher+option, coûts de
+  profondeur croissants, bump/crush de vol).
 - **Découvrabilité du bureau (icônes/boutons)** : icône « Succès » (`QUICK_APPS`/
   `qachievements` → scène achievements en fenêtre) ; **loupe de recherche globale** dans
   la topbar du bureau (`DesktopScene._gsearch_rect`, dessin vectoriel — ouvre la même

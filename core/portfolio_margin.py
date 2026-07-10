@@ -102,6 +102,21 @@ def net_worth(player, market):
     if getattr(player, "hedges", None):
         from core import hedging
         nw += hedging.holdings_value(player, market)
+    if getattr(player, "repo_positions", None):
+        from core import repo as repo_mod
+        nw += repo_mod.holdings_value(player, market)
+    if getattr(player, "mm_deposits", None):
+        from core import money_market as mm_mod
+        nw += mm_mod.holdings_value(player, market)
+    if getattr(player, "cds_positions", None):
+        from core import cds as cds_mod
+        nw += cds_mod.holdings_value(player, market)
+    if getattr(player, "irs_positions", None):
+        from core import irs as irs_mod
+        nw += irs_mod.holdings_value(player, market)
+    if getattr(player, "convertibles", None):
+        from core import convertibles as conv_mod
+        nw += conv_mod.holdings_value(player, market)
     return nw
 
 

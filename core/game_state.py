@@ -54,6 +54,11 @@ class PlayerState:
     structured: list = field(default_factory=list)     # produits structurés souscrits
     securitised: list = field(default_factory=list)    # tranches de titrisation détenues
     hedges: list = field(default_factory=list)         # puts protecteurs (couverture) en cours
+    repo_positions: list = field(default_factory=list)  # pensions livrées (repo) en cours
+    mm_deposits: list = field(default_factory=list)     # dépôts à terme (marché monétaire)
+    cds_positions: list = field(default_factory=list)   # protections CDS en cours
+    irs_positions: list = field(default_factory=list)   # swaps de taux (IRS) en cours
+    convertibles: list = field(default_factory=list)    # obligations convertibles détenues
     options: list = field(default_factory=list)        # options sur actions (calls/puts) en cours
     currency_swaps: list = field(default_factory=list)  # swaps de devises actifs
     next_swap_id: int = 1                                # compteur d'identifiants de swaps
@@ -531,6 +536,58 @@ class GameState:
                 if carry:
                     p.adjust_cash(carry, category="revenus")
                     dividends += carry
+            # desk de FINANCEMENT : intérêts repo/coupons du collatéral,
+            # frais d'emprunt des shorts / revenu de prêt, sweep monétaire
+            # et dépôts à terme échus (core/repo, seclending, money_market)
+            from core import money_market as _mm
+            from core import repo as _repo
+            from core import seclending as _secl
+            funding = 0.0
+            if getattr(p, "repo_positions", None):
+                funding += _repo.accrue(p, market, config.DAYS_PER_STEP)
+            if p.portfolio:
+                funding += _secl.accrue(p, market, config.DAYS_PER_STEP)
+            funding += _mm.sweep_accrue(p, market, config.DAYS_PER_STEP)
+            if funding:
+                p.adjust_cash(funding, category="revenus")
+                dividends += funding
+            for _dep in _mm.mature_due(p, market):
+                from core import notify_queue as _nq
+                _nq.push(p, _L("Depot a terme echu : ", "Term deposit matured: ")
+                         + f"+{_dep['amount'] + _dep['interest']:,.0f} "
+                         + _L("(interets ", "(interest ") + f"{_dep['interest']:,.0f})",
+                         "good")
+            if getattr(p, "repo_positions", None):
+                for _ev in _repo.mark_and_call(p, market):
+                    from core import notify_queue as _nq
+                    _nq.push(p, _L("APPEL DE MARGE REPO - pension liquidee : ",
+                                   "REPO MARGIN CALL - position liquidated: ")
+                             + f"{_ev['name']} ({_ev['equity']:+,.0f})", "warn")
+            # dérivés de crédit/taux & convertibles : primes CDS courues,
+            # évènements de crédit, flux nets d'IRS, coupons de convertibles
+            deriv = 0.0
+            if getattr(p, "cds_positions", None):
+                from core import cds as _cds
+                deriv += _cds.accrue(p, market, config.DAYS_PER_STEP)
+                for _ev in _cds.evaluate_due(p, market):
+                    from core import notify_queue as _nq
+                    if _ev["kind"] == "credit_event":
+                        _nq.push(p, _L("EVENEMENT DE CREDIT ", "CREDIT EVENT ")
+                                 + f"{_ev['ticker']} : protection payee "
+                                 + f"+{_ev['payoff']:,.0f}", "good")
+                    else:
+                        _nq.push(p, f"CDS {_ev['ticker']} "
+                                 + _L("expire sans evenement", "expired unexercised"),
+                                 "info")
+            if getattr(p, "irs_positions", None):
+                from core import irs as _irs
+                deriv += _irs.accrue(p, market, config.DAYS_PER_STEP)
+            if getattr(p, "convertibles", None):
+                from core import convertibles as _conv
+                deriv += _conv.accrue(p, market, config.DAYS_PER_STEP)
+            if deriv:
+                p.adjust_cash(deriv, category="revenus")
+                dividends += deriv
             # ordres conditionnels (stop-loss/take-profit) : exécutés AVANT le
             # contrôle de marge, comme un vrai ordre du joueur (voulu) passerait
             # avant une liquidation forcée (subie) sur la position réduite.

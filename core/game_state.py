@@ -522,6 +522,15 @@ class GameState:
                 if cbi:
                     p.adjust_cash(cbi, category="revenus")
                     dividends += cbi
+            # portage FX (carry) : différentiel de taux couru sur les
+            # positions spot ouvertes (core/fx_carry) — le carry trade
+            # devient un vrai revenu (ou un vrai coût)
+            if getattr(p, "fx_positions", None):
+                from core import fx_carry as _fxc
+                carry = _fxc.accrue(p, market, config.DAYS_PER_STEP)
+                if carry:
+                    p.adjust_cash(carry, category="revenus")
+                    dividends += carry
             # ordres conditionnels (stop-loss/take-profit) : exécutés AVANT le
             # contrôle de marge, comme un vrai ordre du joueur (voulu) passerait
             # avant une liquidation forcée (subie) sur la position réduite.

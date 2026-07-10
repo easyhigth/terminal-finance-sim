@@ -1326,7 +1326,14 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         quick = [(k, kind) for k, _l, kind, _cls in APPS
                  if k not in self._FACTORY_ONLY_APPS and self._icon_visible(k)]
         quick.append(("terminal", "terminal"))
+        # le quick-launch est BORNÉ à ~40 % de la barre : au-delà, les icônes
+        # supplémentaires restent accessibles par le bureau/menu Démarrer, et
+        # la place des FENÊTRES ouvertes (droite) est préservée quel que soit
+        # le nombre d'apps enregistrées (le bureau en gagne à chaque version).
+        x_limit = int(config.SCREEN_WIDTH * 0.40)
         for key, kind in quick:
+            if x + 30 > x_limit:
+                break
             r = pygame.Rect(x, bar.y + 4, 26, TASKBAR_H - 8)
             self._launch_rects[key] = r
             hov = r.collidepoint(pygame.mouse.get_pos())

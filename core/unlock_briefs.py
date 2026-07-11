@@ -513,6 +513,144 @@ FEATURE_BRIEFS = {
                   "adverse scenario BEFORE subscribing: the worst case is all "
                   "the information."),
     },
+    "valuation": {
+        "title": ("Desk Valorisation", "Valuation desk"),
+        "what": ("DCF, droite de marché SML/CAPM et pont d'IRR de LBO — les "
+                 "trois lentilles classiques pour juger si un cours est cher.",
+                 "DCF, the SML/CAPM market line, and an LBO IRR bridge — the "
+                 "three classic lenses for judging whether a price is rich."),
+        "how": ("Menu Apps → « Desk Valorisation ».",
+                "Apps menu → “Valuation desk”."),
+        "why": ("Réservé à la voie M&A : juger une cible avant de l'approcher "
+                "est le cœur du métier.",
+                "Reserved for the M&A track: judging a target before "
+                "approaching it is the heart of the job."),
+        "first": ("Lancez un DCF sur une société suivie et comparez au cours.",
+                  "Run a DCF on a followed company and compare it to the price."),
+    },
+    "creditdesk": {
+        "title": ("Desk Crédit", "Credit desk"),
+        "what": ("Modèle de Merton (défaut implicite), cascade de titrisation, "
+                 "CDS et obligations convertibles.",
+                 "Merton default model, securitization waterfall, CDS and "
+                 "convertible bonds."),
+        "how": ("Menu Apps → « Desk Crédit ».", "Apps menu → “Credit desk”."),
+        "why": ("Réservé à la voie M&A : évaluer la solvabilité d'une cible "
+                "avant de l'endetter davantage.",
+                "Reserved for the M&A track: assessing a target's solvency "
+                "before loading it with more debt."),
+        "first": ("Ouvrez l'onglet Merton sur une société et lisez sa "
+                  "probabilité de défaut implicite.",
+                  "Open the Merton tab on a company and read its implied "
+                  "default probability."),
+    },
+    "attribution": {
+        "title": ("Attribution de performance", "Performance attribution"),
+        "what": ("Décomposition Brinson-Fachler (allocation/sélection) et "
+                 "régression factorielle de votre performance vs le marché.",
+                 "Brinson-Fachler decomposition (allocation/selection) and "
+                 "factor regression of your performance vs the market."),
+        "how": ("Menu Apps → « Attribution ».", "Apps menu → “Attribution”."),
+        "why": ("Réservé à la voie Portfolio : comprendre D'OÙ vient votre "
+                "performance, pas juste combien.",
+                "Reserved for the Portfolio track: understanding WHERE your "
+                "performance comes from, not just how much."),
+        "first": ("Ouvrez l'onglet Brinson et repérez votre plus gros secteur "
+                  "de sur/sous-performance.",
+                  "Open the Brinson tab and spot your biggest over/"
+                  "underperforming sector."),
+    },
+    "backtester": {
+        "title": ("Backtesteur de stratégies", "Strategy backtester"),
+        "what": ("Rejouez une stratégie systématique (croisement de "
+                 "moyennes, momentum, retour à la moyenne) sur l'historique "
+                 "réel d'un titre.",
+                 "Replay a systematic strategy (moving-average crossover, "
+                 "momentum, mean reversion) on a stock's real history."),
+        "how": ("Menu Apps → « Backtesteur ».", "Apps menu → “Backtester”."),
+        "why": ("Réservé à la voie Portfolio : tester une idée avant d'y "
+                "mettre du vrai cash.",
+                "Reserved for the Portfolio track: testing an idea before "
+                "putting real cash behind it."),
+        "first": ("Choisissez une valeur détenue et comparez SMA vs "
+                  "acheter-conserver.",
+                  "Pick a held stock and compare SMA vs buy-and-hold."),
+    },
+    "pnlexplain": {
+        "title": ("P&L Explain", "P&L Explain"),
+        "what": ("Décomposition de la variation de votre patrimoine en "
+                 "revenus passifs (dividendes, coupons, carry...) et effet "
+                 "prix, ventilé par secteur.",
+                 "Breakdown of your net worth change into passive income "
+                 "(dividends, coupons, carry...) and price effect, split by "
+                 "sector."),
+        "how": ("Menu Apps → « P&L Explain ».", "Apps menu → “P&L Explain”."),
+        "why": ("Réservé à la voie Portfolio : savoir si vous gagnez de "
+                "l'argent en dormant ou en pariant.",
+                "Reserved for the Portfolio track: knowing whether you earn "
+                "money while sleeping or by betting."),
+        "first": ("Ouvrez l'app après un pas de marché et lisez le plus gros "
+                  "contributeur du jour.",
+                  "Open the app after a market step and read today's "
+                  "biggest contributor."),
+    },
+    "footballfield": {
+        "title": ("Football Field", "Football Field"),
+        "what": ("Le graphique de valorisation des banques d'affaires : "
+                 "comparables non cotés, DCF, transactions précédentes et "
+                 "comparables publics décotés, superposés en une seule "
+                 "fourchette.",
+                 "The investment-banking valuation chart: private comps, "
+                 "DCF, precedent transactions and discounted public comps, "
+                 "overlaid into a single range."),
+        "how": ("Menu Apps → « Football Field » (voie M&A).",
+                "Apps menu → “Football Field” (M&A track)."),
+        "why": ("Exclusif à la voie M&A : juger un prix demandé en un coup "
+                "d'œil, méthode par méthode, avant d'acquérir une cible.",
+                "M&A-track exclusive: judge an asking price at a glance, "
+                "method by method, before acquiring a target."),
+        "first": ("Ouvrez une cible et repérez si le prix demandé tombe "
+                  "dans la fourchette ou hors des clous.",
+                  "Open a target and see whether the asking price falls "
+                  "inside the range or well outside it."),
+    },
+    "pitchbook": {
+        "title": ("Pitch Book", "Pitch Book"),
+        "what": ("Démarchage ACTIF de mandats : choisissez un profil client "
+                 "et une ambition, lisez votre probabilité de succès, puis "
+                 "pitchez.",
+                 "ACTIVE mandate pitching: pick a client profile and an "
+                 "ambition level, read your win probability, then pitch."),
+        "how": ("Menu Apps → « Pitch Book » (voie Advisory).",
+                "Apps menu → “Pitch Book” (Advisory track)."),
+        "why": ("Exclusif à la voie Advisory : ne plus attendre qu'un "
+                "mandat arrive au hasard, aller le chercher.",
+                "Advisory-track exclusive: stop waiting for a mandate to "
+                "arrive at random — go get one."),
+        "first": ("Pitchez un profil client avec une ambition modérée pour "
+                  "voir comment la probabilité réagit.",
+                  "Pitch a client profile at moderate ambition to see how "
+                  "the probability reacts."),
+    },
+    "strategicalloc": {
+        "title": ("Allocation stratégique", "Strategic allocation"),
+        "what": ("Répartition de votre patrimoine entre actions, "
+                 "obligations, matières premières, crypto et cash — le "
+                 "niveau qui explique le plus la performance à long terme.",
+                 "Your wealth split across equities, bonds, commodities, "
+                 "crypto and cash — the level that explains most long-term "
+                 "performance."),
+        "how": ("Menu Apps → « Allocation stratégique » (voie Portfolio).",
+                "Apps menu → “Strategic allocation” (Portfolio track)."),
+        "why": ("Exclusif à la voie Portfolio : piloter le patrimoine "
+                "entier, pas seulement le choix de titres.",
+                "Portfolio-track exclusive: steer the whole wealth, not "
+                "just stock picking."),
+        "first": ("Choisissez un profil cible et regardez quels buckets "
+                  "dérivent hors de la bande de tolérance.",
+                  "Pick a target profile and see which buckets drift "
+                  "outside the tolerance band."),
+    },
     # Fonctionnalités ouvertes dès le grade 0 : pas de fiche de promotion
     # nécessaire (jamais « nouvellement débloquées ») mais présentes pour
     # robustesse si les paliers changent un jour.

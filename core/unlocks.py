@@ -32,6 +32,14 @@ UNLOCKS = {
     "quant": 0,      # module quant (pricing d'options, sandbox)
     "credit": 6,     # titrisation : tranches de pool de prêts (cash réellement investi)
     "structured": 6,  # produits structurés (cash réellement investi)
+    "valuation": 4,     # Desk Valorisation (DCF/SML/pont IRR) — affinité M&A
+    "creditdesk": 6,    # Desk Crédit (Merton/waterfall/CDS/convertibles) — affinité M&A
+    "attribution": 4,   # Attribution de performance (Brinson/facteurs) — affinité Portfolio
+    "backtester": 4,    # Backtesteur de stratégies — affinité Portfolio
+    "pnlexplain": 4,    # P&L Explain (décomposition du patrimoine) — affinité Portfolio
+    "footballfield": 4,   # Football Field (valorisation multi-méthodes) — affinité M&A
+    "pitchbook": 6,       # Pitch Book (démarchage actif de mandats) — affinité Advisory
+    "strategicalloc": 4,  # Allocation stratégique multi-actifs — affinité Portfolio
 }
 
 def _L(fr, en):
@@ -60,6 +68,14 @@ _LABELS_RAW = {
     "quant": ("Module quant / pricing d'options (QUANT)", "Quant / options pricing module (QUANT)"),
     "credit": ("Titrisation / tranches de crédit (CREDIT)", "Securitization / credit tranches (CREDIT)"),
     "structured": ("Produits structurés (STRUCT)", "Structured products (STRUCT)"),
+    "valuation": ("Desk Valorisation (DCF/SML/LBO)", "Valuation desk (DCF/SML/LBO)"),
+    "creditdesk": ("Desk Crédit (Merton/CDS/convertibles)", "Credit desk (Merton/CDS/convertibles)"),
+    "attribution": ("Attribution de performance (Brinson)", "Performance attribution (Brinson)"),
+    "backtester": ("Backtesteur de stratégies", "Strategy backtester"),
+    "pnlexplain": ("P&L Explain (décomposition du patrimoine)", "P&L Explain (net worth breakdown)"),
+    "footballfield": ("Football Field (valorisation M&A)", "Football Field (M&A valuation)"),
+    "pitchbook": ("Pitch Book (démarchage de mandats)", "Pitch Book (mandate pitching)"),
+    "strategicalloc": ("Allocation stratégique multi-actifs", "Strategic multi-asset allocation"),
 }
 LABELS = {k: v[0] for k, v in _LABELS_RAW.items()}
 
@@ -80,6 +96,14 @@ FEATURE_TUTORIAL = {
     "quant": "quant",
     "credit": "credit",
     "structured": "structured",
+    "valuation": "valuation",
+    "creditdesk": "creditdesk",
+    "attribution": "attribution",
+    "backtester": "backtester",
+    "pnlexplain": "pnlexplain",
+    "footballfield": "footballfield",
+    "pitchbook": "pitchbook",
+    "strategicalloc": "strategicalloc",
 }
 
 # commande (token majuscule) -> fonctionnalité gated
@@ -128,6 +152,14 @@ TRACK_AFFINITY = {
     "options": "Quant",
     "mandates": "Advisory",
     "structured": "Portfolio",
+    "valuation": "M&A",
+    "creditdesk": "M&A",
+    "attribution": "Portfolio",
+    "backtester": "Portfolio",
+    "pnlexplain": "Portfolio",
+    "footballfield": "M&A",
+    "pitchbook": "Advisory",
+    "strategicalloc": "Portfolio",
 }
 TRACK_LOCK_GRADE = len(config.GRADES) - 1
 

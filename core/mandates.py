@@ -271,32 +271,22 @@ _REGIME_MULT = {
 }
 
 
-def maybe_offer(player, rng=None, market=None):
-    """Génère éventuellement une offre de mandat. Retourne l'offre ou None.
-    Le profil de RISQUE du joueur (cf. core.career.risk_profile, dérivé du
-    style de jeu plutôt que du grade) module l'ambition de l'offre (bêta max,
-    commission) ; le profil CLIENT (cf. CLIENT_PROFILES, item 4 — qui est le
-    client : assureur/fonds de pension/family office/opportuniste/
-    institutionnel prudent) module en plus QUEL type de mandat est proposé et
-    À QUEL POINT ses contraintes (drawdown/duration/tracking error/liquidité)
-    sont serrées, ainsi que l'horizon typique et la sensibilité récompense/
-    pénalité. Le régime de marché courant (`market`, si fourni) module aussi
-    la limite de risque et l'objectif visés (cf. _REGIME_MULT)."""
+def _build_offer(player, client_profile, rng, market=None, ambition=1.0):
+    """Construit une offre de mandat pour un PROFIL CLIENT déjà choisi —
+    factorisé depuis `maybe_offer` (qui tire le profil au hasard) pour être
+    réutilisé par `core/pitch_book.py` (voie Advisory) : un pitch ACTIF
+    choisit lui-même son profil au lieu de subir un tirage. `ambition`
+    (0.5..1.5) grossit à la fois le capital proposé et l'objectif de
+    rendement visé — un pitch plus ambitieux vise plus gros, donc plus dur à
+    tenir (cf. `core/pitch_book.py::win_probability`, qui pénalise
+    l'ambition). N'inscrit PAS l'offre dans `player.mandate_offers` : c'est
+    la responsabilité de l'appelant (mandat passif vs pitch actif n'ont pas
+    le même moment d'inscription)."""
     from core import career
-    rng = rng or random
-    if player.grade_index < MIN_GRADE:
-        return None
-    if len(player.mandates) + len(player.mandate_offers) >= MAX_ACTIVE + 1:
-        return None
-    offer_mult = (tracks.perk(player, "mandate_offer_mult") * archetypes.perk(player, "mandate_offer_mult")
-                  * firms.perk(player, "mandate_offer_mult"))
-    if rng.random() > OFFER_PROB * offer_mult:
-        return None
-    client_profile = _pick_profile(rng)
-    capital = round(rng.uniform(300_000, 1_200_000) * _scale(player.grade_index), -3)
+    capital = round(rng.uniform(300_000, 1_200_000) * _scale(player.grade_index) * ambition, -3)
     horizon = rng.choice(client_profile["horizon_choices"])
     rmult = _REGIME_MULT.get(getattr(market, "regime", None), _REGIME_MULT["Calme"])
-    target = round(rng.uniform(4.0, 7.0) * horizon * rmult["target"], 1)  # % cumulé sur l'horizon
+    target = round(rng.uniform(4.0, 7.0) * horizon * rmult["target"] * ambition, 1)  # % cumulé sur l'horizon
     risk_profile = career.risk_profile(player)
     if risk_profile == "Risque élevé":
         max_beta = round(rng.choice([1.3, 1.5, 1.8, 2.0]), 2)
@@ -334,6 +324,31 @@ def maybe_offer(player, rng=None, market=None):
     }
     offer.update(_extra_constraints(mandate_type, rng, client_profile))
     player.next_mandate_id += 1
+    return offer
+
+
+def maybe_offer(player, rng=None, market=None):
+    """Génère éventuellement une offre de mandat. Retourne l'offre ou None.
+    Le profil de RISQUE du joueur (cf. core.career.risk_profile, dérivé du
+    style de jeu plutôt que du grade) module l'ambition de l'offre (bêta max,
+    commission) ; le profil CLIENT (cf. CLIENT_PROFILES, item 4 — qui est le
+    client : assureur/fonds de pension/family office/opportuniste/
+    institutionnel prudent) module en plus QUEL type de mandat est proposé et
+    À QUEL POINT ses contraintes (drawdown/duration/tracking error/liquidité)
+    sont serrées, ainsi que l'horizon typique et la sensibilité récompense/
+    pénalité. Le régime de marché courant (`market`, si fourni) module aussi
+    la limite de risque et l'objectif visés (cf. _REGIME_MULT)."""
+    rng = rng or random
+    if player.grade_index < MIN_GRADE:
+        return None
+    if len(player.mandates) + len(player.mandate_offers) >= MAX_ACTIVE + 1:
+        return None
+    offer_mult = (tracks.perk(player, "mandate_offer_mult") * archetypes.perk(player, "mandate_offer_mult")
+                  * firms.perk(player, "mandate_offer_mult"))
+    if rng.random() > OFFER_PROB * offer_mult:
+        return None
+    client_profile = _pick_profile(rng)
+    offer = _build_offer(player, client_profile, rng, market)
     player.mandate_offers.append(offer)
     return offer
 

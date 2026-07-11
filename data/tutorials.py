@@ -1137,6 +1137,91 @@ TUTORIALS = [
                    "résultat passé ne garantit jamais un résultat futur : c'est "
                    "un outil de jugement, pas une martingale.",
     },
+    {
+        "id": "footballfield",
+        "title": "Football Field : la valorisation en une fourchette",
+        "image": "footballfield.png",
+        "intro": "Exclusif à la voie M&A : le graphique de valorisation "
+                 "classique des banques d'affaires — plusieurs méthodes, "
+                 "superposées en barres, pour juger un prix d'un coup d'œil.",
+        "steps": [
+            "Choisissez une cible dans les chips (les cibles déjà détenues "
+            "sont marquées) — la fiche affiche son EBITDA et sa dette nette.",
+            "Chaque barre est une MÉTHODE : Comparables non cotés, DCF, "
+            "Transactions précédentes du secteur, Comparables publics "
+            "décotés — le trait blanc au milieu est le point médian retenu.",
+            "Le repère vertical ambre marque le PRIX DEMANDÉ par le vendeur : "
+            "s'il tombe dans plusieurs fourchettes, le prix est défendable ; "
+            "hors de toutes, il est cher ou décoté.",
+            "Bouton ACQUÉRIR (ou GÉRER pour une cible déjà détenue) : bascule "
+            "directement vers l'écran M&A pour agir sur ce jugement.",
+        ],
+        "concept": "Aucune méthode de valorisation isolée n'est fiable : le "
+                   "DCF dépend d'hypothèses de croissance/WACC discutables, "
+                   "les comparables dépendent d'un échantillon de sociétés "
+                   "jamais parfaitement identiques. Superposer plusieurs "
+                   "méthodes indépendantes et regarder où elles CONVERGENT "
+                   "(plutôt qu'un chiffre unique) est la pratique standard "
+                   "des banquiers d'affaires — d'où le nom, la forme du "
+                   "graphique rappelant un terrain de football vu de dessus.",
+    },
+    {
+        "id": "pitchbook",
+        "title": "Pitch Book : démarcher un mandat au lieu de l'attendre",
+        "image": "pitchbook.png",
+        "intro": "Exclusif à la voie Advisory : jusqu'ici, un mandat client "
+                 "n'arrivait que par tirage aléatoire. Le Pitch Book permet "
+                 "de CHOISIR un profil client et de le démarcher activement.",
+        "steps": [
+            "Colonne de gauche : les 5 profils clients (Assureur, Fonds de "
+            "pension, Family office, Client opportuniste, Institutionnel "
+            "prudent) avec votre AFFINITÉ pour chacun (réputation, grade, "
+            "voie Advisory) — un profil « indisponible » vient de refuser "
+            "un pitch récent (cooldown de 2 trimestres).",
+            "Colonne de droite : réglez l'AMBITION du pitch avec −/+ — plus "
+            "ambitieux (capital et objectif visés plus élevés) fait BAISSER "
+            "la probabilité de succès affichée, plus modeste l'augmente.",
+            "PITCHER tire le résultat : un succès crée une VRAIE offre de "
+            "mandat (à retrouver dans vos mandats/offres, comme une offre "
+            "normale) ; un échec coûte de la réputation et met ce client en "
+            "pause avant de retenter.",
+            "Le journal des pitchs en bas garde une trace des dernières "
+            "tentatives, gagnées ou perdues.",
+        ],
+        "concept": "Un pitch réussi n'est pas un coup de chance pur : votre "
+                   "réputation, votre grade et le fait d'avoir choisi la "
+                   "voie Advisory augmentent réellement votre probabilité de "
+                   "succès — et viser trop haut (ambition) la fait baisser, "
+                   "comme un vrai client qui négocie plus dur face à une "
+                   "proposition agressive.",
+    },
+    {
+        "id": "strategicalloc",
+        "title": "Allocation stratégique : le niveau qui compte le plus",
+        "image": "strategicalloc.png",
+        "intro": "Exclusif à la voie Portfolio : la répartition de votre "
+                 "patrimoine entre actions, obligations, matières premières, "
+                 "crypto et cash — pas la sélection de titres individuels.",
+        "steps": [
+            "Le donut à gauche montre votre répartition ACTUELLE ; la "
+            "légende compare chaque classe à sa CIBLE et signale (⚠) celles "
+            "hors de la bande de tolérance de 5 points.",
+            "À droite, choisissez un profil (Prudent/Équilibré/Dynamique) "
+            "ou « Personnalisé » pour régler vos propres cibles avec −/+.",
+            "Le bouton RÉÉQUILIBRER (actions) redimensionne PROPORTIONNELLEMENT "
+            "vos positions actions existantes vers la cible ; les autres "
+            "classes hors bande sont seulement SIGNALÉES avec le montant à "
+            "déplacer — direction le desk correspondant pour choisir "
+            "l'instrument.",
+        ],
+        "concept": "La littérature financière (Brinson et al.) montre que la "
+                   "RÉPARTITION entre grandes classes d'actifs explique "
+                   "l'essentiel de la variance de performance d'un "
+                   "portefeuille dans le temps — bien avant le choix de "
+                   "quels titres précis acheter. Un gérant de portefeuille "
+                   "professionnel passe donc autant de temps sur CETTE "
+                   "décision que sur la sélection de titres elle-même.",
+    },
 ]
 
 _BY_ID = {t["id"]: t for t in TUTORIALS}

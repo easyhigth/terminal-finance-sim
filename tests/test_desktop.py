@@ -3005,7 +3005,8 @@ def test_newly_unlocked_diff_between_grades(app):
     p.track = "General"
     p.grade_index = 4
     feats = unlock_briefs.newly_unlocked(p, 3)
-    assert set(feats) == {"trade", "pitch", "ma", "ipo"}
+    assert set(feats) == {"trade", "pitch", "ma", "ipo", "valuation", "attribution",
+                           "backtester", "pnlexplain", "footballfield", "strategicalloc"}
     p.grade_index = 2
     assert set(unlock_briefs.newly_unlocked(p, 1)) == {"track", "deals", "calendar"}
 
@@ -3023,7 +3024,10 @@ def test_promotion_records_pending_unlock_briefs(app):
     ev.idx = len(ev.items)
     ev._finish()
     briefs = p.flags.get("pending_unlock_briefs")
-    assert briefs and set(briefs["features"]) == {"trade", "pitch", "ma", "ipo"}
+    assert briefs and set(briefs["features"]) == {"trade", "pitch", "ma", "ipo",
+                                                    "valuation", "attribution",
+                                                    "backtester", "pnlexplain",
+                                                    "footballfield", "strategicalloc"}
     assert briefs["grade"] == p.grade
 
 

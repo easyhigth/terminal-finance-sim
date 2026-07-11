@@ -17,7 +17,7 @@ import random
 
 from core import archetypes, firms, tracks
 
-MIN_GRADE = 6              # Vice President et au-delà (cf. unlocks)
+MIN_GRADE = 7              # Senior VP et au-delà (cf. unlocks "mandates")
 MAX_ACTIVE = 2            # mandats simultanés
 OFFER_PROB = 0.18         # proba d'une offre par tour (si place dispo)
 

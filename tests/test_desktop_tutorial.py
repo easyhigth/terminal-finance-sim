@@ -107,7 +107,7 @@ def test_active_step_skips_gated_trading_step_before_associate():
 def test_active_step_resumes_once_trade_unlocked():
     for _ in range(5):
         dt.advance()
-    desktop = _FakeDesktop(grade_index=4)   # Associate : trading débloqué
+    desktop = _FakeDesktop(grade_index=1)   # Junior Analyst : trading débloqué
     idx, step = dt.active_step(desktop)
     assert idx == 5
     assert step["id"] == "first_buy"

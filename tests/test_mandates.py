@@ -7,7 +7,7 @@ from core import mandates, market
 from core.game_state import PlayerState
 
 
-def _mk(grade_index=6):
+def _mk(grade_index=mandates.MIN_GRADE):
     m = market.Market(seed=42)
     m.sync_to(market.WARMUP_STEPS)
     p = PlayerState(continent="Europe", grade_index=grade_index)

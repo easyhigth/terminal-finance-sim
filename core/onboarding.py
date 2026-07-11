@@ -9,11 +9,11 @@ dans le désordre. Affichée en bandeau dans scene_terminal ; ignorable (skip).
 
 # NB : les premières étapes ne portent volontairement que sur des commandes
 # toujours accessibles au grade Stagiaire (absentes de core/unlocks.py::CMD_FEATURE,
-# ou débloquées dès le grade 0 comme RESEARCH/ALERT — seul BUY/SELL reste
-# verrouillé jusqu'au grade Associate) — sans ça, le parcours pourrait rester
-# bloqué indéfiniment sur une commande encore inaccessible. Les outils
-# d'investissement (trading, mandats...) sont introduits plus tard, à leur
-# déblocage (core/unlocks.py::FEATURE_TUTORIAL).
+# ou débloquées dès le grade 0 comme RESEARCH/ALERT — BUY/SELL lui-même ne se
+# débloque qu'au grade Junior Analyst, cf. UNLOCKS["trade"]) — sans ça, le
+# parcours pourrait rester bloqué indéfiniment sur une commande encore
+# inaccessible. Les outils d'investissement (trading, mandats...) sont
+# introduits plus tard, à leur déblocage (core/unlocks.py::FEATURE_TUTORIAL).
 def _L(fr, en):
     from core.i18n import get_lang
     return en if get_lang() == "en" else fr

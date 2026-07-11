@@ -700,9 +700,9 @@ FEATURE_BRIEFS = {
                  "(sandbox)."),
         "how": ("Menu Apps → « Quant », ou tapez QUANT.", "Apps menu → “Quant”, or type QUANT."),
         "why": ("Comprendre ce que vaut une option avant d'en acheter une "
-                "(grade 6).",
+                "(grade 8).",
                 "Understand what an option is worth before buying one "
-                "(grade 6)."),
+                "(grade 8)."),
         "first": ("Pricez un call et regardez comment la volatilité change la "
                   "prime.",
                   "Price a call and watch how volatility changes the premium."),

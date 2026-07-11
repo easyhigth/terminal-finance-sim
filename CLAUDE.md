@@ -1157,6 +1157,29 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   d'allocation sommant à 1, plan de rééquilibrage qui VEND pour réduire une surpondération
   actions, exécution best-effort, et paramétrage de `TRACK_AFFINITY`/`FEATURE_BRIEFS` pour
   les 8 clés concernées).
+- **Calendrier de déblocage étalé (`core/unlocks.UNLOCKS`).** Avant ce lot, les 27
+  fonctionnalités du jeu se concentraient sur seulement 5 paliers (grades 0/2/4/5/6), avec
+  deux VAGUES massives — 9 fonctionnalités d'un coup au grade 4 (Associate), 9 autres au
+  grade 6 (Vice President) — et sept grades entiers (1, 3, 7, 8, 9, 10, 11) sans le moindre
+  nouveau déblocage : peu digeste, et une impression de grade « qui ne rapporte rien ».
+  Redistribué sur les grades 1 à 9 à raison de 2-3 déblocages par promotion (grade 0 reste
+  la base sandbox/lecture seule inchangée : `analyst`/`alm`/`risk`/`quant` ; grades 10-11
+  ne débloquent plus rien de neuf — à ce stade tout l'outillage est déjà ouvert, la fin de
+  carrière est affaire de score, pas de contenu). Groupement pensé pour rester cohérent
+  thématiquement (ex. grade 3 : `pitch`+`ma`+`footballfield`, un jalon M&A/advisory groupé ;
+  grade 5 : `backtester`+`pnlexplain`+`strategicalloc`, la vague Portfolio ; grade 8 :
+  `pitchbook`+`options`+`team`, les outils les plus avancés) plutôt que redistribué au
+  hasard. Trois constantes `MIN_GRADE` DÉDIÉES et indépendantes de ce dict, qui portent la
+  mécanique réelle (pas juste l'affichage/la commande) pour `ipo`/`macrocal`/`mandates`
+  (`core/ipo.py`, `core/macrocal.py`, `core/mandates.py`), ont été resynchronisées sur les
+  nouveaux paliers — sinon une commande semblait débloquée dans l'UI tout en étant encore
+  refusée par le module lui-même (piège déjà présent avant ce lot, `mandates.MIN_GRADE`
+  ayant sa propre valeur séparée de `UNLOCKS["mandates"]`, à resynchroniser à la main à
+  chaque changement de palier). Les tests qui vérifiaient les fonctionnalités débloquées à
+  un grade donné (`tests/test_desktop.py::test_newly_unlocked_diff_between_grades`,
+  `test_promotion_records_pending_unlock_briefs`) calculent désormais l'ensemble ATTENDU
+  depuis `unlocks.UNLOCKS` lui-même plutôt qu'un ensemble recopié en dur — un futur
+  réglage du calendrier n'a plus besoin de mettre à jour ces tests à la main.
 - **`data/companies.py`** : roster fictif déterministe (320 sociétés, `ROSTER_SEED` fixe,
   noms déformés exprès : LVMH→LWNH, NVIDIA→MVC…).
 - **`core/`** : systèmes de jeu (career, portfolio, bonds, commodities, crypto, structured,

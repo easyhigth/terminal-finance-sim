@@ -2998,6 +2998,19 @@ def test_every_unlockable_feature_has_a_brief():
     assert not missing, f"fiches manquantes : {missing}"
 
 
+def _features_at_grade(grade):
+    """Fonctionnalités dont le grade EFFECTIF requis (voie "General", sans
+    vétéran) est exactement `grade` — calculé depuis core.unlocks.UNLOCKS
+    plutôt que recopié en dur, pour ne pas devoir mettre à jour un ensemble
+    figé à chaque réglage du calendrier de déblocage."""
+    from core import unlocks
+    from core.game_state import PlayerState
+    p = PlayerState()
+    p.grade_index = grade
+    p.track = "General"
+    return {f for f in unlocks.UNLOCKS if unlocks.effective_required_grade(p, f) == grade}
+
+
 def test_newly_unlocked_diff_between_grades(app):
     from core import unlock_briefs
     p = app.gs.player
@@ -3005,10 +3018,9 @@ def test_newly_unlocked_diff_between_grades(app):
     p.track = "General"
     p.grade_index = 4
     feats = unlock_briefs.newly_unlocked(p, 3)
-    assert set(feats) == {"trade", "pitch", "ma", "ipo", "valuation", "attribution",
-                           "backtester", "pnlexplain", "footballfield", "strategicalloc"}
+    assert set(feats) == _features_at_grade(4)
     p.grade_index = 2
-    assert set(unlock_briefs.newly_unlocked(p, 1)) == {"track", "deals", "calendar"}
+    assert set(unlock_briefs.newly_unlocked(p, 1)) == _features_at_grade(2)
 
 
 def test_promotion_records_pending_unlock_briefs(app):
@@ -3024,10 +3036,7 @@ def test_promotion_records_pending_unlock_briefs(app):
     ev.idx = len(ev.items)
     ev._finish()
     briefs = p.flags.get("pending_unlock_briefs")
-    assert briefs and set(briefs["features"]) == {"trade", "pitch", "ma", "ipo",
-                                                    "valuation", "attribution",
-                                                    "backtester", "pnlexplain",
-                                                    "footballfield", "strategicalloc"}
+    assert briefs and set(briefs["features"]) == _features_at_grade(p.grade_index)
     assert briefs["grade"] == p.grade
 
 

@@ -8,38 +8,60 @@ une montée en complexité maîtrisée.
 """
 from core import config
 
-# fonctionnalité -> grade minimal requis
+# fonctionnalité -> grade minimal requis.
+#
+# Étalé sur les grades 1 à 9 à raison de 2-3 déblocages par grade (au lieu de
+# grosses vagues concentrées sur 2-3 paliers, cf. l'historique de ce fichier
+# avant ce rééquilibrage) : à chaque promotion, le joueur retrouve quelque
+# chose de nouveau à essayer, plutôt que rien pendant plusieurs grades puis
+# neuf fonctionnalités d'un coup. Les grades 10-11 (Managing Director/Partner)
+# ne débloquent plus rien de nouveau : à ce stade tout l'outillage est déjà
+# ouvert, la fin de carrière est affaire de score et de maîtrise, pas de
+# contenu supplémentaire. Grade requis synchronisé avec les constantes
+# `MIN_GRADE` dédiées de `core/ipo.py`, `core/macrocal.py` et
+# `core/mandates.py` (mécanique réelle, indépendante de ce dict mais qui doit
+# rester alignée dessus — sinon une commande semblerait débloquée dans l'UI
+# tout en étant encore refusée par le module).
 UNLOCKS = {
     # ouvert dès l'arrivée (Intern) : ce sont des outils 100% lecture/analyse,
     # sans impact économique (pas d'argent en jeu) — de quoi avoir une vraie
     # activité (watchlist, alertes, recherche) avant le déblocage du trading.
     "analyst": 0,    # watchlist, alertes, comparaison, valeur relative, recherche
-    "track": 2,      # choisir une voie de spécialisation
-    "deals": 2,      # traiter des deals
-    "trade": 4,      # investir : acheter / vendre / allouer / rééquilibrer
-    "pitch": 4,      # démarcher un client pour un mandat
-    "hedge": 6,      # couverture du portefeuille (réduction d'exposition)
-    "leverage": 6,   # levier & vente à découvert (short)
-    "mandates": 6,   # mandats clients
-    "ma": 4,         # M&A : acquisition de cibles privées (LBO réel)
-    "options": 6,    # options sur actions individuelles (calls/puts)
-    "ipo": 4,        # souscription aux introductions en bourse
-    "fx": 5,         # desk FX (spot + forward sur devises)
-    "calendar": 2,   # calendrier macro (paris sur évènements programmés)
-    "team": 6,       # recrutement d'analystes juniors (équipe)
     "alm": 0,        # desk ALM (sandbox actif-passif, lecture/simulation seule)
     "risk": 0,       # module risk (VaR/stress sur exposition de référence, sandbox)
     "quant": 0,      # module quant (pricing d'options, sandbox)
-    "credit": 6,     # titrisation : tranches de pool de prêts (cash réellement investi)
-    "structured": 6,  # produits structurés (cash réellement investi)
+    # grade 1 (Junior Analyst) : choisir sa voie et commencer à investir.
+    "track": 1,      # choisir une voie de spécialisation
+    "deals": 1,      # traiter des deals
+    "trade": 1,      # investir : acheter / vendre / allouer / rééquilibrer
+    # grade 2 (Analyst) : premiers outils complémentaires au trading.
+    "calendar": 2,   # calendrier macro (paris sur évènements programmés)
+    "ipo": 2,        # souscription aux introductions en bourse
+    # grade 3 (Senior Analyst) : premier vrai jalon M&A/advisory.
+    "pitch": 3,      # démarcher un client pour un mandat
+    "ma": 3,         # M&A : acquisition de cibles privées (LBO réel)
+    "footballfield": 3,   # Football Field (valorisation multi-méthodes) — affinité M&A
+    # grade 4 (Associate) : outils d'analyse de niveau 2.
     "valuation": 4,     # Desk Valorisation (DCF/SML/pont IRR) — affinité M&A
-    "creditdesk": 6,    # Desk Crédit (Merton/waterfall/CDS/convertibles) — affinité M&A
     "attribution": 4,   # Attribution de performance (Brinson/facteurs) — affinité Portfolio
-    "backtester": 4,    # Backtesteur de stratégies — affinité Portfolio
-    "pnlexplain": 4,    # P&L Explain (décomposition du patrimoine) — affinité Portfolio
-    "footballfield": 4,   # Football Field (valorisation multi-méthodes) — affinité M&A
-    "pitchbook": 6,       # Pitch Book (démarchage actif de mandats) — affinité Advisory
-    "strategicalloc": 4,  # Allocation stratégique multi-actifs — affinité Portfolio
+    # grade 5 (Senior Associate) : vague d'outils Portfolio.
+    "backtester": 5,    # Backtesteur de stratégies — affinité Portfolio
+    "pnlexplain": 5,    # P&L Explain (décomposition du patrimoine) — affinité Portfolio
+    "strategicalloc": 5,  # Allocation stratégique multi-actifs — affinité Portfolio
+    # grade 6 (Vice President) : desks de marché avancés.
+    "fx": 6,         # desk FX (spot + forward sur devises)
+    "hedge": 6,      # couverture du portefeuille (réduction d'exposition)
+    # grade 7 (Senior VP) : levier et mandats clients.
+    "leverage": 7,   # levier & vente à découvert (short)
+    "mandates": 7,   # mandats clients
+    # grade 8 (Director) : outils les plus avancés/spécialisés.
+    "pitchbook": 8,       # Pitch Book (démarchage actif de mandats) — affinité Advisory
+    "options": 8,    # options sur actions individuelles (calls/puts)
+    "team": 8,       # recrutement d'analystes juniors (équipe)
+    # grade 9 (Executive Director) : produits de crédit structurés.
+    "credit": 9,     # titrisation : tranches de pool de prêts (cash réellement investi)
+    "structured": 9,  # produits structurés (cash réellement investi)
+    "creditdesk": 9,    # Desk Crédit (Merton/waterfall/CDS/convertibles) — affinité M&A
 }
 
 def _L(fr, en):

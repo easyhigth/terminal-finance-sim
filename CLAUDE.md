@@ -1180,6 +1180,41 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   `test_promotion_records_pending_unlock_briefs`) calculent désormais l'ensemble ATTENDU
   depuis `unlocks.UNLOCKS` lui-même plutôt qu'un ensemble recopié en dur — un futur
   réglage du calendrier n'a plus besoin de mettre à jour ces tests à la main.
+- **Historique des déblocages consultable + missions différenciées par voie.** Deux
+  compléments au calendrier de déblocage étalé ci-dessus, pour prolonger l'idée « chaque
+  grade apporte quelque chose de concret » au-delà de la seule carte de promotion :
+  (1) `core/unlocks.features_at_grade(player, grade)` — fonction pure qui renvoie les
+  fonctionnalités dont le grade EFFECTIF requis pour CE joueur (voie, statut vétéran) est
+  EXACTEMENT `grade`, indépendamment du grade ACTUEL du joueur (contrairement à
+  `next_unlock`, pensé pour UN SEUL prochain palier). `scenes/scene_unlock_history.py`
+  (scène "unlockhistory", bouton « DÉBLOCAGES → » de `scene_career.py`, entrée
+  `core/app_catalog.py`) liste TOUS les grades avec leurs fonctionnalités — atteints (✓),
+  grade actuel (▶, surligné), à venir (·, grisé, y compris des grades jamais atteints : un
+  aperçu concret de ce que rapportera la PROCHAINE promotion) — et regroupe les modules
+  verrouillés par une voie incompatible sous le grade `TRACK_LOCK_GRADE`, avec la note
+  explicative de `unlocks.track_lock_note`. Remplace la carte « NOUVEAU PÉRIMÈTRE », qui
+  n'était consultable qu'une fois, au moment de la promotion.
+  (2) **Missions « état réel » exclusives par voie** (`core/portfolio_missions.py`) :
+  jusqu'ici, au tier "portfolio" (VP+), 2 des `MAX_ITEMS` questions de chaque mission
+  vérifiaient l'état RÉEL du portefeuille (diversification, levier, cash, obligations,
+  couverture) — un quiz IDENTIQUE pour tous les joueurs, quelle que soit leur voie. Un pool
+  de checks EXCLUSIF par voie (`TRACK_CHECKS`, résolu par `pool_for_track`/
+  `practical_items_for_track`) interroge désormais le MÉTIER de la spécialisation
+  choisie : M&A → possède au moins une cible LBO ? ses cibles restent-elles sous 3x
+  dette/CA ? (`_owns_ma_target_ok`/`_ma_leverage_ok`) ; Risk → la VaR courante respecte-t-elle
+  le budget de la firme ? (`_var_within_firm_budget_ok`, réutilise `core/risklimits.py`) ;
+  Quant → détient une option ? le book est-il delta-neutre à moins de 25 % du delta brut ?
+  (`_holds_option_ok`/`_delta_hedged_ok`, réutilise `core/delta_hedge.py`) ; Advisory →
+  a un mandat actif ? tous ses mandats respectent-ils leurs contraintes ?
+  (`_has_active_mandate_ok`/`_mandate_constraints_ok`, réutilise
+  `core/mandates.py::check_constraints`). Portfolio/General continuent de recevoir
+  EXACTEMENT le pool générique d'avant (aucun changement pour eux). `core/missions.py`
+  gagne aussi une phrase d'« angle de métier » ajoutée au brief de CHAQUE mission (pas
+  seulement au tier "portfolio") selon la voie choisie — visible dès le premier grade où
+  le joueur a une voie, pas seulement à VP+. Verrouillé par `tests/test_unlock_history.py`
+  et `tests/test_track_missions.py` (couverture des pools, checks purs vacuously vrais sans
+  position concernée puis faux une fois la position prise, intégration dans
+  `missions.generate`, non-régression de General/Portfolio).
 - **`data/companies.py`** : roster fictif déterministe (320 sociétés, `ROSTER_SEED` fixe,
   noms déformés exprès : LVMH→LWNH, NVIDIA→MVC…).
 - **`core/`** : systèmes de jeu (career, portfolio, bonds, commodities, crypto, structured,

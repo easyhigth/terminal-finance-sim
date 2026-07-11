@@ -95,6 +95,33 @@ _TIER_BRIEFS = {
                   "exposure to market, currency and concentration risk."),
 }
 
+# Phrase ajoutée au brief selon la VOIE du joueur — rappelle, à CHAQUE
+# mission (pas seulement au tier "portfolio"), que le métier au quotidien
+# n'est pas le même selon la spécialisation choisie. Un joueur "General"
+# (voie non choisie) ne reçoit aucun ajout : comportement inchangé.
+_TRACK_FLAVOR = {
+    "M&A": ("Angle M&A : jugez comme un banquier d'affaires qui évalue une cible "
+            "avant de l'acquérir.",
+            "M&A angle: judge like an investment banker sizing up a target "
+            "before acquiring it."),
+    "Risk": ("Angle Risk : gardez un œil sur l'exposition et le budget de VaR à "
+             "chaque décision.",
+             "Risk angle: keep an eye on exposure and the VaR budget with "
+             "every decision."),
+    "Quant": ("Angle Quant : raisonnez en grecques et en pricing plutôt qu'en "
+              "intuition seule.",
+              "Quant angle: reason in greeks and pricing rather than intuition "
+              "alone."),
+    "Advisory": ("Angle Advisory : pensez comme un conseiller qui doit tenir ses "
+                 "engagements envers un client.",
+                 "Advisory angle: think like an advisor who must honor "
+                 "commitments to a client."),
+    "Portfolio": ("Angle Portfolio : pensez allocation et construction de "
+                  "portefeuille avant tout.",
+                  "Portfolio angle: think allocation and portfolio "
+                  "construction above all."),
+}
+
 
 # ---------------------------------------------------------------------------
 # API
@@ -102,23 +129,31 @@ _TIER_BRIEFS = {
 def generate(grade_index, market, rng=None, region=None, track="General", player=None):
     """Génère une mission adaptée au grade courant : un tirage de questions
     de la banque d'examens (jusqu'à MAX_ITEMS), thématisé par mission_tier().
-    `track` inclut les questions de la voie du joueur en plus du tronc commun.
+    `track` inclut les questions de la voie du joueur en plus du tronc commun,
+    et ajoute une phrase d'angle de métier au brief (cf. _TRACK_FLAVOR) —
+    "General" (voie non choisie) ne change rien à l'existant.
 
     Au tier "portfolio" (VP et au-delà), si `player` est fourni, 2 des
     MAX_ITEMS questions sont remplacées par des vérifications de l'ÉTAT RÉEL
-    du book (core/portfolio_missions.py) — diversification, levier, coussin
-    de cash, détention d'obligations, couverture — plutôt qu'un quiz
-    générique : à ce niveau, on juge un gérant sur son portefeuille, pas
-    seulement sur sa culture générale. `player` omis (ex. appelants existants
-    qui ne le passaient pas) : comportement inchangé, 100% banque de questions."""
+    du joueur (core/portfolio_missions.py) — le pool de checks dépend de SA
+    voie : diversification/levier/cash générique pour Portfolio/General,
+    mais santé des LBO pour M&A, budget de VaR pour Risk, delta du book pour
+    Quant, santé des mandats pour Advisory (cf.
+    `portfolio_missions.practical_items_for_track`) — à ce niveau, on juge un
+    professionnel sur SON métier, pas sur un quiz générique identique pour
+    tous. `player` omis (ex. appelants existants qui ne le passaient pas) :
+    comportement inchangé, 100% banque de questions."""
     rng = rng or random
     tier = mission_tier(grade_index)
     title = _L(*_TIER_TITLES[tier])
     brief = _L(*_TIER_BRIEFS[tier])
+    flavor = _TRACK_FLAVOR.get(track)
+    if flavor:
+        brief += " " + _L(*flavor)
     if tier == "portfolio" and player is not None:
         from core import portfolio_missions as PM
         n_practical = min(2, MAX_ITEMS)
-        items = PM.practical_items(player, market, count=n_practical, rng=rng)
+        items = PM.practical_items_for_track(player, market, count=n_practical, rng=rng)
         items += _bank_items(grade_index, rng, MAX_ITEMS - n_practical, track=track)
     else:
         items = _bank_items(grade_index, rng, MAX_ITEMS, track=track)

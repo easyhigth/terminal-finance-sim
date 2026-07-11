@@ -3000,15 +3000,14 @@ def test_every_unlockable_feature_has_a_brief():
 
 def _features_at_grade(grade):
     """Fonctionnalités dont le grade EFFECTIF requis (voie "General", sans
-    vétéran) est exactement `grade` — calculé depuis core.unlocks.UNLOCKS
-    plutôt que recopié en dur, pour ne pas devoir mettre à jour un ensemble
-    figé à chaque réglage du calendrier de déblocage."""
+    vétéran) est exactement `grade` — délègue à core.unlocks.features_at_grade
+    plutôt que de recopier un ensemble figé à mettre à jour à la main à
+    chaque réglage du calendrier de déblocage."""
     from core import unlocks
     from core.game_state import PlayerState
     p = PlayerState()
-    p.grade_index = grade
     p.track = "General"
-    return {f for f in unlocks.UNLOCKS if unlocks.effective_required_grade(p, f) == grade}
+    return set(unlocks.features_at_grade(p, grade))
 
 
 def test_newly_unlocked_diff_between_grades(app):

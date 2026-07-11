@@ -32,6 +32,8 @@ class CareerScene(Scene):
             (config.SCREEN_WIDTH - 40 - 160, 60, 160, 32), "RIVAUX →", config.COL_PRESTIGE)
         self.achievements_btn = widgets.Button(
             (config.SCREEN_WIDTH - 40 - 340, 60, 170, 32), "SUCCÈS →", config.COL_PRESTIGE)
+        self.unlocks_btn = widgets.Button(
+            (config.SCREEN_WIDTH - 40 - 560, 60, 210, 32), "DÉBLOCAGES →", config.COL_PRESTIGE)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -42,11 +44,14 @@ class CareerScene(Scene):
             self.app.scenes.go("rivals", return_to="career")
         if self.achievements_btn.handle(event):
             self.app.scenes.go("achievements", return_to="career")
+        if self.unlocks_btn.handle(event):
+            self.app.scenes.go("unlockhistory", return_to="career")
 
     def update(self, dt):
         self.back_btn.update(pygame.mouse.get_pos(), dt)
         self.rivals_btn.update(pygame.mouse.get_pos(), dt)
         self.achievements_btn.update(pygame.mouse.get_pos(), dt)
+        self.unlocks_btn.update(pygame.mouse.get_pos(), dt)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
@@ -86,6 +91,7 @@ class CareerScene(Scene):
         self.back_btn.draw(surf)
         self.rivals_btn.draw(surf)
         self.achievements_btn.draw(surf)
+        self.unlocks_btn.draw(surf)
 
     def _draw_ladder(self, surf, rect, p):
         inner = widgets.draw_panel(surf, rect, "Échelle des grades", config.COL_AMBER)

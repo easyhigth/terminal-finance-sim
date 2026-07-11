@@ -176,6 +176,50 @@ ICON_FEATURE = {
     "backtester": "trade",  # tester une stratégie suppose de pouvoir investir
 }
 
+# Rangement des icônes du bureau en SECTIONS repliables (façon dossiers) —
+# chaque icône a UNE catégorie fixe : une app nouvellement débloquée (cf.
+# ICON_FEATURE ci-dessus) atterrit donc automatiquement dans la bonne section
+# dès son apparition, sans configuration supplémentaire. Une clé absente de
+# ce dict tombe dans DEFAULT_ICON_CATEGORY plutôt que de disparaître — filet
+# défensif si une future icône est ajoutée sans y penser.
+DEFAULT_ICON_CATEGORY = "Autres"
+ICON_CATEGORY_ORDER = [
+    "Essentiels", "Marché & Analyse", "Quant & Risque", "Crédit & Financement",
+    "Carrière", "Outils du bureau", DEFAULT_ICON_CATEGORY,
+]
+ICON_CATEGORY = {
+    # Essentiels : les outils du quotidien, jamais loin.
+    "terminal": "Essentiels", "trading": "Essentiels", "research": "Essentiels",
+    "book": "Essentiels", "markethub": "Essentiels", "watchlist": "Essentiels",
+    # Marché & Analyse : parcourir/comparer/exécuter sur le marché.
+    "qexplorer": "Marché & Analyse", "qshop": "Marché & Analyse",
+    "qwall": "Marché & Analyse", "qgraph": "Marché & Analyse",
+    "fxdesk": "Marché & Analyse", "valuation": "Marché & Analyse",
+    # Quant & Risque : les desks quantitatifs/risque avancés.
+    "sharpe": "Quant & Risque", "zscore": "Quant & Risque",
+    "hedge": "Quant & Risque", "frontier": "Quant & Risque",
+    "greeks": "Quant & Risque", "vardesk": "Quant & Risque",
+    "rates": "Quant & Risque", "attribution": "Quant & Risque",
+    "pairs": "Quant & Risque", "crisislab": "Quant & Risque",
+    "vollab": "Quant & Risque", "backtester": "Quant & Risque",
+    # Crédit & Financement.
+    "creditdesk": "Crédit & Financement", "funding": "Crédit & Financement",
+    "pnlexplain": "Crédit & Financement",
+    # Carrière : progression, mandats, deals, décisions.
+    "mission": "Carrière", "tradejournal": "Carrière", "track": "Carrière",
+    "qmandates": "Carrière", "qdeals": "Carrière", "qdecide": "Carrière",
+    "qexamcert": "Carrière", "qachievements": "Carrière",
+    # Outils du bureau : messagerie, notes, réglages.
+    "sheet": "Outils du bureau", "calculator": "Outils du bureau",
+    "notifcenter": "Outils du bureau", "inbox": "Outils du bureau",
+    "alerts": "Outils du bureau", "qnews": "Outils du bureau",
+    "qcommands": "Outils du bureau", "save": "Outils du bureau",
+}
+
+
+def icon_category(key):
+    return ICON_CATEGORY.get(key, DEFAULT_ICON_CATEGORY)
+
 # Raccourcis Ctrl+<lettre> des icônes du bureau — mêmes mnémoniques que les
 # raccourcis du terminal (RAIL_SHORTCUTS, scenes/scene_terminal.py, garder
 # synchronisé) pour ne pas avoir deux dialectes. Ctrl+T/W/Tab sont réservés

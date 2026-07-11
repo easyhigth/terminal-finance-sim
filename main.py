@@ -36,6 +36,7 @@ from scenes.scene_bonds import BondsScene
 from scenes.scene_book import BookScene
 from scenes.scene_calendar import CalendarScene
 from scenes.scene_career import CareerScene
+from scenes.scene_unlock_history import UnlockHistoryScene
 from scenes.scene_cert import CertScene
 from scenes.scene_commands import CommandsScene
 from scenes.scene_commodities import CommoditiesScene
@@ -176,6 +177,7 @@ def build_scene_manager(app):
     m.register("history", HistoryScene(app))
     m.register("team", TeamScene(app))
     m.register("achievements", AchievementsScene(app))
+    m.register("unlockhistory", UnlockHistoryScene(app))
     m.register("stats", StatsScene(app))
     return m
 

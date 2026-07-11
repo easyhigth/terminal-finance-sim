@@ -244,3 +244,17 @@ def next_unlock(player):
         if g > player.grade_index and (best is None or g < best[1]):
             best = (feature_label(feat), g)
     return best
+
+
+def features_at_grade(player, grade):
+    """Fonctionnalités dont le grade EFFECTIF requis pour CE joueur (son
+    statut vétéran, sa voie — cf. `effective_required_grade`) est EXACTEMENT
+    `grade`, triées par libellé. Indépendant du grade ACTUEL du joueur : sert
+    à lister « ce qui a été/sera débloqué à ce palier », y compris pour un
+    grade déjà dépassé ou pas encore atteint (cf. `scenes/scene_unlock_history.py`,
+    l'historique/aperçu des déblocages). Un module verrouillé par la voie
+    choisie (`track_lock_note` non None) apparaît dans le groupe
+    `TRACK_LOCK_GRADE`, pas dans son grade de base — cohérent avec
+    `unlocked()`/`effective_required_grade()`."""
+    feats = [f for f in UNLOCKS if effective_required_grade(player, f) == grade]
+    return sorted(feats, key=feature_label)

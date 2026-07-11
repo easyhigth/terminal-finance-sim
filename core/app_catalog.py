@@ -87,6 +87,7 @@ SECTIONS = [
         ("Stress test régulateur", "stresstest", {}, "Simulation de crise imposée par le régulateur."),
         ("Équipe / analystes", "team", {}, "Recruter et gérer une équipe d'analystes."),
         ("Succès (badges)", "achievements", {}, "Tous les badges du jeu, obtenus ou encore à débloquer."),
+        ("Historique des déblocages", "unlockhistory", {}, "Ce que chaque grade a débloqué, et ce qui reste à venir."),
         ("Statistiques", "stats", {}, "Synthèse de la session : trading, discipline, progression, score composite."),
     ]),
     ("Apprendre", [

@@ -1,7 +1,8 @@
 """
 scene_track.py — Choix de la voie de spécialisation.
-Débloqué après le grade Analyst. Chaque voie ouvre des modules,
-des questions d'évaluation et des concepts spécifiques.
+Débloqué au grade Junior Analyst (cf. core/unlocks.UNLOCKS["track"]). Chaque
+voie ouvre des modules, des questions d'évaluation et des concepts
+spécifiques.
 """
 import pygame
 

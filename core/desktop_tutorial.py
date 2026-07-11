@@ -12,7 +12,7 @@ n'apprend le bureau qu'une fois, pas à chaque nouvelle partie. « Revoir le
 tutoriel » (menu contextuel du fond du bureau) remet à zéro.
 
 Les deux dernières étapes (premier achat, stop-loss) portent sur le TRADING,
-verrouillé jusqu'au grade Associate (core/unlocks.py) — souvent bien après la
+verrouillé jusqu'au grade Junior Analyst (core/unlocks.py) — parfois après la
 fin des 5 premières étapes. Elles ont un `gate(desktop) -> bool` : tant que le
 trading n'est pas débloqué, `active_step()` retourne None (pas de bandeau
 « en attente » qui pointerait vers une icône encore invisible) ; la séquence

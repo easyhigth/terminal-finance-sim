@@ -25,7 +25,7 @@ import random
 
 import numpy as np
 
-MIN_GRADE = 4              # Associate et au-delà (cf. unlocks "ipo")
+MIN_GRADE = 2              # Analyst et au-delà (cf. unlocks "ipo")
 MAX_ACTIVE_OFFERS = 3       # offres simultanées en attente de décision
 OFFER_PROB = 0.16           # proba d'une offre par tour (si place dispo)
 LISTING_HORIZON = (3, 8)    # pas avant la cotation (min, max)

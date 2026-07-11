@@ -1099,6 +1099,64 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   d'exception). **Bug corrigé au passage** (`core/spreadsheet_engine.py::tokenize`) : le
   scanner d'identifiants n'acceptait pas `_` dans un nom de fonction/référence — `REPO_RATE`,
   `CDS_SPREAD` levaient `ValueError: Caractère inattendu : '_'` avant cette correction.
+- **Identité de carrière par voie (déblocage exclusif + outils exclusifs).** Jusqu'ici,
+  choisir une VOIE (`core/tracks.py`) ne changeait que des multiplicateurs numériques
+  (commission, récompenses de deal/mandat…) — presque tous les desks avancés des lots
+  précédents restaient accessibles à n'importe quelle voie. Deux volets pour donner un vrai
+  sens au choix :
+  (1) **Verrouillage de 5 apps existantes par voie** (`core/unlocks.TRACK_AFFINITY`,
+  mécanisme déjà utilisé pour M&A/hedge/options/mandates/structured, cf. lots précédents) :
+  chacune reçoit sa PROPRE clé de fonctionnalité (au même grade qu'avant — jamais une clé
+  PARTAGÉE comme `"trade"`/`"credit"`, qui aurait verrouillé BUY/SELL ou la titrisation par
+  ricochet) — `valuation`/`creditdesk` → affinité M&A (juger/financer une cible avant de
+  l'acquérir), `attribution`/`backtester`/`pnlexplain` → affinité Portfolio (comprendre SA
+  propre gestion). Comme pour les modules déjà affiliés, un joueur `"General"` (voie non
+  choisie) n'est JAMAIS restreint — seul un choix de voie DIFFÉRENTE ferme la porte jusqu'au
+  grade max (reconversion libre, `core/tracks.TOP_GRADE_INDEX`).
+  (2) **Trois apps EXCLUSIVES nouvelles**, un vrai outil propre à chaque spécialisation
+  plutôt qu'un multiplicateur invisible :
+  - **M&A — Football Field** (`core/precedent_transactions.py` : transactions M&A passées
+    synthétiques et déterministes par secteur, dérivées de `data/ma_targets._PRIVATE_MULT`
+    mais délibérément plus chères — une transaction se conclut à une prime, jamais à la
+    juste valeur « au fil de l'eau » ; `core/football_field.py` : agrège comps + DCF (déjà
+    calculés par `core/ma.py::valuation()`, jamais dupliqués) + transactions précédentes +
+    comparables publics décotés d'illiquidité en fourchettes de fonds propres comparables).
+    App `apps/app_footballfield.py` : barres horizontales par méthode, repère du prix
+    demandé, verdict « dans/hors fourchette », bouton ACQUÉRIR/GÉRER vers l'écran M&A.
+  - **Advisory — Pitch Book** (`core/pitch_book.py`) : jusqu'ici la commande PITCH
+    (`scenes/scene_terminal_career.py`) routait vers le pipeline de deals GÉNÉRIQUE, sans
+    aucun rapport avec le système de mandats (`core/mandates.py::maybe_offer`, jusque-là
+    purement passif/aléatoire) — la voie Advisory n'avait donc aucun outil proactif. Refactor
+    de `maybe_offer` : extraction de `_build_offer(player, client_profile, rng, market,
+    ambition=1.0)` (même construction d'offre, réutilisable) pour que `pitch_book.pitch()`
+    puisse choisir SON profil client (au lieu d'un tirage) et une ambition (grossit capital
+    ET objectif visés, MAIS réduit `win_probability` — un client négocie plus dur face à une
+    demande agressive). `fit_score`/`win_probability` combinent réputation, grade, bonus de
+    voie Advisory et malus des profils « stricts ». Un pitch perdu coûte de la réputation et
+    met CE profil en cooldown (2 trimestres, `player.flags["pitch_cooldowns"]`) avant de
+    retenter. App `apps/app_pitchbook.py` : chips de profils avec affinité affichée,
+    réglage d'ambition, probabilité calculée AVANT de pitcher, journal des tentatives.
+  - **Portfolio — Allocation stratégique** (`core/strategic_allocation.py`) : distinct de la
+    frontière efficiente (`core/quant_tools.py`, qui optimise les POIDS entre actions
+    individuelles) — ici le niveau est plus haut, la répartition entre 5 buckets (cash/
+    actions/obligations/commodities/crypto, mêmes fonctions `holdings_value(player, market)`
+    que `core/portfolio_margin.py::net_worth`). Trois profils prédéfinis (Prudent/Équilibré/
+    Dynamique, cibles sommant à 100%) ou personnalisé ; `drift`/`out_of_band` signalent les
+    buckets à plus de 5 points de la cible. `rebalance_plan`/`apply_plan` ne savent
+    RÉÉQUILIBRER AUTOMATIQUEMENT que le bucket actions (redimensionnement PROPORTIONNEL des
+    positions longues existantes, ordres entiers, ventes puis achats via `core/portfolio.py`)
+    — les autres classes exigent un choix d'instrument que ce module ne peut pas deviner ; il
+    indique alors le montant à déplacer et renvoie vers le desk concerné. App
+    `apps/app_strategicalloc.py` : donut de répartition actuelle, légende avec écart à la
+    cible, bouton RÉÉQUILIBRER (actions).
+  Les trois nouvelles clés de fonctionnalité (`footballfield`/`pitchbook`/`strategicalloc`)
+  suivent le même schéma `TRACK_AFFINITY` que les 5 apps reverrouillées. Verrouillé par
+  `tests/test_track_identity.py` (déterminisme des transactions précédentes, cohérence
+  ask/EV entre `football_field` et `ma.ask_price`, ambition ↔ probabilité de pitch,
+  cooldown/réputation d'un pitch perdu, offre réelle créée par un pitch gagné, cibles
+  d'allocation sommant à 1, plan de rééquilibrage qui VEND pour réduire une surpondération
+  actions, exécution best-effort, et paramétrage de `TRACK_AFFINITY`/`FEATURE_BRIEFS` pour
+  les 8 clés concernées).
 - **`data/companies.py`** : roster fictif déterministe (320 sociétés, `ROSTER_SEED` fixe,
   noms déformés exprès : LVMH→LWNH, NVIDIA→MVC…).
 - **`core/`** : systèmes de jeu (career, portfolio, bonds, commodities, crypto, structured,

@@ -26,6 +26,7 @@ _NEW_DESK_TUTORIAL_IDS = {
     "sharpe", "zscore", "frontier", "greeks", "vardesk", "rates", "attribution",
     "pairs", "creditdesk", "crisislab", "valuation", "fxdesk", "vollab",
     "funding", "pnlexplain", "backtester",
+    "footballfield", "pitchbook", "strategicalloc",
 }
 
 

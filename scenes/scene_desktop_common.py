@@ -23,11 +23,14 @@ from apps.app_dilemma import DilemmaApp
 from apps.app_evaluation import EvaluationApp
 from apps.app_explorer import ExplorerApp
 from apps.app_attribution import AttributionApp
+from apps.app_footballfield import FootballFieldApp
 from apps.app_frontier import FrontierApp
 from apps.app_greeks import GreeksApp
 from apps.app_pairs import PairsApp
+from apps.app_pitchbook import PitchBookApp
 from apps.app_pnlexplain import PnlExplainApp
 from apps.app_rates import RatesApp
+from apps.app_strategicalloc import StrategicAllocApp
 from apps.app_vardesk import VarDeskApp
 from apps.app_inbox import InboxApp
 from apps.app_journal import JournalApp
@@ -112,6 +115,12 @@ APPS = [
     ("funding", "Desk Financement", "book", FundingApp),
     ("pnlexplain", "P&L Explain", "graph", PnlExplainApp),
     ("backtester", "Backtester", "graph", BacktesterApp),
+    # Apps EXCLUSIVES par voie (cf. core/unlocks.TRACK_AFFINITY) : donnent
+    # une identité d'outillage propre à chaque spécialisation, au-delà des
+    # perks numériques de core/tracks.py.
+    ("footballfield", "Football Field", "research", FootballFieldApp),
+    ("pitchbook", "Pitch Book", "advisory", PitchBookApp),
+    ("strategicalloc", "Allocation stratégique", "portfolio", StrategicAllocApp),
 ]
 
 # Application supplémentaire propre à la VOIE (track) choisie par le joueur
@@ -165,15 +174,18 @@ ICON_FEATURE = {
     "hedge": "hedge",        # la couverture arrive au même grade que PROTECT
     "greeks": "options",     # le desk options arrive avec la commande OPTIONS
     "rates": "trade",        # le desk taux arrive quand on peut investir
-    "attribution": "trade",  # juger sa gestion suppose de pouvoir investir
+    "attribution": "attribution",  # affinité Portfolio : juger SA gestion
     "pairs": "leverage",     # la paire exige la vente à découvert
-    "creditdesk": "credit",  # le desk crédit arrive avec la titrisation
-    "valuation": "trade",    # valoriser suppose de pouvoir investir
+    "creditdesk": "creditdesk",  # affinité M&A : solvabilité d'une cible
+    "valuation": "valuation",    # affinité M&A : juger une cible avant offre
     "fxdesk": "trade",       # le carry s'exécute : même palier que le spot FX
     "vollab": "options",     # le labo de vol dialogue avec le desk options
     "funding": "leverage",   # repo/prêt-titres = levier et shorts
-    "pnlexplain": "trade",   # expliquer le P&L suppose de pouvoir investir
-    "backtester": "trade",  # tester une stratégie suppose de pouvoir investir
+    "pnlexplain": "pnlexplain",   # affinité Portfolio : expliquer SON P&L
+    "backtester": "backtester",  # affinité Portfolio : tester une stratégie
+    "footballfield": "footballfield",     # affinité M&A
+    "pitchbook": "pitchbook",             # affinité Advisory
+    "strategicalloc": "strategicalloc",   # affinité Portfolio
 }
 
 # Rangement des icônes du bureau en SECTIONS repliables (façon dossiers) —
@@ -209,6 +221,8 @@ ICON_CATEGORY = {
     "mission": "Carrière", "tradejournal": "Carrière", "track": "Carrière",
     "qmandates": "Carrière", "qdeals": "Carrière", "qdecide": "Carrière",
     "qexamcert": "Carrière", "qachievements": "Carrière",
+    # Apps exclusives par voie (identité de spécialisation).
+    "footballfield": "Carrière", "pitchbook": "Carrière", "strategicalloc": "Carrière",
     # Outils du bureau : messagerie, notes, réglages.
     "sheet": "Outils du bureau", "calculator": "Outils du bureau",
     "notifcenter": "Outils du bureau", "inbox": "Outils du bureau",

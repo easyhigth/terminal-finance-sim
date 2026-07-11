@@ -50,6 +50,7 @@ from scenes.scene_desktop_common import (
     _NEEDS_TICKERS,
     APPS,
     DESKTOP_SHORTCUTS,
+    ICON_CATEGORY_ORDER,
     ICON_FEATURE,
     ICON_GAP,
     ICON_H,
@@ -60,6 +61,7 @@ from scenes.scene_desktop_common import (
     TOPBAR_H,
     TRACK_APP,
     _scene_label,
+    icon_category,
 )
 from scenes.scene_desktop_menus import DesktopMenusMixin
 from scenes.scene_desktop_widgets import DesktopWidgetsMixin
@@ -107,6 +109,7 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         self.start_open = False
         self._icon_rects = {}       # clé -> (Rect, icon_kind, label) — icônes du bureau
         self._icon_hover_t = {}     # clé -> progression hover [0,1]
+        self._section_header_rects = {}  # libellé de section -> Rect (en-tête repliable)
         self._wallpaper_cache = None  # surface du fond pré-rendue (resize)
         self._icon_focus = None     # clé de l'icône ayant le focus clavier (ou None)
         self._icon_drag = None      # {"key","start","pos"} pendant un glisser d'icône (réorganisation)
@@ -602,6 +605,11 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         if self._start_rect and self._start_rect.collidepoint(pos):
             self._toggle_start_menu()
             return
+        # en-tête de section repliable (façon dossier) : clic = replier/déplier
+        for label, r in self._section_header_rects.items():
+            if r.collidepoint(pos):
+                self._toggle_section(label)
+                return
         # icônes du bureau + quick-launch : amorce un glisser (voir plus haut)
         for key, (r, _kind, _label) in self._icon_rects.items():
             if r.collidepoint(pos):
@@ -1119,6 +1127,36 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                   if self._icon_visible(k)]
         return self._apply_icon_order(items)
 
+    def _grouped_icon_sections(self):
+        """Regroupe `_icon_list()` en sections repliables (façon dossiers),
+        selon `scene_desktop_common.ICON_CATEGORY` — une icône nouvellement
+        débloquée atterrit automatiquement dans la bonne section (catégorie
+        fixe par clé, pas de tri à faire). Renvoie [(libellé, [items])],
+        dans l'ordre `ICON_CATEGORY_ORDER`, sans section vide."""
+        buckets = {}
+        for item in self._icon_list():
+            key = item[0]
+            buckets.setdefault(icon_category(key), []).append(item)
+        return [(label, buckets[label]) for label in ICON_CATEGORY_ORDER
+                if buckets.get(label)]
+
+    def _collapsed_sections(self):
+        return self.app.gs.player.flags.get("desktop_collapsed_sections", [])
+
+    def _is_section_collapsed(self, label):
+        return label in self._collapsed_sections()
+
+    def _toggle_section(self, label):
+        """Replie/déplie une section — persisté dans player.flags (survit à
+        une sauvegarde), comme la difficulté ou l'ordre des icônes."""
+        p = self.app.gs.player
+        collapsed = list(p.flags.get("desktop_collapsed_sections", []))
+        if label in collapsed:
+            collapsed.remove(label)
+        else:
+            collapsed.append(label)
+        p.flags["desktop_collapsed_sections"] = collapsed
+
     def _apply_icon_order(self, items):
         """Réordonne `items` selon `player.flags["desktop_icon_order"]`, une
         disposition libre choisie par le joueur (glisser-déposer, cf.
@@ -1169,9 +1207,10 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         # déblocage, pas de toast « nouvelle app » pour elle.
         new = [(k, lbl) for k, lbl, _kind, _acc in items
                if k not in seen and k != "qdecide"]
-        for _k, label in new:
-            self.app.notify(_L(f"Nouvelle app sur le bureau : {label}",
-                               f"New desktop app: {label}"), "prestige")
+        for k, label in new:
+            cat = icon_category(k)
+            self.app.notify(_L(f"Nouvelle app dans « {cat} » : {label}",
+                               f"New app in “{cat}”: {label}"), "prestige")
         if new:
             p.flags["desktop_seen_apps"] = keys
 
@@ -1187,50 +1226,81 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             return None
         return d["key"]
 
+    _SECTION_HEADER_H = 24
+    _SECTION_GAP = 10
+    _SECTION_ICON_COLS = 3   # icônes par colonne au sein d'une section
+    _SECTION_COL_GAP = 20    # espace entre deux colonnes de sections
+
+    @property
+    def _section_col_w(self):
+        return self._SECTION_ICON_COLS * (ICON_W + ICON_GAP) - ICON_GAP + 16
+
+    def _section_height(self, n_items, collapsed):
+        if collapsed:
+            return self._SECTION_HEADER_H + self._SECTION_GAP
+        n_rows = -(-n_items // self._SECTION_ICON_COLS)  # arrondi au-dessus
+        return (self._SECTION_HEADER_H + n_rows * (ICON_H + ICON_GAP)
+                + self._SECTION_GAP)
+
+    def _draw_section_header(self, surf, label, x, y, w, n_items, collapsed):
+        """En-tête de section repliable (façon dossier) : chevron + libellé +
+        compte d'icônes quand repliée. Renvoie le Rect cliquable (stocké dans
+        `self._section_header_rects` par l'appelant)."""
+        r = pygame.Rect(x, y, w, self._SECTION_HEADER_H)
+        hov = r.collidepoint(pygame.mouse.get_pos())
+        if hov:
+            pygame.draw.rect(surf, (*config.COL_PANEL, 90), r, border_radius=4)
+        cx, cy = r.x + 12, r.centery
+        # chevron vectoriel (▸ replié / ▾ déplié) — jamais un glyphe emoji.
+        if collapsed:
+            pts = [(cx - 3, cy - 5), (cx - 3, cy + 5), (cx + 4, cy)]
+        else:
+            pts = [(cx - 5, cy - 3), (cx + 5, cy - 3), (cx, cy + 4)]
+        pygame.draw.polygon(surf, config.COL_AMBER if hov else config.COL_TEXT_DIM, pts)
+        suffix = f" ({n_items})" if collapsed else ""
+        widgets.draw_text(surf, widgets.fit_text(label.upper() + suffix,
+                                                  fonts.tiny(bold=True), w - 28),
+                          (r.x + 24, r.y + 5), fonts.tiny(bold=True),
+                          config.COL_AMBER if hov else config.COL_TEXT_DIM)
+        pygame.draw.line(surf, config.COL_BORDER, (r.x + 24, r.bottom - 2),
+                         (r.right - 4, r.bottom - 2))
+        return r
+
     def _draw_desktop_icons(self, surf):
         self._icon_rects = {}
-        area_h = config.SCREEN_HEIGHT - TOPBAR_H - TASKBAR_H
-        max_rows = max(1, (area_h - 16) // (ICON_H + ICON_GAP))
+        self._section_header_rects = {}
         mp = pygame.mouse.get_pos()
         dragging_key = self._dragging_icon()
-        for i, (key, label, kind, accent) in enumerate(self._icon_list()):
-            col, row = divmod(i, max_rows)
-            x = 16 + col * (ICON_W + ICON_GAP)
-            y = TOPBAR_H + 12 + row * (ICON_H + ICON_GAP)
-            r = pygame.Rect(x, y, ICON_W, ICON_H)
-            self._icon_rects[key] = (r, kind, label)
-            hov_t = self._icon_hover_t.get(key, 0.0)
-            hov = hov_t > 0.01
-            if hov:
-                halo = r.inflate(int(6 * hov_t), int(6 * hov_t))
-                halo_col = (*config.COL_PANEL, int(120 * hov_t))
-                pygame.draw.rect(surf, halo_col, halo, border_radius=10)
-                pygame.draw.rect(surf, (*accent, int(160 * hov_t)), halo, 1, border_radius=10)
-            keynav.draw_focus_ring(surf, r, key == self._icon_focus)
-            ghost = dragging_key is not None and key == dragging_key
-            # icône avec halo/scale au survol, sans smoothscale coûteux :
-            # on décale juste l'icône de 1px vers le haut et on dessine un glow.
-            if hov_t > 0.01:
-                glow = int(4 * hov_t)
-                pygame.draw.circle(surf, (*accent, int(60 * hov_t)),
-                                   (r.centerx, r.y + 28), 20 + glow)
-                offset_y = -int(1.5 * hov_t)
-            else:
-                offset_y = 0
-            desktop_icons.draw(surf, (r.centerx, r.y + 28 + offset_y), kind,
-                               size=36, alpha=110 if ghost else 255)
-            label_col = config.COL_TEXT_DIM if ghost else (
-                style._lerp_color(config.COL_TEXT, accent, 0.3 * hov_t))
-            widgets.draw_text(surf, widgets.fit_text(label, fonts.small(bold=True), ICON_W - 6),
-                              (r.centerx, r.bottom - 18), fonts.small(bold=True),
-                              label_col, align="center")
-            # tooltip raccourci clavier (seulement si aucune fenêtre ne
-            # recouvre l'icône — sinon le survol appartient à la fenêtre)
-            sc_label = _ICON_SHORTCUT.get(key)
-            if hov and sc_label and self.wm._topmost_at(mp) is None:
-                widgets.draw_tooltip(surf, f"{label} · {sc_label}", (r.x, r.bottom + 2))
-        # dépôt en cours : liseré pointillé (façon) sur la case cible la plus
-        # proche du curseur, pour prévisualiser où l'icône va atterrir.
+        col_w = self._section_col_w
+        y_top = TOPBAR_H + 8
+        y_bottom = config.SCREEN_HEIGHT - TASKBAR_H - 8
+        col_x, y = 16, y_top
+        for label, section_items in self._grouped_icon_sections():
+            collapsed = self._is_section_collapsed(label)
+            need_h = self._section_height(len(section_items), collapsed)
+            if y > y_top and y + need_h > y_bottom:
+                # ne tient plus dans cette colonne : on passe à la suivante,
+                # comme des dossiers qui débordent sur le bureau (flux « en
+                # colonnes de journal ») plutôt que de dessiner hors écran.
+                col_x += col_w + self._SECTION_COL_GAP
+                y = y_top
+            self._section_header_rects[label] = self._draw_section_header(
+                surf, label, col_x, y, col_w, len(section_items), collapsed)
+            y += self._SECTION_HEADER_H
+            if collapsed:
+                y += self._SECTION_GAP
+                continue
+            for i, (key, item_label, kind, accent) in enumerate(section_items):
+                row, col = divmod(i, self._SECTION_ICON_COLS)
+                x = col_x + col * (ICON_W + ICON_GAP)
+                iy = y + row * (ICON_H + ICON_GAP)
+                r = pygame.Rect(x, iy, ICON_W, ICON_H)
+                self._draw_one_icon(surf, r, key, item_label, kind, accent,
+                                    mp, dragging_key)
+            n_rows = -(-len(section_items) // self._SECTION_ICON_COLS)
+            y += n_rows * (ICON_H + ICON_GAP) + self._SECTION_GAP
+        # dépôt en cours : liseré pointillé sur la case cible la plus proche
+        # du curseur, pour prévisualiser où l'icône va atterrir.
         if dragging_key is not None:
             best_d, target_r = None, None
             for k, (r, _kind, _label) in self._icon_rects.items():
@@ -1241,6 +1311,39 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
                     best_d, target_r = d, r
             if target_r is not None:
                 pygame.draw.rect(surf, config.COL_AMBER, target_r, 2, border_radius=8)
+
+    def _draw_one_icon(self, surf, r, key, label, kind, accent, mp, dragging_key):
+        self._icon_rects[key] = (r, kind, label)
+        hov_t = self._icon_hover_t.get(key, 0.0)
+        hov = hov_t > 0.01
+        if hov:
+            halo = r.inflate(int(6 * hov_t), int(6 * hov_t))
+            halo_col = (*config.COL_PANEL, int(120 * hov_t))
+            pygame.draw.rect(surf, halo_col, halo, border_radius=10)
+            pygame.draw.rect(surf, (*accent, int(160 * hov_t)), halo, 1, border_radius=10)
+        keynav.draw_focus_ring(surf, r, key == self._icon_focus)
+        ghost = dragging_key is not None and key == dragging_key
+        # icône avec halo/scale au survol, sans smoothscale coûteux :
+        # on décale juste l'icône de 1px vers le haut et on dessine un glow.
+        if hov_t > 0.01:
+            glow = int(4 * hov_t)
+            pygame.draw.circle(surf, (*accent, int(60 * hov_t)),
+                               (r.centerx, r.y + 28), 20 + glow)
+            offset_y = -int(1.5 * hov_t)
+        else:
+            offset_y = 0
+        desktop_icons.draw(surf, (r.centerx, r.y + 28 + offset_y), kind,
+                           size=36, alpha=110 if ghost else 255)
+        label_col = config.COL_TEXT_DIM if ghost else (
+            style._lerp_color(config.COL_TEXT, accent, 0.3 * hov_t))
+        widgets.draw_text(surf, widgets.fit_text(label, fonts.small(bold=True), ICON_W - 6),
+                          (r.centerx, r.bottom - 18), fonts.small(bold=True),
+                          label_col, align="center")
+        # tooltip raccourci clavier (seulement si aucune fenêtre ne
+        # recouvre l'icône — sinon le survol appartient à la fenêtre)
+        sc_label = _ICON_SHORTCUT.get(key)
+        if hov and sc_label and self.wm._topmost_at(mp) is None:
+            widgets.draw_tooltip(surf, f"{label} · {sc_label}", (r.x, r.bottom + 2))
 
     def _draw_topbar(self, surf):
         bar = pygame.Rect(0, 0, config.SCREEN_WIDTH, TOPBAR_H)

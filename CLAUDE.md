@@ -567,6 +567,37 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   budget conservé, cible ATTEINTE après `apply_trades`), `tests/test_quant_apps.py`
   et `tests/test_app_frontier.py` (clic sur courbe → ordres → exécution réelle,
   confirmation modale, invalidation par pas de marché).
+- **Icônes du bureau rangées en sections repliables (façon dossiers).** Le bureau
+  approchant les 40 icônes (cf. tous les desks ci-dessous), `DesktopScene
+  ._grouped_icon_sections()` (`scene_desktop.py`) regroupe désormais
+  `_icon_list()` par catégorie FIXE (`scene_desktop_common.ICON_CATEGORY` —
+  Essentiels/Marché & Analyse/Quant & Risque/Crédit & Financement/Carrière/
+  Outils du bureau, plus un fourre-tout « Autres » défensif pour toute clé
+  oubliée) : une app nouvellement débloquée par le grade atterrit AUTOMATIQUEMENT
+  dans la bonne section, aucun tri manuel n'est nécessaire (le toast
+  « nouvelle app » mentionne désormais la section). Chaque section est un
+  EN-TÊTE cliquable (chevron ▸/▾ dessiné en vectoriel, jamais un glyphe emoji)
+  qui replie/déplie son contenu ; l'état replié est persisté dans
+  `player.flags["desktop_collapsed_sections"]` (survit à une sauvegarde, comme
+  l'ordre des icônes ou la difficulté). Rendu en FLUX DE COLONNES façon
+  journal (`_draw_desktop_icons`) : chaque section occupe une colonne de
+  largeur fixe (3 icônes de large) ; dès qu'une section ne tient plus dans la
+  hauteur restante de la colonne courante, la suivante démarre une nouvelle
+  colonne à droite — jamais d'icône dessinée hors de l'écran, quel que soit le
+  nombre d'apps débloquées. À l'intérieur d'une section, les icônes restent en
+  ORDRE LIGNE (row-major : `row, col = divmod(i, _SECTION_ICON_COLS)`) —
+  piège rencontré une première fois avec un ordre COLONNE (`col, row =
+  divmod(...)`, hérité sans y penser de l'ancienne grille plein écran) qui
+  désynchronisait le nombre de lignes réellement dessinées de celui utilisé
+  par `_section_height()` pour décider si une section tient dans la colonne,
+  faisant déborder des icônes sous la barre des tâches. `_icon_rects` ne
+  contient QUE les icônes des sections dépliées : la navigation clavier
+  (Tab/flèches) et le glisser-déposer de réorganisation (`_reorder_icon`,
+  inchangé) sautent naturellement les sections repliées, comme un vrai
+  dossier fermé. Verrouillé par `tests/test_desktop_folders.py` (couverture
+  catégorie ↔ icône, regroupement sans doublon/omission, déblocage qui
+  atterrit dans la bonne section, repli/dépli persisté et cliquable, aucune
+  icône hors écran, aucun chevauchement d'en-têtes de section).
 - **Salle des marchés avancée (Desk Options / Risque VaR / Desk Taux).** Trois
   desks « qui s'étudient », branchés sur les VRAIS systèmes du jeu (jamais des
   maquettes), chacun avec son module PUR :

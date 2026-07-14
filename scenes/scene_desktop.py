@@ -457,8 +457,8 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         # F2-F10 : raccourcis rapides vers les apps principales
         _F_KEYS = {
             pygame.K_F2: "sheet", pygame.K_F3: "research", pygame.K_F4: "trading",
-            pygame.K_F5: "book", pygame.K_F6: "graph", pygame.K_F7: "news",
-            pygame.K_F8: "inbox", pygame.K_F9: "missions", pygame.K_F10: "deals",
+            pygame.K_F5: "book", pygame.K_F6: "qgraph", pygame.K_F7: "qnews",
+            pygame.K_F8: "inbox", pygame.K_F9: "mission", pygame.K_F10: "deals",
         }
         if event.type == pygame.KEYDOWN and event.key in _F_KEYS:
             key = _F_KEYS[event.key]

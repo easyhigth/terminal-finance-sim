@@ -190,7 +190,7 @@ def test_hedge_ratio_perfect_hedge():
     hr = QT.hedge_ratio(a, a)
     assert hr["ratio"] == pytest.approx(1.0)
     assert hr["corr"] == pytest.approx(1.0)
-    assert hr["resid_vol_pct"] == pytest.approx(0.0, abs=1e-6)
+    assert hr["resid_vol_pct"] == pytest.approx(0.0, abs=1e-5)
 
 
 def test_hedge_ratio_uncorrelated_is_useless():

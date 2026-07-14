@@ -59,6 +59,7 @@ class PlayerState:
     cds_positions: list = field(default_factory=list)   # protections CDS en cours
     irs_positions: list = field(default_factory=list)   # swaps de taux (IRS) en cours
     convertibles: list = field(default_factory=list)    # obligations convertibles détenues
+    trs_positions: list = field(default_factory=list)   # Total Return Swaps en cours
     options: list = field(default_factory=list)        # options sur actions (calls/puts) en cours
     currency_swaps: list = field(default_factory=list)  # swaps de devises actifs
     next_swap_id: int = 1                                # compteur d'identifiants de swaps
@@ -585,6 +586,24 @@ class GameState:
             if getattr(p, "convertibles", None):
                 from core import convertibles as _conv
                 deriv += _conv.accrue(p, market, config.DAYS_PER_STEP)
+            # TRS (Total Return Swaps) : jambe de financement + dividende courus,
+            # évènement de crédit / échéance réglés au MTM
+            if getattr(p, "trs_positions", None):
+                from core import trs as _trs
+                deriv += _trs.accrue(p, market, config.DAYS_PER_STEP)
+                for _ev in _trs.evaluate_due(p, market):
+                    from core import notify_queue as _nq
+                    _side = _L("Receiver", "Receiver") if _ev["side"] == "receiver" \
+                            else _L("Payer", "Payer")
+                    if _ev["kind"] == "credit_event":
+                        _nq.push(p, _L("EVENEMENT DE CREDIT ", "CREDIT EVENT ")
+                                 + f"{_ev['ticker']} ({_side}) : "
+                                 + f"{_ev['payoff']:+,.0f}", "good")
+                    else:
+                        _nq.push(p, f"TRS {_ev['ticker']} ({_side}) "
+                                 + _L("echu : MTM regle ",
+                                      "matured: MTM settled ")
+                                 + f"{_ev['payoff']:+,.0f}", "info")
             if deriv:
                 p.adjust_cash(deriv, category="revenus")
                 dividends += deriv

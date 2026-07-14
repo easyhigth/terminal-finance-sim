@@ -531,9 +531,9 @@ FEATURE_BRIEFS = {
     "creditdesk": {
         "title": ("Desk Crédit", "Credit desk"),
         "what": ("Modèle de Merton (défaut implicite), cascade de titrisation, "
-                 "CDS et obligations convertibles.",
-                 "Merton default model, securitization waterfall, CDS and "
-                 "convertible bonds."),
+                 "CDS, TRS (rendement total) et obligations convertibles.",
+                 "Merton default model, securitization waterfall, CDS, total "
+                 "return swaps and convertible bonds."),
         "how": ("Menu Apps → « Desk Crédit ».", "Apps menu → “Credit desk”."),
         "why": ("Réservé à la voie M&A : évaluer la solvabilité d'une cible "
                 "avant de l'endetter davantage.",

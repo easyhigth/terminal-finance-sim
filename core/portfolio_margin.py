@@ -117,6 +117,9 @@ def net_worth(player, market):
     if getattr(player, "convertibles", None):
         from core import convertibles as conv_mod
         nw += conv_mod.holdings_value(player, market)
+    if getattr(player, "trs_positions", None):
+        from core import trs as trs_mod
+        nw += trs_mod.holdings_value(player, market)
     return nw
 
 

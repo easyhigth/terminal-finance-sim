@@ -795,6 +795,27 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
     Émission au spot à l'achat, mark-to-model, coupons courus.
     Onglets **CDS** et **CONVERTIBLES** ajoutés au Desk Crédit
     (apps/app_creditdesk.py). Les trois classes comptent dans `net_worth`.
+  - `core/trs.py` : **Total Return Swaps** — transfère le rendement total d'un
+    sous-jacent (dividende + Δ prix) contre une jambe de financement flottante
+    (taux directeur `fx_carry.base_rate` + spread de Merton + marge). Les DEUX
+    sens : **RECEIVER** (long synthétique à levier — encaisse le rendement,
+    paie le financement) et **PAYER** (short synthétique — encaisse le
+    financement, paie le rendement). Contrairement au CDS dont le MTM ne bouge
+    qu'avec la peur du défaut (le spread), le TRS a un **MTM vivant** chaque
+    pas : `notionnel × (prix/entrée − 1) − financement couru` (opposé côté
+    payer) — il suit le prix comme une position actionnée. `accrue` (câblé dans
+    `advance_step` à côté du bloc CDS) règle chaque pas le leg de financement
+    + le dividende du sous-jacent (le Δ prix, lui, se règle au dénouement via
+    le MTM pour éviter tout double-comptage) ; `evaluate_due` dénoue
+    l'**évènement de crédit** (action < 25 % de l'entrée : le receiver absorbe
+    (1−40 %) du notionnel comme un détenteur réel, le payer gagne
+    symétriquement) ou l'**échéance** (MTM réglé en cash). Onglet **TRS** du
+    Desk Crédit (chips sens/tenor/notionnel, scanner PD réutilisé, bouton
+    OUVRIR, liste des positions en cours avec croix de fermeture au MTM).
+    Compte dans `net_worth`. Verrouillé par `tests/test_trs.py` (symétrie
+    receiver/payer, financement couru, évènement symétrique, échéance, sortie
+    anticipée, intégration net_worth) et un smoke headless de l'onglet
+    (`tests/test_credit_crisis_apps.py`).
   - `core/liquidity.depth_ladder` + bouton **L2** du Trading : la
     **profondeur de carnet** simulée (bid/ask/coût en bp pour 5 tailles
     d'ordre cumulées, sur le vrai modèle spread+impact) — la microstructure

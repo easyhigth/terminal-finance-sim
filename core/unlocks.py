@@ -91,7 +91,7 @@ _LABELS_RAW = {
     "credit": ("Titrisation / tranches de crédit (CREDIT)", "Securitization / credit tranches (CREDIT)"),
     "structured": ("Produits structurés (STRUCT)", "Structured products (STRUCT)"),
     "valuation": ("Desk Valorisation (DCF/SML/LBO)", "Valuation desk (DCF/SML/LBO)"),
-    "creditdesk": ("Desk Crédit (Merton/CDS/convertibles)", "Credit desk (Merton/CDS/convertibles)"),
+    "creditdesk": ("Desk Crédit (Merton/CDS/TRS/convertibles)", "Credit desk (Merton/CDS/TRS/convertibles)"),
     "attribution": ("Attribution de performance (Brinson)", "Performance attribution (Brinson)"),
     "backtester": ("Backtesteur de stratégies", "Strategy backtester"),
     "pnlexplain": ("P&L Explain (décomposition du patrimoine)", "P&L Explain (net worth breakdown)"),

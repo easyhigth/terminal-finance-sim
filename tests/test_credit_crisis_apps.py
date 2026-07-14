@@ -78,6 +78,28 @@ def test_creditdesk_waterfall_slider_moves_losses(app):
     assert cd.pool_loss < 0.05
 
 
+def test_creditdesk_trs_tab_opens_and_renders(app):
+    desk, w = _open(app, "creditdesk")
+    cd = w.app_obj
+    cd.tab = "trs"
+    cd.draw(app.screen, RECT)                           # onglet vide : aucun TRS en cours
+    assert cd._trs_open_btn is not None                 # cote disponible sur le ticker présélectionné
+    # cliquer OUVRIR LE TRS (receiver par défaut)
+    cd.handle_event(_click(cd._trs_open_btn.center), RECT)
+    assert app.gs.player.trs_positions                   # une position ouverte
+    cd.draw(app.screen, RECT)                            # rendu AVEC une position en cours
+    assert cd._trs_close_rects                           # croix de fermeture présente
+    # bascule côté payer, redraw
+    cd.handle_event(_click(cd._trs_side_rects["payer"].center), RECT)
+    assert cd.trs_side == "payer"
+    cd.draw(app.screen, RECT)
+    # fermeture au MTM
+    pid = next(iter(cd._trs_close_rects))
+    cd.handle_event(_click(cd._trs_close_rects[pid].center), RECT)
+    cd.draw(app.screen, RECT)
+    assert not app.gs.player.trs_positions
+
+
 # ============================================================ Labo de crise
 def test_crisislab_sliders_and_crunch_toggle(app):
     for c in app.market.top_companies(n=3):

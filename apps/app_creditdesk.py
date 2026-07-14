@@ -26,9 +26,10 @@ from core import securitisation as SEC
 from ui import fonts, widgets
 
 TABS = [("merton", "MERTON"), ("cdsdesk", "CDS"),
-        ("convert", "CONVERTIBLES"), ("waterfall", "WATERFALL")]
+        ("trs", "TRS"), ("convert", "CONVERTIBLES"), ("waterfall", "WATERFALL")]
 CDS_NOTIONALS = [100_000.0, 250_000.0, 500_000.0]
 CONV_QTYS = [10, 25, 50]
+TRS_SIDES = [("receiver", "RECEIVER"), ("payer", "PAYER")]
 
 
 class CreditDeskApp(DesktopApp):
@@ -63,6 +64,14 @@ class CreditDeskApp(DesktopApp):
         self._conv_buy_btn = None
         self._conv_sell_rects = {}
         self._conv_arb_rects = {}
+        self.trs_side = "receiver"
+        self.trs_tenor = 3.0
+        self.trs_notional = CDS_NOTIONALS[1]
+        self._trs_side_rects = {}
+        self._trs_tenor_rects = {}
+        self._trs_notional_rects = {}
+        self._trs_open_btn = None
+        self._trs_close_rects = {}
 
     # ------------------------------------------------------------- calculs
     def _ensure_computed(self):
@@ -157,6 +166,41 @@ class CreditDeskApp(DesktopApp):
             if r.collidepoint(pos):
                 self._conv_arb(pid)
                 return True
+        for s, r in self._trs_side_rects.items():
+            if r.collidepoint(pos):
+                self.trs_side = s
+                return True
+        for t, r in self._trs_tenor_rects.items():
+            if r.collidepoint(pos):
+                self.trs_tenor = t
+                return True
+        for v, r in self._trs_notional_rects.items():
+            if r.collidepoint(pos):
+                self.trs_notional = v
+                return True
+        if self._trs_open_btn and self._trs_open_btn.collidepoint(pos):
+            from core import trs as TRS
+            r = TRS.open_trs(self.app.gs.player, self.market, self.ticker,
+                             self.trs_notional, self.trs_tenor, self.trs_side)
+            if r.get("ok"):
+                q = r["quote"]
+                _lab = ("Receiver" if self.trs_side == "receiver" else "Payer")
+                self.msg = (f"TRS {_lab} ouvert : financement "
+                            f"{q['ref_rate']*100:.1f}% + {q['funding_bps']:.0f} bp/an "
+                            "— le rendement total se règle au MTM.")
+                self.msg_col = config.COL_UP
+            else:
+                self.msg, self.msg_col = f"Refusé : {r.get('reason', '?')}.", config.COL_DOWN
+            return True
+        for pid, r in self._trs_close_rects.items():
+            if r.collidepoint(pos):
+                from core import trs as TRS
+                res = TRS.close(self.app.gs.player, self.market, pid)
+                if res.get("ok"):
+                    self.msg = f"TRS dénoué — MTM {res['mtm']:+,.0f}."
+                    self.msg_col = (config.COL_UP if res["mtm"] >= 0
+                                    else config.COL_DOWN)
+                return True
         return False
 
     def _conv_arb(self, pos_id):
@@ -227,6 +271,8 @@ class CreditDeskApp(DesktopApp):
             self._draw_merton(surf, body)
         elif self.tab == "cdsdesk":
             self._draw_cds(surf, body)
+        elif self.tab == "trs":
+            self._draw_trs(surf, body)
         elif self.tab == "convert":
             self._draw_convertibles(surf, body)
         else:
@@ -328,6 +374,105 @@ class CreditDeskApp(DesktopApp):
                               (rinner.x + 8, y + 16), fonts.tiny(), mcol)
             xr = pygame.Rect(rinner.right - 22, y, 18, 18)
             self._cds_close_rects[h["id"]] = xr
+            pygame.draw.rect(surf, config.COL_PANEL, xr, border_radius=3)
+            widgets.draw_text(surf, "×", xr.center, fonts.small(bold=True),
+                              config.COL_DOWN, align="center")
+            y += 36
+
+    # --------------------------------------------------------------- TRS
+    def _draw_trs(self, surf, body):
+        from core import trs as TRS
+        cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
+        col_w = (body.w - 12) // 2
+        left = pygame.Rect(body.x, body.y, col_w, body.h)
+        right = pygame.Rect(left.right + 12, body.y, col_w, body.h)
+        inner = widgets.draw_panel(surf, left,
+                                   f"TRS sur {self.ticker or '—'}",
+                                   config.COL_CYAN)
+        # scanner réutilisé (sélection de la société, PD décroissante)
+        self._scan_rects = {}
+        y = inner.y + 2
+        for row in self._scan[:6]:
+            r = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 19)
+            self._scan_rects[row["ticker"]] = r
+            sel = row["ticker"] == self.ticker
+            if sel:
+                pygame.draw.rect(surf, config.COL_PANEL_HEAD, r, border_radius=3)
+            widgets.draw_text(surf, f"{row['ticker']} — PD {row['pd'] * 100:.1f}%",
+                              (inner.x, y), fonts.small(bold=True),
+                              config.COL_AMBER if sel else config.COL_TEXT)
+            y += 20
+        y += 6
+        # sens : RECEIVER (long synth. à levier) / PAYER (short synth.)
+        self._trs_side_rects = {}
+        self._chips(surf, TRS_SIDES, self.trs_side, inner.x, y,
+                    config.COL_CYAN, self._trs_side_rects)
+        y += 26
+        self._trs_tenor_rects = {}
+        self._chips(surf, [(t, f"{t:.0f} an{'s' if t > 1 else ''}")
+                           for t in TRS.TENORS],
+                    self.trs_tenor, inner.x, y, config.COL_CYAN,
+                    self._trs_tenor_rects)
+        y += 26
+        self._trs_notional_rects = {}
+        self._chips(surf, [(v, widgets.format_money(v, cur))
+                           for v in CDS_NOTIONALS],
+                    self.trs_notional, inner.x, y, config.COL_AMBER,
+                    self._trs_notional_rects)
+        y += 28
+        q = (TRS.quote(self.market, self.ticker, self.trs_tenor)
+             if self.ticker else None)
+        self._trs_open_btn = None
+        if q:
+            cost = q["ref_rate"] * 1e2 + q["funding_bps"] / 1e2
+            widgets.draw_text(surf, f"Financement : {q['ref_rate']*100:.1f}% réf. "
+                              f"+ {q['funding_bps']:.0f} bp = {cost:.2f}%/an "
+                              f"≈ {widgets.format_money(cost/100 * self.trs_notional, cur)}/an",
+                              (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
+            y += 22
+            _lab = ("Receiver : encaisse le rendement total, paie le financement"
+                    if self.trs_side == "receiver"
+                    else "Payer : encaisse le financement, paie le rendement total")
+            widgets.draw_text(surf, _lab, (inner.x, y), fonts.tiny(),
+                              config.COL_TEXT_DIM)
+            y += 18
+            self._trs_open_btn = pygame.Rect(inner.x, y, 200, 26)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._trs_open_btn,
+                             border_radius=4)
+            pygame.draw.rect(surf, config.COL_UP, self._trs_open_btn, 1,
+                             border_radius=4)
+            widgets.draw_text(surf, "OUVRIR LE TRS",
+                              self._trs_open_btn.center, fonts.small(bold=True),
+                              config.COL_UP, align="center")
+        widgets.draw_text(surf, "Évènement de crédit du jeu : action sous "
+                          f"{TRS.TRIGGER_FRAC * 100:.0f}% de l'entrée → le receiver "
+                          f"absorbe {(1 - TRS.RECOVERY) * 100:.0f}% du notionnel "
+                          f"(le payer gagne symétriquement).",
+                          (inner.x, inner.bottom - 12), fonts.tiny(),
+                          config.COL_TEXT_DIM)
+        rinner = widgets.draw_panel(surf, right, "TRS en cours (MTM vivant)",
+                                    config.COL_AMBER)
+        self._trs_close_rects = {}
+        hh = TRS.holdings(self.app.gs.player, self.market)
+        if not hh:
+            widgets.draw_text(surf, "Aucun.", (rinner.x, rinner.y + 4),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+        y = rinner.y + 2
+        for h in hh:
+            if y > rinner.bottom - 36:
+                break
+            mcol = config.COL_UP if h["mtm"] >= 0 else config.COL_DOWN
+            _tag = "REC" if h["side"] == "receiver" else "PAY"
+            widgets.draw_text(surf, f"{_tag} {h['ticker']} · "
+                              f"{widgets.format_money(h['notional'], cur)} · "
+                              f"{h['funding_bps']:.0f} bp",
+                              (rinner.x, y), fonts.small(bold=True), config.COL_TEXT)
+            px = (f"{h['price']:.2f}" if h["price"] else "—")
+            widgets.draw_text(surf, f"cours {px} · MTM {h['mtm']:+,.0f} · "
+                              f"{h['steps_left']} pas",
+                              (rinner.x + 8, y + 16), fonts.tiny(), mcol)
+            xr = pygame.Rect(rinner.right - 22, y, 18, 18)
+            self._trs_close_rects[h["id"]] = xr
             pygame.draw.rect(surf, config.COL_PANEL, xr, border_radius=3)
             widgets.draw_text(surf, "×", xr.center, fonts.small(bold=True),
                               config.COL_DOWN, align="center")

@@ -594,6 +594,45 @@ FEATURE_BRIEFS = {
                   "Open the app after a market step and read today's "
                   "biggest contributor."),
     },
+    "themes": {
+        "title": ("Thématiques de marché", "Market themes"),
+        "what": ("Investir par TENDANCE plutôt que titre par titre : des "
+                 "paniers (IA, transition énergétique, santé...) achetables "
+                 "en un clic, avec un classement de rotation « chaud/froid ».",
+                 "Invest by TREND rather than stock by stock: baskets (AI, "
+                 "energy transition, health...) buyable in one click, with a "
+                 "hot/cold rotation ranking."),
+        "how": ("Menu Apps → « Thématiques ».", "Apps menu → “Themes”."),
+        "why": ("Diversifier au-delà du stock-picking et surfer une "
+                "tendance de fond en une seule décision.",
+                "Diversify beyond stock-picking and ride a structural "
+                "trend in a single decision."),
+        "first": ("Repérez le thème le plus chaud du classement et achetez "
+                  "son panier avec un petit budget.",
+                  "Spot the hottest theme in the ranking and buy its basket "
+                  "with a small budget."),
+    },
+    "mergerarb": {
+        "title": ("Arbitrage de fusion", "Merger arbitrage"),
+        "what": ("Un mode de trading ÉVÉNEMENTIEL : quand une OPA est "
+                 "annoncée sur une société cotée, achetez la cible sous le "
+                 "prix d'offre et capturez l'écart si l'opération se conclut "
+                 "— gros risque si elle rompt.",
+                 "An EVENT-DRIVEN trading mode: when a takeover is announced "
+                 "on a listed company, buy the target below the offer price "
+                 "and capture the spread if the deal closes — big risk if it "
+                 "breaks."),
+        "how": ("Menu Apps → « Arbitrage de fusion ».",
+                "Apps menu → “Merger arbitrage”."),
+        "why": ("Un profil de rendement décorrélé du marché : on parie sur "
+                "la RÉUSSITE d'une opération, pas sur la direction des cours.",
+                "A return profile decorrelated from the market: you bet on a "
+                "deal COMPLETING, not on price direction."),
+        "first": ("Prenez une petite position sur l'opération à l'écart le "
+                  "plus large et regardez-la se resserrer jusqu'à la clôture.",
+                  "Take a small position on the widest-spread deal and watch "
+                  "it tighten toward close."),
+    },
     "footballfield": {
         "title": ("Football Field", "Football Field"),
         "what": ("Le graphique de valorisation des banques d'affaires : "

@@ -41,6 +41,7 @@ UNLOCKS = {
     "pitch": 3,      # démarcher un client pour un mandat
     "ma": 3,         # M&A : acquisition de cibles privées (LBO réel)
     "footballfield": 3,   # Football Field (valorisation multi-méthodes) — affinité M&A
+    "themes": 3,     # thématiques de marché (paniers tradeables par tendance)
     # grade 4 (Associate) : outils d'analyse de niveau 2.
     "valuation": 4,     # Desk Valorisation (DCF/SML/pont IRR) — affinité M&A
     "attribution": 4,   # Attribution de performance (Brinson/facteurs) — affinité Portfolio
@@ -51,6 +52,7 @@ UNLOCKS = {
     # grade 6 (Vice President) : desks de marché avancés.
     "fx": 6,         # desk FX (spot + forward sur devises)
     "hedge": 6,      # couverture du portefeuille (réduction d'exposition)
+    "mergerarb": 6,  # arbitrage de fusion (trading événementiel sur OPA)
     # grade 7 (Senior VP) : levier et mandats clients.
     "leverage": 7,   # levier & vente à découvert (short)
     "mandates": 7,   # mandats clients
@@ -98,6 +100,8 @@ _LABELS_RAW = {
     "footballfield": ("Football Field (valorisation M&A)", "Football Field (M&A valuation)"),
     "pitchbook": ("Pitch Book (démarchage de mandats)", "Pitch Book (mandate pitching)"),
     "strategicalloc": ("Allocation stratégique multi-actifs", "Strategic multi-asset allocation"),
+    "themes": ("Thématiques de marché (paniers)", "Market themes (baskets)"),
+    "mergerarb": ("Arbitrage de fusion (event-driven)", "Merger arbitrage (event-driven)"),
 }
 LABELS = {k: v[0] for k, v in _LABELS_RAW.items()}
 

@@ -60,6 +60,8 @@ class PlayerState:
     irs_positions: list = field(default_factory=list)   # swaps de taux (IRS) en cours
     convertibles: list = field(default_factory=list)    # obligations convertibles détenues
     trs_positions: list = field(default_factory=list)   # Total Return Swaps en cours
+    arb_positions: list = field(default_factory=list)   # positions d'arbitrage de fusion (merger arb) en cours
+    next_arb_id: int = 1                                 # compteur d'identifiants de positions d'arbitrage
     options: list = field(default_factory=list)        # options sur actions (calls/puts) en cours
     currency_swaps: list = field(default_factory=list)  # swaps de devises actifs
     next_swap_id: int = 1                                # compteur d'identifiants de swaps
@@ -607,6 +609,20 @@ class GameState:
             if deriv:
                 p.adjust_cash(deriv, category="revenus")
                 dividends += deriv
+            # arbitrage de fusion : résolution des OPA arrivées à échéance
+            # (conclusion → paiement à l'offre, rupture → perte). Le cash est
+            # crédité dans evaluate_due ; ici on notifie le joueur.
+            if getattr(p, "arb_positions", None):
+                from core import merger_arb as _marb
+                for _ev in _marb.evaluate_due(p, market):
+                    from core import notify_queue as _nq
+                    if _ev["closed"]:
+                        _nq.push(p, _L("OPA CONCLUE ", "DEAL CLOSED ")
+                                 + f"{_ev['ticker']} ({_ev['acquirer']}) : "
+                                 + f"{_ev['pnl']:+,.0f}", "good")
+                    else:
+                        _nq.push(p, _L("OPA ROMPUE ", "DEAL BROKEN ")
+                                 + f"{_ev['ticker']} : {_ev['pnl']:+,.0f}", "warn")
             # ordres conditionnels (stop-loss/take-profit) : exécutés AVANT le
             # contrôle de marge, comme un vrai ordre du joueur (voulu) passerait
             # avant une liquidation forcée (subie) sur la position réduite.

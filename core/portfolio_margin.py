@@ -120,6 +120,9 @@ def net_worth(player, market):
     if getattr(player, "trs_positions", None):
         from core import trs as trs_mod
         nw += trs_mod.holdings_value(player, market)
+    if getattr(player, "arb_positions", None):
+        from core import merger_arb as marb_mod
+        nw += marb_mod.holdings_value(player, market)
     return nw
 
 

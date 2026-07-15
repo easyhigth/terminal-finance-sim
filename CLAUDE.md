@@ -1236,6 +1236,40 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
   et `tests/test_track_missions.py` (couverture des pools, checks purs vacuously vrais sans
   position concernée puis faux une fois la position prise, intégration dans
   `missions.generate`, non-régression de General/Portfolio).
+- **Lot « contenu de trading » : arbitrage de fusion, roll-up M&A, thématiques.** Après
+  plusieurs lots d'OUTILS par voie, ce lot ajoute de nouvelles SITUATIONS à trader (pas des
+  calculatrices de plus), toutes déterministes et branchées sur le moteur existant :
+  (1) **Arbitrage de fusion / event-driven** (`core/merger_arb.py`, app
+  `apps/app_mergerarb.py`, clé UNLOCKS `mergerarb` grade 6, toutes voies) : des OPA sont
+  annoncées sur des sociétés COTÉES à une cadence déterministe (`_deal_params` dérivé de
+  `(market.seed, index)` par un rng DÉDIÉ qui ne consomme JAMAIS le rng du marché — pas de
+  dérive des saves). L'acquéreur offre une prime ; l'action se trade sous l'offre (le « deal
+  spread » qui rémunère le risque de rupture). Le joueur PREND une position (instrument
+  auto-contenu `player.arb_positions`, même patron que cds/irs/repo — sauvegarde auto par
+  champ dataclass) ; l'ISSUE (conclusion/rupture) est un pur produit de `(seed, index)`,
+  CACHÉE au joueur, jamais tirée à la résolution (reconstructible). `evaluate_due` câblé dans
+  `GameState.advance_step` (conclusion → paiement à l'offre, rupture → cours pré-deal
+  déprécié = perte) et `holdings_value` dans `net_worth`. Le MTM se resserre vers l'offre à
+  l'approche de la résolution (portage positif si ça conclut). Profil de rendement
+  DÉCORRÉLÉ du marché — on parie sur la RÉUSSITE d'une opération, pas sur la direction.
+  (2) **Roll-up & synergies M&A** (`core/ma.py::synergy_bonus`/`sector_counts`/
+  `roll_up_summary`) : détenir ≥2 cibles du MÊME secteur débloque un bonus de croissance ET
+  de marge appliqué dans `evolve_quarter`, proportionnel au nombre de paires (plafonné à
+  `SYNERGY_MAX_PEERS`), déterministe (aucun rng). Rend viable la stratégie « buy-and-build »
+  (concentrer les acquisitions pour un effet composé, au prix d'une moindre diversification).
+  Bandeau de synergies dans `scene_ma.py` (panneau « Sociétés détenues »).
+  (3) **Thématiques de marché** (`core/themes.py`, app `apps/app_themes.py`, clé UNLOCKS
+  `themes` grade 3, toutes voies) : des thèmes (IA, transition énergétique, santé &
+  démographie…) = paniers de constituants STABLES (choisis sur le nombre de titres émis,
+  statique — pas la capi courante qui bouge). `theme_strength` mesure le momentum RÉEL du
+  panier (rendement glissant vs marché) → la tendance ÉMERGE des facteurs sectoriels du
+  moteur existant, SANS injecter de nouveau facteur (déterministe, non invasif). `heat_ranking`
+  classe les thèmes chaud→froid (rotation) ; `buy_basket` répartit un budget équipondéré sur
+  les constituants (best-effort via `core/portfolio.buy`). Verrouillé par
+  `tests/test_merger_arb.py` (déterminisme opérations/issues, économie entrée/résolution
+  conclusion=gain / rupture=perte, MTM convergent, save-safe, net_worth), `tests/test_themes.py`
+  (constituants stables/déterministes, force dérivée du marché, panier équipondéré) et les
+  synergies dans `tests/test_ma.py` (plafond, boost de croissance vs cible isolée).
 - **`data/companies.py`** : roster fictif déterministe (320 sociétés, `ROSTER_SEED` fixe,
   noms déformés exprès : LVMH→LWNH, NVIDIA→MVC…).
 - **`core/`** : systèmes de jeu (career, portfolio, bonds, commodities, crypto, structured,

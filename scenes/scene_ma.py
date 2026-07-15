@@ -235,6 +235,14 @@ class MAScene(Scene):
         panel_h = (config.footer_y() - 8 - top - 200)
         panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, max(140, panel_h))
         inner = widgets.draw_panel(surf, panel, f"Sociétés détenues ({len(owned)})", config.COL_UP)
+        # bandeau de synergies de roll-up (détenir >=2 cibles d'un secteur)
+        syns = M.roll_up_summary(p)
+        if syns:
+            parts = [f"{s['sector']} ×{s['count']} (+{s['growth_bonus']*100:.1f}%)" for s in syns]
+            txt = "Synergies roll-up : " + " · ".join(parts)
+            widgets.draw_text(surf, widgets.fit_text(txt, fonts.tiny(bold=True), panel.w - 300),
+                              (panel.right - 12, panel.y + 7), fonts.tiny(bold=True),
+                              config.COL_CYAN, align="right")
         self._row_rects = {}
         if not owned:
             widgets.draw_text(surf, "Aucune société détenue pour le moment — onglet CIBLES pour acquérir.",

@@ -259,6 +259,48 @@ def apply_action(player, ticker, action_id):
     return {"ok": True, "cost": cost, "instance": inst}
 
 
+# --------------------------------------------------------------------- roll-up / synergies
+# Détenir PLUSIEURS cibles du MÊME secteur crée des synergies (mutualisation
+# des coûts, cross-selling) — la stratégie « buy-and-build » : on concentre les
+# acquisitions dans un secteur pour un effet composé, au prix d'une moindre
+# diversification. Déterministe (fonction du nombre de cibles détenues, aucun
+# rng). Le bonus est modeste et plafonné pour ne pas rendre le roll-up
+# systématiquement dominant.
+SYNERGY_PER_PEER = 0.006       # bonus de croissance par cible SUPPLÉMENTAIRE du secteur
+SYNERGY_MAX_PEERS = 3          # plafond (au-delà, plus de bonus marginal)
+
+
+def sector_counts(player):
+    """{secteur -> nb de cibles détenues}."""
+    counts = {}
+    for inst in (getattr(player, "ma_owned", None) or {}).values():
+        counts[inst["sector"]] = counts.get(inst["sector"], 0) + 1
+    return counts
+
+
+def synergy_bonus(player, sector, counts=None):
+    """Bonus de synergie (fraction) pour une cible du `sector` : proportionnel
+    au nombre de PAIRES du même secteur détenues (au-delà de la première),
+    plafonné à SYNERGY_MAX_PEERS. 0 si la cible est seule dans son secteur."""
+    counts = counts if counts is not None else sector_counts(player)
+    peers = min(SYNERGY_MAX_PEERS, max(0, counts.get(sector, 0) - 1))
+    return peers * SYNERGY_PER_PEER
+
+
+def roll_up_summary(player):
+    """Vue synthétique des synergies actives (pour l'UI) : par secteur avec
+    >=2 cibles, {sector, count, growth_bonus, margin_bonus}."""
+    counts = sector_counts(player)
+    out = []
+    for sector, n in sorted(counts.items()):
+        if n < 2:
+            continue
+        syn = synergy_bonus(player, sector, counts)
+        out.append({"sector": sector, "count": n, "growth_bonus": syn,
+                    "margin_bonus": syn * 0.5})
+    return out
+
+
 # --------------------------------------------------------------------- évolution trimestrielle
 def _revert(score):
     return score + (SCORE_MEAN - score) * SCORE_REVERT
@@ -267,23 +309,28 @@ def _revert(score):
 def evolve_quarter(player):
     """Appelée à chaque bascule de trimestre : fait évoluer chaque société
     détenue (croissance, marges, service de la dette, incidents aléatoires
-    déterministes, cash sweep). Renvoie une liste d'événements (titres)."""
+    déterministes, cash sweep). Les synergies de roll-up (cf. synergy_bonus)
+    ajoutent un bonus de croissance et de marge aux cibles d'un secteur
+    concentré. Renvoie une liste d'événements (titres)."""
     events = []
     owned = getattr(player, "ma_owned", None) or {}
+    counts = sector_counts(player)
     to_remove = []
     for ticker, inst in owned.items():
         inst["management_score"] = _revert(inst["management_score"])
         inst["morale"] = _revert(inst["morale"])
         inst["efficiency"] = _revert(inst["efficiency"])
 
+        syn = synergy_bonus(player, inst["sector"], counts)
         eff_growth = inst["growth_base"] \
             + (inst["management_score"] - SCORE_MEAN) * 0.0006 \
             + (inst["morale"] - SCORE_MEAN) * 0.0004 \
-            + (inst["efficiency"] - SCORE_MEAN) * 0.0004
+            + (inst["efficiency"] - SCORE_MEAN) * 0.0004 \
+            + syn
         eff_growth = max(-0.06, min(0.30, eff_growth))
         inst["revenue"] *= (1 + eff_growth / 4.0)
 
-        margin_drift = (inst["efficiency"] - SCORE_MEAN) * 0.00004
+        margin_drift = (inst["efficiency"] - SCORE_MEAN) * 0.00004 + syn * 0.5 / 4.0
         inst["ebitda_margin"] = max(0.02, min(0.65, inst["ebitda_margin"] + margin_drift))
         inst["net_margin"] = max(0.0, inst["ebitda_margin"] - inst.get("margin_spread", 0.05))
 

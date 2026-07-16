@@ -7,7 +7,7 @@ import os
 import time
 from dataclasses import asdict, dataclass, field
 
-from core import autosave_settings, config, ui_state
+from core import autosave_settings, config, crashlog, ui_state
 from core.applog import logger
 from core.i18n import get_lang
 
@@ -490,353 +490,30 @@ class GameState:
                                f"Deal expired : {_ed['title']} (penalty {_ed['penalty_cash']:,.0f})."),
                          "bad", action="deals")
 
-        # dividendes des positions (longs touchent, shorts paient) + financement
-        # (intérêts sur marge + frais d'emprunt de titres) + appel de marge éventuel
-        dividends = 0.0
-        financing = None
-        margin_call = None
-        structured_due = None
-        securitised_due = None
-        hedges_due = None
-        options_due = None
-        ipos_settled = None
-        fx_due = None
-        macro_resolved = None
-        swaps_expired = []
-        conditional_orders_executed = None
+        # systèmes joués à chaque pas de marché (dividendes/coupons/portage,
+        # desk de financement, dérivés, ordres automatiques, marge, limites de
+        # risque, échéances d'instruments…) : registre ORDONNÉ explicite dans
+        # core/step_hooks.py — l'ordre y est un invariant de gameplay commenté
+        # et testé ; ajouter un instrument = ajouter un hook, pas un bloc ici.
+        from core import step_hooks
         if market is not None:
-            from core import portfolio
-            dividends = portfolio.dividends(p, market, config.DAYS_PER_STEP)
-            if dividends:
-                p.adjust_cash(dividends, category="revenus")
-            # coupons obligataires (revenu de portage)
-            if getattr(p, "bonds", None):
-                from core import bonds as _bonds
-                coup = _bonds.coupons(p, market, config.DAYS_PER_STEP)
-                if coup:
-                    p.adjust_cash(coup, category="revenus")
-                    dividends += coup   # agrégé dans le revenu passif affiché
-            # roulement des futures commodities (roll yield : coût en contango)
-            if getattr(p, "commodities", None):
-                from core import commodities as _cmdty
-                roll = _cmdty.roll_cost(p, market, config.DAYS_PER_STEP)
-                if roll:
-                    p.adjust_cash(roll, category="revenus")
-                    dividends += roll
-            # intérêt de la CBDC (actif sûr rémunéré au taux directeur)
-            if getattr(p, "crypto", None):
-                from core import crypto as _crypto
-                cbi = _crypto.interest(p, market, config.DAYS_PER_STEP)
-                if cbi:
-                    p.adjust_cash(cbi, category="revenus")
-                    dividends += cbi
-            # portage FX (carry) : différentiel de taux couru sur les
-            # positions spot ouvertes (core/fx_carry) — le carry trade
-            # devient un vrai revenu (ou un vrai coût)
-            if getattr(p, "fx_positions", None):
-                from core import fx_carry as _fxc
-                carry = _fxc.accrue(p, market, config.DAYS_PER_STEP)
-                if carry:
-                    p.adjust_cash(carry, category="revenus")
-                    dividends += carry
-            # desk de FINANCEMENT : intérêts repo/coupons du collatéral,
-            # frais d'emprunt des shorts / revenu de prêt, sweep monétaire
-            # et dépôts à terme échus (core/repo, seclending, money_market)
-            from core import money_market as _mm
-            from core import repo as _repo
-            from core import seclending as _secl
-            funding = 0.0
-            if getattr(p, "repo_positions", None):
-                funding += _repo.accrue(p, market, config.DAYS_PER_STEP)
-            if p.portfolio:
-                funding += _secl.accrue(p, market, config.DAYS_PER_STEP)
-            funding += _mm.sweep_accrue(p, market, config.DAYS_PER_STEP)
-            if funding:
-                p.adjust_cash(funding, category="revenus")
-                dividends += funding
-            for _dep in _mm.mature_due(p, market):
-                from core import notify_queue as _nq
-                _nq.push(p, _L("Depot a terme echu : ", "Term deposit matured: ")
-                         + f"+{_dep['amount'] + _dep['interest']:,.0f} "
-                         + _L("(interets ", "(interest ") + f"{_dep['interest']:,.0f})",
-                         "good")
-            if getattr(p, "repo_positions", None):
-                for _ev in _repo.mark_and_call(p, market):
-                    from core import notify_queue as _nq
-                    _nq.push(p, _L("APPEL DE MARGE REPO - pension liquidee : ",
-                                   "REPO MARGIN CALL - position liquidated: ")
-                             + f"{_ev['name']} ({_ev['equity']:+,.0f})", "warn")
-            # dérivés de crédit/taux & convertibles : primes CDS courues,
-            # évènements de crédit, flux nets d'IRS, coupons de convertibles
-            deriv = 0.0
-            if getattr(p, "cds_positions", None):
-                from core import cds as _cds
-                deriv += _cds.accrue(p, market, config.DAYS_PER_STEP)
-                for _ev in _cds.evaluate_due(p, market):
-                    from core import notify_queue as _nq
-                    if _ev["kind"] == "credit_event":
-                        _nq.push(p, _L("EVENEMENT DE CREDIT ", "CREDIT EVENT ")
-                                 + f"{_ev['ticker']} : protection payee "
-                                 + f"+{_ev['payoff']:,.0f}", "good")
-                    else:
-                        _nq.push(p, f"CDS {_ev['ticker']} "
-                                 + _L("expire sans evenement", "expired unexercised"),
-                                 "info")
-            if getattr(p, "irs_positions", None):
-                from core import irs as _irs
-                deriv += _irs.accrue(p, market, config.DAYS_PER_STEP)
-            if getattr(p, "convertibles", None):
-                from core import convertibles as _conv
-                deriv += _conv.accrue(p, market, config.DAYS_PER_STEP)
-            # TRS (Total Return Swaps) : jambe de financement + dividende courus,
-            # évènement de crédit / échéance réglés au MTM
-            if getattr(p, "trs_positions", None):
-                from core import trs as _trs
-                deriv += _trs.accrue(p, market, config.DAYS_PER_STEP)
-                for _ev in _trs.evaluate_due(p, market):
-                    from core import notify_queue as _nq
-                    _side = _L("Receiver", "Receiver") if _ev["side"] == "receiver" \
-                            else _L("Payer", "Payer")
-                    if _ev["kind"] == "credit_event":
-                        _nq.push(p, _L("EVENEMENT DE CREDIT ", "CREDIT EVENT ")
-                                 + f"{_ev['ticker']} ({_side}) : "
-                                 + f"{_ev['payoff']:+,.0f}", "good")
-                    else:
-                        _nq.push(p, f"TRS {_ev['ticker']} ({_side}) "
-                                 + _L("echu : MTM regle ",
-                                      "matured: MTM settled ")
-                                 + f"{_ev['payoff']:+,.0f}", "info")
-            if deriv:
-                p.adjust_cash(deriv, category="revenus")
-                dividends += deriv
-            # arbitrage de fusion : résolution des OPA arrivées à échéance
-            # (conclusion → paiement à l'offre, rupture → perte). Le cash est
-            # crédité dans evaluate_due ; ici on notifie le joueur.
-            if getattr(p, "arb_positions", None):
-                from core import merger_arb as _marb
-                for _ev in _marb.evaluate_due(p, market):
-                    from core import notify_queue as _nq
-                    if _ev["closed"]:
-                        _nq.push(p, _L("OPA CONCLUE ", "DEAL CLOSED ")
-                                 + f"{_ev['ticker']} ({_ev['acquirer']}) : "
-                                 + f"{_ev['pnl']:+,.0f}", "good")
-                    else:
-                        _nq.push(p, _L("OPA ROMPUE ", "DEAL BROKEN ")
-                                 + f"{_ev['ticker']} : {_ev['pnl']:+,.0f}", "warn")
-            # ordres conditionnels (stop-loss/take-profit) : exécutés AVANT le
-            # contrôle de marge, comme un vrai ordre du joueur (voulu) passerait
-            # avant une liquidation forcée (subie) sur la position réduite.
-            if getattr(p, "conditional_orders", None):
-                from core import conditional_orders as _condord
-                _condord.update_trailing_stops(p, market)
-                conditional_orders_executed = _condord.execute_due(p, market)
-                if conditional_orders_executed:
-                    from core import notify_queue as _nq
-                    try:
-                        from core import audio as _audio
-                        _audio.play("conditional")
-                    except Exception:
-                        pass
-                    for _exec in conditional_orders_executed[:3]:
-                        _o = _exec["order"]
-                        _side = _L("Stop-loss", "Stop-loss") if _o["kind"] == "stop" else _L("Take-profit", "Take-profit")
-                        _txt = f"{_side} {_o['ticker']} " + _L("exécuté", "executed") + f" @ {_exec['result']['price']:.2f}"
-                        _nq.push(p, _txt, "info", action="trading",
-                                 action_kwargs={"ticker": _o["ticker"]})
-            # ordres TWAP/fractionnés : exécution par tranches à chaque pas
-            if getattr(p, "pending_orders", None):
-                from core import orders as _orders
-                twap_executed = _orders.execute_due(p, market)
-                if twap_executed:
-                    from core import notify_queue as _nq
-                    try:
-                        from core import audio as _audio
-                        _audio.play("order")
-                    except Exception:
-                        pass
-                    for _exec in twap_executed[:3]:
-                        _side = _L("Achat", "Buy") if _exec["side"] == "buy" else _L("Vente", "Sell")
-                        _txt = f"TWAP {_exec['key']} : {_side} {_exec['chunk']:g} @ {_exec['price']:.2f}"
-                        _nq.push(p, _txt, "info", action="trading", action_kwargs={"ticker": _exec["key"]})
-            # alertes de prix déclenchées
-            if getattr(p, "alerts", None):
-                from core import alerts as _alerts
-                triggered_alerts = _alerts.check(p, market)
-                if triggered_alerts:
-                    from core import notify_queue as _nq
-                    for ev in triggered_alerts[:3]:
-                        kind = "warn" if not ev["above"] else "info"
-                        if ev.get("is_index"):
-                            # indice : pas d'écran de trading dédié — le clic
-                            # ouvre le hub Marché (vue d'ensemble des indices)
-                            _nq.push(p, _alerts.format_trigger(ev), kind, action="markethub")
-                        else:
-                            _nq.push(p, _alerts.format_trigger(ev), kind,
-                                     action="trading", action_kwargs={"ticker": ev["ticker"]})
-            # résultats trimestriels d'une société SUIVIE (watchlist) : le
-            # moteur publie déjà `market.last_earnings` à chaque pas (~1/4 des
-            # sociétés, cf. Market._step_earnings), mais rien ne le signalait
-            # jusqu'ici — il fallait être sur la bonne fiche au bon moment
-            # pour le voir. Toast + message inbox (raison de suivre une valeur).
-            watchlist = getattr(p, "watchlist", None)
-            if watchlist and getattr(market, "last_earnings", None):
-                from core import inbox as _inbox
-                from core import notify_queue as _nq
-                watched = {t.upper() for t in watchlist}
-                for rep in market.last_earnings:
-                    if rep["ticker"] not in watched:
-                        continue
-                    verb = _L("bat les attentes", "beats expectations") if rep["beat"] \
-                        else _L("déçoit", "misses expectations")
-                    pct = rep["surprise"] * 100.0
-                    txt = (f"{rep['ticker']} {verb} ({pct:+.1f}%)")
-                    _nq.push(p, txt, "good" if rep["beat"] else "warn",
-                             action="scene", action_kwargs={"name": "company", "ticker": rep["ticker"]})
-                    _inbox.push(p, "desk",
-                               _L("Bureau de recherche", "Research desk"),
-                               _L(f"Résultats {rep['ticker']} : {verb}",
-                                  f"{rep['ticker']} earnings: {verb}"),
-                               _L(f"{rep['name']} ({rep['ticker']}) publie une surprise de "
-                                  f"{pct:+.1f}% par rapport aux attentes. Guidance : "
-                                  f"{rep['guidance_label']}.",
-                                  f"{rep['name']} ({rep['ticker']}) reports a {pct:+.1f}% "
-                                  f"surprise vs expectations. Guidance: {rep['guidance_label']}."))
-            financing = portfolio.accrue_financing(p, market, config.DAYS_PER_STEP)
-            margin_call = portfolio.check_margin_call(p, market)
-            if margin_call:
-                try:
-                    from core import audio
-                    audio.play("margin_call")
-                except Exception:
-                    pass
-                from core import notify_queue as _nq
-                _nq.push(p, _L("Appel de marge : positions liquidées.",
-                               "Margin call : positions liquidated."), "bad",
-                         action="book")
-                # une liquidation forcée (APRÈS execute_due) peut avoir fermé
-                # des positions portant des ordres conditionnels : on les purge
-                # tout de suite, sinon un ordre périmé survivrait un pas et
-                # pourrait s'appliquer à une position rouverte entre-temps.
-                if getattr(p, "conditional_orders", None):
-                    from core import conditional_orders as _condord
-                    _condord.prune_orphans(p)
-            # échantillonnage du levier (style de jeu, indépendant de la progression de
-            # grade) : utilisé par career.risk_profile() pour moduler les mandats proposés.
-            if portfolio.leverage(p, market) >= 2.5:
-                p.flags["high_leverage_steps"] = p.flags.get("high_leverage_steps", 0) + 1
-            # limite de VaR IMPOSÉE PAR LA FIRME (par grade) : avertissement,
-            # puis réputation, puis RÉDUCTION FORCÉE (cf. risklimits.firm_var_*)
-            from core import risklimits as _rl
-            _firm_ev = _rl.firm_var_enforce(p, market)
-            if _firm_ev is not None:
-                from core import notify_queue as _nq
-                if _firm_ev["level"] == "cut":
-                    _nq.push(p, _L("RISQUE : la firme a COUPÉ ",
-                                   "RISK: the firm CUT ")
-                             + f"{_firm_ev['cut_qty']} × {_firm_ev['cut_ticker']}"
-                             + _L(" (VaR au-dessus de la limite du grade)",
-                                  " (VaR above grade limit)"), "warn")
-                elif _firm_ev["level"] == "rep":
-                    _nq.push(p, _L("RISQUE : dépassement persistant de la limite "
-                                   "de VaR de la firme (réputation −3)",
-                                   "RISK: persistent firm VaR limit breach "
-                                   "(reputation −3)"), "warn")
-                else:
-                    _nq.push(p, _L("Avertissement risque : VaR ",
-                                   "Risk warning: VaR ")
-                             + f"{_firm_ev['var']:.2f} M > "
-                             + _L("limite ", "limit ")
-                             + f"{_firm_ev['limit']:.2f} M", "warn")
-            # dépassement persistant des limites de risque (cf. core/risklimits.py,
-            # scenes/scene_risk.py) : un dépassement isolé ne coûte rien, mais le
-            # laisser filer pénalise la réputation (mandataire qui tolère le
-            # risque non maîtrisé) tant qu'il n'est pas corrigé.
-            from core import risklimits as _risklimits
-            if _risklimits.check_limits(p, market)["breaches"]:
-                p.flags["risk_breach_streak"] = p.flags.get("risk_breach_streak", 0) + 1
-                if p.flags["risk_breach_streak"] >= 3:
-                    from core.i18n import get_lang
-                    reason = ("Persistent risk limit breach" if get_lang() == "en"
-                              else "Dépassement persistant des limites de risque")
-                    p.adjust_reputation(-2, reason=reason)
-            else:
-                p.flags["risk_breach_streak"] = 0
-            # veille marché : critères sauvegardés (core/opportunities.py) ->
-            # notification inbox dès qu'un nouveau titre matche (une seule fois
-            # par titre/critère, cf. `_seen` mémorisé sur le critère)
-            if getattr(p, "saved_screens", None):
-                from core import opportunities as _opportunities
-                _opportunities.check_alerts(p, market)
-            # produits structurés arrivés à échéance
-            if getattr(p, "structured", None):
-                from core import structured as _struct
-                structured_due = _struct.evaluate_due(p, market)
-            if getattr(p, "securitised", None):
-                from core import securitisation as _sec
-                securitised_due = _sec.evaluate_due(p, market)
-            if getattr(p, "hedges", None):
-                from core import hedging as _hedging
-                hedges_due = _hedging.evaluate_due(p, market)
-                if hedges_due:
-                    from core import notify_queue as _nq
-                    _total = sum(h["pnl"] for h in hedges_due)
-                    _kind = "good" if _total >= 0 else "bad"
-                    _nq.push(p, _L(f"Couverture échue : P&L {_total:+.0f}.",
-                                   f"Hedge expired : P&L {_total:+.0f}."), _kind)
-            if getattr(p, "options", None):
-                from core import options as _options
-                options_due = _options.evaluate_due(p, market)
-                if options_due:
-                    from core import notify_queue as _nq
-                    for _opt in options_due[:3]:
-                        _kind = "good" if _opt["pnl"] >= 0 else "bad"
-                        _nq.push(p, _L(f"Option {_opt['position']['ticker']} échue : P&L {_opt['pnl']:+.0f}.",
-                                       f"Option {_opt['position']['ticker']} expired : P&L {_opt['pnl']:+.0f}."), _kind)
-            if getattr(p, "ipos", None):
-                from core import ipo as _ipo
-                ipos_settled = _ipo.evaluate_listings(p, market)
-                if ipos_settled:
-                    from core import notify_queue as _nq
-                    for _ipo_res in ipos_settled[:3]:
-                        _nq.push(p, _L(f"IPO {_ipo_res['ticker']} cotée : {_ipo_res['shares']:.0f} actions reçues.",
-                                       f"IPO {_ipo_res['ticker']} listed : {_ipo_res['shares']:.0f} shares received."), "good")
-            if getattr(p, "fx_forwards", None):
-                from core import fx as _fx
-                fx_due = _fx.evaluate_due(p, market)
-                if fx_due:
-                    from core import notify_queue as _nq
-                    for _fxr in fx_due[:3]:
-                        _kind = "good" if _fxr.get("pnl", 0) >= 0 else "bad"
-                        _nq.push(p, _L(f"Forward FX échu : P&L {_fxr.get('pnl', 0):+.0f}.",
-                                       f"FX forward expired : P&L {_fxr.get('pnl', 0):+.0f}."), _kind)
-            if getattr(p, "macro_events", None):
-                from core import macrocal as _macrocal
-                macro_resolved = _macrocal.resolve_due_events(p, market)
-                if macro_resolved:
-                    from core import notify_queue as _nq
-                    for _mr in macro_resolved[:3]:
-                        _kind = "good" if _mr.get("pnl", 0) >= 0 else "bad"
-                        _nq.push(p, _L(f"Pari macro résolu : P&L {_mr.get('pnl', 0):+.0f}.",
-                                       f"Macro bet resolved : P&L {_mr.get('pnl', 0):+.0f}."), _kind)
-            if getattr(p, "currency_swaps", None):
-                from core import swaps as _swaps
-                swap_flow, swaps_expired = _swaps.accrue(p, market, config.DAYS_PER_STEP)
-                if swap_flow:
-                    p.adjust_cash(swap_flow, category="revenus")
-                    dividends += swap_flow
-                if swaps_expired:
-                    from core import notify_queue as _nq
-                    for _sw in swaps_expired[:3]:
-                        _nq.push(p, _L(f"Swap de devises {_sw['foreign_region']} échu.",
-                                       f"Currency swap {_sw['foreign_region']} expired."), "info")
-            nw = portfolio.net_worth(p, market)
-            # news feed contextualisé au portefeuille (résultats, événements,
-            # gros mouvements, crises sectorielles) — après que le marché a step
-            # et que les valorisations sont à jour.
-            from core import portfolio_news as _portfolio_news
-            _portfolio_news.generate(p, market)
+            step_ctx = step_hooks.run(p, market)
         else:
-            nw = p.cash
+            step_ctx = step_hooks.new_context()
+            step_ctx["nw"] = p.cash
+        dividends = step_ctx["dividends"]
+        financing = step_ctx["financing"]
+        margin_call = step_ctx["margin_call"]
+        structured_due = step_ctx["structured_due"]
+        securitised_due = step_ctx["securitised_due"]
+        hedges_due = step_ctx["hedges_due"]
+        options_due = step_ctx["options_due"]
+        ipos_settled = step_ctx["ipos_settled"]
+        fx_due = step_ctx["fx_due"]
+        macro_resolved = step_ctx["macro_resolved"]
+        swaps_expired = step_ctx["swaps_expired"]
+        conditional_orders_executed = step_ctx["conditional_orders_executed"]
+        nw = step_ctx["nw"]
 
         # bascule de trimestre : clôture des objectifs + génération des suivants
         quarter_report = None
@@ -860,7 +537,7 @@ class GameState:
                     from core import audio as _audio
                     _audio.play("milestone")
                 except Exception:
-                    pass
+                    crashlog.swallowed("core.game_state")
                 _done = quarter_report.get("done", 0)
                 _tot = quarter_report.get("total", 0)
                 if _done == _tot:

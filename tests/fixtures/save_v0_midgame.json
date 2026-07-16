@@ -1,0 +1,26 @@
+{
+  "created_at": 1700000000.0,
+  "last_saved": 1710000000.0,
+  "version": "0.1.0",
+  "player": {
+    "name": "MiParcours",
+    "continent": "USA",
+    "track": "Portfolio",
+    "grade_index": 5,
+    "reputation": 70,
+    "cash": 950000.0,
+    "day": 301,
+    "quarter": 4,
+    "market_seed": 1234,
+    "market_step": 10,
+    "portfolio": {"MVC": {"shares": 50, "avg": 260.0}, "GUGL": {"shares": -10, "avg": 170.0}},
+    "bonds": {},
+    "watchlist": ["MIRC", "POME"],
+    "alerts": [{"ticker": "MVC", "price": 500.0, "above": true}],
+    "conditional_orders": [{"id": 1, "ticker": "MVC", "kind": "stop", "trigger": 100.0, "qty": 50, "is_short": false}],
+    "next_conditional_order_id": 2,
+    "cash_history": [900000.0, 920000.0, 950000.0],
+    "flags": {"difficulty": "normal"},
+    "onboarding_done": true
+  }
+}

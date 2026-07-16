@@ -81,31 +81,6 @@ def desc(p):
     return _L(*p["desc"])
 
 
-def salary_mult(player):
-    return preset(get_id(player))["salary_mult"]
-
-
-def maint_margin_mult(player):
-    return preset(get_id(player))["maint_margin_mult"]
-
-
-def crisis_bad_mult(player):
-    """Multiplicateur du poids des scénarios NÉFASTES (core/scenarios.py) —
-    les booms (kind good) ne sont pas touchés."""
-    return preset(get_id(player))["crisis_bad_mult"]
-
-
-def crisis_sev_mult(player):
-    """Multiplicateur de la sévérité tirée pour un scénario néfaste."""
-    return preset(get_id(player))["crisis_sev_mult"]
-
-
-def rival_aggro_mult(player):
-    """Multiplicateur des probabilités d'action des rivaux (core/rivals.py::act) —
-    Exigeant les rend plus mordants, Détendu plus passifs."""
-    return preset(get_id(player))["rival_aggro_mult"]
-
-
 def apply(player, preset_id):
     """Fixe la difficulté du run et ajuste le capital de départ (une seule
     fois, à la création — après le scénario de départ qui fixe le cash)."""
@@ -148,22 +123,26 @@ def maint_margin_mult(player):
 
 
 def crisis_bad_mult(player):
+    """Multiplicateur du poids des scénarios NÉFASTES (core/scenarios.py) —
+    les booms (kind good) ne sont pas touchés."""
     if get_id(player) == "custom":
         return get_custom_param(player, "crisis_bad_mult")
     return preset(get_id(player))["crisis_bad_mult"]
 
 
 def crisis_sev_mult(player):
+    """Multiplicateur de la sévérité tirée pour un scénario néfaste."""
     if get_id(player) == "custom":
         return get_custom_param(player, "crisis_sev_mult")
     return preset(get_id(player))["crisis_sev_mult"]
 
 
 def rival_aggro_mult(player):
+    """Multiplicateur des probabilités d'action des rivaux (core/rivals.py::act) —
+    Exigeant les rend plus mordants, Détendu plus passifs."""
     if get_id(player) == "custom":
         return get_custom_param(player, "rival_aggro_mult")
     return preset(get_id(player))["rival_aggro_mult"]
-    return p
 
 
 def daily_seed(date=None):

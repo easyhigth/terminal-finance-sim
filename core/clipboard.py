@@ -10,6 +10,7 @@ pygame.scrap n'est pas toujours disponible (headless/CI, plateforme sans
 presse-papiers) : toutes les fonctions sont silencieuses en cas d'échec,
 jamais bloquantes ni levantes.
 """
+from core import crashlog
 
 
 def copy(text):
@@ -20,7 +21,7 @@ def copy(text):
             scrap.init()
         scrap.put(_scrap_text_type(), text.encode("utf-8"))
     except Exception:
-        pass
+        crashlog.swallowed("core.clipboard")
 
 
 def paste():

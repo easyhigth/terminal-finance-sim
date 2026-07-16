@@ -9,7 +9,7 @@ juste immobiles entre deux pas de marché.
 import json
 import os
 
-from core import config
+from core import config, crashlog
 
 _REDUCE_MOTION = False
 _PATH = os.path.join(config.SAVE_DIR, "anim_settings.json")
@@ -30,7 +30,7 @@ def _save():
         with open(_PATH, "w", encoding="utf-8") as f:
             json.dump({"reduce_motion": _REDUCE_MOTION}, f)
     except Exception:
-        pass
+        crashlog.swallowed("core.anim_settings")
 
 
 def reduce_motion():

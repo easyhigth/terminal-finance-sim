@@ -10,7 +10,7 @@ réglage ; ce module ne fait que le mémoriser/le restituer.
 import json
 import os
 
-from core import config
+from core import config, crashlog
 
 # Modes valides + libellés bilingues (l'UI réglages les affiche).
 MODES = ("windowed", "fullscreen", "borderless")
@@ -48,7 +48,7 @@ def _save():
         with open(_PATH, "w", encoding="utf-8") as f:
             json.dump({"mode": _MODE, "resolution": _RESOLUTION}, f)
     except Exception:
-        pass
+        crashlog.swallowed("core.display_settings")
 
 
 def get_mode():

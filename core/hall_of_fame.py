@@ -21,7 +21,7 @@ import json
 import os
 import uuid
 
-from core import config, difficulty
+from core import config, crashlog, difficulty
 
 MAX_RUNS = 10
 # stockage à PART pour les runs de défi du jour (fichier séparé, pas mêlé au
@@ -63,7 +63,7 @@ def _save_json(path, runs):
         with open(path, "w", encoding="utf-8") as f:
             json.dump(runs, f, ensure_ascii=False)
     except Exception:
-        pass    # jamais bloquant (disque en lecture seule, CI…)
+        crashlog.swallowed("core.hall_of_fame")  # jamais bloquant (disque en lecture seule, CI…)
 
 
 def load():

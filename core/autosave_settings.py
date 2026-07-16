@@ -17,7 +17,7 @@ réglage.
 import json
 import os
 
-from core import config
+from core import config, crashlog
 
 # secondes entre deux écritures RÉELLES du slot auto ; 0 = à chaque action
 # (comportement historique) ; None = sauvegarde auto désactivée (seule la
@@ -50,7 +50,7 @@ def _save():
         with open(_PATH, "w", encoding="utf-8") as f:
             json.dump({"interval_seconds": _INTERVAL}, f)
     except Exception:
-        pass
+        crashlog.swallowed("core.autosave_settings")
 
 
 def get_interval():

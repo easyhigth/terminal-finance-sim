@@ -15,7 +15,7 @@ import pygame
 from core import config, desktop_onboarding, desktop_tutorial, unlock_briefs
 from core import portfolio_margin as pm_mod
 from core.i18n import get_lang
-from scenes.scene_desktop_common import _L, cached_shade, TASKBAR_H, TOPBAR_H
+from scenes.scene_desktop_common import _L, TASKBAR_H, TOPBAR_H, cached_shade
 from ui import fonts, style, widgets
 
 

@@ -12,9 +12,8 @@ partie se charge normalement avec un bureau vierge.
 import json
 import os
 
-from core import config
+from core import config, crashlog
 from core.workbook import Workbook
-
 
 _PATH = lambda slot: os.path.join(config.SAVE_DIR, f"ui_state_{slot}.json")
 
@@ -56,7 +55,7 @@ def save(slot, app):
         with open(_PATH(slot), "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False)
     except Exception:
-        pass
+        crashlog.swallowed("core.ui_state")
 
 
 def load(slot, app):
@@ -78,9 +77,7 @@ def load(slot, app):
         try:
             player.watchlist = list(data["watchlist"])[:10]
         except Exception:
-            pass
-
-    # onglets : recréer les pages sauvegardées si PageManager existe
+            crashlog.swallowed("core.ui_state")  # onglets : recréer les pages sauvegardées si PageManager existe
     pages = getattr(app, "pages", None)
     if pages is not None and "pages" in data:
         try:
@@ -110,17 +107,13 @@ def load(slot, app):
                     pages.active = desktop_idx
                     pages._ensure_manager()
         except Exception:
-            pass
-
-    # classeur : restaurer si un workbook existe déjà
+            crashlog.swallowed("core.ui_state")  # classeur : restaurer si un workbook existe déjà
     if getattr(app, "workbook", None) is not None and "workbook" in data:
         try:
             app.workbook = Workbook.from_dict(
                 data["workbook"], app.workbook.n_rows, app.workbook.n_cols)
         except Exception:
-            pass
-
-    # fenêtres : stocké dans l'app pour application dès que le bureau est prêt
+            crashlog.swallowed("core.ui_state")  # fenêtres : stocké dans l'app pour application dès que le bureau est prêt
     app._pending_ui_layout = data.get("windows")
     return data
 
@@ -132,4 +125,4 @@ def delete(slot):
     except FileNotFoundError:
         pass
     except Exception:
-        pass
+        crashlog.swallowed("core.ui_state")

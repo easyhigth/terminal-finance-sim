@@ -103,6 +103,7 @@ class SceneHostApp(DesktopApp):
         self._kwargs = dict(kwargs or {})
         self._rect = None
         self._offscreen = None
+        self._scaled = None    # Surface de destination du smoothscale, réutilisée
         self._opener_cb = None
         self.router = _Router(app.scenes, self._route_open, scene_name)
         self.proxy = _ProxyApp(app, self.router)
@@ -166,11 +167,19 @@ class SceneHostApp(DesktopApp):
             self._offscreen = pygame.Surface((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
         with self._mouse_patch():
             self.scene.draw(self._offscreen)
-        # smoothscale est coûteux, mais l'offscreen est redessiné à chaque
-        # frame : on ne peut pas réutiliser le scaled_surf précédent car son
-        # contenu source a changé. On rescale donc systématiquement.
-        scaled = pygame.transform.smoothscale(self._offscreen, (rect.w, rect.h))
-        surf.blit(scaled, rect.topleft)
+        # smoothscale est coûteux, et l'offscreen est redessiné à chaque
+        # frame : on ne peut pas sauter le rescale (le contenu source a
+        # changé). En revanche on évite le coût annexe : à taille égale, blit
+        # direct sans mise à l'échelle ; sinon la Surface de destination est
+        # RÉUTILISÉE entre les frames (variante dest_surface de smoothscale)
+        # au lieu d'être ré-allouée à chaque frame.
+        if (rect.w, rect.h) == (config.SCREEN_WIDTH, config.SCREEN_HEIGHT):
+            surf.blit(self._offscreen, rect.topleft)
+            return
+        if self._scaled is None or self._scaled.get_size() != (rect.w, rect.h):
+            self._scaled = pygame.Surface((rect.w, rect.h))
+        pygame.transform.smoothscale(self._offscreen, (rect.w, rect.h), self._scaled)
+        surf.blit(self._scaled, rect.topleft)
 
     def handle_event(self, event, rect):
         self._rect = rect

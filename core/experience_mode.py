@@ -14,7 +14,7 @@ déjà en cours ni pour un joueur qui n'a jamais touché ce réglage.
 import json
 import os
 
-from core import config
+from core import config, crashlog
 
 MODES = ("expert", "beginner")
 _mode = "expert"
@@ -56,7 +56,7 @@ def _save():
         with open(_PATH, "w", encoding="utf-8") as f:
             json.dump({"mode": _mode}, f)
     except Exception:
-        pass
+        crashlog.swallowed("core.experience_mode")
 
 
 def get_mode():

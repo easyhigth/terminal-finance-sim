@@ -541,7 +541,6 @@ class BookScene(Scene, PopupMixin):
     def _draw_side_panel(self, surf, rect):
         """Panneau latéral à onglets : répartition sectorielle OU évolution de la
         valeur nette au fil du temps (`cash_history`)."""
-        p = self.app.gs.player
         inner = widgets.draw_panel(surf, rect, "Analyse globale", config.COL_AMBER)
         sub_rect = self._draw_side_tabs(surf, inner)
         if self.side_mode == "sector":

@@ -7,7 +7,7 @@ Ctrl+K ouvre par-dessus la scène courante une palette de navigation globale
 """
 import pygame
 
-from core import config, fuzzy, ui_state
+from core import config, crashlog, fuzzy, ui_state
 from core.i18n import get_lang
 from core.sim_clock import LIVE_SCENE_NAMES
 from ui import fonts, widgets
@@ -427,7 +427,7 @@ class SceneManager:
                 else:
                     self.app.route_scene(action, **kwargs)
             except Exception:
-                pass
+                crashlog.swallowed("core.scene_manager")
 
         return cb
 

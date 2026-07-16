@@ -28,7 +28,7 @@ def _player(watchlist=None):
 def test_watched_ticker_earnings_push_toast_and_inbox_message():
     m = Market(seed=7)
     tk = m.companies[3]["ticker"]
-    rep = _advance_to_next_earnings(m, tk)
+    _advance_to_next_earnings(m, tk)
 
     p = _player(watchlist=[tk])
     gs = GameState()

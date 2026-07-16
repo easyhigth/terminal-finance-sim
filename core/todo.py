@@ -12,6 +12,7 @@ Chaque entrée : {"label": str, "kind": "warn"|"info"|"bad", "scene": str}.
 La liste est déjà triée par priorité (le plus urgent d'abord) et bornée à
 `MAX_ITEMS` — le widget n'a qu'à l'afficher telle quelle.
 """
+from core import crashlog
 
 MAX_ITEMS = 4
 DEAL_URGENT_DAYS = 5          # un deal à ≤ 5 jours d'échéance devient urgent
@@ -53,8 +54,7 @@ def suggestions(player, market=None):
                                               "Margin under watch: reduce leverage"),
                                   "kind": "bad", "scene": "book"})
         except Exception:
-            pass
-    # 4) opportunités datées : offres de mandat, deals proches de l'échéance
+            crashlog.swallowed("core.todo")  # 4) opportunités datées : offres de mandat, deals proches de l'échéance
     offers = getattr(player, "mandate_offers", None) or []
     if offers:
         items.append({"label": _L(f"{len(offers)} offre(s) de mandat en attente",

@@ -37,7 +37,7 @@ ce module (donc dès que `main.py` l'importe, avant toute scène ne dessine) et
 import json
 import os
 
-from core import config
+from core import config, crashlog
 
 _PATH = os.path.join(config.SAVE_DIR, "colorblind_settings.json")
 
@@ -101,7 +101,7 @@ def _save():
         with open(_PATH, "w", encoding="utf-8") as f:
             json.dump({"enabled": _ENABLED}, f)
     except Exception:
-        pass    # jamais bloquant (disque en lecture seule, CI…)
+        crashlog.swallowed("core.colorblind_settings")  # jamais bloquant (disque en lecture seule, CI…)
 
 
 def is_enabled():

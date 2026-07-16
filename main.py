@@ -36,7 +36,6 @@ from scenes.scene_bonds import BondsScene
 from scenes.scene_book import BookScene
 from scenes.scene_calendar import CalendarScene
 from scenes.scene_career import CareerScene
-from scenes.scene_unlock_history import UnlockHistoryScene
 from scenes.scene_cert import CertScene
 from scenes.scene_commands import CommandsScene
 from scenes.scene_commodities import CommoditiesScene
@@ -98,6 +97,7 @@ from scenes.scene_terminal import TerminalScene
 from scenes.scene_track import TrackScene
 from scenes.scene_tradingwall import TradingWallScene
 from scenes.scene_tutorials import TutorialsScene
+from scenes.scene_unlock_history import UnlockHistoryScene
 from ui.logo import make_icon_surface
 from ui.notifications import NotificationCenter
 
@@ -352,7 +352,7 @@ class App:
                 try:
                     self.notify(msg, "bad")
                 except Exception:
-                    pass
+                    crashlog.swallowed("main")
 
     def run(self):
         while self.running:

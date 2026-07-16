@@ -6,7 +6,7 @@ Extrait de scene_terminal_commands.py pour limiter sa taille ; mixé dans
 TerminalScene avec les autres mixins de commandes.
 """
 
-from core import audio, config
+from core import audio, config, crashlog
 from core import badges as badges_mod
 from core import career as career_mod
 from core import deals as deals_mod
@@ -71,7 +71,7 @@ class TerminalTimeMixin:
                 elif was_open and not is_open:
                     _audio.play("session_close")
             except Exception:
-                pass
+                crashlog.swallowed("scenes.scene_terminal_time")
         self.worldmap.push_news(market_news)
         # retombées visibles : postmortem des crises qui viennent de s'éteindre
         for cr in m.ended_crises:

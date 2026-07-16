@@ -20,7 +20,7 @@ Structure d'un deal (dict) :
 """
 import random
 
-from core import archetypes, config, firms, tracks, unlocks
+from core import archetypes, config, crashlog, firms, tracks, unlocks
 
 MAX_ACTIVE_DEALS = 4        # au-delà, plus de génération
 GEN_PROBABILITY = 0.45      # proba de générer un deal à un tour donné
@@ -188,7 +188,7 @@ def maybe_generate(player, rng=None):
         from core import team
         prob_bonus = team.team_deal_prob_bonus(player)
     except Exception:
-        pass
+        crashlog.swallowed("core.deals")
     gen_prob = (GEN_PROBABILITY * tracks.perk(player, "deal_gen_prob_mult")
                 * archetypes.perk(player, "deal_gen_prob_mult")
                 * firms.perk(player, "deal_gen_prob_mult"))

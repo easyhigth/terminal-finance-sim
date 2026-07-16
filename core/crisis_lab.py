@@ -24,7 +24,6 @@ from core import finmath as fm
 from core import hedging as H
 from core import options as opt
 from core import portfolio as pf
-from core import quant_tools as QT
 
 CRUNCH_VOL_BUMP = 0.10          # +10 pts de vol implicite en mode crise
 

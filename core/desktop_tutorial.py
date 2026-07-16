@@ -24,7 +24,7 @@ Logique sans pygame ; les `check`/`gate` reçoivent la DesktopScene (accès à
 import json
 import os
 
-from core import config
+from core import config, crashlog
 
 _PATH = os.path.join(config.SAVE_DIR, "desktop_tutorial.json")
 
@@ -131,7 +131,7 @@ def _save(state):
         with open(_PATH, "w", encoding="utf-8") as f:
             json.dump(state, f)
     except Exception:
-        pass    # jamais bloquant (disque en lecture seule, CI…)
+        crashlog.swallowed("core.desktop_tutorial")  # jamais bloquant (disque en lecture seule, CI…)
 
 
 # --------------------------------------------------------------------- API

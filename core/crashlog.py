@@ -42,6 +42,22 @@ def record(exc, context=""):
         pass
 
 
+def swallowed(context=""):
+    """À appeler dans un `except Exception:` best-effort À LA PLACE d'un
+    `pass` nu : trace l'exception en cours via le logger applog (visible avec
+    FINSIM_DEBUG=1) au lieu de l'avaler sans AUCUNE trace. N'écrit jamais dans
+    crash.log (réservé aux vrais plantages de la boucle principale : ces
+    handlers best-effort peuvent se déclencher à chaque frame et évinceraient
+    les 20 entrées utiles), ne lève jamais, coût nul hors mode debug
+    (NullHandler). Ne change RIEN au comportement du handler : l'exception
+    reste absorbée."""
+    try:
+        from core.applog import logger
+        logger.warning("exception avalée (best-effort) [%s]", context, exc_info=True)
+    except Exception:
+        pass
+
+
 def path():
     """Chemin du fichier de journal (pour l'afficher au joueur/le diagnostic)."""
     return _PATH

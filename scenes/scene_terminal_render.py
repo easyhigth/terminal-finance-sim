@@ -12,7 +12,6 @@ from core import liquidity as liq_mod
 from core import market_hours as mh_mod
 from core import onboarding as onboarding_mod
 from core import portfolio as pf_mod
-from core import portfolio_views as pv_mod
 from core import unlocks as unlocks_mod
 from core.i18n import get_lang
 from core.i18n import t as _t

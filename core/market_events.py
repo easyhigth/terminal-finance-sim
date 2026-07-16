@@ -18,7 +18,6 @@ Contraintes de conception :
 - CALIBRAGE : la magnitude est bornée pour ne pas dénaturer le modèle à facteurs
   existant ; elle est aussi fonction de la volatilité propre de la société.
 """
-import random
 
 
 def _L(fr, en):

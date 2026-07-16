@@ -17,7 +17,7 @@ par une certification ACI à venir). Holdings : PlayerState.fx_forwards =
 """
 import numpy as np
 
-from core import config
+from core import config, crashlog
 
 # (pair, base_price, drift annuel, vol annuelle)
 PAIRS_DEF = [
@@ -142,7 +142,7 @@ def forward_unlocked(player):
         if certifications.is_complete(player, "ACI"):
             grade_needed -= 3
     except Exception:
-        pass
+        crashlog.swallowed("core.fx")
     return player.grade_index >= grade_needed
 
 

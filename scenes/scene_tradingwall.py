@@ -99,7 +99,6 @@ class TradingWallScene(Scene, PopupMixin):
             self._tile_rects.append((rect, kind, key))
             inner = widgets.draw_panel(surf, rect, key, config.COL_AMBER if kind == "stock" else config.COL_CYAN)
             last = hist[-1]
-            prev = hist[-2] if len(hist) >= 2 else hist[0]
             chg = (last / hist[0] - 1.0) * 100.0 if hist[0] else 0.0
             base_c = config.COL_UP if chg >= 0 else config.COL_DOWN
             c = self._flash.tick(key, last, config.COL_UP, config.COL_DOWN, base_c)

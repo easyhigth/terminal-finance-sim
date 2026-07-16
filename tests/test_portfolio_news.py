@@ -1,9 +1,9 @@
 """Tests pour core/portfolio_news.py — génération contextualisée d'inbox."""
 import pytest
 
-from core import config, game_state
+from core import config, game_state, portfolio_news
+from core import portfolio as pf
 from core.market import Market
-from core import portfolio as pf, portfolio_news
 
 
 def _make_player_and_market(seed=42, steps=10, cash=1_000_000):

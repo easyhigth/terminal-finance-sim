@@ -104,3 +104,36 @@ def ui_small(bold=False):    return _ui_get(config.FONT_SIZE_SMALL, bold)
 def ui_body(bold=False):     return _ui_get(config.FONT_SIZE_BODY, bold)
 def ui_head(bold=False):     return _ui_get(config.FONT_SIZE_HEAD, bold)
 def ui_title(bold=False):    return _ui_get(config.FONT_SIZE_TITLE, bold)
+
+
+# ---------------------------------------------------------------------------
+# CACHE DE RENDU TEXTE
+# ---------------------------------------------------------------------------
+# pygame re-rasterise chaque appel à font.render() — or le bureau redessine
+# beaucoup de texte identique à CHAQUE frame (libellés, en-têtes, tables).
+# Ce cache mémorise la Surface rendue par (police, texte, couleur). Les
+# polices étant elles-mêmes cachées à vie (_cache/_ui_cache ci-dessus),
+# id(font) est une clé stable. Borné : au-delà de _RENDER_CACHE_MAX entrées,
+# la moitié la plus ANCIENNE est purgée (ordre d'insertion des dicts) — les
+# textes vivants (prix qui défilent) tournent, les libellés fixes restent.
+# IMPORTANT : les Surfaces retournées sont PARTAGÉES — ne jamais les muter
+# (set_alpha, fill…) ; les helpers de ui/widgets.py ne font que les blitter.
+_render_cache = {}
+_RENDER_CACHE_MAX = 4096
+
+
+def render_cached(font, text, color):
+    """font.render(text, True, color) avec mémoïsation. Retourne une Surface
+    PARTAGÉE : à blitter uniquement, jamais à modifier."""
+    try:
+        key = (id(font), text, tuple(color))
+    except TypeError:
+        return font.render(text, True, color)
+    img = _render_cache.get(key)
+    if img is None:
+        img = font.render(text, True, color)
+        if len(_render_cache) >= _RENDER_CACHE_MAX:
+            for k in list(_render_cache.keys())[:_RENDER_CACHE_MAX // 2]:
+                del _render_cache[k]
+        _render_cache[key] = img
+    return img

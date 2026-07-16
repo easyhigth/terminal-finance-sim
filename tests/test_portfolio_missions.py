@@ -4,8 +4,9 @@ import random
 
 import pytest
 
-from core import missions, portfolio_missions as PM
+from core import missions
 from core import portfolio as pf
+from core import portfolio_missions as PM
 from core.game_state import PlayerState
 from core.market import Market
 
@@ -101,7 +102,6 @@ def test_generate_portfolio_tier_includes_practical_items_when_player_given(play
                           track="General", player=player)
     assert m["kind"] == "portfolio"
     assert len(m["items"]) == missions.MAX_ITEMS
-    practical_ids = {c[0] for c in PM.PRACTICAL_CHECKS}
     practical_prompts = {c[1] for c in PM.PRACTICAL_CHECKS} | {c[2] for c in PM.PRACTICAL_CHECKS}
     n_practical = sum(1 for it in m["items"] if it["prompt"] in practical_prompts)
     assert n_practical == 2

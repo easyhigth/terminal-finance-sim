@@ -16,7 +16,7 @@ informatif : n'affecte jamais une transaction réelle du joueur.
 """
 import random
 
-from data.ma_targets import TARGETS_SEED, _PRIVATE_MULT
+from data.ma_targets import _PRIVATE_MULT, TARGETS_SEED
 
 DEALS_PER_SECTOR = 6
 # les transactions passées se sont conclues plus cher que la juste valeur

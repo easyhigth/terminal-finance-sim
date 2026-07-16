@@ -7,7 +7,7 @@ Tout est dessiné à la main avec pygame.draw pour garder l'esthétique Bloomber
 import pygame
 
 from core import config
-from ui import fonts, style
+from ui import fonts
 
 
 # ---------------------------------------------------------------------------

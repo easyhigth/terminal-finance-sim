@@ -8,7 +8,8 @@ commande TRADES/TJOURNAL du terminal ou depuis le hub PLUS.
 """
 import pygame
 
-from core import config, journal as J
+from core import config
+from core import journal as J
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
 
@@ -348,7 +349,6 @@ class TradeJournalScene(Scene):
         if row_rect.collidepoint(mp):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, row_rect, border_radius=3)
         keynav.draw_focus_ring(surf, row_rect, cursor)
-        cur = self._cur()
         widgets.draw_text(surf, f"#{e['id']}", (inner.x, y), fonts.tiny(), config.COL_AMBER)
         widgets.draw_text(surf, f"j{e['day']}", (inner.x + 50, y), fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, widgets.fit_text(e['key'], fonts.small(bold=True), 68),

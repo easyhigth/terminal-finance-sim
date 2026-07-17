@@ -120,7 +120,16 @@ def test_track_mismatch_rows_carry_a_note(app):
     scene.draw(app.screen)
     lock_group = next((g for g in scene.groups if g["grade"] == unlocks.TRACK_LOCK_GRADE), None)
     assert lock_group is not None
-    assert all(r["note"] for r in lock_group["rows"])
+    # le groupe du grade max mélange désormais les VRAIS déblocages de ce grade
+    # ("founding", sans note) et les modules repoussés là par un choix de voie
+    # incompatible (avec note) — chaque module verrouillé par la voie doit
+    # porter sa note, les déblocages natifs du grade n'en ont pas.
+    for r in lock_group["rows"]:
+        if unlocks.required_grade(r["feature"]) < unlocks.TRACK_LOCK_GRADE:
+            assert r["note"], r["feature"]     # repoussé par la voie -> note explicative
+        else:
+            assert not r["note"], r["feature"]  # déblocage natif du grade max
+    assert any(r["note"] for r in lock_group["rows"])   # le cas voie existe bien
 
 
 def test_back_button_returns_to_career(app):

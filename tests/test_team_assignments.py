@@ -9,7 +9,7 @@ from core.market import Market
 def _setup(n=1):
     gs = GameState()
     p = gs.player
-    p.grade_index = 8
+    p.grade_index = 10   # "team" se débloque au grade Managing Director
     p.cash = 1_000_000.0
     for _ in range(n):
         team.hire(p, "equity_junior")

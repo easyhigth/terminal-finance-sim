@@ -178,6 +178,12 @@ QUICK_APPS = [
 # une icône verrouillée n'apparaît tout simplement pas (et son apparition au
 # grade suivant fait office de récompense, cf. DesktopScene._check_new_icons).
 ICON_FEATURE = {
+    # --- le stagiaire n'a que 5 apps (Terminal, Mission, Exam/Certif, Inbox,
+    # --- Manuel + Sauver/Aide) : le reste du confort arrive au grade 1 ---
+    "calculator": "analyst",   # calculatrice : accompagne les outils d'analyse
+    "qnews": "analyst",        # fil d'actus dédié — le Terminal suffit au stagiaire
+    "notifcenter": "analyst",  # centre de notifications : rien à notifier avant d'agir
+    "qachievements": "analyst",  # succès : à découvrir une fois la carrière lancée
     # --- outils d'analyse : arrivent quand on devient analyste (grade 1) ---
     "markethub": "analyst",    # hub Marché : de l'analyse — le Terminal suffit au stagiaire
     "research": "analyst",     # recherche société

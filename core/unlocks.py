@@ -10,14 +10,11 @@ from core import config
 
 # fonctionnalité -> grade minimal requis.
 #
-# Étalé sur les grades 1 à 9 à raison de 2-3 déblocages par grade (au lieu de
+# Étalé sur les grades 1 à 11 à raison de 2-3 déblocages par grade (au lieu de
 # grosses vagues concentrées sur 2-3 paliers, cf. l'historique de ce fichier
-# avant ce rééquilibrage) : à chaque promotion, le joueur retrouve quelque
-# chose de nouveau à essayer, plutôt que rien pendant plusieurs grades puis
-# neuf fonctionnalités d'un coup. Les grades 10-11 (Managing Director/Partner)
-# ne débloquent plus rien de nouveau : à ce stade tout l'outillage est déjà
-# ouvert, la fin de carrière est affaire de score et de maîtrise, pas de
-# contenu supplémentaire. Grade requis synchronisé avec les constantes
+# avant ce rééquilibrage) : CHAQUE promotion apporte quelque chose de nouveau à
+# essayer, jusqu'au sommet — l'équipe au grade Managing Director, la fondation
+# de sa propre firme au grade Partner. Grade requis synchronisé avec les constantes
 # `MIN_GRADE` dédiées de `core/ipo.py`, `core/macrocal.py` et
 # `core/mandates.py` (mécanique réelle, indépendante de ce dict mais qui doit
 # rester alignée dessus — sinon une commande semblerait débloquée dans l'UI
@@ -64,12 +61,20 @@ UNLOCKS = {
     # grade 8 (Director) : outils les plus avancés/spécialisés.
     "pitchbook": 8,       # Pitch Book (démarchage actif de mandats) — affinité Advisory
     "options": 8,    # options sur actions individuelles (calls/puts)
-    "team": 8,       # recrutement d'analystes juniors (équipe)
     # grade 9 (Executive Director) : produits de crédit structurés.
     "credit": 9,     # titrisation : tranches de pool de prêts (cash réellement investi)
     "structured": 9,  # produits structurés (cash réellement investi)
     "creditdesk": 9,    # Desk Crédit (Merton/waterfall/CDS/convertibles) — affinité M&A
+    # grade 10 (Managing Director) : on dirige — on recrute son équipe.
+    "team": 10,      # recrutement d'analystes juniors (équipe)
+    # grade 11 (Partner) : l'endgame — fonder sa propre firme.
+    "founding": 11,  # fonder sa firme (mécanique réelle : core/founding.can_found)
 }
+
+# Fonctionnalités exclues du raccourci vétéran : leur grade est un invariant de
+# MÉCANIQUE (core/founding.can_found exige le grade max), pas un simple palier
+# pédagogique — un headstart afficherait « débloqué » ce que le module refuse.
+_NO_HEADSTART = {"founding"}
 
 def _L(fr, en):
     from core.i18n import get_lang
@@ -96,6 +101,7 @@ _LABELS_RAW = {
     "fx": ("Desk FX (spot & forward) (FX)", "FX desk (spot & forward) (FX)"),
     "calendar": ("Calendrier macro (MACRO)", "Macro calendar (MACRO)"),
     "team": ("Équipe d'analystes juniors (TEAM)", "Junior analyst team (TEAM)"),
+    "founding": ("Fonder sa propre firme", "Founding your own firm"),
     "alm": ("Desk ALM bancaire (ALM)", "Bank ALM desk (ALM)"),
     "risk": ("Module risque / VaR (RISK)", "Risk / VaR module (RISK)"),
     "quant": ("Module quant / pricing d'options (QUANT)", "Quant / options pricing module (QUANT)"),
@@ -210,7 +216,7 @@ def effective_required_grade(player, feature):
     joueur a choisi une AUTRE voie — un vétéran ne contourne pas ce verrou,
     qui dépend du choix de voie, pas de l'expérience générale."""
     g = required_grade(feature)
-    if player.flags.get("veteran") and g > 0:
+    if player.flags.get("veteran") and g > 0 and feature not in _NO_HEADSTART:
         # un vétéran rouvre la complexité plus vite — MAIS garde un vrai stade
         # Intern : le headstart ne descend jamais une fonctionnalité gated
         # jusqu'au grade 0 (sinon le stagiaire retrouve tout d'un coup, à

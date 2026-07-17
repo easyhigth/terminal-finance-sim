@@ -22,6 +22,7 @@ def desktop():
     a = main.App()
     a.ensure_market()
     p = a.gs.player
+    p.grade_index = 1   # les icônes de confort (Succès…) arrivent au grade 1
     p.flags["intro_guide_done"] = True
     p.flags["desktop_seeded"] = True
     a.scenes.go("desktop")

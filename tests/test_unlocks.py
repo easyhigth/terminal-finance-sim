@@ -119,6 +119,30 @@ def test_risk_and_quant_tools_unlock_at_grade_two():
         assert unlocks.unlocked(p, feature), feature
 
 
+def test_every_grade_unlocks_something():
+    """CHAQUE promotion (grades 1 à 11) apporte au moins une fonctionnalité —
+    l'équipe au grade Managing Director, la fondation de sa firme à Partner."""
+    from core import config
+    grades_with_unlock = set(unlocks.UNLOCKS.values())
+    for g in range(1, len(config.GRADES)):
+        assert g in grades_with_unlock, f"le grade {g} ne débloque rien"
+
+
+def test_founding_declared_at_top_grade_and_no_headstart():
+    """"founding" (fonder sa firme) est déclaré au grade max, aligné sur la
+    mécanique réelle (core/founding.can_found exige le grade max) — et le
+    raccourci vétéran ne le descend PAS (sinon l'UI montrerait débloqué ce
+    que le module refuse)."""
+    from core import config
+    top = len(config.GRADES) - 1
+    assert unlocks.required_grade("founding") == top
+    p = _player(grade=top - 1)
+    p.flags["veteran"] = True
+    assert not unlocks.unlocked(p, "founding")
+    p.grade_index = top
+    assert unlocks.unlocked(p, "founding")
+
+
 def test_veteran_still_gets_a_bare_intern():
     """Le raccourci vétéran accélère la suite mais ne saute JAMAIS le stade
     Intern : au grade 0, aucune fonctionnalité gated n'est ouverte, même pour

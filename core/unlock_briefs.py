@@ -693,6 +693,26 @@ FEATURE_BRIEFS = {
     # Fonctionnalités ouvertes dès le grade 0 : pas de fiche de promotion
     # nécessaire (jamais « nouvellement débloquées ») mais présentes pour
     # robustesse si les paliers changent un jour.
+    "founding": {
+        "title": ("Fonder sa propre firme", "Founding your own firm"),
+        "what": ("L'acte final de la carrière : quitter la banque et lancer "
+                 "votre propre boutique, sous votre nom.",
+                 "The career's final act: leave the bank and launch your own "
+                 "shop, under your own name."),
+        "how": ("Écran Carrière → bouton FONDER (grade Partner, capital "
+                "d'installation requis).",
+                "Career screen → FOUND button (Partner grade, seed capital "
+                "required)."),
+        "why": ("Vos clients vous suivent (confiance et capital confié en "
+                "hausse), revenu d'associé-gérant permanent, et le classement "
+                "affiche VOTRE enseigne.",
+                "Your clients follow you (higher trust and entrusted capital), "
+                "a permanent partner draw, and the rankings show YOUR shingle."),
+        "first": ("Réunissez le capital d'installation, choisissez un nom, et "
+                  "fondez la maison que vous avez toujours voulue.",
+                  "Raise the seed capital, pick a name, and found the house "
+                  "you always wanted."),
+    },
     "charts": {
         "title": ("Graphes de cours", "Price charts"),
         "what": ("Les graphes : ligne, bougies, comparaison de plusieurs titres "

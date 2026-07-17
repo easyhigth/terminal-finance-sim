@@ -34,8 +34,51 @@ class CareerScene(Scene):
             (config.SCREEN_WIDTH - 40 - 340, 60, 170, 32), "SUCCÈS →", config.COL_PRESTIGE)
         self.unlocks_btn = widgets.Button(
             (config.SCREEN_WIDTH - 40 - 560, 60, 210, 32), "DÉBLOCAGES →", config.COL_PRESTIGE)
+        # fondation de firme (endgame, grade max) — cf. core/founding.py
+        self.found_prompt = False
+        self.found_buf = ""
+        self._found_btn_rect = None
+        self._found_box_rect = None
 
     def handle_event(self, event):
+        from core import founding
+        p = self.app.gs.player
+        # boîte modale « nom de votre firme » : capture tout en premier
+        if self.found_prompt:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.found_prompt = False
+                elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                    res = founding.found(p, self.found_buf)
+                    if res["ok"]:
+                        self.found_prompt = False
+                        self.app.notify(f"{p.firm_name} est née. À vous de jouer, fondateur.", "good")
+                    else:
+                        self.app.notify("Il faut un nom.", "warn")
+                elif event.key == pygame.K_BACKSPACE:
+                    self.found_buf = self.found_buf[:-1]
+                elif event.unicode and event.unicode.isprintable() and len(self.found_buf) < 24:
+                    self.found_buf += event.unicode
+            return
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._found_btn_rect and self._found_btn_rect.collidepoint(event.pos):
+                ok, reason = founding.can_found(p)
+                if ok:
+                    self.found_prompt = True
+                    self.found_buf = ""
+                elif reason == "cash":
+                    self.app.notify(f"Fonder sa firme coûte "
+                                    f"{widgets.format_money(founding.FOUNDING_COST, '$')} — "
+                                    f"capital insuffisant.", "warn")
+                return
+            from core import focus as focus_mod
+            for key, r in getattr(self, "_focus_rects", {}).items():
+                if r.collidepoint(event.pos):
+                    p = self.app.gs.player
+                    res = focus_mod.set_focus(p, None if focus_mod.current(p) == key else key)
+                    if not res["ok"] and res["reason"] == "quarter":
+                        self.app.notify("Focus déjà changé ce trimestre — patience.", "warn")
+                    return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.app.scenes.back(self.return_to)
         if self.back_btn.handle(event):
@@ -87,11 +130,89 @@ class CareerScene(Scene):
         self._draw_objectives(surf, pygame.Rect(x3, top, colw, row_h), p)
         self._draw_journal(surf, pygame.Rect(x1, top + row_h + gap,
                                              config.SCREEN_WIDTH - 2 * M, journal_h), p)
+        self._draw_focus_bar(surf, p)
+        self._draw_founding(surf, p)
 
         self.back_btn.draw(surf)
         self.rivals_btn.draw(surf)
         self.achievements_btn.draw(surf)
         self.unlocks_btn.draw(surf)
+
+    def _draw_founding(self, surf, p):
+        """Bouton « FONDER MA FIRME » (grade max, cf. core/founding.py) puis
+        boîte modale de nom. Une firme déjà fondée s'affiche en en-tête."""
+        from core import founding
+        self._found_btn_rect = None
+        if founding.founded(p):
+            widgets.draw_badge(surf, p.firm_name.upper(),
+                               (config.SCREEN_WIDTH - 40, 130),
+                               config.COL_PRESTIGE, align="right")
+            return
+        ok, reason = founding.can_found(p)
+        if reason == "grade":
+            return   # pas encore Partner : le bouton n'existe pas
+        r = pygame.Rect(config.SCREEN_WIDTH - 40 - 220, 122, 220, 30)
+        self._found_btn_rect = r
+        hov = r.collidepoint(pygame.mouse.get_pos())
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_PANEL,
+                         r, border_radius=4)
+        pygame.draw.rect(surf, config.COL_PRESTIGE, r, 2, border_radius=4)
+        widgets.draw_text(surf, "FONDER MA FIRME", r.center,
+                          fonts.small(bold=True), config.COL_PRESTIGE, align="center")
+        if self.found_prompt:
+            box = pygame.Rect(config.SCREEN_WIDTH // 2 - 240,
+                              config.SCREEN_HEIGHT // 2 - 60, 480, 120)
+            self._found_box_rect = box
+            pygame.draw.rect(surf, config.COL_PANEL, box, border_radius=6)
+            pygame.draw.rect(surf, config.COL_PRESTIGE, box, 2, border_radius=6)
+            widgets.draw_text(surf, "LE NOM DE VOTRE FIRME",
+                              (box.centerx, box.y + 18), fonts.small(bold=True),
+                              config.COL_PRESTIGE, align="center")
+            import time as _time
+            cursor = "_" if int(_time.time() * 2) % 2 == 0 else ""
+            widgets.draw_text(surf, (self.found_buf or "") + cursor,
+                              (box.centerx, box.y + 52), fonts.head(bold=True),
+                              config.COL_TEXT, align="center")
+            widgets.draw_text(surf,
+                              f"Coût : {widgets.format_money(4_000_000, '$')} · "
+                              "ENTRÉE valider · ÉCHAP annuler",
+                              (box.centerx, box.y + 92), fonts.tiny(),
+                              config.COL_TEXT_DIM, align="center")
+
+    def _draw_focus_bar(self, surf, p):
+        """FOCUS DU TRIMESTRE (core/focus.py) : où passez-vous vos journées ?
+        Un clic choisit l'axe (re-clic = aucun) ; un seul changement par
+        trimestre. Rangée compacte dans l'en-tête, à côté du sous-titre."""
+        from core import focus as focus_mod
+        self._focus_rects = {}
+        x = 420
+        y = 68
+        widgets.draw_text(surf, "FOCUS DU TRIMESTRE", (x, y - 14),
+                          fonts.tiny(bold=True), config.COL_CYAN)
+        current = focus_mod.current(p)
+        mp = pygame.mouse.get_pos()
+        hovered = None
+        for key in focus_mod.FOCUS:
+            lbl = focus_mod.label(key)
+            w = fonts.tiny(bold=True).size(lbl)[0] + 16
+            r = pygame.Rect(x, y, w, 20)
+            sel = key == current
+            hov = r.collidepoint(mp)
+            if hov:
+                hovered = key
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD if (sel or hov) else config.COL_PANEL,
+                             r, border_radius=3)
+            pygame.draw.rect(surf, config.COL_CYAN if sel else config.COL_BORDER,
+                             r, 2 if sel else 1, border_radius=3)
+            widgets.draw_text(surf, lbl, r.center, fonts.tiny(bold=sel),
+                              config.COL_CYAN if sel else config.COL_TEXT_DIM, align="center")
+            self._focus_rects[key] = r
+            x += w + 6
+        if not focus_mod.can_change(p):
+            widgets.draw_text(surf, "changé ce trimestre", (x + 6, y + 4),
+                              fonts.tiny(), config.COL_TEXT_DIM)
+        if hovered:
+            widgets.draw_tooltip(surf, focus_mod.desc(hovered), mp)
 
     def _draw_ladder(self, surf, rect, p):
         inner = widgets.draw_panel(surf, rect, "Échelle des grades", config.COL_AMBER)

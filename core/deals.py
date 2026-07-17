@@ -186,12 +186,15 @@ def maybe_generate(player, rng=None):
     prob_bonus = 0.0
     try:
         from core import team
-        prob_bonus = team.team_deal_prob_bonus(player)
+        prob_bonus = (team.team_deal_prob_bonus(player)
+                      + team.deals_assign_bonus(player))   # analystes affectés au support deals
     except Exception:
         crashlog.swallowed("core.deals")
+    from core import focus as _focus
     gen_prob = (GEN_PROBABILITY * tracks.perk(player, "deal_gen_prob_mult")
                 * archetypes.perk(player, "deal_gen_prob_mult")
-                * firms.perk(player, "deal_gen_prob_mult"))
+                * firms.perk(player, "deal_gen_prob_mult")
+                * _focus.perk(player, "offer_mult"))
     if rng.random() > gen_prob + prob_bonus:
         return []
     t = rng.choice(_eligible_templates(player))

@@ -181,10 +181,16 @@ def grade_focus(grade_index):
     )
 
 
-def compute_rewards(mission, correct, total):
-    """Réputation + honoraire en fonction du score (ratio de bonnes réponses)."""
+def compute_rewards(mission, correct, total, player=None):
+    """Réputation + honoraire en fonction du score (ratio de bonnes réponses).
+    Si `player` est fourni, le focus « recherche » (core/focus.py) valorise
+    la réputation de mission."""
     ratio = correct / max(1, total)
-    rep = int(round(mission["reward_rep"] * ratio))
+    rep_mult = 1.0
+    if player is not None:
+        from core import focus as _focus
+        rep_mult = _focus.perk(player, "mission_rep_mult")
+    rep = int(round(mission["reward_rep"] * ratio * rep_mult))
     if correct > 0:
         rep = max(rep, 1)
     # honoraire de conseil, croissant avec le grade

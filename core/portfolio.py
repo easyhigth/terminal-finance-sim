@@ -75,8 +75,11 @@ LIQUIDATION_FEE = 0.005   # surcoût appliqué à la valeur liquidée lors d'un 
 
 
 def _commission(player):
-    """Commission effective (réduite pour la voie Portfolio)."""
-    return COMMISSION * tracks.perk(player, "commission_mult")
+    """Commission effective (réduite pour la voie Portfolio, modulée par le
+    focus du trimestre — cf. core/focus.py)."""
+    from core import focus as _focus
+    return (COMMISSION * tracks.perk(player, "commission_mult")
+            * _focus.perk(player, "commission_mult"))
 
 
 def market_impact(order_value, liquidity, stress_level=0.0):

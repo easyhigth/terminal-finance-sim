@@ -64,7 +64,8 @@ def test_repo_rate_matches_module(app):
 
 
 def test_cds_spread_matches_module(app):
-    from core import cds, credit_risk as cr
+    from core import cds
+    from core import credit_risk as cr
     sa = _sheet_app(app)
     tk = cr.market_scan(app.market, n=1)[0]["ticker"]
     v = _set_and_eval(sa, f'=CDS_SPREAD("{tk}",3)')

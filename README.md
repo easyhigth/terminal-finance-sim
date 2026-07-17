@@ -1,21 +1,40 @@
 # TERMINAL — Finance Career Simulator
 
-Prototype jouable — moteur de base + interface Bloomberg + modules financiers réels.
+Simulateur de carrière en finance de marché (Python + pygame) : vous démarrez
+stagiaire dans une salle des marchés et grimpez les 12 grades jusqu'au sommet,
+en travaillant (missions, examens, deals, mandats) et en gérant un vrai
+portefeuille multi-classes sur un **marché déterministe à modèle de facteurs**
+— actions, ETF, obligations, commodities, crypto, FX, options, CDS, IRS, TRS,
+repo, titrisation, convertibles, arbitrage de fusion…
 
-## Contenu actuel
+Le jeu se joue sur un **poste de travail fenêtré** façon PC de trading : un
+bureau avec ~40 applications qui s'ouvrent dans des fenêtres déplaçables,
+redimensionnables, ancrables (glisser vers un bord, Alt+Tab, menu Démarrer,
+palette Ctrl+K, recherche globale Ctrl+/). Le temps s'écoule en continu
+(pause/x1/x2/x3) et le marché avance pendant que vous travaillez.
 
-### Écrans
-- **Menu principal** avec ticker animé, nouvelle/charger partie.
-- **Choix du continent** : globe 3D interactif (Europe/USA/Asia), fiches réglementaires.
-- **Terminal Bloomberg** : bandeau joueur, ticker, panneau marchés (indices + sparklines),
-  flux de news régional, cadre réglementaire, ligne de commande.
-- **Évaluation de promotion** : QCM adaptés au grade et à la voie, seuil 70%, feedback + explications.
-- **Glossaire** : 48 termes en 8 catégories, recherche au clavier.
-- **Module Portfolio** : frontière efficiente de Markowitz, optimisation Sharpe/min-variance,
-  Capital Market Line, ajustement des poids en direct.
-- **Module M&A** : modèle LBO (MOIC/IRR) + analyse accretion/dilution.
-- **Choix de voie** : Portfolio / M&A / Risk / Quant / Advisory.
-- **Applications financières avancées** : Sharpe Ratio, Z-Score, Couverture (Hedge)
+## Vue d'ensemble
+
+### Le poste de travail (bureau)
+- **Bureau maître** : icônes rangées en sections repliables (Essentiels,
+  Marché & Analyse, Quant & Risque, Crédit & Financement, Carrière, Outils),
+  barre des tâches, widgets ambiants (patrimoine, À FAIRE, ticker d'indices).
+- **Apps natives** : Recherche (type Bloomberg), Trading (ordres, TWAP, ordres
+  conditionnels stop/target/trailing, profondeur de carnet L2), Portefeuille,
+  Marché, Tableur multi-feuilles (formules, graphiques, fonctions de marché en
+  direct `=PRICE()`, VLOOKUP, CSV, undo/redo), Inbox, Alertes, Watchlist,
+  Journal de trading (+ critère de Kelly), Mission, Évaluation, Boutique…
+- **Desks spécialisés** : Desk Options (5 modèles de pricing, stratégies,
+  grecques, surface de vol, gamma scalping), Desk Taux (courbe, DV01, chocs,
+  immunisation, IRS), Desk Crédit (Merton, waterfall de titrisation, CDS,
+  convertibles, TRS), VaR desk (Euler, Kupiec), Frontière efficiente
+  interactive, Pairs trading, Backtester, Labo de crise, Desk FX (carry),
+  P&L Explain, Attribution Brinson, Valorisation (DCF/SML/LBO)…
+- **Carrière** : 5 voies (Portfolio / M&A / Risk / Quant / Advisory) avec
+  outils **exclusifs** par voie (Football Field, Pitch Book, Allocation
+  stratégique), certifications (CFA/FRM/CQF), dilemmes éthiques, rivaux qui
+  tradent, arcs narratifs, panthéon local et **Défi du jour** partageable
+  entre amis par code copié/collé (sans serveur).
 
 ### Moteur financier (core/finmath.py) — formules réelles, toutes testées
 - Valeur temps de l'argent : PV, FV, NPV, IRR
@@ -243,9 +262,28 @@ indique le **prochain déblocage**.
   feedback d'appui sur les boutons, marges cohérentes.
 
 ## Démarrage
-Au lancement d'une **nouvelle carrière**, un **briefing** explique l'objectif du jeu
-et son fonctionnement (ADV, missions, EVAL, trading, deals/mandats, décisions, rivaux/crises)
-avant d'entrer dans le terminal.
+Au lancement d'une **nouvelle carrière**, un **guide multi-pages** explique
+l'objectif du jeu et son fonctionnement (boucle missions → réputation →
+examen → promotion, temps continu, outils du grade), puis un tutoriel guidé
+du bureau prend le relais. Une nouvelle partie atterrit directement sur le
+**bureau** ; le terminal classique reste accessible en fenêtre.
+
+```bash
+pip install -r requirements.txt        # pygame, numpy, scipy
+python main.py                         # jeu normal
+python main_cheat.py                   # jeu + triches (GRADE/CASH/REP…)
+```
+
+## Tests
+
+Suite pytest (~200 fichiers de tests : formules financières, déterminisme du
+marché, portefeuille/levier, desks, apps du bureau, smoke test headless de
+chaque scène, fixtures de compatibilité des sauvegardes) :
+
+```bash
+pip install numpy scipy pytest pygame
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
+```
 
 ## Installation sur Mac (PyCharm)
 
@@ -341,7 +379,14 @@ les sauvegardes sont écrites dans l'espace utilisateur (`~/Library/Application 
 sur Mac, `%APPDATA%` sur Windows).
 
 ## Prochaines étapes
-- Davantage de profondeur sur les modules (Risk/Quant interactifs liés aux deals).
-- Mini-jeux de résolution de deals (au lieu d'une résolution probabiliste).
-- Signature/notarisation du `.app` pour distribution hors développeur.
+- Playtests avec des joueurs neufs (le contenu est là ; le prochain levier,
+  c'est la digestion — cf. le suivi de découverte des apps dans
+  `core/profile.py::apps_never_opened`).
 - Équilibrage fin de l'économie (salaires, amplitude des événements).
+- Signature/notarisation du `.app` pour distribution hors développeur.
+
+## Historique de développement
+
+La chronologie détaillée des refontes (bureau fenêtré, desks avancés, lots de
+contenu) est dans [`docs/HISTORY.md`](docs/HISTORY.md) ; les conventions et
+invariants pour contribuer sont dans [`CLAUDE.md`](CLAUDE.md).

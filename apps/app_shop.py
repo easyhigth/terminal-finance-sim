@@ -20,6 +20,7 @@ par type d'actif (ETF/obligations/…) et l'Explorateur restent hébergés
 """
 import pygame
 
+from apps.base import DesktopApp
 from core import bonds as B
 from core import commodities as CM
 from core import config, intraday, unlocks
@@ -31,8 +32,6 @@ from core import portfolio_margin as PM
 from core import securitisation as SEC
 from core import structured as S
 from core.i18n import get_lang
-
-from apps.base import DesktopApp
 from ui import fonts, keynav, widgets
 from ui.popups import PopupMixin
 

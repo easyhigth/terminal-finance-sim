@@ -8,7 +8,7 @@ overlay par le SceneManager après la scène courante.
 """
 import pygame
 
-from core import config
+from core import config, crashlog
 from ui import fonts
 
 _KIND_COLOR = {
@@ -72,8 +72,7 @@ class NotificationCenter:
                     try:
                         cb()
                     except Exception:
-                        pass
-                # retire le toast cliqué (feedback immédiat)
+                        crashlog.swallowed("ui.notifications")  # retire le toast cliqué (feedback immédiat)
                 t["age"] = TTL
                 return True
         return False

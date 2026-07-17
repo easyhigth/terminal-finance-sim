@@ -236,3 +236,67 @@ def test_statements_for_produces_five_coherent_years():
         assert inc["tax"] == pytest.approx(inc["ebt"] - inc["net_income"], rel=1e-6)
         bal = b["balance"]
         assert bal["total_assets"] == pytest.approx(bal["total_liab"] + bal["equity"], rel=1e-6)
+
+
+# --------------------------------------------------------------- roll-up / synergies
+def _acquire_sector(p, sector, n):
+    """Acquiert les n cibles les moins chères d'un secteur donné."""
+    targets = [t for t in all_targets() if t["sector"] == sector and not M.is_taken(p, t["ticker"])]
+    targets.sort(key=M.ask_price)
+    for t in targets[:n]:
+        M.acquire(p, t["ticker"], debt_pct=0.75)
+    return [t["ticker"] for t in targets[:n]]
+
+
+def test_sector_counts_reflects_holdings():
+    p = _player(cash=5e7)
+    _acquire_sector(p, "Tech", 2)
+    assert M.sector_counts(p).get("Tech") == 2
+
+
+def test_no_synergy_for_a_lone_target():
+    p = _player(cash=5e7)
+    _acquire_sector(p, "Tech", 1)
+    assert M.synergy_bonus(p, "Tech") == 0.0
+    assert M.roll_up_summary(p) == []
+
+
+def test_synergy_scales_with_peers_and_is_capped():
+    p = _player(cash=1e8)
+    _acquire_sector(p, "Tech", 3)
+    assert M.synergy_bonus(p, "Tech") == pytest.approx(2 * M.SYNERGY_PER_PEER)
+    # au-delà du plafond, pas de bonus marginal
+    p2 = _player(cash=1e8)
+    got = _acquire_sector(p2, "Tech", M.SYNERGY_MAX_PEERS + 3)
+    if len(got) >= M.SYNERGY_MAX_PEERS + 1:
+        assert M.synergy_bonus(p2, "Tech") == pytest.approx(M.SYNERGY_MAX_PEERS * M.SYNERGY_PER_PEER)
+
+
+def test_roll_up_summary_lists_active_synergies():
+    p = _player(cash=1e8)
+    _acquire_sector(p, "Tech", 2)
+    summ = M.roll_up_summary(p)
+    assert len(summ) == 1
+    assert summ[0]["sector"] == "Tech" and summ[0]["count"] == 2
+    assert summ[0]["growth_bonus"] > 0
+
+
+def test_synergy_boosts_quarterly_growth_vs_lone_target():
+    """Une cible dans un secteur concentré croît plus vite qu'une cible
+    identique isolée (à fondamentaux de départ égaux)."""
+    # deux joueurs, même première cible ; l'un ajoute des pairs du même secteur
+    solo = _player(cash=1e8)
+    roll = _player(cash=1e8)
+    tech = [t for t in all_targets() if t["sector"] == "Tech"]
+    tech.sort(key=M.ask_price)
+    anchor = tech[0]
+    M.acquire(solo, anchor["ticker"], debt_pct=0.75)
+    M.acquire(roll, anchor["ticker"], debt_pct=0.75)
+    for t in tech[1:3]:
+        M.acquire(roll, t["ticker"], debt_pct=0.75)
+    # neutralise l'incident aléatoire en fixant morale/mgmt hauts
+    for inst in list(solo.ma_owned.values()) + list(roll.ma_owned.values()):
+        inst["morale"] = inst["management_score"] = inst["efficiency"] = 60.0
+    M.evolve_quarter(solo)
+    M.evolve_quarter(roll)
+    assert roll.ma_owned[anchor["ticker"]]["revenue"] > solo.ma_owned[anchor["ticker"]]["revenue"]

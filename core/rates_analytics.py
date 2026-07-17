@@ -18,7 +18,6 @@ fixed income, calculées sur le VRAI univers obligataire du jeu
   chaque ligne : c'est la convexité et la RÉPARTITION par maturité qui
   font la différence entre deux books de même duration (immunisation).
 """
-import numpy as np
 
 from core import bonds as B
 

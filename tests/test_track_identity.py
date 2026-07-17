@@ -103,7 +103,6 @@ def test_pitch_below_grade_is_still_computable_but_offer_capped_by_caller():
 def test_pitch_win_creates_a_real_mandate_offer():
     p = _player(grade=9, track="Advisory")
     p.reputation = 90
-    rng = random.Random(7)
     key = M.CLIENT_PROFILES[0]["key"]
     # force un tirage gagnant : cherche une seed qui gagne
     won = False

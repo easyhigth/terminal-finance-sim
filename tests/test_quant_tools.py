@@ -9,7 +9,7 @@ import pytest
 
 from core import quant_tools as QT
 from core.game_state import PlayerState
-from core.market import Market, STEPS_PER_YEAR
+from core.market import STEPS_PER_YEAR, Market
 
 
 @pytest.fixture()
@@ -40,7 +40,6 @@ def _buy(p, m, n=3, shares=50):
 def test_period_steps_match_graph_scene():
     from scenes.scene_graph import STEP_PERIODS
     for code, steps in QT.PERIOD_STEPS.items():
-        key = code if code in STEP_PERIODS else code.replace("A", "A")
         if code in STEP_PERIODS:
             assert STEP_PERIODS[code] == steps, code
 

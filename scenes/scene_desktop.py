@@ -708,6 +708,10 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
             self._launch(key)
 
     def _launch(self, key):
+        # diagnostic de découvrabilité : note (par machine) que cette app a
+        # été ouverte au moins une fois (cf. core/profile.apps_never_opened)
+        from core import profile as _profile
+        _profile.record_app_opened(key)
         if key == "terminal":
             return self._open_terminal_window()
         if key == "track":
@@ -780,6 +784,8 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, Scene):
         scènes hébergées (cf. apps/scene_host.py). `attention=True` (popup
         FORCÉ par le jeu, cf. App.route_scene) fait clignoter son entrée dans
         la barre des tâches jusqu'à ce qu'elle soit focalisée."""
+        from core import profile as _profile
+        _profile.record_app_opened(name)
         if name == "terminal":
             return self._open_terminal_window()
         if name == "spreadsheet":

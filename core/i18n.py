@@ -16,7 +16,7 @@ français pour l'instant — extensible en ajoutant des clés ici.
 import json
 import os
 
-from core import config
+from core import config, crashlog
 
 _LANG = "fr"
 _SETTINGS = os.path.join(config.SAVE_DIR, "settings.json")
@@ -37,7 +37,7 @@ def _save():
         with open(_SETTINGS, "w", encoding="utf-8") as f:
             json.dump({"lang": _LANG}, f)
     except Exception:
-        pass
+        crashlog.swallowed("core.i18n")
 
 
 def get_lang():

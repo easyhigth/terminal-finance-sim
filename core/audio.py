@@ -19,7 +19,7 @@ API :
 import json
 import os
 
-from core import config
+from core import config, crashlog
 
 _PATH = os.path.join(config.SAVE_DIR, "audio_settings.json")
 
@@ -94,7 +94,7 @@ def _save():
         with open(_PATH, "w", encoding="utf-8") as f:
             json.dump({"muted": _MUTED, "volume": _VOLUME}, f)
     except Exception:
-        pass
+        crashlog.swallowed("core.audio")
 
 
 def _ensure_mixer():
@@ -183,7 +183,7 @@ def play(name):
         snd.set_volume(_VOLUME)
         snd.play()
     except Exception:
-        pass
+        crashlog.swallowed("core.audio")
 
 
 _load()

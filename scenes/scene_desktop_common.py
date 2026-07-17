@@ -12,45 +12,48 @@ import pygame
 
 from apps.app_alerts import AlertsApp
 from apps.app_analytics import AnalyticsApp
+from apps.app_attribution import AttributionApp
 from apps.app_backtester import BacktesterApp
 from apps.app_book import BookApp
 from apps.app_calculator import CalculatorApp
+from apps.app_company import CompanyApp
 from apps.app_creditdesk import CreditDeskApp
 from apps.app_crisislab import CrisisLabApp
-from apps.app_company import CompanyApp
 from apps.app_deals import DealsApp
 from apps.app_dilemma import DilemmaApp
 from apps.app_evaluation import EvaluationApp
 from apps.app_explorer import ExplorerApp
-from apps.app_attribution import AttributionApp
 from apps.app_footballfield import FootballFieldApp
 from apps.app_frontier import FrontierApp
+from apps.app_funding import FundingApp
+from apps.app_fxdesk import FxDeskApp
 from apps.app_greeks import GreeksApp
+from apps.app_hedge import HedgeApp
+from apps.app_inbox import InboxApp
+from apps.app_journal import JournalApp
+from apps.app_markethub import MarketHubApp
+from apps.app_mergerarb import MergerArbApp
+from apps.app_mission import MissionApp
+from apps.app_notifications import NotificationCenterApp
 from apps.app_pairs import PairsApp
 from apps.app_pitchbook import PitchBookApp
 from apps.app_pnlexplain import PnlExplainApp
 from apps.app_rates import RatesApp
-from apps.app_strategicalloc import StrategicAllocApp
-from apps.app_vardesk import VarDeskApp
-from apps.app_inbox import InboxApp
-from apps.app_journal import JournalApp
-from apps.app_markethub import MarketHubApp
-from apps.app_mission import MissionApp
-from apps.app_notifications import NotificationCenterApp
 from apps.app_research import ResearchApp
 from apps.app_review import ReviewApp
-from apps.app_shop import ShopApp
-from apps.app_sheet import SheetApp
-from apps.app_trading import TradingApp
-from apps.app_valuation import ValuationApp
-from apps.app_funding import FundingApp
-from apps.app_fxdesk import FxDeskApp
-from apps.app_vollab import VolLabApp
-from apps.app_watchlist import WatchlistApp
+
 # Applications financières avancées
 from apps.app_sharpe import SharpeApp
+from apps.app_sheet import SheetApp
+from apps.app_shop import ShopApp
+from apps.app_strategicalloc import StrategicAllocApp
+from apps.app_themes import ThemesApp
+from apps.app_trading import TradingApp
+from apps.app_valuation import ValuationApp
+from apps.app_vardesk import VarDeskApp
+from apps.app_vollab import VolLabApp
+from apps.app_watchlist import WatchlistApp
 from apps.app_zscore import ZScoreApp
-from apps.app_hedge import HedgeApp
 from core.app_catalog import SECTIONS
 
 TOPBAR_H = 36
@@ -121,6 +124,9 @@ APPS = [
     ("footballfield", "Football Field", "research", FootballFieldApp),
     ("pitchbook", "Pitch Book", "advisory", PitchBookApp),
     ("strategicalloc", "Allocation stratégique", "portfolio", StrategicAllocApp),
+    # Nouveaux modes de trading (contenu — accessibles à toutes les voies)
+    ("mergerarb", "Arbitrage de fusion", "deals", MergerArbApp),
+    ("themes", "Thématiques", "graph", ThemesApp),
 ]
 
 # Application supplémentaire propre à la VOIE (track) choisie par le joueur
@@ -186,6 +192,8 @@ ICON_FEATURE = {
     "footballfield": "footballfield",     # affinité M&A
     "pitchbook": "pitchbook",             # affinité Advisory
     "strategicalloc": "strategicalloc",   # affinité Portfolio
+    "mergerarb": "mergerarb",             # trading événementiel (toutes voies)
+    "themes": "themes",                   # thématiques de marché (toutes voies)
 }
 
 # Rangement des icônes du bureau en SECTIONS repliables (façon dossiers) —
@@ -207,6 +215,7 @@ ICON_CATEGORY = {
     "qexplorer": "Marché & Analyse", "qshop": "Marché & Analyse",
     "qwall": "Marché & Analyse", "qgraph": "Marché & Analyse",
     "fxdesk": "Marché & Analyse", "valuation": "Marché & Analyse",
+    "mergerarb": "Marché & Analyse", "themes": "Marché & Analyse",
     # Quant & Risque : les desks quantitatifs/risque avancés.
     "sharpe": "Quant & Risque", "zscore": "Quant & Risque",
     "hedge": "Quant & Risque", "frontier": "Quant & Risque",

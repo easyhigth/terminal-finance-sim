@@ -144,7 +144,6 @@ def generate(player, market):
                 continue
             move_pct = (cur_price / prev - 1.0) * 100.0
             if abs(move_pct) >= PRICE_MOVE_PCT:
-                pnl = (cur_price - pos["avg"]) * pos["shares"] - (pos["avg"] - prev) * pos["shares"]
                 # on veut le P&L DU PAS, pas le P&L latent total
                 pnl_step = (cur_price - prev) * pos["shares"]
                 if not _on_cooldown(player, "move", tk, step):

@@ -13,6 +13,7 @@ Les messages sont déclenchés par le contexte (promotion, trimestre, crise,
 """
 import random
 
+from core import crashlog
 from data.inbox_en import _SENS_EN, INBOX_EN
 
 MAX_INBOX = 40
@@ -50,7 +51,7 @@ def push(player, kind, sender, subject, body):
             from core import audio
             audio.play("message")
         except Exception:
-            pass
+            crashlog.swallowed("core.inbox")
     return msg
 
 

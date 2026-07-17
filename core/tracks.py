@@ -27,7 +27,7 @@ Clés de perk (toutes optionnelles ; valeur par défaut = neutre) :
                           tension de la voie est un contrôle permanent, pas un pic isolé.
 """
 
-from core import config
+from core import config, crashlog
 
 TOP_GRADE_INDEX = len(config.GRADES) - 1   # grade max : reconversion libre et gratuite
 
@@ -199,7 +199,7 @@ def deal_edge(player, deal):
             from core import firms
             bonus += firms.track_synergy_bonus(player)
         except Exception:
-            pass
+            crashlog.swallowed("core.tracks")
         return bonus, perk(player, "diff_relief")
     return 0.0, 0.0
 

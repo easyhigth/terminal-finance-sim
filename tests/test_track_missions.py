@@ -7,8 +7,9 @@ import random
 
 import pytest
 
-from core import missions, portfolio_missions as PM
+from core import missions
 from core import portfolio as pf
+from core import portfolio_missions as PM
 from core.game_state import PlayerState
 from core.market import Market
 

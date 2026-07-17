@@ -21,7 +21,7 @@ testable en headless avec un PlayerState synthétique.
 """
 from dataclasses import dataclass, field
 
-from core import finmath
+from core import crashlog, finmath
 
 
 def _L(fr, en):
@@ -103,7 +103,7 @@ def _score_risque(player, market=None):
                 score = 100.0 - var_frac * 400.0
                 return _clip(score)
         except Exception:
-            pass
+            crashlog.swallowed("core.score")
     hist = list(getattr(player, "cash_history", None) or [])
     if len(hist) < 3:
         return 70.0  # pas assez d'historique pour juger, score légèrement positif par défaut

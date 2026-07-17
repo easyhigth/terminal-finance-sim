@@ -2764,8 +2764,8 @@ def test_scene_host_redraws_content_every_frame_at_same_size():
     à chaque frame : l'image affichée restait donc figée tant que la fenêtre
     gardait la même taille — les fenêtres semblaient ne plus réagir au clic
     car le feedback visuel n'était pas mis à jour."""
-    from apps.scene_host import SceneHostApp
     import main
+    from apps.scene_host import SceneHostApp
     a = main.App()
     a.ensure_market()
     host = SceneHostApp(a, "markethub", "Marché", {})
@@ -2774,8 +2774,12 @@ def test_scene_host_redraws_content_every_frame_at_same_size():
 
     calls = []
     orig_smoothscale = pygame.transform.smoothscale
-    def tracking_smoothscale(surf, size):
+    def tracking_smoothscale(surf, size, dest=None):
+        # la variante à 3 arguments (dest_surface réutilisée entre les frames)
+        # reste un rescale par frame — c'est l'invariant vérifié ici.
         calls.append(size)
+        if dest is not None:
+            return orig_smoothscale(surf, size, dest)
         return orig_smoothscale(surf, size)
     pygame.transform.smoothscale = tracking_smoothscale
     try:

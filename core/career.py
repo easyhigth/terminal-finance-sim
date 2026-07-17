@@ -12,7 +12,7 @@ Aucune dépendance pygame : testable en headless.
 """
 import random
 
-from core import config, missions
+from core import config, crashlog, missions
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +61,7 @@ def promotion_requirements(player):
         thr = max(50, thr - rep_cut)
         req_missions = max(1, req_missions - miss_cut)
     except Exception:
-        pass
+        crashlog.swallowed("core.career")
     req_deals = 0 if gi <= 1 else (1 if gi <= 5 else 2)
     req_tenure = 0 if gi <= 3 else 1          # trimestres dans le grade
     tenure = max(0, player.quarter - player.grade_start_quarter)

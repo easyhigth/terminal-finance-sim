@@ -722,7 +722,6 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
             widgets.draw_tooltip(surf, *self._tooltip)
 
     def _draw_side_panel(self, surf, rect):
-        p = self.app.gs.player
         inner = widgets.draw_panel(surf, rect, "Analyse globale", config.COL_AMBER)
         sub_rect = self._draw_side_tabs(surf, inner)
         if self.side_mode == "sector":

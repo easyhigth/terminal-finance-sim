@@ -16,8 +16,8 @@ annulation individuelle (croix par ligne, _cond_cancel_rects).
 """
 import pygame
 
-from core import config
 from core import conditional_orders as CO
+from core import config
 from ui import fonts, style, widgets
 
 COND_ROW_H = 20

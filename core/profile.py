@@ -50,3 +50,43 @@ def record_grade_reached(grade_index):
 def is_veteran():
     """Vrai si ce profil a déjà prouvé sa maîtrise (grade élevé) dans une partie antérieure."""
     return load().get("best_grade_reached", 0) >= VETERAN_GRADE
+
+
+# ---------------------------------------------------------------------------
+# DÉCOUVERTE DES APPS DU BUREAU
+# ---------------------------------------------------------------------------
+# Le bureau approche les 40 apps : sans mesure, impossible de savoir
+# lesquelles ne sont JAMAIS découvertes par les joueurs. On note ici (par
+# machine, toutes parties confondues) chaque clé d'app/fenêtre ouverte au
+# moins une fois — chokepoint : DesktopScene._launch/_open_scene_window.
+# Best-effort : ne doit jamais gêner l'ouverture d'une fenêtre.
+
+def record_app_opened(key):
+    """Marque l'app `key` comme découverte (ouverte au moins une fois sur
+    cette machine). N'écrit sur disque que la PREMIÈRE fois pour chaque clé."""
+    if not key:
+        return
+    try:
+        data = load()
+        opened = data.get("apps_opened", [])
+        if key in opened:
+            return
+        opened.append(key)
+        data["apps_opened"] = opened
+        os.makedirs(config.SAVE_DIR, exist_ok=True)
+        with open(_path(), "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception:
+        from core import crashlog
+        crashlog.swallowed("profile.record_app_opened")
+
+
+def apps_opened():
+    """Ensemble des clés d'apps déjà ouvertes au moins une fois."""
+    return set(load().get("apps_opened", []))
+
+
+def apps_never_opened(all_keys):
+    """Clés de `all_keys` jamais découvertes sur cette machine — pour repérer
+    les apps que personne ne trouve (diagnostic de découvrabilité)."""
+    return sorted(set(all_keys) - apps_opened())

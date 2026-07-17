@@ -17,6 +17,7 @@ FENÊTRE de "explorer" est redirigée ici (cf. DesktopScene._open_scene_window).
 """
 import pygame
 
+from apps.base import DesktopApp
 from core import bonds as B
 from core import commodities as C
 from core import config, intraday
@@ -25,8 +26,6 @@ from core import etfs as ETF
 from core import fx as FX
 from core import governments as GOV
 from core import unlocks as unlocks_mod
-
-from apps.base import DesktopApp
 from ui import fonts, keynav, widgets
 from ui.popups import PopupMixin
 

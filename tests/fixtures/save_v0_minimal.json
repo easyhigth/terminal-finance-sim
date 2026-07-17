@@ -1,0 +1,18 @@
+{
+  "created_at": 1700000000.0,
+  "last_saved": 1700000100.0,
+  "version": "0.1.0",
+  "player": {
+    "name": "Ancien",
+    "continent": "Europe",
+    "grade_index": 1,
+    "reputation": 55,
+    "cash": 180000.0,
+    "day": 46,
+    "quarter": 1,
+    "market_seed": 1234,
+    "market_step": 10,
+    "portfolio": {"MVC": {"shares": 20, "avg": 250.0}},
+    "flags": {}
+  }
+}

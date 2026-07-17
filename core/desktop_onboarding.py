@@ -12,7 +12,7 @@ tant que `seen()` est faux, et appelle `mark_seen()` au premier passage.
 import json
 import os
 
-from core import config
+from core import config, crashlog
 
 _SEEN = False
 _PATH = os.path.join(config.SAVE_DIR, "desktop_onboarding.json")
@@ -33,7 +33,7 @@ def _save():
         with open(_PATH, "w", encoding="utf-8") as f:
             json.dump({"desktop_seen": _SEEN}, f)
     except Exception:
-        pass
+        crashlog.swallowed("core.desktop_onboarding")
 
 
 def seen():

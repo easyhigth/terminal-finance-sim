@@ -49,7 +49,8 @@ def app():
     p.reputation = 80
     p.flags["intro_guide_done"] = True
     p.flags["desktop_seeded"] = True
-    from core import desktop_onboarding, desktop_tutorial, onboarding as onboarding_mod
+    from core import desktop_onboarding, desktop_tutorial
+    from core import onboarding as onboarding_mod
     desktop_onboarding.mark_seen()
     desktop_tutorial.skip()
     onboarding_mod.skip(p)

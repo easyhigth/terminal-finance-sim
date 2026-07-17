@@ -12,6 +12,7 @@ Vérifie :
 """
 import numpy as np
 import pytest
+
 from core import market_events as mev
 from core.i18n import set_lang
 
@@ -93,9 +94,6 @@ class TestStepEvents:
         rng2 = _make_rng(99)
         s1, e1 = mev.step_events(50, 0, sigma, cap, rng1)
         s2, e2 = mev.step_events(50, 0, sigma, cap, rng2)
-        # Les deux peuvent être vides, mais si non vides ils diffèrent
-        nz1 = [i for i in range(50) if e1[i] is not None]
-        nz2 = [i for i in range(50) if e2[i] is not None]
         # Pas de garantie qu'ils diffèrent, mais c'est très probable
         # On vérifie juste que ça ne crash pas
 

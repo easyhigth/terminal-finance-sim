@@ -57,8 +57,10 @@ def hover_accent(active, base=config.COL_AMBER, hover_color=config.COL_CYAN):
 # TEXTE
 # ---------------------------------------------------------------------------
 def draw_text(surf, text, pos, font, color=config.COL_TEXT, align="left"):
-    """Dessine du texte. align: left | center | right. Retourne le Rect."""
-    img = font.render(text, True, color)
+    """Dessine du texte. align: left | center | right. Retourne le Rect.
+    Passe par le cache de rendu de ui/fonts.py : le même (police, texte,
+    couleur) n'est rasterisé qu'une fois, pas à chaque frame."""
+    img = fonts.render_cached(font, text, color)
     rect = img.get_rect()
     if align == "left":
         rect.topleft = pos
@@ -105,7 +107,7 @@ def draw_tooltip(surf, text, pos):
 def draw_text_scaled(surf, text, pos, font, color, max_width, align="left"):
     """Dessine du texte sur une seule ligne, réduit à l'échelle s'il dépasse
     `max_width` (utile pour les titres longs qui ne doivent pas sortir de l'écran)."""
-    img = font.render(text, True, color)
+    img = fonts.render_cached(font, text, color)
     w = img.get_width()
     if max_width and w > max_width:
         h = max(1, int(img.get_height() * (max_width / w)))
@@ -380,12 +382,26 @@ def format_money(amount, currency="$"):
 # pour la rétrocompatibilité (96 fichiers importent ui.widgets).
 # ---------------------------------------------------------------------------
 from ui.chart_widgets import (  # noqa: F401, E402 — réexport
-    Sparkline, _gradient_mask, fill_gradient_area, draw_current_price_line,
-    draw_series, _aggregate_ohlc, _sma, draw_candles,
-    draw_chart_axes, draw_chart_x_labels, draw_chart_zero_line,
-    draw_chart_crosshair, draw_chart_extrema, sync_chart_hover,
-    draw_chart_ghost, ChartCursor, draw_chart_legend, _hover_sync,
+    ChartCursor,
+    Sparkline,
+    _aggregate_ohlc,
+    _gradient_mask,
+    _hover_sync,
+    _sma,
+    draw_candles,
+    draw_chart_axes,
+    draw_chart_crosshair,
+    draw_chart_extrema,
+    draw_chart_ghost,
+    draw_chart_legend,
+    draw_chart_x_labels,
+    draw_chart_zero_line,
+    draw_current_price_line,
+    draw_series,
+    fill_gradient_area,
+    sync_chart_hover,
 )
+
 
 # ---------------------------------------------------------------------------
 # BARRE DE PROGRESSION / JAUGE

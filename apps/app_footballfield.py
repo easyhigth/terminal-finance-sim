@@ -14,9 +14,8 @@ avec les deux nouvelles lentilles de `core/football_field.py`.
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import config, crashlog, ma
 from core import football_field as FF
-from core import ma
 from ui import fonts, widgets
 
 TIER_LABEL = {"small": "Petite", "mid": "Moyenne", "large": "Grande"}
@@ -137,7 +136,7 @@ class FootballFieldApp(DesktopApp):
         try:
             cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
         except Exception:
-            pass
+            crashlog.swallowed("apps.app_footballfield")
         head = f"{t['name']} ({t['ticker']}) — {t['sector']} · {TIER_LABEL.get(t.get('tier'), '')}"
         widgets.draw_text(surf, head, (body.x, body.y), fonts.small(bold=True), config.COL_TEXT)
         widgets.draw_text(surf, f"EBITDA {widgets.format_money(f['ebitda'], cur)} · "

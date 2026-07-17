@@ -33,6 +33,20 @@ def _ensure_lists(player):
         player.alerts = []
     if not hasattr(player, "alerts_history") or player.alerts_history is None:
         player.alerts_history = []
+    # migration : les sauvegardes antérieures aux alertes multi-types
+    # stockaient {ticker, price, above} sans "kind"/"id"/"value" — on les
+    # requalifie en alerte de NIVEAU plutôt que de faire planter check()
+    # (cf. tests/test_save_compat.py).
+    for a in player.alerts:
+        if "kind" not in a:
+            a["kind"] = "level"
+            a.setdefault("value", float(a.get("price", 0.0) or 0.0))
+            a.setdefault("above", True)
+            a.setdefault("set_price", 0.0)
+            a.setdefault("best_price", 0.0)
+            a.setdefault("is_index", False)
+        if "id" not in a:
+            a["id"] = _next_id(player)
 
 
 def _match_index(market, name):

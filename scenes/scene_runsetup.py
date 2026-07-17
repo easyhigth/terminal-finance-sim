@@ -76,7 +76,6 @@ class RunSetupScene(Scene):
         """Boîte « Importer un code d'ami » — même pattern que
         scene_gameover.py (modale, Échap annule la saisie seulement)."""
         from core import clipboard
-        from core import hall_of_fame as hof
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self.code_prompt = False

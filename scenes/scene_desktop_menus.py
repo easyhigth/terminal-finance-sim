@@ -8,7 +8,7 @@ mixé dans `DesktopScene` aux côtés de `DesktopWidgetsMixin`.
 import pygame
 
 from core import app_catalog, config, desktop_tutorial, experience_mode, fuzzy
-from scenes.scene_desktop_common import _L, APPS, cached_shade, TASKBAR_H, TOPBAR_H, _scene_label
+from scenes.scene_desktop_common import _L, APPS, TASKBAR_H, TOPBAR_H, _scene_label, cached_shade
 from ui import fonts, keynav, style, widgets
 
 START_COLS = 4

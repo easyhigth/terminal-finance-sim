@@ -473,7 +473,6 @@ class GreeksApp(DesktopApp):
 
     # ----------------------------------------------------- onglet Δ-HEDGE
     def _draw_dhedge(self, surf, body):
-        cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
         inner = widgets.draw_panel(surf, body,
                                    "Couverture dynamique — gamma scalping",
                                    config.COL_UP)

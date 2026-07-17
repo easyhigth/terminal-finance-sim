@@ -23,8 +23,6 @@ le lien actions ↔ spreads observé en vrai).
 """
 import math
 
-import numpy as np
-
 from core import financials
 from core import quant_tools as QT
 

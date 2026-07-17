@@ -18,7 +18,6 @@ LA leçon vécue du trading d'options, en deux morceaux :
           + résidu (ordres supérieurs, saut de vol)
   Déterministe (chemin de clôtures du moteur, grecques Black-Scholes).
 """
-import math
 
 from core import finmath as fm
 from core import options as opt

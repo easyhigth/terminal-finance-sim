@@ -9,7 +9,7 @@ dans market.py, pour qu'il soit aussi compact et facile à auditer que possible.
 """
 import numpy as np
 
-from core import credit
+from core import crashlog, credit
 from core.market_constants import (
     BASE_CREDIT_HY_BPS,
     BASE_CREDIT_IG_BPS,
@@ -137,7 +137,7 @@ class MarketQueryMixin:
             from core import audio
             audio.play("crisis")
         except Exception:
-            pass
+            crashlog.swallowed("core.market_query")
 
     def bump_region_credit(self, region, amount):
         """Élargit (amount>0) ou resserre (amount<0) le spread de crédit d'une

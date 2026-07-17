@@ -179,12 +179,14 @@ QUICK_APPS = [
 # grade suivant fait office de récompense, cf. DesktopScene._check_new_icons).
 ICON_FEATURE = {
     # --- outils d'analyse : arrivent quand on devient analyste (grade 1) ---
+    "markethub": "analyst",    # hub Marché : de l'analyse — le Terminal suffit au stagiaire
     "research": "analyst",     # recherche société
     "watchlist": "analyst",    # favoris/watchlist
     "alerts": "analyst",       # alertes de prix
     "qexplorer": "analyst",    # explorateur des 320 sociétés
     "qgraph": "charts",        # graphes : PAS pour un stagiaire (rien à en faire encore)
-    # --- ce qui suppose de pouvoir investir (grade 1, avec "trade") ---
+    # --- ce qui suppose de pouvoir investir/détenir des positions (grade 1) ---
+    "book": "trade",           # portefeuille : vide et inutile tant qu'on ne peut pas investir
     "qshop": "trade",          # boutique : acheter tout actif = investir
     "qwall": "trade",          # mur de trading live
     "tradejournal": "trade",   # journal de trading : n'a de sens qu'avec des trades

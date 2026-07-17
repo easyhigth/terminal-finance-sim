@@ -21,7 +21,7 @@ import json
 import os
 import uuid
 
-from core import config, crashlog, difficulty
+from core import config, crashlog, difficulty, ghost
 
 MAX_RUNS = 10
 # stockage à PART pour les runs de défi du jour (fichier séparé, pas mêlé au
@@ -101,6 +101,8 @@ def make_entry(player, score_total, date=None):
         # difficulty.is_daily_challenge/mark_daily.
         "daily_date": player.flags.get("daily_challenge")
                       if difficulty.is_daily_challenge(player) else None,
+        # courbe de patrimoine compressée (runs fantômes, cf. core/ghost.py)
+        "curve": ghost.compress_curve(player.cash_history),
     }
 
 

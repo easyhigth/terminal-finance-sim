@@ -375,11 +375,19 @@ class DesktopWidgetsMixin:
                           fonts.tiny(), config.COL_TEXT)
         levcol = config.COL_DOWN if lev > 2.0 else config.COL_AMBER if lev > 1.0 else config.COL_TEXT_DIM
         widgets.draw_text(surf, f"Levier {lev:.2f}x", (x + 10, y + 54), fonts.tiny(bold=True), levcol)
-        # mini-sparkline du patrimoine
+        # mini-sparkline du patrimoine (+ RUNS FANTÔMES des amis sur le même
+        # défi du jour, cf. core/ghost.py — trajectoires grisées)
         spark = pygame.Rect(x + 10, y + H - 20, W - 20, 14)
         if len(hist) >= 2:
+            shown = hist[-40:]
+            from core import ghost as ghost_mod
+            for g in ghost_mod.ghosts_for(p):
+                gvals = ghost_mod.project(g["curve"], shown[0], len(shown))
+                if gvals:
+                    widgets.draw_series(surf, spark, gvals, config.COL_TEXT_DIM,
+                                        baseline=False, show_extrema=False, y_fmt=None)
             gcol = config.COL_UP if hist[-1] >= hist[0] else config.COL_DOWN
-            widgets.draw_series(surf, spark, hist[-40:], gcol, baseline=False,
+            widgets.draw_series(surf, spark, shown, gcol, baseline=False,
                                 show_extrema=False, y_fmt=None)
 
     def _draw_index_ticker(self, surf):

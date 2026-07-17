@@ -21,6 +21,8 @@ Conséquences « gratuites », comme dans le réel :
 Déterminisme : tout est piloté par un numpy RandomState(seed). L'état se
 reconstruit donc exactement via (seed, nombre de pas) — pratique pour le save.
 """
+import random as _pyrandom
+
 import numpy as np
 
 from core.applog import logger
@@ -95,6 +97,14 @@ class Market(MarketQueryMixin):
         self.seed = int(seed)
         self.rng = np.random.RandomState(self.seed)
         self.step_count = 0
+        # ÉPOQUE de marché : rng DÉDIÉ dérivé de la seed (jamais le rng du
+        # marché — sinon toutes les saves dériveraient). ~10 % des graines
+        # sont une « décennie perdue » : dérive monde nette négative, le
+        # buy-and-hold ne sauve plus personne (cf. market_constants).
+        from core.market_constants import LOST_DECADE_DRIFT, LOST_DECADE_PROB
+        _epoch_rng = _pyrandom.Random(f"epoch:{self.seed}")
+        self.epoch = "decennie_perdue" if _epoch_rng.random() < LOST_DECADE_PROB else "normale"
+        self.epoch_drift = LOST_DECADE_DRIFT if self.epoch == "decennie_perdue" else 0.0
 
         companies, index_defs = comp_data.COMPANIES, comp_data.INDICES
         self.companies = companies
@@ -309,7 +319,7 @@ class Market(MarketQueryMixin):
         # plus après une mauvaise nouvelle que symétriquement après une bonne.
         world_noise_draw = self.rng.standard_t(T_DF_WORLD)
         world_noise = VOL_WORLD * vol_mult * self.world_vol_mult_state * _T_SCALE_WORLD * world_noise_draw
-        F_world = MU_WORLD + reg["drift"] + world_noise + world_shock
+        F_world = MU_WORLD + self.epoch_drift + reg["drift"] + world_noise + world_shock
         F_sector = (VOL_SECTOR * vol_mult * _T_SCALE_SECTOR
                     * self.rng.standard_t(T_DF_SECTOR, size=len(self.sectors)) + sec_shock)
         F_region = (VOL_REGION * vol_mult * _T_SCALE_REGION
@@ -357,7 +367,7 @@ class Market(MarketQueryMixin):
         if w_blend > 0.0:
             # partie centrée du monde (bruit + saut, hors dérive régime/macro/crise) :
             # cible de mélange, pour ne pas injecter de biais de niveau supplémentaire.
-            world_centered = F_world - (MU_WORLD + reg["drift"] + world_shock)
+            world_centered = F_world - (MU_WORLD + self.epoch_drift + reg["drift"] + world_shock)
             F_sector = _blend_factor_toward_world(F_sector, world_centered, w_blend, sector_std, world_std)
             F_region = _blend_factor_toward_world(F_region, world_centered, w_blend, region_std, world_std)
             eps = _blend_factor_toward_world(eps, world_centered, w_blend, eps_std, world_std)

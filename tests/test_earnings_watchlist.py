@@ -26,7 +26,7 @@ def _player(watchlist=None):
 
 
 def test_watched_ticker_earnings_push_toast_and_inbox_message():
-    m = Market(seed=7)
+    m = Market(seed=8)   # graine d'époque NORMALE (7 = décennie perdue, message vétéran)
     tk = m.companies[3]["ticker"]
     _advance_to_next_earnings(m, tk)
 
@@ -43,7 +43,7 @@ def test_watched_ticker_earnings_push_toast_and_inbox_message():
 
 
 def test_toast_action_targets_company_scene():
-    m = Market(seed=7)
+    m = Market(seed=8)   # graine d'époque NORMALE (7 = décennie perdue, message vétéran)
     tk = m.companies[3]["ticker"]
     _advance_to_next_earnings(m, tk)
 
@@ -60,7 +60,7 @@ def test_toast_action_targets_company_scene():
 
 
 def test_unwatched_ticker_earnings_are_silent():
-    m = Market(seed=7)
+    m = Market(seed=8)   # graine d'époque NORMALE (7 = décennie perdue, message vétéran)
     tk = m.companies[3]["ticker"]
     _advance_to_next_earnings(m, tk)
 
@@ -76,7 +76,7 @@ def test_unwatched_ticker_earnings_are_silent():
 
 
 def test_watchlist_case_insensitive_match():
-    m = Market(seed=7)
+    m = Market(seed=8)   # graine d'époque NORMALE (7 = décennie perdue, message vétéran)
     tk = m.companies[3]["ticker"]
     _advance_to_next_earnings(m, tk)
 
@@ -90,7 +90,7 @@ def test_watchlist_case_insensitive_match():
 
 
 def test_no_crash_when_no_earnings_this_step():
-    m = Market(seed=7)
+    m = Market(seed=8)   # graine d'époque NORMALE (7 = décennie perdue, message vétéran)
     tk = m.companies[0]["ticker"]
     p = _player(watchlist=[tk])
     gs = GameState()

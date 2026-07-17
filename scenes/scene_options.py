@@ -317,7 +317,22 @@ class OptionsScene(Scene):
                 widgets.draw_text(surf, f"Δ {g['delta']:+.2f}  Γ {g['gamma']:.3f}  "
                                         f"V {g['vega']:+.3f}  Θ {g['theta']:+.3f}  ρ {g['rho']:+.3f}",
                                   (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
-                y += 26
+                y += 18
+                # le thêta traduit en devise PAR TOUR + point mort : ce que
+                # l'option coûte si rien ne bouge, et où elle devient gagnante
+                from core import config as _cfg
+                theta_step = abs(g["theta"]) * self.contracts * _cfg.DAYS_PER_STEP / 365.0
+                if option_type == "call":
+                    breakeven = q["strike"] + q["premium"]
+                else:
+                    breakeven = q["strike"] - q["premium"]
+                be_pct = (breakeven / q["spot"] - 1.0) * 100.0 if q["spot"] else 0.0
+                widgets.draw_text(surf, widgets.fit_text(
+                    f"Si rien ne bouge : ~-{theta_step:,.0f}/tour (thêta) · "
+                    f"point mort : {breakeven:.2f} ({be_pct:+.1f}%)",
+                    fonts.tiny(), inner.w),
+                    (inner.x, y), fonts.tiny(), config.COL_WARN)
+                y += 22
                 self.buy_btn = pygame.Rect(inner.x, y, 200, 32)
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, self.buy_btn, border_radius=4)
                 pygame.draw.rect(surf, config.COL_UP, self.buy_btn, 1, border_radius=4)

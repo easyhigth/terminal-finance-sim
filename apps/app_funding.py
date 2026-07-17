@@ -234,7 +234,13 @@ class FundingApp(DesktopApp):
                 widgets.draw_text(surf, widgets.fit_text(txt, fonts.tiny(), inner.w),
                                   (inner.x, y), fonts.tiny(), col)
                 y += 16
-            y += 8
+            # la phrase concrète (core/impact_phrases) : ce que le repo
+            # immobilise, libère, et coûte PAR TOUR
+            from core import impact_phrases as _ip
+            phrase = _ip.repo_impact(dv["value"], dv["borrowed"], dv["rate"])
+            widgets.draw_text(surf, widgets.fit_text(phrase, fonts.tiny(), inner.w),
+                              (inner.x, y), fonts.tiny(), config.COL_WARN)
+            y += 20
             self._open_btn = pygame.Rect(inner.x, y, 200, 26)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._open_btn,
                              border_radius=4)

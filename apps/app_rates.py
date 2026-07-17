@@ -477,7 +477,17 @@ class RatesApp(DesktopApp):
                           f"{IRS.par_rate(self.market, 5.0) * 100:.2f}% — le "
                           "payeur gagne si les taux montent.",
                           (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
-        y += 22
+        y += 16
+        # le DV01 traduit en devise (core/impact_phrases) : ce que ±1 pt de
+        # taux ferait au swap proposé, AVANT de l'ouvrir
+        dv01_book = IRS.portfolio_dv01(self.app.gs.player, self.market)
+        if abs(dv01_book) > 1e-9:
+            from core import impact_phrases as _ip
+            notional = IRS.hedge_notional(dv01_book, years=5.0)
+            widgets.draw_text(surf, widgets.fit_text(
+                _ip.irs_impact(abs(notional), 5.0), fonts.tiny(), inner.w),
+                (inner.x, y), fonts.tiny(), config.COL_WARN)
+        y += 20
         self._hedge_swap_btn = pygame.Rect(inner.x, y, 260, 26)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._hedge_swap_btn,
                          border_radius=4)

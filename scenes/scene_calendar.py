@@ -181,6 +181,19 @@ class CalendarScene(Scene):
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._bet_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_AMBER, self._bet_rect, 1, border_radius=4)
         widgets.draw_text(surf, "PARIER", self._bet_rect.center, fonts.small(bold=True), config.COL_AMBER, align="center")
+        # les DEUX issues chiffrées AVANT de parier : gain si l'issue choisie
+        # sort (mise × multiplicateur - mise), perte sinon (la mise entière)
+        if self.selected_event is not None and self.selected_outcome:
+            mult = MACRO._multiplier_for(self.selected_event, self.selected_outcome)
+            stake = self._stake()
+            if mult and stake > 0:
+                win = stake * mult - stake
+                widgets.draw_text(surf, widgets.fit_text(
+                    f"Si « {self.selected_outcome} » sort : +{win:,.0f} · sinon : "
+                    f"-{stake:,.0f} (x{mult:.2f})", fonts.tiny(),
+                    config.SCREEN_WIDTH - self._bet_rect.right - 40),
+                    (self._bet_rect.right + 12, ctrl_y + 8), fonts.tiny(),
+                    config.COL_WARN)
 
         top = 142
         # ---- évènements programmés ----

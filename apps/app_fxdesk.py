@@ -180,7 +180,13 @@ class FxDeskApp(DesktopApp):
                         "risque de décrochage ?")
             ratio_font = fonts.tiny()
             y += widgets.draw_text_wrapped(surf, ratio_txt, (inner.x, y), ratio_font,
-                                           config.COL_TEXT_DIM, inner.w) + 4
+                                           config.COL_TEXT_DIM, inner.w) + 2
+            # le carry traduit en devise PAR TOUR pour le notionnel choisi
+            from core import impact_phrases as _ip
+            phrase = _ip.fx_carry_impact(self.notional, carry)
+            if phrase:
+                y += widgets.draw_text_wrapped(surf, phrase, (inner.x, y), fonts.tiny(),
+                                               config.COL_WARN, inner.w, line_gap=3) + 4
         self._notional_rects = {}
         x = inner.x
         for v in NOTIONALS:

@@ -298,6 +298,18 @@ class StructuredScene(Scene):
                 widgets.draw_text(surf, f"{widgets.format_money(h['notional'], cur)} · "
                                         f"sous-jacent {h['perf']:+.1f}% · échéance {h['years_left']:.1f} an",
                                   (pinner.x, y + 18), fonts.tiny(), pcol)
+                bd = h.get("barrier_dist_pct")
+                if bd is not None:
+                    # distance à la barrière : LE chiffre à surveiller
+                    close = abs(bd) < 10.0
+                    bcol = config.COL_DOWN if close else config.COL_TEXT_DIM
+                    if bd < 0:
+                        btxt = f"barrière à {bd:.0f}% du niveau actuel"
+                    else:
+                        btxt = f"BARRIÈRE FRANCHIE (knock à +{bd:.0f}%)"
+                        bcol = config.COL_DOWN
+                    widgets.draw_text(surf, btxt, (pinner.x, y + 32), fonts.tiny(bold=close), bcol)
+                    y += 14
                 y += 44
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
                               [("↑↓", "naviguer"), ("ENTRÉE", "investir/vendre")])

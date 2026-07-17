@@ -72,7 +72,9 @@ class TerminalWindowsMixin:
             return
         offset = 16 * (len(self.datawins) % 6)
         pos = (config.MARGIN + 30 + offset, 90 + offset)
-        self.datawins.append(CompanyPopup(ticker, self.market, pos=pos))
+        _w = CompanyPopup(ticker, self.market, pos=pos)
+        _w.player = self.app.gs.player   # niveaux des ordres conditionnels sur le graphe
+        self.datawins.append(_w)
         if len(self.datawins) > 5:
             self.datawins.pop(0)
 
@@ -149,7 +151,9 @@ class TerminalWindowsMixin:
             if not ticker or self.market.metrics(ticker.upper()) is None:
                 continue
             if entry.get("cls") == "company":
-                self.datawins.append(CompanyPopup(ticker, self.market, pos=pos))
+                _w = CompanyPopup(ticker, self.market, pos=pos)
+                _w.player = self.app.gs.player   # niveaux des ordres sur le graphe
+                self.datawins.append(_w)
             elif entry.get("cls") == "chart":
                 kind = entry.get("kind", "line")
                 self.datawins.append(ChartPopup(f"GRAPHE — {ticker.upper()}", market=self.market,

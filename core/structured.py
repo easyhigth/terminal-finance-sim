@@ -408,8 +408,17 @@ def holdings(player, market):
         cur = market.index_value(p["underlying"])
         perf = (cur / p["start_level"] - 1.0) * 100 if p["start_level"] else 0.0
         steps_left = max(0, p["maturity_step"] - market.step_count)
+        # distance à la BARRIÈRE (si le produit en a une) : combien le
+        # sous-jacent peut encore bouger avant de la toucher — le chiffre
+        # que le souscripteur doit surveiller (cf. scene_structured)
+        tpl = _BY_ID.get(p.get("tpl_id", p.get("type")))
+        barrier_dist_pct = None
+        if tpl and tpl.get("barrier") and p.get("start_level") and cur:
+            barrier_level = tpl["barrier"] * p["start_level"]
+            barrier_dist_pct = (barrier_level / cur - 1.0) * 100.0
         out.append({"name": p["name"], "family": p.get("family", "Classique"),
                     "tpl_id": p.get("tpl_id", p.get("type")), "notional": p["notional"],
                     "underlying": p["underlying"], "perf": perf,
+                    "barrier_dist_pct": barrier_dist_pct,
                     "steps_left": steps_left, "years_left": steps_left / STEPS_PER_YEAR})
     return out

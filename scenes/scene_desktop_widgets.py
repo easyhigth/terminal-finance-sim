@@ -344,6 +344,25 @@ class DesktopWidgetsMixin:
             pygame.draw.rect(surf, config.COL_AMBER, r.inflate(pulse * 2, pulse * 2), 2,
                              border_radius=10)
 
+    def _var_gauge(self):
+        """VaR courante vs limite de la firme (core/risklimits.firm_var_check,
+        échantillonnage réduit), en cache par pas de marché."""
+        m = self.app.market
+        if m is None or not self.app.gs.player.portfolio:
+            return None
+        cached = getattr(self, "_var_gauge_cache", None)
+        if cached is not None and cached[0] == m.step_count:
+            return cached[1]
+        from core import risklimits
+        try:
+            vc = risklimits.firm_var_check(self.app.gs.player, m, n=1500)
+        except Exception:
+            from core import crashlog
+            crashlog.swallowed("desktop.var_gauge")
+            vc = None
+        self._var_gauge_cache = (m.step_count, vc)
+        return vc
+
     def _draw_ambient(self, surf):
         """Widget « ambiant » du bureau (coin bas-droit, au-dessus de la barre
         des tâches, sous les fenêtres) : patrimoine net, cash, levier et une
@@ -375,6 +394,30 @@ class DesktopWidgetsMixin:
                           fonts.tiny(), config.COL_TEXT)
         levcol = config.COL_DOWN if lev > 2.0 else config.COL_AMBER if lev > 1.0 else config.COL_TEXT_DIM
         widgets.draw_text(surf, f"Levier {lev:.2f}x", (x + 10, y + 54), fonts.tiny(bold=True), levcol)
+        # jauge VaR vs limite de la firme : on VOIT la jauge se remplir en
+        # achetant, au lieu de découvrir la limite en la violant. Calcul en
+        # cache par pas de marché (la simulation VaR coûte).
+        vc = self._var_gauge()
+        if vc is not None and vc["limit"]:
+            ratio = min(1.5, vc["var"] / vc["limit"])
+            gcol = (config.COL_DOWN if ratio >= 1.0 else
+                    config.COL_WARN if ratio >= 0.75 else config.COL_UP)
+            widgets.draw_text(surf, "VaR", (x + 100, y + 54), fonts.tiny(bold=True),
+                              config.COL_TEXT_DIM)
+            bar = pygame.Rect(x + 128, y + 57, 54, 7)
+            pygame.draw.rect(surf, config.COL_PANEL_HEAD, bar, border_radius=3)
+            fill = bar.copy()
+            fill.w = max(0, min(bar.w, int(bar.w * ratio)))
+            if fill.w:
+                pygame.draw.rect(surf, gcol, fill, border_radius=3)
+            pygame.draw.rect(surf, config.COL_BORDER, bar, 1, border_radius=3)
+            widgets.draw_text(surf, f"{ratio*100:.0f}%", (bar.right + 5, y + 54),
+                              fonts.tiny(bold=True), gcol)
+            if pygame.Rect(x + 100, y + 52, W - 108, 14).collidepoint(pygame.mouse.get_pos()):
+                widgets.draw_tooltip(surf,
+                                     f"VaR 95% : {vc['var']:.2f} M / limite de la firme "
+                                     f"{vc['limit']:.2f} M (grade)",
+                                     pygame.mouse.get_pos())
         # mini-sparkline du patrimoine (+ RUNS FANTÔMES des amis sur le même
         # défi du jour, cf. core/ghost.py — trajectoires grisées)
         spark = pygame.Rect(x + 10, y + H - 20, W - 20, 14)

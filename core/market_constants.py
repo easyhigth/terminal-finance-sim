@@ -393,3 +393,13 @@ class Crisis:
         self.severity = severity                # intensité tirée à l'origine (cf. scenarios.py)
         self.kind = kind                         # "bad"/"good" — pour la narration du postmortem
         self.start_nw = None                    # snapshot patrimoine net, posé par l'appelant
+
+# ----- ÉPOQUES DE MARCHÉ (core/market.py) ----------------------------------
+# Tirée d'un rng DÉDIÉ dérivé de la seed (ne consomme jamais le rng du
+# marché) : ~10 % des graines vivent une « décennie perdue » où la dérive
+# monde nette devient légèrement négative — le buy-and-hold passif y PERD,
+# et les outils défensifs (short, options, obligations, cash) deviennent la
+# seule voie. NB : sur ces graines, les prix diffèrent des versions du jeu
+# antérieures à l'époque (assumé et signalé, cf. CLAUDE.md déterminisme).
+LOST_DECADE_PROB = 0.10
+LOST_DECADE_DRIFT = -0.0016   # ajouté à MU_WORLD (0.0011) -> dérive nette < 0

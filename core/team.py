@@ -145,3 +145,137 @@ def team_deal_prob_bonus(player):
         if profile:
             total += profile.get("deal_prob_bonus", 0.0)
     return total
+
+
+# ---------------------------------------------------------------------------
+# AFFECTATIONS (l'équipe devient un CHOIX, pas une rente passive)
+# ---------------------------------------------------------------------------
+# Chaque analyste peut être affecté à un poste actif : ses effets passifs
+# continuent, mais le poste ajoute un effet TANGIBLE — au prix d'une FATIGUE
+# qui monte tant qu'il est affecté (à 100, il repart se reposer : affectation
+# remise à « libre », fatigue qui décroît). Champs ajoutés à l'entrée
+# analyste (tolérants : .get, sauvegardes anciennes = libre/0) :
+#     "assignment": "libre"|"recherche"|"deals"|"risque",  "fatigue": 0-100
+
+ASSIGNMENTS = {
+    "libre": {
+        "label": ("Libre", "Free"),
+        "desc": ("Effets passifs seuls ; la fatigue récupère.",
+                 "Passive effects only; fatigue recovers."),
+    },
+    "recherche": {
+        "label": ("Recherche", "Research"),
+        "desc": ("Publie régulièrement des notes de recherche sur vos valeurs "
+                 "(watchlist et portefeuille).",
+                 "Regularly publishes research notes on your names (watchlist "
+                 "and portfolio)."),
+    },
+    "deals": {
+        "label": ("Support deals", "Deal support"),
+        "desc": ("Augmente la probabilité d'offres de deals/mandats.",
+                 "Increases the probability of deal/mandate offers."),
+    },
+    "risque": {
+        "label": ("Contrôle des risques", "Risk control"),
+        "desc": ("Fait retomber plus vite le scrutin réglementaire (heat).",
+                 "Cools down regulatory scrutiny (heat) faster."),
+    },
+}
+
+FATIGUE_PER_STEP = 3       # fatigue gagnée par pas sur un poste actif
+REST_RECOVERY = 5          # fatigue récupérée par pas au repos (libre)
+FATIGUE_MAX = 100
+RESEARCH_EVERY_STEPS = 5   # cadence de publication d'un analyste en recherche
+RESEARCH_FRESH_DAYS = 25   # ne réécrit pas une note plus récente que ça
+DEALS_ASSIGN_BONUS = 0.05  # bonus additif de proba d'offre par analyste affecté
+RISK_HEAT_DECAY = 0.6      # décrue de heat supplémentaire par analyste affecté
+
+
+def assignment_label(key):
+    from core.i18n import get_lang
+    a = ASSIGNMENTS.get(key, ASSIGNMENTS["libre"])
+    return a["label"][1] if get_lang() == "en" else a["label"][0]
+
+
+def assignment_desc(key):
+    from core.i18n import get_lang
+    a = ASSIGNMENTS.get(key, ASSIGNMENTS["libre"])
+    return a["desc"][1] if get_lang() == "en" else a["desc"][0]
+
+
+def assign(player, index, assignment):
+    """Affecte l'analyste `index` au poste `assignment`. Un analyste épuisé
+    (fatigue == max) ne peut pas reprendre un poste actif tant qu'il n'a pas
+    récupéré sous 50."""
+    if assignment not in ASSIGNMENTS:
+        return {"ok": False, "reason": "assignment"}
+    analysts = getattr(player, "analysts", None) or []
+    if not (0 <= index < len(analysts)):
+        return {"ok": False, "reason": "index"}
+    a = analysts[index]
+    if assignment != "libre" and a.get("fatigue", 0) >= 50 and a.get("exhausted"):
+        return {"ok": False, "reason": "fatigue"}
+    a["assignment"] = assignment
+    if assignment == "libre":
+        a.pop("exhausted", None)
+    return {"ok": True}
+
+
+def _effective(a):
+    """Facteur d'efficacité d'un analyste sur poste actif (la fatigue pèse)."""
+    return max(0.3, 1.0 - a.get("fatigue", 0) / 150.0)
+
+
+def deals_assign_bonus(player):
+    """Bonus additif de proba d'offre apporté par les analystes affectés au
+    support deals (s'ajoute à team_deal_prob_bonus, les perks passifs)."""
+    total = 0.0
+    for a in getattr(player, "analysts", None) or []:
+        if a.get("assignment") == "deals":
+            total += DEALS_ASSIGN_BONUS * _effective(a)
+    return total
+
+
+def _research_target(player, market):
+    """Prochaine valeur à couvrir : watchlist puis portefeuille, sans note
+    fraîche (< RESEARCH_FRESH_DAYS jours)."""
+    candidates = list(getattr(player, "watchlist", None) or [])
+    candidates += [tk for tk in player.portfolio if tk not in candidates]
+    for tk in candidates:
+        note = player.research.get(tk)
+        if not note or player.day - note.get("day", 0) >= RESEARCH_FRESH_DAYS:
+            return tk
+    return None
+
+
+def assignments_step(player, market):
+    """Joue les effets des affectations pour CE pas (appelé par le hook de
+    pas "team_assignments"). Retourne une liste d'évènements notifiables :
+    [{"kind": "research_note"|"rest", ...}]."""
+    events = []
+    analysts = getattr(player, "analysts", None) or []
+    for a in analysts:
+        assignment = a.get("assignment", "libre")
+        if assignment == "libre":
+            a["fatigue"] = max(0, a.get("fatigue", 0) - REST_RECOVERY)
+            continue
+        a["fatigue"] = min(FATIGUE_MAX, a.get("fatigue", 0) + FATIGUE_PER_STEP)
+        eff = _effective(a)
+        if assignment == "recherche":
+            since = getattr(player, "market_step", 0) - a.get("last_research_step", -999)
+            if since >= RESEARCH_EVERY_STEPS:
+                tk = _research_target(player, market)
+                if tk is not None:
+                    from core import research_notes as _rn
+                    note = _rn.write_note(player, market, tk)
+                    if note:
+                        a["last_research_step"] = getattr(player, "market_step", 0)
+                        events.append({"kind": "research_note", "analyst": a,
+                                       "note": note})
+        elif assignment == "risque":
+            player.heat = max(0, player.heat - RISK_HEAT_DECAY * eff)
+        if a["fatigue"] >= FATIGUE_MAX:
+            a["assignment"] = "libre"
+            a["exhausted"] = True
+            events.append({"kind": "rest", "analyst": a})
+    return events

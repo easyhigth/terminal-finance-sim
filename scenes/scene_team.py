@@ -89,6 +89,16 @@ class TeamScene(Scene):
                 if rect.collidepoint(event.pos):
                     self._do_fire(idx)
                     return
+            for (idx, key), rect in getattr(self, "assign_rects", {}).items():
+                if rect.collidepoint(event.pos):
+                    r = TEAM.assign(p, idx, key)
+                    if r.get("ok"):
+                        from core import audio
+                        audio.play("click")
+                    else:
+                        self.app.notify(_L("Analyste épuisé : laissez-le récupérer.",
+                                           "Exhausted analyst: let them recover."), "warn")
+                    return
 
     def _do_hire(self, pid):
         p = self.app.gs.player
@@ -190,6 +200,7 @@ class TeamScene(Scene):
         list_area = pygame.Rect(tinner.x - 4, tinner.y, tinner.w + 8, tinner.h - footer_h)
         self._list_rect = list_area
         self.fire_rects = {}
+        self.assign_rects = {}
         if not p.analysts:
             widgets.draw_text(surf, "Aucun analyste recruté. Embauchez dans le catalogue ci-contre.",
                               (tinner.x, tinner.y), fonts.small(), config.COL_TEXT_DIM)
@@ -217,6 +228,34 @@ class TeamScene(Scene):
                     widgets.draw_text(surf, "LICENCIER", fire_btn.center, fonts.tiny(bold=True),
                                       config.COL_DOWN, align="center")
                     self.fire_rects[idx] = fire_btn
+                    # affectation (poste actif) + fatigue — cf. core/team.ASSIGNMENTS
+                    ax = row.x + 250
+                    current = a.get("assignment", "libre")
+                    for key in TEAM.ASSIGNMENTS:
+                        lbl = TEAM.assignment_label(key)
+                        bw = fonts.tiny(bold=True).size(lbl)[0] + 14
+                        ar = pygame.Rect(ax, row.y + 6, bw, 18)
+                        sel = key == current
+                        pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL,
+                                         ar, border_radius=3)
+                        pygame.draw.rect(surf, config.COL_CYAN if sel else config.COL_BORDER,
+                                         ar, 2 if sel else 1, border_radius=3)
+                        widgets.draw_text(surf, lbl, ar.center, fonts.tiny(bold=sel),
+                                          config.COL_CYAN if sel else config.COL_TEXT_DIM,
+                                          align="center")
+                        self.assign_rects[(idx, key)] = ar
+                        ax += bw + 6
+                    fat = a.get("fatigue", 0)
+                    fat_bar = pygame.Rect(row.x + 250, row.y + 30, 160, 6)
+                    pygame.draw.rect(surf, config.COL_PANEL_HEAD, fat_bar, border_radius=3)
+                    fill = fat_bar.copy()
+                    fill.w = max(0, int(fat_bar.w * fat / 100.0))
+                    fat_col = (config.COL_DOWN if fat >= 70 else
+                               config.COL_WARN if fat >= 40 else config.COL_UP)
+                    if fill.w:
+                        pygame.draw.rect(surf, fat_col, fill, border_radius=3)
+                    widgets.draw_text(surf, ("Fatigue" if fat else "Reposé") + (f" {fat}" if fat else ""),
+                                      (fat_bar.right + 8, row.y + 26), fonts.tiny(), fat_col)
                 ty += ROW_H
             surf.set_clip(prev_clip)
             content_h = (ty + self.scroll) - tinner.y

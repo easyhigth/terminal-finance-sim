@@ -616,3 +616,89 @@ def contest_target(player, ticker, rng=None):
             f"Contre-offre échouée sur {target['name']}",
             f"Failed counter-bid on {target['name']}"))
     return {"ok": True, "success": success, "cost": cost, "rival": r["name"], "target": target["name"]}
+
+
+# ---------------------------------------------------------------------------
+# NÉMÉSIS PERSONNEL (rival désigné de VOTRE voie)
+# ---------------------------------------------------------------------------
+# `nemesis()` ci-dessus est positionnel (le rival juste au-dessus au
+# classement) ; le némésis PERSONNEL est narratif : le rival de votre voie,
+# désigné au choix de spécialisation, qui vous suit toute la carrière — il
+# vous écrit, et chaque trimestre votre performance est comparée à la sienne
+# (hook de pas "nemesis_h2h").
+
+H2H_REP_DELTA = 1     # réputation gagnée/perdue au tête-à-tête trimestriel
+
+
+def designate_nemesis(player, notify=True):
+    """Désigne le rival de la voie du joueur comme némésis personnel (appelé
+    au choix de voie et à une reconversion). Retourne le rival, ou None."""
+    ensure(player)
+    r = next((x for x in player.rivals if x["track"] == getattr(player, "track", None)), None)
+    if r is None:
+        return None
+    if player.flags.get("nemesis") == r["name"]:
+        return r
+    player.flags["nemesis"] = r["name"]
+    player.flags.pop("nemesis_h2h", None)
+    if notify:
+        from core import inbox as _inbox
+        _inbox.push(player, "rival", r["name"],
+                    _L("Bienvenue sur MON terrain", "Welcome to MY turf"),
+                    _L(f"On me dit que vous choisissez la voie {player.track}. "
+                       f"Amusant. C'est la mienne depuis des années — et il n'y a "
+                       f"de place que pour un nom en haut du classement. Le mien. "
+                       f"— {r['name']}, {r['firm']}",
+                       f"I hear you're picking the {player.track} track. Cute. "
+                       f"It's been mine for years — and there's only room for one "
+                       f"name at the top. Mine. — {r['name']}, {r['firm']}"))
+    return r
+
+
+def personal_nemesis(player):
+    """Le némésis désigné (dict rival), ou None si pas encore de voie."""
+    name = player.flags.get("nemesis")
+    if not name:
+        return None
+    return next((r for r in player.rivals if r["name"] == name), None)
+
+
+def quarterly_head_to_head(player, market):
+    """Tête-à-tête trimestriel avec le némésis : compare la CROISSANCE de
+    votre patrimoine à celle de son score depuis le dernier relevé. Le
+    gagnant prend +1 de réputation (perçu comme LE gérant de la voie), le
+    perdant reçoit un message bien senti. Retourne le résultat ou None."""
+    r = personal_nemesis(player)
+    if r is None:
+        return None
+    mine = player_score(player, market)
+    his = r["score"]
+    prev = player.flags.get("nemesis_h2h")
+    player.flags["nemesis_h2h"] = {"mine": mine, "his": his, "quarter": player.quarter}
+    if not isinstance(prev, dict) or not prev.get("mine") or not prev.get("his"):
+        return None   # premier relevé : pas encore de comparaison
+    my_growth = mine / prev["mine"] - 1.0
+    his_growth = his / prev["his"] - 1.0
+    win = my_growth > his_growth
+    from core import inbox as _inbox
+    if win:
+        player.adjust_reputation(H2H_REP_DELTA, reason=_L(
+            f"Trimestre gagné contre {r['name']}", f"Quarter won against {r['name']}"))
+        _inbox.push(player, "rival", r["name"],
+                    _L("Cette fois-ci seulement", "Just this once"),
+                    _L(f"{my_growth:+.1%} contre {his_growth:+.1%}. Profitez de "
+                       f"votre trimestre — je ne perds jamais deux fois de suite.",
+                       f"{my_growth:+.1%} against {his_growth:+.1%}. Enjoy your "
+                       f"quarter — I never lose twice in a row."))
+        _set_action(r, _L("encaisse mal votre trimestre", "takes your quarter badly"), "down")
+    else:
+        player.adjust_reputation(-H2H_REP_DELTA, reason=_L(
+            f"Trimestre perdu contre {r['name']}", f"Quarter lost against {r['name']}"))
+        _inbox.push(player, "rival", r["name"],
+                    _L("Le classement parle", "The scoreboard speaks"),
+                    _L(f"{his_growth:+.1%} contre votre petit {my_growth:+.1%}. "
+                       f"Ne le prenez pas mal : certains sont faits pour suivre.",
+                       f"{his_growth:+.1%} against your little {my_growth:+.1%}. "
+                       f"Don't take it badly: some people are built to follow."))
+        _set_action(r, _L("parade après vous avoir battu", "gloats after beating you"), "up")
+    return {"win": win, "my_growth": my_growth, "his_growth": his_growth, "rival": r}

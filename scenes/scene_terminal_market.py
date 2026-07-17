@@ -468,16 +468,11 @@ class TerminalMarketMixin:
         if not mt:
             self._log(_L(f"  Aucun résultat : {ticker}.", f"  No match: {ticker}."))
             return
-        # valeur intrinsèque simplifiée : BPA capitalisé à un P/E « juste » sectoriel
-        fair_pe = {"Tech": 24, "Semicon": 22, "Luxe": 22, "Sante": 19, "Conso": 18,
-                   "Finance": 11, "Energie": 10, "Industrie": 15, "Agro": 13,
-                   "Telecom": 12, "Utilities": 14, "Materiaux": 12,
-                   "Immobilier": 15, "Auto": 9}.get(mt["sector"], 15)
-        fair = max(0.5, mt["eps"] * fair_pe)
-        upside = (fair / mt["price"] - 1) * 100
-        rating = ("ACHAT" if upside > 12 else "VENTE" if upside < -12 else "NEUTRE")
-        p.research[tk] = {"fair": round(fair, 2), "rating": rating,
-                          "upside": round(upside, 1), "day": p.day}
+        # valeur intrinsèque simplifiée (core/research_notes.py — partagée
+        # avec les analystes juniors affectés à la recherche)
+        from core import research_notes as _rn
+        note = _rn.write_note(p, self.market, tk)
+        fair, upside, rating = note["fair"], note["upside"], note["rating"]
         self._log(_L(f"  Recherche {tk} : valeur intrinsèque {fair:.2f} "
                   f"(potentiel {upside:+.0f}%) → {rating}.",
                   f"  Research {tk}: intrinsic value {fair:.2f} "

@@ -518,10 +518,25 @@ class GameOverScene(Scene):
             return
 
         chart_rect = pygame.Rect(inner.x + 50, inner.y, inner.w - 60, inner.h - 38)
+        # RUNS FANTÔMES : la trajectoire des amis sur le même défi du jour
+        # (core/ghost.py), projetée sur l'échelle locale, sous votre courbe.
+        from core import ghost as ghost_mod
+        ghosts = [(g["name"], ghost_mod.project(g["curve"], hist[0], len(hist)))
+                  for g in ghost_mod.ghosts_for(p)]
+        ghosts = [(n, v) for n, v in ghosts if v]
         lo, hi = min(hist), max(hist)
+        for _n, gvals in ghosts:
+            lo, hi = min(lo, min(gvals)), max(hi, max(gvals))
         lo, hi, span = widgets.draw_chart_axes(
             surf, chart_rect, lo, hi,
             y_fmt=lambda v: widgets.format_money(v, cur), rows=2)
+        for gname, gvals in ghosts:
+            widgets.draw_series(surf, chart_rect, gvals, config.COL_TEXT_DIM,
+                                baseline=False, show_extrema=False, y_fmt=None)
+            gx = chart_rect.right - 6
+            gy = chart_rect.bottom - int((gvals[-1] - lo) / (span or 1) * chart_rect.h)
+            widgets.draw_text(surf, gname, (gx, gy - 10), fonts.tiny(),
+                              config.COL_TEXT_DIM, align="right")
         widgets.draw_series(surf, chart_rect, hist, config.COL_CYAN, baseline=False,
                             mouse_pos=pygame.mouse.get_pos(),
                             y_fmt=lambda v: widgets.format_money(v, cur),

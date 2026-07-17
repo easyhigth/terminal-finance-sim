@@ -36,6 +36,9 @@ class RunSetupScene(Scene):
         self.hardcore = False
         self.diff_idx = next(i for i, p in enumerate(diff_mod.PRESETS)
                              if p["id"] == diff_mod.DEFAULT)
+        self.player_name = ""        # nom choisi par le joueur ("" -> Trainee)
+        self._name_active = False    # champ nom en cours d'édition
+        self._name_rect = None
         self.daily = False           # « Défi du jour » : marché du jour partagé
         self.hist_idx = -1           # « Défi historique » : -1 = aucun, sinon index HIST_SCENARIOS
         # classement du défi du JOUR (runs locaux + amis importés), affiché
@@ -66,6 +69,31 @@ class RunSetupScene(Scene):
             (40, fy, 200, 42), t("runsetup.prev"), config.COL_TEXT_DIM)
         self.confirm_btn = widgets.Button(
             (config.SCREEN_WIDTH-300, fy, 260, 42), t("runsetup.confirm"), config.COL_UP)
+
+    def _draw_name_field(self, surf):
+        """Champ « votre nom » (haut droit de la page 1) : clic pour éditer,
+        ENTRÉE/ÉCHAP/TAB pour valider — vide = « Trainee » comme avant."""
+        import time as _time
+
+        from core.i18n import get_lang
+        en = get_lang() == "en"
+        r = pygame.Rect(config.SCREEN_WIDTH - 40 - 280, 24, 280, 34)
+        self._name_rect = r
+        active = self._name_active
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD if active else config.COL_PANEL,
+                         r, border_radius=4)
+        pygame.draw.rect(surf, config.COL_CYAN if active else config.COL_BORDER,
+                         r, 2 if active else 1, border_radius=4)
+        widgets.draw_text(surf, "VOTRE NOM" if not en else "YOUR NAME",
+                          (r.x, r.y - 14), fonts.tiny(bold=True), config.COL_CYAN)
+        shown = self.player_name
+        col = config.COL_TEXT
+        if not shown and not active:
+            shown = "Trainee (cliquer pour changer)" if not en                 else "Trainee (click to change)"
+            col = config.COL_TEXT_DIM
+        cursor = "_" if active and int(_time.time() * 2) % 2 == 0 else ""
+        widgets.draw_text(surf, widgets.fit_text(shown + cursor, fonts.small(), r.w - 16),
+                          (r.x + 8, r.y + 9), fonts.small(bold=active), col)
 
     def _today_iso(self):
         import datetime
@@ -121,6 +149,18 @@ class RunSetupScene(Scene):
         if self.code_prompt:
             self._handle_code_prompt_event(event)
             return
+        # champ « votre nom » en édition : capture TOUTES les touches en
+        # premier (sinon ÉCHAP renverrait à l'écran continent au milieu de la
+        # frappe) — même pattern que la boîte de code du défi du jour.
+        if self._name_active and event.type == pygame.KEYDOWN:
+            if event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_KP_ENTER,
+                             pygame.K_TAB):
+                self._name_active = False
+            elif event.key == pygame.K_BACKSPACE:
+                self.player_name = self.player_name[:-1]
+            elif event.unicode and event.unicode.isprintable() and len(self.player_name) < 18:
+                self.player_name += event.unicode
+            return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             if self.page == 2:
                 self.page = 1
@@ -136,6 +176,10 @@ class RunSetupScene(Scene):
                 if st and st.handle_wheel(event):
                     return
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if self._name_rect and self._name_rect.collidepoint(event.pos):
+                    self._name_active = True
+                    return
+                self._name_active = False
                 # panneau « Défi du jour » dessiné PAR-DESSUS la liste des
                 # archétypes : absorbe tout clic dans ses limites (import ou
                 # non), jamais de fallthrough vers les cartes derrière.
@@ -195,7 +239,7 @@ class RunSetupScene(Scene):
     def _start_run(self):
         gs = GameState()
         gs.player = PlayerState(
-            name="Trainee", continent=self.continent,
+            name=(self.player_name.strip() or "Trainee"), continent=self.continent,
             grade_index=0, cash=config.START_CASH, reputation=50,
             hardcore=self.hardcore,
         )
@@ -247,6 +291,8 @@ class RunSetupScene(Scene):
         step_key = "runsetup.step1" if self.page == 1 else "runsetup.step2"
         widgets.draw_text(surf, t("runsetup.subtitle").format(continent=self.continent) + "  ·  " + t(step_key),
                           (42, 70), fonts.small(), config.COL_TEXT_DIM)
+        if self.page == 1:
+            self._draw_name_field(surf)
 
         fy = config.SCREEN_HEIGHT - 50
         hardcore_top = fy - 8 - 60

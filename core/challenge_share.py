@@ -23,8 +23,10 @@ import zlib
 _PREFIX = "FSC1:"
 # champs utiles à l'affichage d'un classement (pas l'id local ni la date
 # générale d'enregistrement, cf. hall_of_fame.make_entry).
+# "curve" : courbe de patrimoine compressée (runs fantômes, cf. core/ghost.py)
+# — absente des VIEUX codes (décodée à None, tolérée partout).
 _FIELDS = ("name", "grade", "track", "continent", "quarters", "days",
-           "best_nw", "score", "hardcore", "daily_date")
+           "best_nw", "score", "hardcore", "daily_date", "curve")
 
 
 def encode_entry(entry):

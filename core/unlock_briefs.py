@@ -693,6 +693,34 @@ FEATURE_BRIEFS = {
     # Fonctionnalités ouvertes dès le grade 0 : pas de fiche de promotion
     # nécessaire (jamais « nouvellement débloquées ») mais présentes pour
     # robustesse si les paliers changent un jour.
+    "charts": {
+        "title": ("Graphes de cours", "Price charts"),
+        "what": ("Les graphes : ligne, bougies, comparaison de plusieurs titres "
+                 "et corrélation. De quoi LIRE un historique de prix.",
+                 "Price charts: line, candles, multi-name comparison and "
+                 "correlation. The tools to READ a price history."),
+        "how": ("Icône Graphes du bureau, ou le bouton graphe d'une fiche société.",
+                "Graphs desktop icon, or the chart button on a company sheet."),
+        "why": ("Un stagiaire lit des chiffres ; un analyste lit des tendances. "
+                "Les graphes n'ont de sens qu'une fois qu'on peut agir dessus.",
+                "An intern reads numbers; an analyst reads trends. Charts only "
+                "matter once you can act on them."),
+        "first": ("Ouvrez le graphe d'un titre de votre watchlist et repérez sa tendance.",
+                  "Open the chart of a watchlisted name and spot its trend."),
+    },
+    "tools": {
+        "title": ("Boîte à outils quant", "Quant toolbox"),
+        "what": ("Ratio de Sharpe, Z-score, frontière efficiente, tableur à "
+                 "formules et labo de crise : des outils d'analyse autonomes.",
+                 "Sharpe ratio, Z-score, efficient frontier, formula spreadsheet "
+                 "and crisis lab: standalone analysis tools."),
+        "how": ("Icônes dédiées du bureau (section Marché & Analyse).",
+                "Dedicated desktop icons (Market & Analysis section)."),
+        "why": ("Mesurer, comparer et stresser vos idées avec la rigueur d'un pro.",
+                "Measure, compare and stress-test your ideas like a pro."),
+        "first": ("Calculez le ratio de Sharpe de votre portefeuille.",
+                  "Compute your portfolio's Sharpe ratio."),
+    },
     "analyst": {
         "title": ("Outils d'analyse", "Analysis tools"),
         "what": ("Recherche de sociétés, watchlist, alertes de prix, "

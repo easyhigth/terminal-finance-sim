@@ -177,6 +177,9 @@ def test_desk_icons_gated_by_unlocks(app):
     assert {"greeks", "vardesk", "rates"} <= keys     # grade 9 : tout visible
     app.gs.player.grade_index = 0
     keys0 = {k for k, _l, _kind, _acc in desk._icon_list()}
-    assert "greeks" not in keys0                      # options : grade 6
-    assert "rates" not in keys0                       # trade : grade 4
-    assert "vardesk" in keys0                         # risk : grade 0
+    assert "greeks" not in keys0                      # options : grade 8
+    assert "rates" not in keys0                       # trade : grade 1
+    assert "vardesk" not in keys0                     # risk : grade 2 (rien d'analytique au stagiaire)
+    app.gs.player.grade_index = 2
+    keys2 = {k for k, _l, _kind, _acc in desk._icon_list()}
+    assert "vardesk" in keys2                          # risk débloqué au grade 2

@@ -151,5 +151,8 @@ def test_new_desk_icons_gating(app):
     assert {"creditdesk", "crisislab"} <= keys
     app.gs.player.grade_index = 0
     keys0 = {k for k, _l, _kind, _acc in desk._icon_list()}
-    assert "creditdesk" not in keys0                  # credit : grade 6
-    assert "crisislab" in keys0                       # libre dès le début
+    assert "creditdesk" not in keys0                  # credit : grade 9
+    assert "crisislab" not in keys0                   # boîte à outils quant : grade 2 (rien au stagiaire)
+    app.gs.player.grade_index = 2
+    keys2 = {k for k, _l, _kind, _acc in desk._icon_list()}
+    assert "crisislab" in keys2                        # débloqué avec la boîte à outils (grade 2)

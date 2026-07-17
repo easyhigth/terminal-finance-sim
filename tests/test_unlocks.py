@@ -88,16 +88,32 @@ def test_track_affinity_ignores_veteran_headstart():
     assert not unlocks.unlocked(p, "options")
 
 
-def test_intern_has_read_only_analysis_tools_from_day_one():
-    """Dès le grade Intern (0), les outils d'analyse/sandbox sans impact
-    économique (watchlist, alertes, recherche, ALM/RISK/QUANT en lecture/
-    simulation) sont ouverts, pour donner une activité réelle avant que le
-    trading/les mandats ne se débloquent."""
+def test_intern_has_only_the_bare_basics():
+    """Le stagiaire (grade 0) n'a QUE les basiques : rien d'analytique, pas de
+    graphes, pas de watchlist/alertes, pas de VaR/quant/ALM ni de boîte à
+    outils. Ces outils n'ont aucun sens tant qu'on ne peut ni investir ni
+    détenir de position — ils se découvrent à mesure qu'ils deviennent
+    utilisables (progression plus digeste)."""
     p = _player(grade=0)
-    for feature in ("analyst", "alm", "risk", "quant"):
-        assert unlocks.unlocked(p, feature), feature
-    for cmd in ("WATCHLIST", "ALERT", "COMPARE", "RESEARCH"):
-        assert unlocks.cmd_unlocked(p, cmd), cmd
-    # le trading et les mandats restent verrouillés (pas de changement d'équilibre)
-    for feature in ("trade", "mandates", "deals", "ma"):
+    for feature in ("analyst", "charts", "risk", "quant", "alm", "tools",
+                    "trade", "deals", "track", "ipo", "calendar"):
         assert not unlocks.unlocked(p, feature), feature
+    for cmd in ("WATCHLIST", "ALERT", "COMPARE", "RESEARCH", "BUY"):
+        assert not unlocks.cmd_unlocked(p, cmd), cmd
+
+
+def test_analyst_and_charts_unlock_at_grade_one():
+    """Grade 1 (Junior Analyst) : on devient un analyste qui investit — les
+    outils d'analyse, les graphes et le trading arrivent ensemble."""
+    p = _player(grade=1)
+    for feature in ("analyst", "charts", "trade", "deals", "track"):
+        assert unlocks.unlocked(p, feature), feature
+    # la mesure de risque et la boîte à outils quant restent pour le grade 2
+    for feature in ("risk", "quant", "tools"):
+        assert not unlocks.unlocked(p, feature), feature
+
+
+def test_risk_and_quant_tools_unlock_at_grade_two():
+    p = _player(grade=2)
+    for feature in ("risk", "quant", "tools", "calendar", "ipo"):
+        assert unlocks.unlocked(p, feature), feature

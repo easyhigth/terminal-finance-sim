@@ -23,21 +23,26 @@ from core import config
 # rester alignée dessus — sinon une commande semblerait débloquée dans l'UI
 # tout en étant encore refusée par le module).
 UNLOCKS = {
-    # ouvert dès l'arrivée (Intern) : ce sont des outils 100% lecture/analyse,
-    # sans impact économique (pas d'argent en jeu) — de quoi avoir une vraie
-    # activité (watchlist, alertes, recherche) avant le déblocage du trading.
-    "analyst": 0,    # watchlist, alertes, comparaison, valeur relative, recherche
-    "alm": 0,        # desk ALM (sandbox actif-passif, lecture/simulation seule)
-    "risk": 0,       # module risk (VaR/stress sur exposition de référence, sandbox)
-    "quant": 0,      # module quant (pricing d'options, sandbox)
-    # grade 1 (Junior Analyst) : choisir sa voie et commencer à investir.
+    # grade 0 (Intern) : RIEN d'analytique. Le stagiaire n'a QUE les basiques
+    # (Terminal, Marché en survol, Portefeuille, Mission, Inbox, Manuel,
+    # Calculatrice, News, Exam/Certif) — pas de graphes, pas de watchlist, pas
+    # de VaR/quant/ALM. Ces outils n'ont AUCUN sens tant qu'on ne peut ni
+    # investir ni détenir de position : on les découvre à mesure qu'ils
+    # deviennent utilisables (cf. la demande de progression plus digeste).
+    # grade 1 (Junior Analyst) : on devient un analyste qui investit.
+    "analyst": 1,    # watchlist, alertes, comparaison, valeur relative, recherche, explorateur
+    "charts": 1,     # graphes de cours (ligne/bougies/comparaison/corrélation)
     "track": 1,      # choisir une voie de spécialisation
     "deals": 1,      # traiter des deals
-    "trade": 1,      # investir : acheter / vendre / allouer / rééquilibrer
-    # grade 2 (Analyst) : premiers outils complémentaires au trading.
+    "trade": 1,      # investir : acheter / vendre / allouer / rééquilibrer (+ shop, mur, journal)
+    # grade 2 (Analyst) : mesurer son risque et s'outiller.
+    "risk": 2,       # module risk (VaR/stress) — enfin des positions à mesurer
+    "quant": 2,      # module quant (pricing d'options, grecques)
+    "tools": 2,      # boîte à outils quant autonome (Sharpe, Z-score, frontière, tableur, labo de crise)
     "calendar": 2,   # calendrier macro (paris sur évènements programmés)
     "ipo": 2,        # souscription aux introductions en bourse
-    # grade 3 (Senior Analyst) : premier vrai jalon M&A/advisory.
+    # grade 3 (Senior Analyst) : gestion actif-passif et premier jalon M&A/advisory.
+    "alm": 3,        # desk ALM bancaire (actif-passif)
     "pitch": 3,      # démarcher un client pour un mandat
     "ma": 3,         # M&A : acquisition de cibles privées (LBO réel)
     "footballfield": 3,   # Football Field (valorisation multi-méthodes) — affinité M&A
@@ -72,8 +77,12 @@ def _L(fr, en):
 
 
 _LABELS_RAW = {
-    "analyst": ("Outils d'analyse (watchlist, alertes, recherche, RV)",
-                "Analysis tools (watchlist, alerts, research, comps)"),
+    "analyst": ("Outils d'analyse (watchlist, alertes, recherche, RV, explorateur)",
+                "Analysis tools (watchlist, alerts, research, comps, explorer)"),
+    "charts": ("Graphes de cours (ligne, bougies, comparaison)",
+               "Price charts (line, candles, comparison)"),
+    "tools": ("Boîte à outils quant (Sharpe, Z-score, frontière, tableur)",
+              "Quant toolbox (Sharpe, Z-score, frontier, spreadsheet)"),
     "track": ("Choix d'une voie de spécialisation", "Choosing a specialization track"),
     "deals": ("Traiter des deals", "Handling deals"),
     "trade": ("Investir (acheter / vendre / allouer)", "Investing (buy / sell / allocate)"),

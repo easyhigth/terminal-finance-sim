@@ -178,6 +178,21 @@ QUICK_APPS = [
 # une icône verrouillée n'apparaît tout simplement pas (et son apparition au
 # grade suivant fait office de récompense, cf. DesktopScene._check_new_icons).
 ICON_FEATURE = {
+    # --- outils d'analyse : arrivent quand on devient analyste (grade 1) ---
+    "research": "analyst",     # recherche société
+    "watchlist": "analyst",    # favoris/watchlist
+    "alerts": "analyst",       # alertes de prix
+    "qexplorer": "analyst",    # explorateur des 320 sociétés
+    "qgraph": "charts",        # graphes : PAS pour un stagiaire (rien à en faire encore)
+    # --- ce qui suppose de pouvoir investir (grade 1, avec "trade") ---
+    "qshop": "trade",          # boutique : acheter tout actif = investir
+    "qwall": "trade",          # mur de trading live
+    "tradejournal": "trade",   # journal de trading : n'a de sens qu'avec des trades
+    # --- boîte à outils quant autonome (grade 2) ---
+    "sheet": "tools", "sharpe": "tools", "zscore": "tools",
+    "frontier": "tools", "crisislab": "tools",
+    # --- Risque (VaR) : suit le module risk (grade 2) ---
+    "vardesk": "risk",
     "trading": "trade",
     "qmandates": "mandates",
     "clients": "mandates",

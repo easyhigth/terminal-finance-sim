@@ -230,23 +230,27 @@ class GameOverScene(Scene):
         col_w = 250
         gap = 8
         row_h = 360
-        left_x = cx - (3 * col_w + 2 * gap) // 2
+        left_x = cx - (4 * col_w + 3 * gap) // 2
 
         # panneau gauche : rapport final + stats de run (défilable)
         left = pygame.Rect(left_x, top_y, col_w, row_h)
         self._draw_report_panel(surf, left, p, cur)
 
-        # panneau central : journal de carrière, intégral (défilable)
+        # panneau centre-gauche : journal de carrière, intégral (défilable)
         mid = pygame.Rect(left_x + col_w + gap, top_y, col_w, row_h)
         self._draw_journal_panel(surf, mid, p)
 
+        # panneau centre-droit : décisions marquantes + badges du run
+        decisions = pygame.Rect(left_x + 2 * (col_w + gap), top_y, col_w, row_h)
+        self._draw_decisions_panel(surf, decisions, p)
+
         # panneau droit : score composite de fin de run
-        right = pygame.Rect(left_x + 2 * (col_w + gap), top_y, col_w, row_h)
+        right = pygame.Rect(left_x + 3 * (col_w + gap), top_y, col_w, row_h)
         self._draw_score_panel(surf, right)
 
         # panneau bas : rétrospective graphique de la valeur nette
         bottom_h = 150
-        bottom = pygame.Rect(left_x, top_y + row_h + gap, 3 * col_w + 2 * gap, bottom_h)
+        bottom = pygame.Rect(left_x, top_y + row_h + gap, 4 * col_w + 3 * gap, bottom_h)
         binner = widgets.draw_panel(surf, bottom, "Rétrospective — valeur nette", config.COL_CYAN)
         self._draw_networth_retrospective(surf, binner, p, cur)
 
@@ -312,6 +316,12 @@ class GameOverScene(Scene):
             f"Record : {widgets.format_money(max(p.best_cash, p.cash), cur)}",
             f"Rép.   : {p.reputation}/100",
             f"Deals {p.deals_won}  Miss. {p.missions_done}",
+            "",
+            "— P&L DU RUN —",
+            f"Réalisé : {widgets.format_money(p.realized_pnl, cur)}",
+            f"Frais   : {widgets.format_money(-p.total_fees_paid, cur)}",
+            f"Financ. : {widgets.format_money(-p.total_financing_paid, cur)}",
+            f"Marge   : {widgets.format_money(-p.total_margin_penalty, cur)}",
         ]
         for ln in lines:
             widgets.draw_text(surf, ln, (inner.x, y), fonts.tiny(), config.COL_TEXT)
@@ -411,6 +421,62 @@ class GameOverScene(Scene):
         self.scroll_journal = max(0, min(self._journal_max_scroll, self.scroll_journal))
         self.scroll_journal = widgets.draw_scrollbar(surf, rect, list_area, self.scroll_journal,
                                self._journal_max_scroll, content_h)
+
+    def _draw_decisions_panel(self, surf, rect, p):
+        """Décisions marquantes (dilemmes tranchés, core/dilemmas.py) et
+        badges décrochés pendant le run — la mémoire NARRATIVE de la partie,
+        complémentaire du journal (événements) et du score (chiffres)."""
+        from core import badges as badges_mod
+        inner = widgets.draw_panel(surf, rect, "Décisions & badges", config.COL_PRESTIGE)
+        y = inner.y
+        decisions = getattr(p, "decisions_log", None) or []
+        if decisions:
+            widgets.draw_text(surf, "DÉCISIONS MARQUANTES", (inner.x, y),
+                              fonts.tiny(bold=True), config.COL_CYAN)
+            y += 18
+            for d in decisions[-6:][::-1]:
+                widgets.draw_text(surf, f"J{d.get('day', '?')}", (inner.x, y),
+                                  fonts.tiny(bold=True), config.COL_CYAN)
+                widgets.draw_text(surf,
+                                  widgets.fit_text(str(d.get("title", "")), fonts.tiny(),
+                                                   inner.w - 40),
+                                  (inner.x + 40, y), fonts.tiny(), config.COL_TEXT)
+                y += 15
+                widgets.draw_text(surf,
+                                  widgets.fit_text("→ " + str(d.get("choice", "")),
+                                                   fonts.tiny(), inner.w - 40),
+                                  (inner.x + 40, y), fonts.tiny(), config.COL_TEXT_DIM)
+                y += 19
+        else:
+            y += widgets.draw_text_wrapped(
+                surf, "Aucun dilemme tranché pendant ce run.",
+                (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM, inner.w) + 6
+        badge_ids = getattr(p, "badges", None) or []
+        if badge_ids:
+            y += 8
+            widgets.draw_text(surf, f"BADGES ({len(badge_ids)})", (inner.x, y),
+                              fonts.tiny(bold=True), config.COL_PRESTIGE)
+            y += 18
+            shown = 0
+            for b in badges_mod.BADGES:
+                if b["id"] not in badge_ids:
+                    continue
+                if y > inner.bottom - 14:
+                    remaining = len(badge_ids) - shown
+                    if remaining > 0:
+                        widgets.draw_text(surf, f"… +{remaining} autres", (inner.x, y - 2),
+                                          fonts.tiny(), config.COL_TEXT_DIM)
+                    break
+                widgets.draw_text(surf,
+                                  widgets.fit_text("· " + badges_mod.badge_name(b),
+                                                   fonts.tiny(), inner.w),
+                                  (inner.x, y), fonts.tiny(), config.COL_WARN)
+                y += 16
+                shown += 1
+        if getattr(p, "investigations_count", 0):
+            y += 8
+            widgets.draw_text(surf, f"Enquêtes subies : {p.investigations_count}",
+                              (inner.x, y), fonts.tiny(), config.COL_DOWN)
 
     def _draw_score_panel(self, surf, rect):
         """Affiche le score composite de fin de run (core/score.py) : note

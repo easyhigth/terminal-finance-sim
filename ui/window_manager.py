@@ -42,6 +42,8 @@ class Window:
                                   # barre de titre) — cf. WindowManager._z_order
         self._dock_flash_until = 0   # horloge murale : liseré pulsé après ancrage/agrandissement
         self._open_t = 0.0        # progression d'ouverture [0,1] (animation scale/fade)
+        self.first_open_brief = None  # {"title","text"} : bandeau première ouverture, ou None
+        self._brief_btn_rect = None   # Rect du bouton COMPRIS du bandeau
         self._last_update_frame = 0  # pour throttler les fenêtres cachées
 
     # --- sous-rectangles du chrome (recalculés à la volée depuis self.rect) ---
@@ -149,6 +151,7 @@ class Window:
         surf.set_clip(cont)
         try:
             self.app_obj.draw(surf, cont)
+            self._draw_first_open_brief(surf, cont)
         finally:
             surf.set_clip(prev_clip)
         # poignée de redimensionnement (trois traits en coin bas-droit)
@@ -156,6 +159,48 @@ class Window:
         for i in range(1, 4):
             pygame.draw.line(surf, accent, (rr.right - i * 4, rr.bottom - 2),
                              (rr.right - 2, rr.bottom - i * 4), 1)
+
+    def _draw_first_open_brief(self, surf, cont):
+        """Bandeau « première ouverture » : 2-3 lignes qui disent à quoi sert
+        cette app et par où commencer, affiché en bas de la zone de contenu
+        la toute première fois que l'app est ouverte sur cette machine
+        (cf. DesktopScene._launch + core/profile.apps_opened). Se ferme d'un
+        clic sur COMPRIS — géré centralement ici pour que CHAQUE app en
+        profite sans écrire une ligne."""
+        brief = getattr(self, "first_open_brief", None)
+        if not brief:
+            self._brief_btn_rect = None
+            return
+        from core.i18n import get_lang
+        text = brief.get("text", "")
+        font = fonts.tiny()
+        pad = 8
+        lines = widgets.wrap_text_lines(text, font, cont.w - pad * 2 - 90)
+        lines = lines[:4]
+        h = 22 + len(lines) * (font.get_height() + 3) + pad
+        band = pygame.Rect(cont.x, cont.bottom - h, cont.w, h)
+        overlay = pygame.Surface((band.w, band.h))
+        overlay.fill(config.COL_PANEL_HEAD)
+        overlay.set_alpha(238)
+        surf.blit(overlay, band.topleft)
+        pygame.draw.line(surf, config.COL_CYAN, band.topleft, band.topright, 1)
+        title = brief.get("title", "")
+        label = ("FIRST OPEN — " if get_lang() == "en" else "PREMIÈRE OUVERTURE — ") + title
+        widgets.draw_text(surf, label.upper(), (band.x + pad, band.y + 6),
+                          fonts.tiny(bold=True), config.COL_CYAN)
+        y = band.y + 22
+        for ln in lines:
+            widgets.draw_text(surf, ln, (band.x + pad, y), font, config.COL_TEXT)
+            y += font.get_height() + 3
+        btn_label = "GOT IT" if get_lang() == "en" else "COMPRIS"
+        bw = 78
+        btn = pygame.Rect(band.right - bw - pad, band.y + 5, bw, 20)
+        hover = btn.collidepoint(pygame.mouse.get_pos())
+        pygame.draw.rect(surf, config.COL_CYAN if hover else config.COL_BORDER, btn, 1,
+                         border_radius=3)
+        widgets.draw_text(surf, btn_label, btn.center, fonts.tiny(bold=True),
+                          config.COL_CYAN if hover else config.COL_TEXT, align="center")
+        self._brief_btn_rect = btn
 
 
 class WindowManager:
@@ -314,6 +359,13 @@ class WindowManager:
                 self._last_title_click = (w, now)
                 w._drag_off = (event.pos[0] - w.rect.x, event.pos[1] - w.rect.y)
                 return True
+            # bandeau « première ouverture » : le bouton COMPRIS est
+            # intercepté AVANT l'app (il est dessiné par-dessus son contenu)
+            if getattr(w, "first_open_brief", None):
+                btn = getattr(w, "_brief_btn_rect", None)
+                if btn and btn.collidepoint(event.pos):
+                    w.first_open_brief = None
+                    return True
             # sinon : clic dans le contenu → application. Le clic est de toute
             # façon dans le rectangle de la fenêtre : il ne doit JAMAIS
             # « traverser » vers le bureau (icônes/barre des tâches) derrière,

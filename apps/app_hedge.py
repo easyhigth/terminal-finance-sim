@@ -163,6 +163,36 @@ class HedgeApp(DesktopApp):
                 return True
         return False
 
+    def _hedge_before_after(self, ctx):
+        """Perte du portefeuille à marché -10 % avant/après le put proposé
+        (core/trade_preview + crisis_lab sur une copie) — en cache par
+        (pas de marché, strike, maturité)."""
+        key = (self.market.step_count, self.strike_idx, self.years_idx,
+               round(ctx.get("notional", 0.0), -3))
+        cached = getattr(self, "_ba_cache", None)
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        out = None
+        notional = ctx.get("notional", 0.0)
+        if notional > 0:
+            try:
+                from core import crisis_lab
+                from core import trade_preview as tp
+                p = self.app.gs.player
+                before = crisis_lab.reprice(p, self.market, eq_shock=-0.10, dy=0.0)["total"]
+                q = tp.clone_player(p)
+                r = H.buy_put(q, self.market, notional,
+                              H.STRIKE_CHOICES[self.strike_idx],
+                              H.MATURITY_CHOICES[self.years_idx])
+                if r.get("ok"):
+                    after = crisis_lab.reprice(q, self.market, eq_shock=-0.10, dy=0.0)["total"]
+                    out = {"before": before, "after": after}
+            except Exception:
+                from core import crashlog
+                crashlog.swallowed("app_hedge.before_after")
+        self._ba_cache = (key, out)
+        return out
+
     def _buy_put(self):
         p = self.app.gs.player
         if not unlocks.unlocked(p, "hedge"):
@@ -351,7 +381,18 @@ class HedgeApp(DesktopApp):
                               f"{widgets.format_money(ctx.get('premium', 0.0), cur)} "
                               f"({q['premium_rate'] * 100:.2f}% du notionnel)",
                               (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
-            y += 30
+            y += 22
+            # LA pédagogie du hedge : la perte à -10 % AVANT / APRÈS le put
+            # (Labo de crise sur une copie, en cache par pas + réglages)
+            ba = self._hedge_before_after(ctx)
+            if ba:
+                widgets.draw_text(surf, widgets.fit_text(
+                    f"Si marché -10 % : {ba['before']:+,.0f} sans couverture "
+                    f"-> {ba['after']:+,.0f} avec ce put", fonts.tiny(), inner.w),
+                    (inner.x, y), fonts.tiny(), config.COL_WARN)
+                y += 20
+            else:
+                y += 8
         self._buy_btn = pygame.Rect(inner.x, y, 190, 26)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._buy_btn, border_radius=4)
         pygame.draw.rect(surf, config.COL_UP, self._buy_btn, 1, border_radius=4)

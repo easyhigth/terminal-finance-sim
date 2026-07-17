@@ -338,6 +338,12 @@ class BondsScene(Scene, PopupMixin):
                     sr = pygame.Rect(cols["act"] + 50, y - 2, 44, 20)
                     self.buy_rects[q["id"]] = br
                     self.sell_rects[q["id"]] = sr
+                    if br.collidepoint(mp):
+                        # l'impact concret AVANT de cliquer (core/impact_phrases)
+                        from core import impact_phrases as _ip
+                        phrase = _ip.bond_impact(m, q["id"], LOT)
+                        if phrase:
+                            self._tooltip = (phrase, mp)
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, br, border_radius=3)
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, sr, border_radius=3)
                     widgets.draw_text(surf, f"+{LOT}", (br.x + 7, y), fonts.tiny(bold=True), config.COL_UP)

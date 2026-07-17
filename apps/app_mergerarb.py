@@ -144,10 +144,23 @@ class MergerArbApp(DesktopApp):
                 pygame.draw.rect(surf, config.COL_CYAN, btn, 1, border_radius=4)
                 widgets.draw_text(surf, "PRENDRE", btn.center, fonts.tiny(bold=True),
                                   config.COL_CYAN, align="center")
+                if btn.collidepoint(pygame.mouse.get_pos()) and s.get("implied"):
+                    # les DEUX issues chiffrées par action, AVANT de prendre
+                    win = s["offer"] - s["implied"]
+                    pre_offer = s["offer"] / (1 + s["premium"]) if s["premium"] > -1 else s["implied"]
+                    loss = s["implied"] - pre_offer
+                    from core import impact_phrases as _ip
+                    self._arb_tooltip = (
+                        _ip.merger_arb_impact(s["implied"], s["offer"], s["steps_left"])
+                        + f" · conclut : +{win:.2f}/action · rompt : −{loss:.2f}/action",
+                        pygame.mouse.get_pos())
             yy += 56
         widgets.draw_text(surf, "Acheter sous l'offre : gain si l'opération conclut, "
                           "perte si elle rompt.", (inner.x, inner.bottom - 12),
                           fonts.tiny(), config.COL_TEXT_DIM)
+        if getattr(self, "_arb_tooltip", None):
+            widgets.draw_tooltip(surf, *self._arb_tooltip)
+            self._arb_tooltip = None
 
     def _draw_positions(self, surf, body, market, p):
         cur = self._cur()

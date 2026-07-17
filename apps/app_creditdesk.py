@@ -337,7 +337,14 @@ class CreditDeskApp(DesktopApp):
                               f"(Merton + {CDS.MARKET_SPREAD_BPS:.0f} bp de marge) "
                               f"≈ {widgets.format_money(q['spread_bps'] / 1e4 * self.cds_notional, cur)}/an",
                               (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
-            y += 24
+            y += 22
+            # les bps traduits en concret (core/impact_phrases)
+            from core import impact_phrases as _ip
+            widgets.draw_text(surf, widgets.fit_text(
+                _ip.cds_impact(self.market, self.ticker, self.cds_notional,
+                               self.cds_tenor), fonts.tiny(), inner.w),
+                (inner.x, y), fonts.tiny(), config.COL_WARN)
+            y += 20
             self._cds_buy_btn = pygame.Rect(inner.x, y, 220, 26)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._cds_buy_btn,
                              border_radius=4)
@@ -430,12 +437,12 @@ class CreditDeskApp(DesktopApp):
                               f"≈ {widgets.format_money(cost/100 * self.trs_notional, cur)}/an",
                               (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
             y += 22
-            _lab = ("Receiver : encaisse le rendement total, paie le financement"
-                    if self.trs_side == "receiver"
-                    else "Payer : encaisse le financement, paie le rendement total")
-            widgets.draw_text(surf, _lab, (inner.x, y), fonts.tiny(),
-                              config.COL_TEXT_DIM)
-            y += 18
+            from core import impact_phrases as _ip
+            _lab = _ip.trs_impact(self.trs_notional,
+                                  q["ref_rate"] + q["funding_bps"] / 1e4,
+                                  side=self.trs_side)
+            y += widgets.draw_text_wrapped(surf, _lab, (inner.x, y), fonts.tiny(),
+                                           config.COL_WARN, inner.w, line_gap=3) + 4
             self._trs_open_btn = pygame.Rect(inner.x, y, 200, 26)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._trs_open_btn,
                              border_radius=4)

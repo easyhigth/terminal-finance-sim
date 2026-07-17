@@ -79,11 +79,45 @@ def _draw_kind_tabs(surf, rect, kind, accent):
     return rects
 
 
-def _draw_kind_plot(surf, rect, market, ticker, kind):
+def _draw_kind_plot(surf, rect, market, ticker, kind, player=None):
     """Dessine le graphe sélectionné pour `ticker`. Retourne un libellé de
-    légende (ou None s'il n'y a rien à afficher)."""
+    légende (ou None s'il n'y a rien à afficher). Si `player` est fourni et
+    que le graphe est en mode ligne, les ORDRES CONDITIONNELS posés sur ce
+    ticker sont tracés en niveaux horizontaux (stop rouge, target vert) —
+    on VOIT ses stops sur le graphe au lieu de les lire dans une liste."""
     s = market.history_of(ticker, 365) if market else []
-    return _draw_series_plot(surf, rect, s, kind)
+    legend = _draw_series_plot(surf, rect, s, kind)
+    if player is not None and kind == "line" and len(s) >= 2:
+        _draw_order_levels(surf, pygame.Rect(rect).inflate(-_PLOT_INSET * 2,
+                                                           -_PLOT_INSET * 2),
+                           s, player, ticker)
+    return legend
+
+
+def _draw_order_levels(surf, inner, s, player, ticker):
+    """Trace les niveaux stop/target/trailing du joueur sur `ticker` par-
+    dessus le graphe ligne (même échelle que widgets.draw_series)."""
+    lo, hi = min(s), max(s)
+    span = (hi - lo) or 1.0
+    for o in getattr(player, "conditional_orders", None) or []:
+        if o.get("ticker") != ticker:
+            continue
+        level = o.get("trigger")
+        if o.get("kind") == "trailing":
+            level = o.get("best_price", 0) * (1 - o.get("distance_pct", 0) / 100.0)                 if o.get("best_price") else None
+        if not level or not (lo <= level <= hi):
+            continue
+        y = inner.bottom - int((level - lo) / span * inner.h)
+        col = config.COL_DOWN if o.get("kind") in ("stop", "trailing") else config.COL_UP
+        # trait pointillé horizontal (vectoriel)
+        x = inner.x
+        while x < inner.right - 4:
+            pygame.draw.line(surf, col, (x, y), (min(x + 6, inner.right), y), 1)
+            x += 12
+        label = {"stop": "STOP", "target": "TARGET", "trailing": "TRAIL"}.get(
+            o.get("kind"), "ORD")
+        widgets.draw_text(surf, f"{label} {level:,.2f}", (inner.right - 4, y - 12),
+                          fonts.tiny(bold=True), col, align="right")
 
 
 def _draw_series_plot(surf, rect, s, kind):
@@ -242,7 +276,8 @@ class CompanyPopup(DataWindow):
         legend_h = 16
         plot_rect = pygame.Rect(content.x, y, content.w,
                                 max(20, content.bottom - y - legend_h - LABEL_H - 22))
-        legend = _draw_kind_plot(surf, plot_rect, self.market, self.ticker, self.kind)
+        legend = _draw_kind_plot(surf, plot_rect, self.market, self.ticker, self.kind,
+                                 player=getattr(self, "player", None))
         if legend:
             widgets.draw_text(surf, widgets.fit_text(legend, fonts.tiny(), content.w),
                               (content.x, plot_rect.bottom + 4 + LABEL_H),
@@ -298,7 +333,8 @@ class ChartPopup(DataWindow):
         tabs_rect = pygame.Rect(content.x, content.y, content.w, 22)
         self._kind_rects = _draw_kind_tabs(surf, tabs_rect, self.kind, self.accent)
         plot_rect = pygame.Rect(content.x, content.y + 28, content.w, content.h - 28 - 18 - LABEL_H)
-        legend = _draw_kind_plot(surf, plot_rect, self.market, self.ticker, self.kind)
+        legend = _draw_kind_plot(surf, plot_rect, self.market, self.ticker, self.kind,
+                                 player=getattr(self, "player", None))
         if legend:
             widgets.draw_text(surf, widgets.fit_text(f"{self.ticker}  {legend}", fonts.tiny(bold=True), content.w),
                               (content.x, plot_rect.bottom + 4 + LABEL_H),
@@ -923,6 +959,7 @@ class PopupMixin:
         if not market or market.metrics(ticker.upper()) is None:
             return None
         w = CompanyPopup(ticker, market, pos=self._popup_pos(), accent=accent)
+        w.player = self.app.gs.player   # niveaux des ordres conditionnels sur le graphe
         self.popups.append(w)
         if len(self.popups) > self._MAX_POPUPS:
             self.popups.pop(0)

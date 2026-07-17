@@ -87,3 +87,26 @@ def test_delete_removes_backup_too(save_dir):
     gs.save("slot_test")   # crée le .bak
     assert GameState.delete("slot_test") is True
     assert GameState.load("slot_test") is None
+
+
+# ---------------------------------------------------- rotation d'autosaves
+def test_autosave_rotation_keeps_generations(save_dir, monkeypatch):
+    from core import autosave_settings
+    monkeypatch.setattr(autosave_settings, "get_interval", lambda: 0)
+    gs = GameState()
+    for i, name in enumerate(["V1", "V2", "V3", "V4"]):
+        gs.player.name = name
+        gs.last_saved = 0.0
+        gs.save(config.AUTOSAVE_SLOT)
+    assert GameState.load(config.AUTOSAVE_SLOT).player.name == "V4"
+    assert GameState.load(config.AUTOSAVE_HISTORY_SLOTS[0]).player.name == "V3"
+    assert GameState.load(config.AUTOSAVE_HISTORY_SLOTS[1]).player.name == "V2"
+
+
+def test_manual_slots_do_not_rotate(save_dir, monkeypatch):
+    gs = GameState()
+    gs.player.name = "M1"
+    gs.save("slot1")
+    gs.player.name = "M2"
+    gs.save("slot1")
+    assert GameState.load(config.AUTOSAVE_HISTORY_SLOTS[0]) is None

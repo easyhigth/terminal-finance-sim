@@ -36,3 +36,26 @@ jobs:
           SDL_VIDEODRIVER: dummy
           SDL_AUDIODRIVER: dummy
         run: pytest
+
+  screenshots:
+    # Fumée du harnais de captures : chaque écran capturé doit se rendre
+    # sans lever (a déjà attrapé un crash de scrollbar). Les images ne sont
+    # PAS committées ici — juste exposées en artefact pour inspection.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Installer les dépendances
+        run: pip install numpy scipy pygame
+      - name: Générer les captures (headless)
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: python scripts/make_screenshots.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: docs/screenshots/*.png
+          retention-days: 14

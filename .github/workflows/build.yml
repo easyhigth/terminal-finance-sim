@@ -3,6 +3,7 @@ name: build
 on:
   push:
     branches: [main]
+    tags: ["v*"]      # un tag v1.2.3 produit une release VERSIONNÉE
   workflow_dispatch:  # permet de lancer manuellement depuis GitHub
 
 permissions:
@@ -60,14 +61,35 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Télécharger tous les artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
+      # tag v* : release VERSIONNÉE, immuable, avec notes générées — c'est
+      # celle qu'on partage aux joueurs. La release glissante "latest-build"
+      # (ci-dessous) continue de suivre main pour les curieux.
+      - name: Créer la release versionnée (tag v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: TERMINAL ${{ github.ref_name }}
+          generate_release_notes: true
+          body: |
+            Versions exécutables de TERMINAL — Finance Career Simulator.
+            - `TERMINAL-Windows.zip` : dézipper et lancer `TERMINAL.exe`
+            - `TERMINAL-macOS.zip` : dézipper et lancer `TERMINAL.app`
+              (clic droit → Ouvrir la première fois : app non signée)
+          files: |
+            artifacts/TERMINAL-Windows/TERMINAL-Windows.zip
+            artifacts/TERMINAL-macOS/TERMINAL-macOS.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Créer / mettre à jour la release "latest"
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest-build

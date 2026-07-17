@@ -355,20 +355,30 @@ class App:
                     crashlog.swallowed("main")
 
     def run(self):
+        # overlay de perf (FINSIM_DEBUG=1) : FPS + ms par phase de frame —
+        # coût nul en jeu normal (désactivé), cf. ui/perf_overlay.py.
+        from ui.perf_overlay import PerfOverlay
+        perf = PerfOverlay()
         while self.running:
             dt = self.clock.tick(config.FPS) / 1000.0
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
-                    self.toggle_fullscreen()
-                    continue
-                self._safe_call(lambda event=event: self.pages.handle_event(event), "handle_event")
+            with perf.phase("events"):
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        self.running = False
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
+                        self.toggle_fullscreen()
+                        continue
+                    self._safe_call(lambda event=event: self.pages.handle_event(event), "handle_event")
             if self.gs.player.market_seed:
                 self.pending_market_steps += self.sim_clock.advance(dt, config.DAYS_PER_STEP)
-            self._safe_call(lambda: self.pages.update(dt), "update")
-            self._safe_call(lambda: self.pages.draw(self.screen), "draw")
-            pygame.display.flip()
+            with perf.phase("update"):
+                self._safe_call(lambda: self.pages.update(dt), "update")
+            with perf.phase("draw"):
+                self._safe_call(lambda: self.pages.draw(self.screen), "draw")
+            perf.draw(self.screen)
+            with perf.phase("flip"):
+                pygame.display.flip()
+            perf.frame()
 
         pygame.quit()
         sys.exit(0)

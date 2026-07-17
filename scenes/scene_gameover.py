@@ -50,6 +50,10 @@ class GameOverScene(Scene):
         # run définitif en hardcore : on efface l'autosave
         if p.hardcore:
             GameState.delete(config.AUTOSAVE_SLOT)
+            # la rotation d'autosaves ne doit pas permettre de ressusciter
+            # un run hardcore terminé : on purge aussi les générations.
+            for slot in config.AUTOSAVE_HISTORY_SLOTS:
+                GameState.delete(slot)
         market = getattr(self.app, "market", None)
         self.score = score_mod.compute_final_score(p, market)
         # panthéon local : le run terminé entre au classement (une seule fois

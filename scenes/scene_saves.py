@@ -61,8 +61,14 @@ class SavesScene(Scene):
 
     def _refresh(self):
         """(Re)construit la liste des slots affichés avec leurs métadonnées."""
-        # ordre : autosave en tête, puis slots manuels
-        self.slots = [config.AUTOSAVE_SLOT] + list(config.SAVE_SLOTS)
+        # ordre : autosave en tête (+ ses générations précédentes quand
+        # elles existent — rotation, cf. GameState._rotate_autosaves), puis
+        # slots manuels
+        self.slots = [config.AUTOSAVE_SLOT]
+        for hist in config.AUTOSAVE_HISTORY_SLOTS:
+            if GameState.slot_meta(hist) is not None:
+                self.slots.append(hist)
+        self.slots += list(config.SAVE_SLOTS)
         self.meta = {s: GameState.slot_meta(s) for s in self.slots}
         # rectangles de boutons recalculés au draw
         self._load_rects = {}

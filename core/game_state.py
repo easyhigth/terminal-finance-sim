@@ -70,6 +70,7 @@ class PlayerState:
     ma_owned: dict = field(default_factory=dict)        # sociétés M&A détenues : ticker -> instance
     ma_history: list = field(default_factory=list)      # historique M&A (cessions, défauts)
     eval_state: dict = field(default_factory=dict)     # examen en pause (reprise possible)
+    seen_questions: list = field(default_factory=list) # identités des questions déjà posées (missions + examens) — jamais reposées (core/question_log.py)
     realized_pnl: float = 0.0                          # P&L réalisé cumulé (ventes)
     total_fees_paid: float = 0.0                       # commissions/frais d'exécution cumulés (achats/ventes/short/cover)
     total_margin_penalty: float = 0.0                  # surcoûts cumulés de liquidation forcée (appels de marge)

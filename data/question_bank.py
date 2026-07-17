@@ -771,7 +771,7 @@ def available_pool(grade_index, track="General", lang="fr"):
             and (q["track"] == "General" or q["track"] == track)]
 
 
-def for_grade(grade_index, track="General", count=5, rng=None, lang="fr"):
+def for_grade(grade_index, track="General", count=5, rng=None, lang="fr", avoid=None):
     """
     Retourne une sélection variée de questions adaptées au grade visé.
 
@@ -779,24 +779,40 @@ def for_grade(grade_index, track="General", count=5, rng=None, lang="fr"):
     tout en introduisant de l'aléatoire : deux évaluations successives au même
     grade ne posent donc pas la même série. Inclut les questions 'General' et
     celles de la voie choisie, de manière cumulative.
+
+    `avoid` : ensemble d'identités déjà vues (cf. core/question_log — de la
+    forme "b:<id>"). On tire EN PRIORITÉ des questions jamais posées ; on ne
+    complète avec des questions déjà vues que si la banque du grade est épuisée
+    (tolérance de répétition en révision, jamais assez pour vider le pool).
     """
     rng = rng or random
     pool = available_pool(grade_index, track, lang)
     if not pool:
         return []
+    avoid = avoid or set()
     # poids : plus la question est proche du grade visé, plus elle est probable ;
     # on favorise aussi une difficulté en phase avec le grade.
     def weight(q):
         proximity = 1.0 / (1 + abs(q["grade"] - grade_index))
         return proximity * (1 + 0.15 * q["diff"])
-    weights = [weight(q) for q in pool]
-    # tirage sans remise pondéré
-    chosen = []
-    remaining = list(zip(pool, weights))
-    n = min(count, len(pool))
-    for _ in range(n):
-        items, w = zip(*remaining)
-        pick = rng.choices(range(len(items)), weights=w, k=1)[0]
-        chosen.append(items[pick])
-        remaining.pop(pick)
-    return chosen
+
+    def _draw(cands, k):
+        """Tirage sans remise pondéré de `k` questions parmi `cands`."""
+        chosen = []
+        remaining = [(q, weight(q)) for q in cands]
+        k = min(k, len(remaining))
+        for _ in range(k):
+            items, w = zip(*remaining)
+            pick = rng.choices(range(len(items)), weights=w, k=1)[0]
+            chosen.append(items[pick])
+            remaining.pop(pick)
+        return chosen
+
+    unseen = [q for q in pool if ("b:" + str(q["id"])) not in avoid]
+    picked = _draw(unseen, count)
+    if len(picked) < count:
+        # banque du grade épuisée : on complète avec des questions déjà vues
+        picked_ids = {id(q) for q in picked}
+        rest = [q for q in pool if id(q) not in picked_ids]
+        picked += _draw(rest, count - len(picked))
+    return picked

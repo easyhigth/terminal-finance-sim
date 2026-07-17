@@ -47,17 +47,19 @@ class EvaluationScene(Scene):
             self.return_to = saved.get("return_to", self.return_to)
             self.state = "question"
         else:
+            from core import question_log
+            avoid = question_log.seen_set(p)   # jamais une question déjà vue (mission ou examen)
             if self.mode == "cert":
                 from core import certifications as C
                 prog = C.PROGRAMS[self.cert_program]
                 tier = kwargs.get("tier", prog["tier"])
-                self.items = exam.generate(p.grade_index, difficulty=tier, n=C.EXAM_N)
+                self.items = exam.generate(p.grade_index, difficulty=tier, n=C.EXAM_N, avoid=avoid)
                 self.pass_threshold = C.PASS_THRESHOLD
                 self.target_grade = f"{prog['name']} niveau {self.cert_level + 1}"
             else:
                 target = min(p.grade_index + 1, len(config.GRADES) - 1)
                 self.target_grade = config.GRADES[target]
-                self.items = exam.generate(p.grade_index)
+                self.items = exam.generate(p.grade_index, avoid=avoid)
                 self.pass_threshold = exam.PASS_THRESHOLD
             self.idx = 0
             self.score = 0
@@ -211,8 +213,9 @@ class EvaluationScene(Scene):
             self.state = "question"
 
     def _finish(self):
-        from core import career
+        from core import career, question_log
         p = self.app.gs.player
+        question_log.mark_seen(p, self.items)   # questions de cet examen : jamais reposées
         p.eval_state = {}                 # examen terminé : on efface l'état en pause
         self.app.pending_market_steps += 1    # passer une éval fait avancer le temps d'un tic
         ratio = self.score / max(1, len(self.items))

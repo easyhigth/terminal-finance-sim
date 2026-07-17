@@ -513,7 +513,9 @@ def _concept_from_bank(rng, max_grade):
     if not pool:
         return g_def(rng)
     q = rng.choice(pool)
-    return _mcq(q["q"], list(q["choices"]), q["answer"], q["expl"], rng)
+    it = _mcq(q["q"], list(q["choices"]), q["answer"], q["expl"], rng)
+    it["src_id"] = q["id"]   # garde l'identité de banque -> jamais reposée après une mission
+    return it
 
 
 # ===========================================================================
@@ -740,23 +742,29 @@ def lesson_for_item(item):
     return item.get("lesson")
 
 
-def generate(grade_index, rng=None, n=None, difficulty=None):
+def generate(grade_index, rng=None, n=None, difficulty=None, avoid=None):
     """Génère un examen : liste d'items variés, calibrés sur le grade.
-    `difficulty` force un tier (utilisé par les certifications)."""
+    `difficulty` force un tier (utilisé par les certifications).
+    `avoid` : ensemble d'identités déjà vues (core/question_log) — aucune
+    question déjà posée (en mission ou dans un examen antérieur) n'est reprise.
+    On tolère plus de tentatives quand `avoid` est fourni : l'espace généré est
+    immense, mais filtrer le déjà-vu demande quelques tirages de plus."""
+    from core import question_log
     rng = rng or random
     tier = difficulty if difficulty is not None else exam_tier(grade_index)
     gens = TIER_GENERATORS[max(0, min(4, tier))]
     n = n or num_questions(grade_index)
     items = []
-    seen = set()
+    seen = set(avoid or ())           # déjà-vu inter-sessions + dédoublonnage local
+    cap = n * (24 if avoid else 12)
     attempts = 0
-    while len(items) < n and attempts < n * 12:
+    while len(items) < n and attempts < cap:
         attempts += 1
         gen = rng.choice(gens)
         it = gen(rng)
         if not it:
             continue
-        key = it["prompt"]
+        key = question_log.identity(it) or ("g:" + str(it.get("prompt", "")))
         if key in seen:
             continue
         seen.add(key)

@@ -51,12 +51,13 @@ def _rep_base(grade_index):
 # ---------------------------------------------------------------------------
 # Helpers de construction d'items
 # ---------------------------------------------------------------------------
-def _mcq(prompt, choices, correct_idx, expl, rng, chart=None):
+def _mcq(prompt, choices, correct_idx, expl, rng, chart=None, src_id=None):
     order = list(range(len(choices)))
     rng.shuffle(order)
     shuffled = [choices[i] for i in order]
     return {"kind": "mcq", "prompt": prompt, "choices": shuffled,
-            "answer": order.index(correct_idx), "expl": expl, "chart": chart}
+            "answer": order.index(correct_idx), "expl": expl, "chart": chart,
+            "src_id": src_id}   # id de banque conservé -> marquage « déjà vue »
 
 
 def check_fill(item, value):
@@ -67,12 +68,15 @@ def check_fill(item, value):
     return abs(value - ans) <= max(1e-9, abs(ans) * item.get("tol", 0.05))
 
 
-def _bank_items(grade_index, rng, count, track="General"):
+def _bank_items(grade_index, rng, count, track="General", avoid=None):
     """Pioche `count` questions de la banque d'examens (déjà rng-aware, donc
-    déterministe) et les adapte au format d'item de mission."""
+    déterministe) et les adapte au format d'item de mission. `avoid` : identités
+    déjà vues (core/question_log) — évitées en priorité (cf. for_grade)."""
     from core.i18n import get_lang
-    picked = question_bank.for_grade(grade_index, track, count, rng=rng, lang=get_lang())
-    return [_mcq(q["q"], list(q["choices"]), q["answer"], q["expl"], rng) for q in picked]
+    picked = question_bank.for_grade(grade_index, track, count, rng=rng,
+                                     lang=get_lang(), avoid=avoid)
+    return [_mcq(q["q"], list(q["choices"]), q["answer"], q["expl"], rng, src_id=q["id"])
+            for q in picked]
 
 
 _TIER_TITLES = {
@@ -150,13 +154,18 @@ def generate(grade_index, market, rng=None, region=None, track="General", player
     flavor = _TRACK_FLAVOR.get(track)
     if flavor:
         brief += " " + _L(*flavor)
+    # questions déjà posées à ce joueur (missions + examens) -> évitées en priorité
+    avoid = None
+    if player is not None:
+        from core import question_log
+        avoid = question_log.seen_set(player)
     if tier == "portfolio" and player is not None:
         from core import portfolio_missions as PM
         n_practical = min(2, MAX_ITEMS)
         items = PM.practical_items_for_track(player, market, count=n_practical, rng=rng)
-        items += _bank_items(grade_index, rng, MAX_ITEMS - n_practical, track=track)
+        items += _bank_items(grade_index, rng, MAX_ITEMS - n_practical, track=track, avoid=avoid)
     else:
-        items = _bank_items(grade_index, rng, MAX_ITEMS, track=track)
+        items = _bank_items(grade_index, rng, MAX_ITEMS, track=track, avoid=avoid)
     return {"grade": grade_index, "kind": tier, "title": title, "brief": brief,
             "items": items, "reward_rep": _rep_base(grade_index), "reward_cash": 0,
             "charts": {}}

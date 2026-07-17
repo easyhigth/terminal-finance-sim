@@ -144,8 +144,10 @@ class MissionScene(Scene):
             self.state = "question"
 
     def _finish(self):
-        from core import career
+        from core import career, question_log
         p = self.app.gs.player
+        # les questions de banque servies ne seront jamais reposées (mission ou examen)
+        question_log.mark_seen(p, [it for it in self.mission["items"] if it.get("src_id")])
         total = len(self.mission["items"])
         self.rep_gain, self.cash_gain = M.compute_rewards(self.mission, self.score, total,
                                                   player=self.app.gs.player)

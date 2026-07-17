@@ -28,7 +28,7 @@ from core import liquidity as liq
 from core import portfolio as pf
 from core import securitisation as SEC
 from core import structured as S
-from ui import fonts, widgets
+from ui import fonts, style, widgets
 from ui.order_prompt import ConditionalOrderMixin
 from ui.popups import PopupMixin
 
@@ -52,6 +52,9 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
     def on_open(self):
         self.market = self.app.ensure_market()
         self.init_popups()
+        self._story = None          # fiche « pourquoi cette ligne a bougé »
+        self._pnl_rects = {}
+        self._flux_cache = None
         self._name_rects = {}
         self._chart_rects = {}
         self._row_cls = {}
@@ -97,6 +100,23 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         self.init_order_prompt()
 
     # ------------------------------------------------------- popups (fiches)
+    def _position_flux(self):
+        """{(cls, label): flux/tour} (core/position_flows), en CACHE par pas
+        de marché — le calcul isole chaque position sur un clone, on ne le
+        refait jamais à chaque frame."""
+        step = self.market.step_count
+        cached = getattr(self, "_flux_cache", None)
+        if cached is None or cached[0] != step:
+            from core import position_flows
+            try:
+                self._flux_cache = (step, position_flows.per_position(
+                    self.app.gs.player, self.market))
+            except Exception:
+                from core import crashlog
+                crashlog.swallowed("app_book.position_flux")
+                self._flux_cache = (step, {})
+        return self._flux_cache[1]
+
     def _popup_pos(self):
         """Cascade relative à CETTE fenêtre (pas à l'écran entier, contrairement
         au défaut de PopupMixin) : la fiche s'ouvre près de la fenêtre qui l'a
@@ -347,6 +367,20 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
     # ----------------------------------------------------------------- events
     def handle_event(self, event, rect):
         self._last_rect = rect
+        if getattr(self, "_story", None):
+            # fiche de ligne MODALE : n'importe quel clic/touche la ferme
+            if event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN):
+                self._story = None
+                return True
+            return False
+        if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
+            for (cls, label), r in getattr(self, "_pnl_rects", {}).items():
+                if r.collidepoint(event.pos):
+                    from core import position_flows
+                    self._story = position_flows.position_story(
+                        self.app.gs.player, self.market, cls, label)
+                    if self._story is not None:
+                        return True
         if self._liq_confirm:
             # confirmation « TOUT VENDRE » MODALE : absorbe tout
             return self._handle_liq_confirm_event(event)
@@ -606,6 +640,14 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
 
         inner = widgets.draw_panel(surf, table, "Positions (toutes classes)", config.COL_CYAN)
         rows = analytics.holdings_table(p, m)
+        if rows:
+            # somme des flux par tour de toutes les positions : le PORTAGE du
+            # book, visible en permanence (survol d'une ligne pour le détail)
+            total_flux = sum(self._position_flux().values())
+            fcol = config.COL_UP if total_flux >= 0 else config.COL_DOWN
+            widgets.draw_text(surf, f"Flux passif net : {total_flux:+,.0f}/tour",
+                              (table.right - 12, table.y + 6), fonts.tiny(bold=True),
+                              fcol, align="right")
         if not rows:
             widgets.draw_text_wrapped(
                 surf, "Aucune position. Utilisez la barre de trading rapide ci-dessus, le "
@@ -627,6 +669,7 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
             self._chart_rects = {}
             self._row_cls = {}
             self._order_rects = {}
+            self._pnl_rects = {}
             self._tooltip = None
             prev_clip = surf.get_clip()
             surf.set_clip(list_area)
@@ -667,15 +710,21 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
                     hov = name_rect.collidepoint(mp) or (chart_rect and chart_rect.collidepoint(mp))
                     if hov:
                         pygame.draw.rect(surf, config.COL_PANEL_HEAD, (inner.x - 4, y - 1, inner.w + 8, ROW_H - 2))
+                        # flux par tour de CETTE position (dividende, coupon,
+                        # roll, intérêt, frais d'emprunt d'un short…) — mesuré
+                        # sur les vrais accruals du moteur (core/position_flows)
+                        flux = self._position_flux().get((r["cls"], label))
+                        tip = ""
+                        if flux is not None and abs(flux) >= 0.5:
+                            verb = "rapporte" if flux >= 0 else "coûte"
+                            tip = (f"Cette position vous {verb} "
+                                   f"{widgets.format_money(abs(flux), cur)}/tour")
                         if is_stock:
                             dy = m.metrics(label)["div_yield"]
                             if dy:
-                                sign = -1.0 if r["short"] else 1.0
-                                income = sign * live_value * dy
-                                verb = "perçu" if income >= 0 else "payé (short)"
-                                self._tooltip = (
-                                    f"Dividende estimé : {widgets.format_money(abs(income), cur)}/an "
-                                    f"{verb} ({dy*100:.1f}% de rendement).", mp)
+                                tip += (" · " if tip else "") + f"rendement {dy*100:.1f}%/an"
+                        tip += (" · " if tip else "") + "clic sur le P&L : détail de la ligne"
+                        self._tooltip = (tip, mp)
                     name_label = widgets.fit_text(r["name"], fonts.small(bold=True), name_w - 4) \
                         + (" (S)" if r["short"] else "")
                     name_col = config.COL_DOWN if r["short"] else kcol
@@ -688,6 +737,8 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
                                       (cols[5][1], y), fonts.tiny(), config.COL_TEXT)
                     widgets.draw_text(surf, f"{'+' if live_pnl>=0 else ''}{live_pnl_pct:+.1f}%",
                                       (cols[6][1], y), fonts.tiny(bold=True), pcol)
+                    self._pnl_rects[(r["cls"], label)] = pygame.Rect(
+                        cols[6][1] - 4, y - 1, 70, ROW_H - 2)
                     if is_stock:
                         ord_rect = self._order_rects[label]
                         hov_ord = ord_rect.collidepoint(mp)
@@ -718,8 +769,48 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
             self._draw_order_prompt(surf, rect)
         if self._liq_confirm:
             self._draw_liq_confirm(surf, rect)
+        if getattr(self, "_story", None):
+            self._draw_story(surf, rect)
         if self._tooltip:
             widgets.draw_tooltip(surf, *self._tooltip)
+
+    def _draw_story(self, surf, rect):
+        """Fiche « Pourquoi cette ligne a bougé » (core/position_flows.
+        position_story) : effet prix, P&L réalisé et frais cumulés sur ce
+        titre (journal de trades), flux par tour. Clic n'importe où : fermer."""
+        s = self._story
+        cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
+        overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 150))
+        surf.blit(overlay, rect.topleft)
+        box = pygame.Rect(0, 0, min(400, rect.w - 30), 210)
+        box.center = rect.center
+        style.draw_card(surf, box, bg=config.COL_PANEL, border=config.COL_CYAN,
+                        radius=style.RADIUS_MD)
+        widgets.draw_text(surf, f"POURQUOI {s['label']} A BOUGÉ",
+                          (box.x + 12, box.y + 10), fonts.small(bold=True), config.COL_CYAN)
+        y = box.y + 36
+        lines = [
+            ("Effet prix (latent)", s["price_effect"],
+             f"{s['qty']:g} × ({s['price']:.2f} − PRU {s['avg']:.2f})"),
+            ("P&L réalisé sur ce titre", s["realized"],
+             f"{s['trades']} trade(s) au journal"),
+            ("Frais payés sur ce titre", -s["fees"], "commissions cumulées"),
+            ("Flux par tour actuel", s["flux"], "dividende/coupon/portage"),
+        ]
+        for label, val, note in lines:
+            col = config.COL_UP if val >= 0 else config.COL_DOWN
+            widgets.draw_text(surf, label, (box.x + 12, y), fonts.tiny(), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, f"{val:+,.0f}", (box.x + 230, y), fonts.tiny(bold=True), col)
+            widgets.draw_text(surf, widgets.fit_text(note, fonts.tiny(), box.w - 300),
+                              (box.x + 290, y), fonts.tiny(), config.COL_TEXT_DIM)
+            y += 22
+        total = s["price_effect"] + s["realized"] - s["fees"]
+        widgets.draw_text(surf, f"Bilan de la ligne : {total:+,.0f} {cur}",
+                          (box.x + 12, y + 8), fonts.small(bold=True),
+                          config.COL_UP if total >= 0 else config.COL_DOWN)
+        widgets.draw_text(surf, "clic pour fermer", (box.centerx, box.bottom - 16),
+                          fonts.tiny(), config.COL_TEXT_DIM, align="center")
 
     def _draw_side_panel(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, "Analyse globale", config.COL_AMBER)

@@ -81,6 +81,11 @@ def place_twap(player, market, asset_class, key, side, total_qty, steps, label=N
         "steps_left": int(steps),
         "label": label or key,
         "created_step": getattr(market, "step_count", 0),
+        # suivi d'exécution : prix au moment du POSER (référence) et cumul
+        # des tranches exécutées -> "votre TWAP obtient X vs Y au départ"
+        "start_price": market.price_of(key) if hasattr(market, "price_of") else None,
+        "filled_qty": 0.0,
+        "filled_value": 0.0,
     }
     player.pending_orders.append(order)
     return {"ok": True, "order": order}
@@ -147,6 +152,10 @@ def execute_due(player, market):
         if r.get("ok"):
             order["remaining"] -= chunk
             order["steps_left"] -= 1
+            fill_px = r.get("price")
+            if fill_px:
+                order["filled_qty"] = order.get("filled_qty", 0.0) + chunk
+                order["filled_value"] = order.get("filled_value", 0.0) + chunk * fill_px
             executed.append({
                 "id": order["id"],
                 "asset_class": order["asset_class"],

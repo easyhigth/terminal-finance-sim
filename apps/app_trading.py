@@ -178,10 +178,20 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         if not high_impact and not large_sell:
             return False
         reason = "large_position" if (large_sell and not high_impact) else "high_impact"
+        # panneau AVANT -> APRÈS (core/trade_preview) : calculé UNE fois à
+        # l'ouverture de la boîte (la VaR coûte), affiché par la modale.
+        from core import trade_preview as _tp
+        if side == "buy":
+            pv = _tp.preview(p, self.market, lambda q, mk: PF.buy(q, mk, tk, qty))
+        else:
+            pv = _tp.preview(p, self.market, lambda q, mk: PF.sell(q, mk, tk, qty))
+        stress = _tp.stress_compare(p, self.market, pv.get("player_after"))
         self._confirm_pending = {
             "side": side, "ticker": tk, "qty": qty, "notional": notional,
             "ratio": order_confirm.impact_ratio(p, self.market, notional),
             "reason": reason,
+            "preview": pv, "stress": stress,
+            "cost": _tp.execution_cost(p, self.market, tk, qty, side),
         }
         return True
 
@@ -454,8 +464,12 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         # pouvoir d'achat — version compacte si la fenêtre est étroite (le
         # libellé complet passait SUR la barre de recherche à la taille mini)
         st = PM.margin_status(p, self.market)
+        cushion = st.get("cushion_pct")
         bp_full = (f"Pouvoir d'achat {widgets.format_money(st['buying_power'], cur)} · "
                    f"levier {st['leverage']:.2f}x")
+        if cushion is not None and cushion < 40.0:
+            # distance à l'appel de marge : visible dès qu'elle se resserre
+            bp_full += f" · coussin de marge {cushion:.0f}%"
         bp_short = f"PA {widgets.format_money(st['buying_power'], cur)}"
         bp_avail = rect.right - pad - (sr.right + 12)
         bp_font = fonts.small(bold=True)
@@ -515,9 +529,12 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         # réserver une bande visible sans qu'ils soient enterrés hors écran)
         orders = self._cond_orders()
         cond_h = self.cond_band_height(orders)
+        pending = getattr(p, "pending_orders", None) or []
+        twap_h = (16 * min(3, len(pending)) + 20) if pending else 0
         list_top = qy + 30
         list_area = pygame.Rect(rect.x + pad, list_top, rect.w - 2 * pad,
-                                rect.bottom - list_top - 30 - cond_h - (6 if cond_h else 0))
+                                rect.bottom - list_top - 30 - cond_h - (6 if cond_h else 0)
+                                - twap_h - (6 if twap_h else 0))
         self._list_rect = list_area
         style.draw_card(surf, list_area, bg=config.COL_BG, border=config.COL_BORDER,
                         radius=style.RADIUS_MD)
@@ -528,6 +545,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
                           fonts.tiny(bold=True), config.COL_TEXT_DIM)
         rows = self._rows()
         self._buy_rects, self._sell_rects, self._order_rects, self._twap_rects = {}, {}, {}, {}
+        self._cost_tooltip = None   # (ticker, side) si un bouton d'ordre est survolé
         body = pygame.Rect(list_area.x, list_area.y + 22, list_area.w, list_area.h - 24)
         prev_clip = surf.get_clip()
         surf.set_clip(body)
@@ -558,6 +576,26 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         else:
             self._draw_feed(surf, rect, msg_y, pad)
 
+        if pending:
+            # TWAP EN COURS : tranches restantes + prix moyen obtenu vs prix
+            # au moment du POSER — on suit la promesse de l'ordre fractionné
+            ty = list_area.bottom + 4
+            widgets.draw_text(surf, "TWAP EN COURS", (list_area.x + 4, ty),
+                              fonts.tiny(bold=True), config.COL_CYAN)
+            ty += 16
+            for o in pending[:3]:
+                done = o["steps_total"] - o["steps_left"]
+                txt = (f"{'ACHAT' if o['side'] == 'buy' else 'VENTE'} {o['key']} · "
+                       f"{done}/{o['steps_total']} tranches · reste {o['remaining']:g}")
+                if o.get("filled_qty"):
+                    avg_px = o["filled_value"] / o["filled_qty"]
+                    txt += f" · prix moyen {avg_px:.2f}"
+                    if o.get("start_price"):
+                        drift = (avg_px / o["start_price"] - 1.0) * 100.0
+                        txt += f" ({drift:+.2f}% vs départ)"
+                widgets.draw_text(surf, widgets.fit_text(txt, fonts.tiny(), list_area.w - 8),
+                                  (list_area.x + 4, ty), fonts.tiny(), config.COL_TEXT_DIM)
+                ty += 16
         if self._order_prompt is not None:
             self._draw_order_prompt(surf, rect)
         if self._twap_prompt is not None:
@@ -566,6 +604,22 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
             self._draw_depth(surf, rect)
         if self._confirm_pending is not None:
             self._draw_confirm_dialog(surf, rect)
+        elif getattr(self, "_cost_tooltip", None):
+            # survol d'un bouton ACHETER/VENDRE : coût réel + poids de la
+            # ligne après l'ordre, AVANT de cliquer (core/trade_preview)
+            tk, side = self._cost_tooltip
+            qty = self._qty_for_ticker(tk)
+            if qty > 0:
+                from core import trade_preview as _tp
+                cost = _tp.execution_cost(p, self.market, tk, qty, side)
+                if cost:
+                    txt = (f"Coût réel ≈ {widgets.format_money(cost['total'], cur)} "
+                           f"({cost['total_pct']:.2f}%)")
+                    if side == "buy":
+                        w_after = _tp.position_weight_after(p, self.market, tk, qty)
+                        if w_after is not None:
+                            txt += f" · la ligne fera {w_after:.1f}% du portefeuille"
+                    widgets.draw_tooltip(surf, txt, pygame.mouse.get_pos())
 
     def _draw_confirm_dialog(self, surf, rect):
         """Boîte de confirmation modale pour un ordre à fort impact (>30% du
@@ -574,7 +628,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         overlay = pygame.Surface(rect.size, pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 160))
         surf.blit(overlay, rect.topleft)
-        box = pygame.Rect(0, 0, min(340, rect.w - 40), 150)
+        box = pygame.Rect(0, 0, min(440, rect.w - 40), 336)
         box.center = rect.center
         is_large = c.get("reason") == "large_position"
         border_col = config.COL_WARN if is_large else config.COL_AMBER
@@ -593,8 +647,26 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         else:
             widgets.draw_text(surf, f"Soit {c['ratio']*100:.0f}% de votre patrimoine net en un seul ordre.",
                               (box.x + 12, box.y + 54), fonts.tiny(), config.COL_TEXT_DIM)
-        widgets.draw_text(surf, "Confirmer ?", (box.x + 12, box.y + 76),
-                          fonts.tiny(), config.COL_TEXT_DIM)
+        # coût d'exécution réel (commission + spread + impact)
+        y = box.y + 74
+        cost = c.get("cost")
+        if cost:
+            widgets.draw_text_wrapped(
+                surf,
+                f"Coût réel ≈ {widgets.format_money(cost['total'], cur)} "
+                f"({cost['total_pct']:.2f}% de l'ordre) — commission "
+                f"{widgets.format_money(cost['fee'], cur)}, spread+impact "
+                f"{widgets.format_money(cost['spread_impact'], cur)}",
+                (box.x + 12, y), fonts.tiny(), config.COL_WARN, box.w - 24)
+            y += 32
+        # panneau AVANT -> APRÈS + stress (ui/preview_panel)
+        from ui import preview_panel
+        if c.get("preview"):
+            y += preview_panel.draw(surf, pygame.Rect(box.x + 12, y, box.w - 24, 120),
+                                    c["preview"], cur=cur) + 6
+        if c.get("stress"):
+            preview_panel.draw_stress(surf, pygame.Rect(box.x + 12, y, box.w - 24, 80),
+                                      c["stress"], cur=cur)
         self._confirm_yes_rect = pygame.Rect(box.x + 12, box.bottom - 32, box.w - 88, 24)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._confirm_yes_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_AMBER, self._confirm_yes_rect, 1, border_radius=4)
@@ -758,6 +830,10 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
             self._buy_rects[tk] = br
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, br, border_radius=3)
             widgets.draw_text(surf, "ACHETER", br.center, fonts.tiny(bold=True), config.COL_UP, align="center")
+            # survol ACHETER : coût réel + poids de la ligne après l'ordre —
+            # l'impact se lit AVANT de cliquer (cf. core/trade_preview)
+            if br.collidepoint(pygame.mouse.get_pos()):
+                self._cost_tooltip = (tk, "buy")
             if held > 0:
                 sre = pygame.Rect(r.right - 134, r.y, 62, ROW_H - 4)
                 self._sell_rects[tk] = sre

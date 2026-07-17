@@ -142,9 +142,15 @@ def margin_status(player, market):
     # appel de marge dès que l'equity passe sous la marge de maintenance
     # (y compris equity négative : c'est le cas le plus grave)
     call = gross > 0 and eq < _maint_margin(player) * gross
+    # COUSSIN de marge : de combien (en % de l'exposition) l'equity dépasse
+    # la marge de maintenance — la « distance à l'appel de marge » affichée
+    # par l'app Trading pour que la liquidation ne surprenne plus personne.
+    cushion_pct = ((eq - _maint_margin(player) * gross) / gross * 100.0
+                   if gross > 0 else None)
     return {"equity": eq, "gross": gross, "leverage": (gross / eq) if eq > 0 else float("inf"),
             "max_leverage": maxlev, "buying_power": buying_power,
-            "borrowed": max(0.0, -player.cash), "margin_call": call}
+            "borrowed": max(0.0, -player.cash), "margin_call": call,
+            "cushion_pct": cushion_pct}
 
 
 def _would_exceed_leverage(player, market, new_gross, fee=0.0):

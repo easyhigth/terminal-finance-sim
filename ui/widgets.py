@@ -513,6 +513,10 @@ def draw_scrollbar(surf, panel_rect, list_area, scroll, max_scroll, content_h):
         return scroll
     panel_rect = pygame.Rect(panel_rect)
     list_area = pygame.Rect(list_area)
+    if list_area.h <= 0 or panel_rect.w <= 8:
+        # zone dégénérée (fenêtre très étroite/basse) : pygame.Surface
+        # planterait sur une taille nulle/négative — pas de scrollbar du tout.
+        return max(0, min(max_scroll, scroll))
     mx, my = pygame.mouse.get_pos()
 
     # piste fine et discrète (4 px), collée au bord droit

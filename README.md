@@ -13,6 +13,16 @@ redimensionnables, ancrables (glisser vers un bord, Alt+Tab, menu Démarrer,
 palette Ctrl+K, recherche globale Ctrl+/). Le temps s'écoule en continu
 (pause/x1/x2/x3) et le marché avance pendant que vous travaillez.
 
+![Le bureau : fenêtres Marché et Portefeuille sur la grille d'icônes](docs/screenshots/desktop.png)
+
+<p align="center">
+  <img src="docs/screenshots/trading.png" width="49%" alt="App Trading : carnet d'ordres, TWAP, L2" />
+  <img src="docs/screenshots/gameover.png" width="49%" alt="Rétrospective de fin de run : score, décisions, courbe de patrimoine" />
+</p>
+
+*Captures générées automatiquement par `scripts/make_screenshots.py` (rendu
+headless déterministe — les régénérer après un changement d'UI).*
+
 ## Vue d'ensemble
 
 ### Le poste de travail (bureau)

@@ -13,10 +13,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - name: Installer ruff
-        run: pip install ruff
+      - name: Installer ruff et mypy
+        run: pip install ruff mypy
       - name: Lancer ruff
         run: ruff check .
+      - name: Lancer mypy (périmètre graduel, cf. pyproject.toml)
+        run: mypy
 
   pytest:
     runs-on: ubuntu-latest
@@ -28,7 +30,7 @@ jobs:
       - name: Installer les dépendances de test
         # pygame est requis depuis l'ajout du test de fumée des scènes
         # (tests/test_scene_smoke.py), exécuté en mode headless (SDL dummy).
-        run: pip install numpy scipy pytest pygame
+        run: pip install numpy scipy pytest pygame hypothesis
       - name: Lancer pytest
         env:
           SDL_VIDEODRIVER: dummy

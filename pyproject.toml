@@ -8,3 +8,22 @@ ignore = ["E501", "E702", "E701", "E731", "E741", "E402"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["F401", "F811"]
+
+[tool.mypy]
+# Typage GRADUEL : on ne vérifie que la logique pure de core/ la plus
+# critique (celle où un AttributeError coûte une partie), en mode lenient.
+# Étendre la liste `files` au fil de l'eau ; ne jamais l'étendre à ui/scenes
+# (pygame non typé) sans stubs.
+python_version = "3.11"
+files = [
+    "core/finmath.py", "core/config.py", "core/jsonio.py", "core/crashlog.py",
+    "core/applog.py", "core/sim_clock.py", "core/step_hooks.py",
+    "core/difficulty.py", "core/profile.py", "core/alerts.py",
+    "core/conditional_orders.py", "core/game_state.py",
+]
+follow_imports = "silent"
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = false

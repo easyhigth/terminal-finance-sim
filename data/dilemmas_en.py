@@ -96,6 +96,23 @@ DILEMMAS_EN = {
              "outcome": "You preserve your budget. The talent stays with the competitor."},
         ],
     },
+    "headhunt": {
+        "title": "Offer from a rival firm",
+        "scenario": "A headhunter passes you a firm offer from a competing house: an "
+                    "immediate transfer bonus, but you start from scratch with your "
+                    "clients — and your current firm will know.",
+        "options": [
+            {"label": "Accept the transfer",
+             "outcome": "Bonus pocketed, new firm culture. Your former clients resent "
+                        "you — everything must be rebuilt."},
+            {"label": "Decline out of loyalty",
+             "outcome": "Your firm hears about your refusal. Loyalty gets noticed, "
+                        "and remembered."},
+            {"label": "Negotiate a counter-offer",
+             "outcome": "Your firm partially matches: your base salary increases. The "
+                        "headhunter notes your pragmatism."},
+        ],
+    },
     "megamerger": {
         "title": "Transformative mega-merger",
         "scenario": "You're entrusted with a merger that would reshape an entire industry. "

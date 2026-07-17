@@ -462,6 +462,35 @@ def _hook_net_worth(p, market, ctx):
     ctx["nw"] = portfolio.net_worth(p, market)
 
 
+def _hook_hist_scenario(p, market, ctx):
+    """Scénario HISTORIQUE du run (core/histscenarios.py) : déclenche la
+    crise scriptée au pas prévu et rend le verdict au pas de fin. APRÈS
+    "net_worth" (il consomme la valeur nette du pas pour l'ancre et le
+    ratio final)."""
+    if not p.flags.get("hist_scenario"):
+        return
+    from core import histscenarios as _hist
+    from core import notify_queue as _nq
+    ev = _hist.step(p, market, ctx["nw"])
+    if not ev:
+        return
+    if ev["kind"] == "crisis":
+        _nq.push(p, _L("DÉFI HISTORIQUE — la crise frappe : ",
+                       "HISTORICAL CHALLENGE — the crisis hits: ")
+                 + _hist.label(ev["scenario"]), "warn", action="markethub")
+    else:
+        if ev["success"]:
+            _nq.push(p, _L("DÉFI HISTORIQUE RÉUSSI : ",
+                           "HISTORICAL CHALLENGE PASSED: ")
+                     + f"{ev['ratio']:.0%} " + _L("du patrimoine préservé",
+                                                  "of net worth preserved"), "good")
+        else:
+            _nq.push(p, _L("Défi historique échoué : ",
+                           "Historical challenge failed: ")
+                     + f"{ev['ratio']:.0%} " + _L("du patrimoine préservé",
+                                                  "of net worth preserved"), "warn")
+
+
 def _hook_portfolio_news(p, market, ctx):
     """News feed contextualisé au portefeuille (résultats, événements, gros
     mouvements, crises sectorielles) — après que le marché a step et que les
@@ -503,6 +532,7 @@ STEP_HOOKS = [
     ("macro_bets", _hook_macro_bets),
     ("currency_swaps", _hook_currency_swaps),
     ("net_worth", _hook_net_worth),
+    ("hist_scenario", _hook_hist_scenario),
     ("portfolio_news", _hook_portfolio_news),
 ]
 

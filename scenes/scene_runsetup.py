@@ -15,6 +15,7 @@ import pygame
 
 from core import archetypes, config, firms
 from core import difficulty as diff_mod
+from core import histscenarios as hist_mod
 from core import profile as profile_mod
 from core import startscenarios as scen
 from core.game_state import GameState, PlayerState
@@ -36,6 +37,7 @@ class RunSetupScene(Scene):
         self.diff_idx = next(i for i, p in enumerate(diff_mod.PRESETS)
                              if p["id"] == diff_mod.DEFAULT)
         self.daily = False           # « Défi du jour » : marché du jour partagé
+        self.hist_idx = -1           # « Défi historique » : -1 = aucun, sinon index HIST_SCENARIOS
         # classement du défi du JOUR (runs locaux + amis importés), affiché
         # dès que la case est cochée — on voit le score à battre AVANT de
         # lancer le run. Cache rafraîchi au cochage et après un import.
@@ -54,6 +56,7 @@ class RunSetupScene(Scene):
         self._hardcore_rect = None
         self._diff_rects = {}
         self._daily_rect = None
+        self._hist_rect = None
         self._scrolls = {}
         fy = config.SCREEN_HEIGHT - 50
         self.back_btn = widgets.Button((40, fy, 200, 42), t("runsetup.back"), config.COL_TEXT_DIM)
@@ -161,7 +164,14 @@ class RunSetupScene(Scene):
                 if self._daily_rect and self._daily_rect.collidepoint(event.pos):
                     self.daily = not self.daily
                     if self.daily:
+                        self.hist_idx = -1   # exclusif avec le défi historique
                         self._refresh_daily_ranking()
+                    return
+                if self._hist_rect and self._hist_rect.collidepoint(event.pos):
+                    # cycle : Aucun -> 2008 -> 2023 -> dot-com -> Aucun
+                    self.hist_idx = (self.hist_idx + 2) % (len(hist_mod.HIST_SCENARIOS) + 1) - 1
+                    if self.hist_idx >= 0:
+                        self.daily = False   # exclusif avec le défi du jour
                     return
             if self.next_btn.handle(event):
                 self.page = 2
@@ -207,6 +217,11 @@ class RunSetupScene(Scene):
             # affronte exactement les mêmes conditions.
             gs.player.market_seed = diff_mod.daily_seed()
             diff_mod.mark_daily(gs.player)
+        elif self.hist_idx >= 0:
+            # défi historique : graine FIXE + position de départ imposée +
+            # crise scriptée (cf. core/histscenarios, hook de pas dédié) —
+            # APRÈS les presets, qu'il écrase volontairement.
+            hist_mod.apply(gs.player, hist_mod.HIST_SCENARIOS[self.hist_idx]["id"])
         else:
             gs.player.market_seed = random.randint(1, 2_000_000_000)
         # démarre la carrière après 5 ans de marché : les graphes ont un passé
@@ -367,6 +382,32 @@ class RunSetupScene(Scene):
         label = widgets.fit_text(label, fonts.small(bold=self.daily), dr.right - (box.right + 8) - 8)
         widgets.draw_text(surf, label, (box.right + 8, dr.y + 5), fonts.small(bold=self.daily),
                           config.COL_PRESTIGE if self.daily else config.COL_TEXT_DIM)
+        # défi HISTORIQUE (sous le défi du jour) : run court scripté — clic =
+        # cycle Aucun / 2008 / 2023 / dot-com (exclusif avec le défi du jour)
+        hr = pygame.Rect(rect.right - 300, dr.bottom + 6, 286, 24)
+        self._hist_rect = hr
+        active = self.hist_idx >= 0
+        h_accent = config.COL_WARN if active else config.COL_BORDER
+        pygame.draw.rect(surf, config.COL_PANEL_HEAD if active else config.COL_PANEL, hr, border_radius=4)
+        pygame.draw.rect(surf, h_accent, hr, 2 if active else 1, border_radius=4)
+        hbox = pygame.Rect(hr.x + 10, hr.centery - 6, 12, 12)
+        pygame.draw.rect(surf, h_accent, hbox, 1)
+        if active:
+            pygame.draw.rect(surf, config.COL_WARN, hbox.inflate(-6, -6))
+        if active:
+            h_label = (("Défi historique : " if not en else "Historical challenge: ")
+                       + hist_mod.label(hist_mod.HIST_SCENARIOS[self.hist_idx]))
+        else:
+            h_label = ("Défi historique : aucun (cliquer)" if not en
+                       else "Historical challenge: none (click)")
+        h_label = widgets.fit_text(h_label, fonts.small(bold=active), hr.right - (hbox.right + 8) - 8)
+        widgets.draw_text(surf, h_label, (hbox.right + 8, hr.y + 5), fonts.small(bold=active),
+                          config.COL_WARN if active else config.COL_TEXT_DIM)
+        if active:
+            story = widgets.fit_text(hist_mod.story(hist_mod.HIST_SCENARIOS[self.hist_idx]),
+                                     fonts.tiny(), rect.w - 28)
+            widgets.draw_text(surf, story, (rect.x + 14, rect.bottom - 18), fonts.tiny(),
+                              config.COL_TEXT_DIM)
 
     def _draw_daily_panel(self, surf, rect):
         """Classement du défi du JOUR (runs locaux + amis importés, cf.

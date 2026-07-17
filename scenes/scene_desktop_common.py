@@ -31,6 +31,7 @@ from apps.app_greeks import GreeksApp
 from apps.app_hedge import HedgeApp
 from apps.app_inbox import InboxApp
 from apps.app_journal import JournalApp
+from apps.app_manual import ManualApp
 from apps.app_markethub import MarketHubApp
 from apps.app_mergerarb import MergerArbApp
 from apps.app_mission import MissionApp
@@ -89,6 +90,7 @@ APPS = [
     ("book", "Portefeuille", "book", BookApp),
     ("watchlist", "Watchlist", "star", WatchlistApp),
     ("calculator", "Calculatrice", "calc", CalculatorApp),
+    ("manual", "Manuel", "help", ManualApp),
     ("notifcenter", "Notifications", "bell", NotificationCenterApp),
     ("dilemma", "Décision", "decide", DilemmaApp),
     ("review", "Revue de performance", "review", ReviewApp),
@@ -237,6 +239,7 @@ ICON_CATEGORY = {
     "notifcenter": "Outils du bureau", "inbox": "Outils du bureau",
     "alerts": "Outils du bureau", "qnews": "Outils du bureau",
     "qcommands": "Outils du bureau", "save": "Outils du bureau",
+    "manual": "Outils du bureau",
 }
 
 

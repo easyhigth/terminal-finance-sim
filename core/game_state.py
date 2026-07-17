@@ -298,6 +298,8 @@ class GameState:
         os.makedirs(config.SAVE_DIR, exist_ok=True)
         self.last_saved = time.time()
         path = os.path.join(config.SAVE_DIR, f"{slot}.json")
+        if slot == config.AUTOSAVE_SLOT:
+            self._rotate_autosaves()
         try:
             # écriture ATOMIQUE (+ .bak du slot précédent) : un crash en
             # plein dump ne peut plus laisser un slot à moitié écrit.
@@ -312,6 +314,25 @@ class GameState:
             except Exception:
                 logger.warning("save: échec ui_state (slot=%s)", slot, exc_info=True)
         return path
+
+    @staticmethod
+    def _rotate_autosaves():
+        """Décale les générations d'autosave AVANT d'écrire la nouvelle :
+        autosave -> autosave_h1 -> autosave_h2 (la plus vieille tombe).
+        Les générations sont des slots ordinaires (visibles/chargeables dans
+        l'écran Sauvegardes) — revenir 1-2 points en arrière devient
+        possible après une mauvaise décision, en plus du filet anti-
+        corruption .bak de core/jsonio. Best-effort : une rotation qui
+        échoue (fichier verrouillé…) n'empêche jamais la sauvegarde."""
+        names = (config.AUTOSAVE_SLOT,) + tuple(config.AUTOSAVE_HISTORY_SLOTS)
+        try:
+            for older, newer in zip(reversed(names[1:]), reversed(names[:-1])):
+                src_path = os.path.join(config.SAVE_DIR, f"{newer}.json")
+                dst = os.path.join(config.SAVE_DIR, f"{older}.json")
+                if os.path.exists(src_path):
+                    os.replace(src_path, dst)
+        except OSError:
+            crashlog.swallowed("game_state.rotate_autosaves")
 
     @classmethod
     def load(cls, slot="manual"):

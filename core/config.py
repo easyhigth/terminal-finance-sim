@@ -244,4 +244,8 @@ def _resolve_save_dir():
 
 SAVE_DIR = _resolve_save_dir()
 AUTOSAVE_SLOT = "autosave"
+# générations PRÉCÉDENTES de l'autosave (rotation à chaque écriture :
+# autosave -> _h1 -> _h2) : permet de revenir 1-2 points de sauvegarde en
+# arrière après une bêtise — cf. GameState._rotate_autosaves.
+AUTOSAVE_HISTORY_SLOTS = ("autosave_h1", "autosave_h2")
 SAVE_SLOTS = ["slot1", "slot2", "slot3"]   # slots manuels visibles dans l'UI

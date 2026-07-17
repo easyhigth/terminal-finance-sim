@@ -106,6 +106,22 @@ DILEMMAS = [
          {"label": "Laisser tomber", "cash_k": 0, "rep": 0, "heat": 0,
           "outcome": "Vous préservez votre budget. Le talent reste chez le concurrent."},
      ]},
+    {"id": "headhunt", "category": "strategie", "min_grade": 3, "weight": 2,
+     "title": "Offre d'une firme rivale",
+     "scenario": "Un chasseur de têtes vous transmet une offre ferme d'une firme "
+                 "concurrente : prime de transfert immédiate, mais vous repartez de "
+                 "zéro auprès de vos clients — et votre firme actuelle le saura.",
+     "options": [
+         {"label": "Accepter le transfert", "cash_k": 80, "rep": -6, "heat": 0,
+          "outcome": "Prime encaissée, nouvelle culture de firme. Vos anciens clients "
+                     "vous en veulent — tout est à reconstruire."},
+         {"label": "Refuser par loyauté", "cash_k": 0, "rep": 3, "heat": 0,
+          "outcome": "Votre firme apprend votre refus. La loyauté se remarque, et se "
+                     "retient."},
+         {"label": "Négocier une contre-offre", "cash_k": 0, "rep": 1, "heat": 0,
+          "outcome": "Votre firme s'aligne partiellement : votre salaire fixe augmente. "
+                     "Le chasseur de têtes note votre pragmatisme."},
+     ]},
     # ------------------------------ signature ------------------------------
     {"id": "megamerger", "category": "signature", "min_grade": 8, "weight": 2,
      "title": "Méga-fusion transformative",
@@ -393,6 +409,27 @@ def apply_choice(player, dilemma, option_index):
         r["score"] = max(1000.0, r["score"] * 0.97)
         r["last"] = "perd un talent débauché par vous"
         r["mood"] = "down"
+    elif dilemma["id"] == "headhunt":
+        from core import firms as _firms
+        if option_index == 0:
+            # transfert : la firme (et ses perks, cf. core/firms.perk) CHANGE
+            # réellement — tirée parmi les autres ADN de firme disponibles.
+            others = [f["id"] for f in _firms.FIRMS if f["id"] != player.firm]
+            if others:
+                new_firm = random.choice(others)
+                player.firm = new_firm
+                from core import career as _career
+                _career.log(player, "warn",
+                            "Transfert : vous rejoignez une firme au profil « "
+                            + _firms.get(new_firm)["name"] + " »")
+        elif option_index == 2:
+            # contre-offre : petit supplément de salaire fixe permanent, du
+            # même mécanisme que les revues de performance (salary_bonus_per_step)
+            player.salary_bonus_per_step = (getattr(player, "salary_bonus_per_step", 0.0)
+                                            + 600.0 * _scale(player.grade_index))
+        if option_index == 1:
+            # loyauté remarquée : mémorisée pour de futurs contenus (revues…)
+            player.flags["loyalty_proven"] = player.flags.get("loyalty_proven", 0) + 1
 
     # retire le dilemme de la file
     player.pending_dilemmas = [d for d in player.pending_dilemmas

@@ -16,6 +16,7 @@ from apps.app_attribution import AttributionApp
 from apps.app_backtester import BacktesterApp
 from apps.app_book import BookApp
 from apps.app_calculator import CalculatorApp
+from apps.app_clients import ClientsApp
 from apps.app_company import CompanyApp
 from apps.app_creditdesk import CreditDeskApp
 from apps.app_crisislab import CrisisLabApp
@@ -98,6 +99,7 @@ APPS = [
     ("tradejournal", "Journal de trading", "journal", JournalApp),
     ("evaluation", "Évaluation", "examcert", EvaluationApp),
     ("deals", "Deals", "deals", DealsApp),
+    ("clients", "Carnet clients", "review", ClientsApp),
     ("company", "Fiche société", "research", CompanyApp),
     ("shop", "Boutique", "shop", ShopApp),
     ("analytics", "Analyse du portefeuille", "graph", AnalyticsApp),
@@ -178,6 +180,7 @@ QUICK_APPS = [
 ICON_FEATURE = {
     "trading": "trade",
     "qmandates": "mandates",
+    "clients": "mandates",
     "qdeals": "deals",
     "hedge": "hedge",        # la couverture arrive au même grade que PROTECT
     "greeks": "options",     # le desk options arrive avec la commande OPTIONS
@@ -230,6 +233,7 @@ ICON_CATEGORY = {
     "pnlexplain": "Crédit & Financement",
     # Carrière : progression, mandats, deals, décisions.
     "mission": "Carrière", "tradejournal": "Carrière", "track": "Carrière",
+    "clients": "Carrière",
     "qmandates": "Carrière", "qdeals": "Carrière", "qdecide": "Carrière",
     "qexamcert": "Carrière", "qachievements": "Carrière",
     # Apps exclusives par voie (identité de spécialisation).

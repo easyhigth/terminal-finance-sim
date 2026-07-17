@@ -147,6 +147,8 @@ def switch_track(player, market, new_track):
     player.cash -= cost
     player.track = new_track
     player.flags["track_chosen_day"] = player.day
+    from core import rivals as _rivals
+    _rivals.designate_nemesis(player)
     if cost > 0:
         player.flags["track_switch_day"] = player.day
         ramp_days = RAMP_DAYS

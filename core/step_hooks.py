@@ -353,6 +353,26 @@ def _hook_saved_screens(p, market, ctx):
         _opportunities.check_alerts(p, market)
 
 
+def _hook_team_assignments(p, market, ctx):
+    """Affectations de l'équipe d'analystes (core/team.assignments_step) :
+    notes de recherche auto, décrue du scrutin, fatigue/repos."""
+    if not getattr(p, "analysts", None):
+        return
+    from core import notify_queue as _nq
+    from core import team as _team
+    for ev in _team.assignments_step(p, market)[:3]:
+        if ev["kind"] == "research_note":
+            note = ev["note"]
+            _nq.push(p, _L(f"Note d'analyste : {note['ticker']} → {note['rating']} "
+                           f"({note['upside']:+.0f}%)",
+                           f"Analyst note: {note['ticker']} → {note['rating']} "
+                           f"({note['upside']:+.0f}%)"),
+                     "info", action="research")
+        elif ev["kind"] == "rest":
+            _nq.push(p, _L("Un analyste épuisé repasse en poste libre.",
+                           "An exhausted analyst returns to free duty."), "warn")
+
+
 # ----- Échéances d'instruments ---------------------------------------------
 
 def _hook_structured_due(p, market, ctx):
@@ -462,6 +482,83 @@ def _hook_net_worth(p, market, ctx):
     ctx["nw"] = portfolio.net_worth(p, market)
 
 
+def _hook_focus_network(p, market, ctx):
+    """Focus « réseau » (core/focus.py) : réputation passive fractionnaire,
+    créditée aux entiers via un accumulateur dans les flags — même mécanisme
+    que le bonus d'équipe (team_rep_accum)."""
+    from core import focus as _focus
+    per_step = _focus.perk(p, "rep_per_step")
+    if not per_step:
+        return
+    acc = p.flags.get("focus_rep_accum", 0.0) + per_step
+    whole = int(acc)
+    if whole:
+        p.adjust_reputation(whole, reason=_L("Réseau : votre visibilité paie",
+                                             "Network: your visibility pays off"))
+        acc -= whole
+    p.flags["focus_rep_accum"] = acc
+
+
+def _hook_nemesis_h2h(p, market, ctx):
+    """Tête-à-tête TRIMESTRIEL contre le némésis personnel (core/rivals) :
+    le quart courant est déjà à jour quand les hooks tournent — on compare
+    une fois par nouveau trimestre (mémo dans flags["nemesis_h2h"])."""
+    if not p.flags.get("nemesis"):
+        return
+    memo = p.flags.get("nemesis_h2h")
+    if isinstance(memo, dict) and memo.get("quarter") == p.quarter:
+        return
+    from core import rivals as _rivals
+    _rivals.quarterly_head_to_head(p, market)
+
+
+def _hook_epoch_notice(p, market, ctx):
+    """Époque « décennie perdue » (core/market.py) : une rumeur de vétérans
+    au début du run — le joueur est prévenu UNE fois que ce marché-là ne
+    pardonnera pas le buy-and-hold, à lui d'en tirer les conséquences."""
+    if getattr(market, "epoch", "normale") != "decennie_perdue":
+        return
+    if p.flags.get("epoch_noticed"):
+        return
+    p.flags["epoch_noticed"] = True
+    from core import inbox as _inbox
+    from core import notify_queue as _nq
+    _nq.push(p, _L("Les vétérans du desk parlent d'une décennie difficile…",
+                   "Desk veterans whisper about a hard decade ahead…"), "warn")
+    _inbox.push(p, "desk", _L("Un vétéran du desk", "A desk veteran"),
+                _L("Ce marché-là ne pardonne pas", "This market won't forgive"),
+                _L("J'ai connu ça une fois dans ma carrière : des années où le "
+                   "marché ne monte plus tout seul. Acheter-garder ne suffira "
+                   "pas cette fois. Couvertures, obligations, ventes à découvert, "
+                   "cash — tout ce que le desk vous a appris va enfin servir.",
+                   "I've seen this once in my career: years where the market "
+                   "stops rising on its own. Buy-and-hold won't cut it this "
+                   "time. Hedges, bonds, shorts, cash — everything the desk "
+                   "taught you will finally matter."))
+
+
+def _hook_coach(p, market, ctx):
+    """Coach comportemental (core/coach.py) : au premier pas d'un nouveau
+    trimestre, analyse les trades du trimestre PRÉCÉDENT et livre le rapport
+    en inbox (mémo anti-doublon dans les flags)."""
+    if p.flags.get("coach_quarter") == p.quarter:
+        return
+    first_reading = "coach_quarter" not in p.flags
+    p.flags["coach_quarter"] = p.quarter
+    if first_reading:
+        return   # premier relevé : rien à analyser encore
+    from core import coach as _coach
+    from core import notify_queue as _nq
+    report = _coach.quarterly_review(p)
+    if report is None:
+        return
+    _coach.deliver(p, report)
+    if report["findings"]:
+        _nq.push(p, _L(f"Coach : {len(report['findings'])} biais détecté(s) ce trimestre",
+                       f"Coach: {len(report['findings'])} bias(es) detected this quarter"),
+                 "info", action="inbox")
+
+
 def _hook_hist_scenario(p, market, ctx):
     """Scénario HISTORIQUE du run (core/histscenarios.py) : déclenche la
     crise scriptée au pas prévu et rend le verdict au pas de fin. APRÈS
@@ -523,6 +620,8 @@ STEP_HOOKS = [
     ("firm_var_limit", _hook_firm_var_limit),
     ("risk_breach_streak", _hook_risk_breach_streak),
     ("saved_screens", _hook_saved_screens),
+    ("team_assignments", _hook_team_assignments),
+    ("focus_network", _hook_focus_network),
     ("structured_due", _hook_structured_due),
     ("securitised_due", _hook_securitised_due),
     ("hedges_due", _hook_hedges_due),
@@ -532,6 +631,9 @@ STEP_HOOKS = [
     ("macro_bets", _hook_macro_bets),
     ("currency_swaps", _hook_currency_swaps),
     ("net_worth", _hook_net_worth),
+    ("nemesis_h2h", _hook_nemesis_h2h),
+    ("coach", _hook_coach),
+    ("epoch_notice", _hook_epoch_notice),
     ("hist_scenario", _hook_hist_scenario),
     ("portfolio_news", _hook_portfolio_news),
 ]

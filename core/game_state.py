@@ -106,6 +106,7 @@ class PlayerState:
     legacy: list = field(default_factory=list)         # ids d'objectifs de légende (core/legacy.py) débloqués
     # ----- contenu : mandats / recherche / alertes -----
     mandates: list = field(default_factory=list)       # mandats clients actifs
+    clients: list = field(default_factory=list)         # carnet de clients récurrents (core/clients.py)
     mandate_offers: list = field(default_factory=list)  # offres de mandats en attente
     next_mandate_id: int = 1
     mandate_history: list = field(default_factory=list)  # postmortems résolus (succès/échec, capé)

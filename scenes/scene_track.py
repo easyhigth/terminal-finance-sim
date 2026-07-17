@@ -81,6 +81,8 @@ class TrackScene(Scene):
         p = self.app.gs.player
         if p.track == "General":
             p.track = self.selected
+            from core import rivals as _rivals
+            _rivals.designate_nemesis(p)
             p.flags["can_choose_track"] = False
             p.flags["track_chosen_day"] = p.day
             self.app.gs.save(config.AUTOSAVE_SLOT)

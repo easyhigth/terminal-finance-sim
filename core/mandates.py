@@ -343,12 +343,19 @@ def maybe_offer(player, rng=None, market=None):
         return None
     if len(player.mandates) + len(player.mandate_offers) >= MAX_ACTIVE + 1:
         return None
+    from core import focus as _focus
     offer_mult = (tracks.perk(player, "mandate_offer_mult") * archetypes.perk(player, "mandate_offer_mult")
-                  * firms.perk(player, "mandate_offer_mult"))
+                  * firms.perk(player, "mandate_offer_mult")
+                  * _focus.perk(player, "offer_mult"))
     if rng.random() > OFFER_PROB * offer_mult:
         return None
     client_profile = _pick_profile(rng)
     offer = _build_offer(player, client_profile, rng, market)
+    # carnet de clients récurrents : le plus souvent, l'offre vient d'un
+    # client CONNU (sa confiance module capital et commission) plutôt que
+    # d'un nom jetable — cf. core/clients.py.
+    from core import clients as _clients
+    _clients.attach_client(player, offer, rng)
     player.mandate_offers.append(offer)
     return offer
 
@@ -584,6 +591,9 @@ def evaluate_due(player, market):
             else:
                 career.log(player, "crisis", _L(f"Mandat {m['client']} échoué ({reason})",
                                                 f"Mandate {m['client']} failed ({reason})"))
+        # mémoire du carnet clients : confiance, référencements, pertes
+        from core import clients as _clients
+        _clients.notify_events(player, _clients.record_outcome(player, m["client"], ok))
         result = {"mandate": m, "ok": ok, "growth": growth, "beta": beta, "reason": reason,
                   "client": m["client"], "target_pct": m["target_pct"], "max_beta": m["max_beta"],
                   "reward_cash": m["reward_cash"], "reward_rep": m["reward_rep"],

@@ -27,7 +27,7 @@ def test_net_worth_computed_after_all_settlements():
     names = _names()
     idx_nw = names.index("net_worth")
     for name in names:
-        if name in ("net_worth", "hist_scenario", "portfolio_news"):
+        if name in ("net_worth", "nemesis_h2h", "coach", "epoch_notice", "hist_scenario", "portfolio_news"):
             continue
         assert names.index(name) < idx_nw, name
 

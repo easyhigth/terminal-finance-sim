@@ -210,8 +210,12 @@ def effective_required_grade(player, feature):
     joueur a choisi une AUTRE voie — un vétéran ne contourne pas ce verrou,
     qui dépend du choix de voie, pas de l'expérience générale."""
     g = required_grade(feature)
-    if player.flags.get("veteran"):
-        g = max(0, g - VETERAN_HEADSTART)
+    if player.flags.get("veteran") and g > 0:
+        # un vétéran rouvre la complexité plus vite — MAIS garde un vrai stade
+        # Intern : le headstart ne descend jamais une fonctionnalité gated
+        # jusqu'au grade 0 (sinon le stagiaire retrouve tout d'un coup, à
+        # l'opposé de la découverte progressive voulue).
+        g = max(1, g - VETERAN_HEADSTART)
     affinity = TRACK_AFFINITY.get(feature)
     track = getattr(player, "track", "General")
     if affinity and track not in (affinity, "General"):

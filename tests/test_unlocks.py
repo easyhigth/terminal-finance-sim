@@ -117,3 +117,16 @@ def test_risk_and_quant_tools_unlock_at_grade_two():
     p = _player(grade=2)
     for feature in ("risk", "quant", "tools", "calendar", "ipo"):
         assert unlocks.unlocked(p, feature), feature
+
+
+def test_veteran_still_gets_a_bare_intern():
+    """Le raccourci vétéran accélère la suite mais ne saute JAMAIS le stade
+    Intern : au grade 0, aucune fonctionnalité gated n'est ouverte, même pour
+    un profil vétéran."""
+    p = _player(grade=0)
+    p.flags["veteran"] = True
+    for feature in unlocks.UNLOCKS:
+        assert not unlocks.unlocked(p, feature), feature
+    # mais le vétéran accélère bien dès le grade 1 (headstart appliqué au-dessus)
+    p.grade_index = 1
+    assert unlocks.unlocked(p, "risk")     # risk (grade 2) ramené à 1 pour un vétéran

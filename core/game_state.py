@@ -7,7 +7,7 @@ import os
 import time
 from dataclasses import asdict, dataclass, field
 
-from core import autosave_settings, config, crashlog, ui_state
+from core import autosave_settings, config, crashlog, jsonio, ui_state
 from core.applog import logger
 from core.i18n import get_lang
 
@@ -120,7 +120,7 @@ class PlayerState:
     game_over_reason: str = ""
     # ----- revue de performance annuelle (négociation de bonus) -----
     last_review_quarter: int = 0        # dernier trimestre où une revue a eu lieu
-    pending_review: dict = None         # offre de revue en attente de réponse, ou None
+    pending_review: dict | None = None  # offre de revue en attente de réponse, ou None
     salary_bonus_per_step: float = 0.0  # supplément de salaire fixe négocié (revues)
     analysts: list = field(default_factory=list)  # équipe d'analystes juniors : [{profile_id, hired_step}]
     team_rep_accum: float = 0.0  # accumulateur fractionnaire du bonus de réputation de l'équipe
@@ -135,7 +135,7 @@ class PlayerState:
     macro_bet_history: list = field(default_factory=list)  # historique des derniers paris résolus (UI)
     # ----- stress test réglementaire périodique -----
     last_stresstest_quarter: int = 0    # dernier trimestre où un stress test a eu lieu
-    pending_stresstest: dict = None     # stress test en attente de réponse, ou None
+    pending_stresstest: dict | None = None  # stress test en attente de réponse, ou None
     stresstest_history: list = field(default_factory=list)  # derniers résultats résolus (UI, max ~10)
     # ----- parcours d'intégration (premiers jours guidés) -----
     onboarding_step: int = 0            # index de l'étape courante (core/onboarding.py)
@@ -299,8 +299,9 @@ class GameState:
         self.last_saved = time.time()
         path = os.path.join(config.SAVE_DIR, f"{slot}.json")
         try:
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(self.to_dict(), f, indent=2)
+            # écriture ATOMIQUE (+ .bak du slot précédent) : un crash en
+            # plein dump ne peut plus laisser un slot à moitié écrit.
+            jsonio.write_json_atomic(path, self.to_dict())
         except Exception:
             logger.warning("save: échec (slot=%s, path=%s)", slot, path, exc_info=True)
             raise
@@ -321,16 +322,19 @@ class GameState:
         plutôt que de faire planter le jeu sur une sauvegarde abîmée."""
         logger.info("load: début (slot=%s)", slot)
         path = os.path.join(config.SAVE_DIR, f"{slot}.json")
-        if not os.path.exists(path):
-            logger.info("load: aucune sauvegarde trouvée (slot=%s, path=%s)", slot, path)
+        # lit le slot, et retombe automatiquement sur le .bak (écrit par
+        # jsonio.write_json_atomic à chaque save) si le principal est
+        # absent/corrompu — un fichier abîmé ne coûte plus la partie.
+        data, source = jsonio.read_json_with_backup(path)
+        if data is None:
+            logger.info("load: aucune sauvegarde exploitable (slot=%s, path=%s)", slot, path)
             return None
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                gs = cls.from_dict(json.load(f))
+            gs = cls.from_dict(data)
         except Exception:
             logger.warning("load: échec (slot=%s, path=%s)", slot, path, exc_info=True)
             return None
-        logger.info("load: succès (slot=%s, path=%s)", slot, path)
+        logger.info("load: succès (slot=%s, path=%s, source=%s)", slot, path, source)
         return gs
 
     def export_to(self, path):
@@ -341,12 +345,8 @@ class GameState:
         Fonctionne aussi en mode sandbox (contrairement à `save()`) : c'est une
         action explicite du joueur, pas un point de sauvegarde automatique."""
         logger.info("export_to: début (path=%s)", path)
-        d = os.path.dirname(path)
-        if d:
-            os.makedirs(d, exist_ok=True)
         try:
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(self.to_dict(), f, indent=2)
+            jsonio.write_json_atomic(path, self.to_dict(), keep_backup=False)
         except Exception:
             logger.warning("export_to: échec (path=%s)", path, exc_info=True)
             raise
@@ -375,6 +375,11 @@ class GameState:
     def delete(slot):
         """Supprime un slot de sauvegarde. Retourne True si supprimé."""
         path = os.path.join(config.SAVE_DIR, f"{slot}.json")
+        # supprime AUSSI le backup : sinon un slot supprimé « ressusciterait »
+        # au prochain load() via le repli .bak de jsonio.
+        bak = jsonio.backup_path(path)
+        if os.path.exists(bak):
+            os.remove(bak)
         if os.path.exists(path):
             os.remove(path)
             ui_state.delete(slot)

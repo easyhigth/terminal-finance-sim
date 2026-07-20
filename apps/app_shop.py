@@ -39,6 +39,25 @@ from ui.popups import PopupMixin
 def _L(fr, en):
     return en if get_lang() == "en" else fr
 
+
+# libellés d'AFFICHAGE (les mêmes chaînes FR servent de clés de logique — chips,
+# col_map, tri — donc on ne les traduit qu'au moment du rendu, via _tr).
+_UI_EN = {
+    "TOUTES": "ALL", "ACTIONS": "EQUITIES", "ETF": "ETF", "OBLIGATIONS": "BONDS",
+    "COMMODITIES": "COMMODITIES", "CRYPTO": "CRYPTO", "STRUCTURÉS": "STRUCTURED",
+    "CRÉDIT": "CREDIT", "NOM": "NAME", "COURS": "PRICE", "VALEUR": "VALUE",
+    "RENDEMENT": "YIELD", "VAR %": "CHG %", "TYPE": "TYPE", "POSSÉDÉ": "HELD",
+    "SECTEUR / CAT.": "SECTOR / CAT.", "Action": "Equity", "Oblig.": "Bond",
+    "Cmdty": "Cmdty", "Struct.": "Struct.", "Crédit": "Credit",
+    "■ ETF": "■ ETF", "▫ OBLIGATIONS": "▫ BONDS", "▲ COMMODITIES": "▲ COMMODITIES",
+    "₿ CRYPTO": "₿ CRYPTO", "◆ STRUCTURÉS": "◆ STRUCTURED", "● CRÉDIT": "● CREDIT",
+}
+
+
+def _tr(lbl):
+    return _UI_EN.get(lbl, lbl) if get_lang() == "en" else lbl
+
+
 ROW_H = 26
 SORT_FIELDS = [("name", "NOM"), ("price", "COURS"), ("value", "VALEUR"),
                ("yield_pct", "RENDEMENT"), ("change_pct", "VAR %")]
@@ -310,7 +329,7 @@ class ShopApp(DesktopApp, PopupMixin):
             return
         qty = min(self._qty(), held)
         if qty <= 0:
-            self.msg = "Quantité invalide : indiquez un nombre positif."
+            self.msg = _L("Quantité invalide : indiquez un nombre positif.", "Invalid quantity: enter a positive number.")
             return
         p, m = self.app.gs.player, self.market
         if kind == "Action":
@@ -330,12 +349,12 @@ class ShopApp(DesktopApp, PopupMixin):
         else:
             return
         if r["ok"]:
-            self.msg = f"Vendu {r['qty']:g} × {key} @ {r['price']:.2f} (P&L {r['realized']:+.0f})." \
+            self.msg = _L(f"Vendu {r['qty']:g} × {key} @ {r['price']:.2f} (P&L {r['realized']:+.0f}).", f"Sold {r['qty']:g} × {key} @ {r['price']:.2f} (P&L {r['realized']:+.0f}).") \
                 + self._slip_suffix(r)
             if not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
         else:
-            self.msg = f"Vente refusée ({r['reason']})."
+            self.msg = _L(f"Vente refusée ({r['reason']}).", f"Sell rejected ({r['reason']}).")
 
     def _slip_suffix(self, r):
         slip = r.get("slippage")
@@ -343,14 +362,14 @@ class ShopApp(DesktopApp, PopupMixin):
             return ""
         mid = r["price"] - slip
         pct = (slip / mid * 100.0) if mid else 0.0
-        return f" Glissement {pct:+.2f}%."
+        return _L(f" Glissement {pct:+.2f}%.", f" Slippage {pct:+.2f}%.")
 
     def _do_buy(self, kind, key):
         if not self._can_trade():
             return
         qty = self._qty()
         if qty <= 0:
-            self.msg = "Quantité invalide : indiquez un nombre positif."
+            self.msg = _L("Quantité invalide : indiquez un nombre positif.", "Invalid quantity: enter a positive number.")
             return
         p, m = self.app.gs.player, self.market
         if kind == "Action":
@@ -370,11 +389,11 @@ class ShopApp(DesktopApp, PopupMixin):
         else:
             return
         if r["ok"]:
-            self.msg = f"Acheté {qty:g} × {key} @ {r['price']:.2f}." + self._slip_suffix(r)
+            self.msg = _L(f"Acheté {qty:g} × {key} @ {r['price']:.2f}.", f"Bought {qty:g} × {key} @ {r['price']:.2f}.") + self._slip_suffix(r)
             if not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
         else:
-            self.msg = f"Achat refusé ({r['reason']})."
+            self.msg = _L(f"Achat refusé ({r['reason']}).", f"Buy rejected ({r['reason']}).")
 
     def _scroll_to_cursor(self):
         if not self._list_rect:
@@ -534,10 +553,10 @@ class ShopApp(DesktopApp, PopupMixin):
         p = self.app.gs.player
         cur = config.CONTINENTS[p.continent]["currency"]
         pad = 16
-        widgets.draw_text(surf, "BOUTIQUE — TOUS LES ACTIFS", (rect.x + pad, rect.y + 8),
+        widgets.draw_text(surf, _L("BOUTIQUE — TOUS LES ACTIFS", "SHOP — ALL ASSETS"), (rect.x + pad, rect.y + 8),
                           fonts.head(bold=True), config.COL_AMBER)
-        msg_line = ("Clic sur le nom = fiche · quantité puis ACHETER/VENDRE. " + self.msg) \
-            if self.msg else "Clic sur le nom = fiche d'analyse · quantité puis ACHETER ou VENDRE."
+        msg_line = (_L("Clic sur le nom = fiche · quantité puis ACHETER/VENDRE. ", "Click the name = sheet · quantity then BUY/SELL. ") + self.msg) \
+            if self.msg else _L("Clic sur le nom = fiche d'analyse · quantité puis ACHETER ou VENDRE.", "Click the name = analysis sheet · quantity then BUY or SELL.")
         widgets.draw_text(surf, widgets.fit_text(msg_line, fonts.tiny(), rect.w - 2 * pad - 260),
                           (rect.x + pad, rect.y + 34), fonts.tiny(), config.COL_TEXT_DIM)
         st = PM.margin_status(p, self.market)
@@ -556,7 +575,7 @@ class ShopApp(DesktopApp, PopupMixin):
         pygame.draw.rect(surf, config.COL_CYAN if self.text_focus == "search" else config.COL_BORDER,
                           search_rect, 1, border_radius=4)
         cursor = "_" if (self.text_focus == "search" and int(self._t * 2) % 2 == 0) else " "
-        label = (self.search + cursor) if self.search else (cursor + "Rechercher…")
+        label = (self.search + cursor) if self.search else (cursor + _L("Rechercher…", "Search…"))
         scol = config.COL_TEXT if self.search else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
                           (search_rect.x + 8, search_rect.y + 4), fonts.small(), scol)
@@ -569,7 +588,7 @@ class ShopApp(DesktopApp, PopupMixin):
 
         qx = search_rect.right + 16
         if qx < rect.right - 260:
-            widgets.draw_text(surf, "QTÉ", (qx, top + 4), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, _L("QTÉ", "QTY"), (qx, top + 4), fonts.tiny(bold=True), config.COL_TEXT_DIM)
             qx += 34
             self._qty_minus = pygame.Rect(qx, top, 22, 24)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._qty_minus, border_radius=3)
@@ -605,7 +624,7 @@ class ShopApp(DesktopApp, PopupMixin):
             self._preset_rects = {}
 
         self._type_rects, y = self._draw_chip_row(surf, x0, top + 30, rect.right - pad,
-                                                   TYPE_CHIPS, self.type_filter, config.COL_AMBER)
+                                                   [(v, _tr(l)) for v, l in TYPE_CHIPS], self.type_filter, config.COL_AMBER)
 
         sub_opts = self._sub_options()
         if sub_opts:
@@ -617,12 +636,12 @@ class ShopApp(DesktopApp, PopupMixin):
 
         y += 6
         self._sort_rects = {}
-        widgets.draw_text(surf, "TRIER :", (x0, y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("TRIER :", "SORT:"), (x0, y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         sx = x0 + 50
         for key, lbl in SORT_FIELDS:
             active = (self.sort_key == key)
             arrow = (" ▲" if self.sort_dir > 0 else " ▼") if active else ""
-            full = lbl + arrow
+            full = _tr(lbl) + arrow
             w = fonts.tiny(bold=True).size(full)[0] + 14
             if sx + w > rect.right - pad:
                 break
@@ -640,7 +659,7 @@ class ShopApp(DesktopApp, PopupMixin):
         panel = pygame.Rect(x0, y, rect.right - pad - x0, rect.bottom - pad - link_row_h - y)
         if panel.h < 40:
             return
-        inner = widgets.draw_panel(surf, panel, f"Catalogue ({len(rows)})", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L(f"Catalogue ({len(rows)})", f"Catalog ({len(rows)})"), config.COL_CYAN)
         wide = inner.w >= 820
         cols = [("NOM", 0), ("TYPE", 200), ("POSSÉDÉ", 260), ("COURS", 340),
                 ("VALEUR", 420), ("RENDEMENT", 520), ("VAR %", 610)]
@@ -649,7 +668,7 @@ class ShopApp(DesktopApp, PopupMixin):
                     ("COURS", 560), ("VALEUR", 650), ("RENDEMENT", 750), ("VAR %", 860)]
         for lbl, dx in cols:
             if inner.x + dx < inner.right - 140:
-                widgets.draw_text(surf, lbl, (inner.x + dx, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+                widgets.draw_text(surf, _tr(lbl), (inner.x + dx, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
 
         list_top = inner.y + 22
         list_area = pygame.Rect(inner.x - 6, list_top, inner.w + 12, inner.bottom - list_top - 22)
@@ -672,13 +691,14 @@ class ShopApp(DesktopApp, PopupMixin):
         self.scroll = widgets.draw_scrollbar(surf, panel, list_area, self.scroll, self._max_scroll, content_h)
 
         if not self._can_trade():
-            widgets.draw_text(surf, "⊘ Trading débloqué au grade Associate.",
+            widgets.draw_text(surf, _L("⊘ Trading débloqué au grade Junior Analyst.", "⊘ Trading unlocked at Junior Analyst grade."),
                               (inner.x, inner.bottom - 4), fonts.tiny(), config.COL_TEXT_DIM)
 
         link_y = panel.bottom + 4
         lx = x0
         self._scene_link_rects = {}
         for scene_name, label in SCENE_LINKS:
+            label = _tr(label)
             w = fonts.tiny(bold=True).size(label)[0] + 16
             if lx + w > rect.right - pad:
                 break
@@ -708,7 +728,7 @@ class ShopApp(DesktopApp, PopupMixin):
         widgets.draw_text(surf, widgets.fit_text(r["name"], fonts.small(bold=True), cols[1][1] - 4),
                           (inner.x, y), fonts.small(bold=True), kcol)
         col_map = {lbl: dx for lbl, dx in cols}
-        widgets.draw_text(surf, KIND_LABEL.get(kind, kind), (inner.x + col_map["TYPE"], y),
+        widgets.draw_text(surf, _tr(KIND_LABEL.get(kind, kind)), (inner.x + col_map["TYPE"], y),
                           fonts.tiny(bold=True), kcol)
         if wide:
             sub_txt = str(r["sub"])
@@ -731,7 +751,7 @@ class ShopApp(DesktopApp, PopupMixin):
             price_rect = pygame.Rect(inner.x + col_map["COURS"] - 4, y - 2, 80, ROW_H - 4)
             if price_rect.collidepoint(mp):
                 tier = LIQ.equity_tier(self.market, key)
-                self._tooltip = (f"Liquidité : {tier}.", mp)
+                self._tooltip = (_L(f"Liquidité : {tier}.", f"Liquidity: {tier}."), mp)
         value_txt = widgets.format_money(live["value"], cur) if live["value"] is not None else "—"
         widgets.draw_text(surf, value_txt, (inner.x + col_map["VALEUR"], y), fonts.small(bold=True), config.COL_TEXT)
         if live["yield_pct"] is not None:

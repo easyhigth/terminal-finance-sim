@@ -30,6 +30,23 @@ from ui.popups import PopupMixin
 def _L(fr, en):
     return en if get_lang() == "en" else fr
 
+
+_UI_EN = {
+    "TOUTES": "ALL", "ACTIONS": "EQUITIES", "ETF": "ETF", "OBLIGATIONS": "BONDS",
+    "COMMODITIES": "COMMODITIES", "CRYPTO": "CRYPTO", "STRUCTURÉS": "STRUCTURED",
+    "CRÉDIT": "CREDIT", "NOM": "NAME", "COURS": "PRICE", "VALEUR": "VALUE",
+    "RENDEMENT": "YIELD", "VAR %": "CHG %", "TYPE": "TYPE", "POSSÉDÉ": "HELD",
+    "SECTEUR / CAT.": "SECTOR / CAT.", "Action": "Equity", "Oblig.": "Bond",
+    "Cmdty": "Cmdty", "Struct.": "Struct.", "Crédit": "Credit",
+    "■ ETF": "■ ETF", "▫ OBLIGATIONS": "▫ BONDS", "▲ COMMODITIES": "▲ COMMODITIES",
+    "₿ CRYPTO": "₿ CRYPTO", "◆ STRUCTURÉS": "◆ STRUCTURED", "● CRÉDIT": "● CREDIT",
+}
+
+
+def _tr(lbl):
+    return _UI_EN.get(lbl, lbl) if get_lang() == "en" else lbl
+
+
 ROW_H = 26
 SORT_FIELDS = [("name", "NOM"), ("price", "COURS"), ("value", "VALEUR"),
                ("yield_pct", "RENDEMENT"), ("change_pct", "VAR %")]
@@ -295,7 +312,7 @@ class ShopScene(Scene, PopupMixin):
             return
         qty = min(self._qty(), held)
         if qty <= 0:
-            self.msg = "Quantité invalide : indiquez un nombre positif."
+            self.msg = _L("Quantité invalide : indiquez un nombre positif.", "Invalid quantity: enter a positive number.")
             return
         p, m = self.app.gs.player, self.market
         if kind == "Action":
@@ -315,12 +332,12 @@ class ShopScene(Scene, PopupMixin):
         else:
             return
         if r["ok"]:
-            self.msg = f"Vendu {r['qty']:g} × {key} @ {r['price']:.2f} (P&L {r['realized']:+.0f})." \
+            self.msg = _L(f"Vendu {r['qty']:g} × {key} @ {r['price']:.2f} (P&L {r['realized']:+.0f}).", f"Sold {r['qty']:g} × {key} @ {r['price']:.2f} (P&L {r['realized']:+.0f}).") \
                 + self._slip_suffix(r)
             if not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
         else:
-            self.msg = f"Vente refusée ({r['reason']})."
+            self.msg = _L(f"Vente refusée ({r['reason']}).", f"Sell rejected ({r['reason']}).")
 
     def _slip_suffix(self, r):
         slip = r.get("slippage")
@@ -328,14 +345,14 @@ class ShopScene(Scene, PopupMixin):
             return ""
         mid = r["price"] - slip
         pct = (slip / mid * 100.0) if mid else 0.0
-        return f" Glissement {pct:+.2f}%."
+        return _L(f" Glissement {pct:+.2f}%.", f" Slippage {pct:+.2f}%.")
 
     def _do_buy(self, kind, key):
         if not self._can_trade():
             return
         qty = self._qty()
         if qty <= 0:
-            self.msg = "Quantité invalide : indiquez un nombre positif."
+            self.msg = _L("Quantité invalide : indiquez un nombre positif.", "Invalid quantity: enter a positive number.")
             return
         p, m = self.app.gs.player, self.market
         if kind == "Action":
@@ -355,11 +372,11 @@ class ShopScene(Scene, PopupMixin):
         else:
             return
         if r["ok"]:
-            self.msg = f"Acheté {qty:g} × {key} @ {r['price']:.2f}." + self._slip_suffix(r)
+            self.msg = _L(f"Acheté {qty:g} × {key} @ {r['price']:.2f}.", f"Bought {qty:g} × {key} @ {r['price']:.2f}.") + self._slip_suffix(r)
             if not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
         else:
-            self.msg = f"Achat refusé ({r['reason']})."
+            self.msg = _L(f"Achat refusé ({r['reason']}).", f"Buy rejected ({r['reason']}).")
 
     def _scroll_to_cursor(self):
         """Ajuste le scroll pour garder la ligne sélectionnée au clavier visible."""
@@ -525,11 +542,10 @@ class ShopScene(Scene, PopupMixin):
         surf.fill(config.COL_BG)
         p = self.app.gs.player
         cur = config.CONTINENTS[p.continent]["currency"]
-        widgets.draw_text(surf, "BOUTIQUE — TOUS LES ACTIFS", (40, 22),
+        widgets.draw_text(surf, _L("BOUTIQUE — TOUS LES ACTIFS", "SHOP — ALL ASSETS"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Actions · ETF · obligations · commodities · crypto · structurés · crédit — "
-                                "clic sur le nom = fiche d'analyse · choisissez une quantité puis ACHETER "
-                                "ou VENDRE (positions détenues). "
+        widgets.draw_text(surf, _L("Actions · ETF · obligations · commodities · crypto · structurés · crédit — clic sur le nom = fiche d'analyse · choisissez une quantité puis ACHETER ou VENDRE (positions détenues). ",
+                                   "Equities · ETFs · bonds · commodities · crypto · structured · credit — click the name = analysis sheet · pick a quantity then BUY or SELL (held positions). ")
                                 + (self.msg if self.msg else ""),
                           (42, 72), fonts.tiny(), config.COL_TEXT_DIM)
         st = PM.margin_status(p, self.market)
@@ -549,7 +565,7 @@ class ShopScene(Scene, PopupMixin):
         pygame.draw.rect(surf, config.COL_CYAN if self.text_focus == "search" else config.COL_BORDER,
                           search_rect, 1, border_radius=4)
         cursor = "_" if (self.text_focus == "search" and int(self._t * 2) % 2 == 0) else " "
-        label = (self.search + cursor) if self.search else (cursor + "Tapez pour rechercher (nom, ticker, secteur)…")
+        label = (self.search + cursor) if self.search else (cursor + _L("Tapez pour rechercher (nom, ticker, secteur)…", "Type to search (name, ticker, sector)…"))
         scol = config.COL_TEXT if self.search else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
                           (search_rect.x + 8, search_rect.y + 4), fonts.small(), scol)
@@ -562,7 +578,7 @@ class ShopScene(Scene, PopupMixin):
 
         # ---- quantité ----
         qx = search_rect.right + 20
-        widgets.draw_text(surf, "QUANTITÉ :", (qx, top + 4), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("QUANTITÉ :", "QUANTITY:"), (qx, top + 4), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         qx += 78
         self._qty_minus = pygame.Rect(qx, top, 22, 24)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._qty_minus, border_radius=3)
@@ -594,7 +610,7 @@ class ShopScene(Scene, PopupMixin):
 
         # ---- chips TYPE ----
         self._type_rects, y = self._draw_chip_row(surf, x0, top + 30, config.SCREEN_WIDTH - 40,
-                                                   TYPE_CHIPS, self.type_filter, config.COL_AMBER)
+                                                   [(v, _tr(l)) for v, l in TYPE_CHIPS], self.type_filter, config.COL_AMBER)
 
         # ---- chips SECTEUR / CATÉGORIE (dynamiques selon le TYPE) ----
         sub_opts = self._sub_options()
@@ -608,13 +624,13 @@ class ShopScene(Scene, PopupMixin):
         # ---- boutons de tri ----
         y += 6
         self._sort_rects = {}
-        widgets.draw_text(surf, "TRIER :", (x0, y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("TRIER :", "SORT:"), (x0, y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         sx0 = x0 + 56
         sx = sx0
         for key, lbl in SORT_FIELDS:
             active = (self.sort_key == key)
             arrow = (" ▲" if self.sort_dir > 0 else " ▼") if active else ""
-            full = lbl + arrow
+            full = _tr(lbl) + arrow
             w = fonts.tiny(bold=True).size(full)[0] + 16
             rect = pygame.Rect(sx, y, w, 20)
             self._sort_rects[key] = rect
@@ -633,7 +649,7 @@ class ShopScene(Scene, PopupMixin):
         cols = [("NOM", 0), ("TYPE", 240), ("SECTEUR / CAT.", 310), ("POSSÉDÉ", 470),
                 ("COURS", 560), ("VALEUR", 650), ("RENDEMENT", 750), ("VAR %", 860)]
         for lbl, dx in cols:
-            widgets.draw_text(surf, lbl, (inner.x + dx, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, _tr(lbl), (inner.x + dx, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
 
         list_top = inner.y + 22
         list_area = pygame.Rect(inner.x - 6, list_top, inner.w + 12, inner.bottom - list_top - 22)
@@ -656,7 +672,7 @@ class ShopScene(Scene, PopupMixin):
         self.scroll = widgets.draw_scrollbar(surf, panel, list_area, self.scroll, self._max_scroll, content_h)
 
         if not self._can_trade():
-            widgets.draw_text(surf, "⊘ Trading débloqué au grade Associate.",
+            widgets.draw_text(surf, _L("⊘ Trading débloqué au grade Junior Analyst.", "⊘ Trading unlocked at Junior Analyst grade."),
                               (inner.x, inner.bottom - 4), fonts.tiny(), config.COL_TEXT_DIM)
 
         # ---- rangée de liens vers les scènes dédiées par type d'actif ----
@@ -664,6 +680,7 @@ class ShopScene(Scene, PopupMixin):
         lx = x0
         self._scene_link_rects = {}
         for scene_name, label in SCENE_LINKS:
+            label = _tr(label)
             w = fonts.tiny(bold=True).size(label)[0] + 18
             rect = pygame.Rect(lx, link_y, w, 24)
             self._scene_link_rects[scene_name] = rect
@@ -693,7 +710,7 @@ class ShopScene(Scene, PopupMixin):
         self._name_rects[ident] = pygame.Rect(inner.x - 2, y - 2, name_w + 4, ROW_H - 4)
         widgets.draw_text(surf, widgets.fit_text(r["name"], fonts.small(bold=True), 225),
                           (inner.x, y), fonts.small(bold=True), kcol)
-        widgets.draw_text(surf, KIND_LABEL.get(kind, kind), (inner.x + cols[1][1], y),
+        widgets.draw_text(surf, _tr(KIND_LABEL.get(kind, kind)), (inner.x + cols[1][1], y),
                           fonts.tiny(bold=True), kcol)
         sub_txt = str(r["sub"])
         sub_fitted = widgets.fit_text(sub_txt, fonts.tiny(), 150)
@@ -715,9 +732,8 @@ class ShopScene(Scene, PopupMixin):
             price_rect = pygame.Rect(inner.x + cols[4][1] - 4, y - 2, 80, ROW_H - 4)
             if price_rect.collidepoint(mp):
                 tier = LIQ.equity_tier(self.market, key)
-                self._tooltip = (f"Liquidité : {tier} (selon la capitalisation). "
-                                  "Tier moins liquide = spread et impact de marché plus élevés "
-                                  "sur les gros ordres.", mp)
+                self._tooltip = (_L(f"Liquidité : {tier} (selon la capitalisation). Tier moins liquide = spread et impact de marché plus élevés sur les gros ordres.",
+                                    f"Liquidity: {tier} (by market cap). Less liquid tier = higher spread and market impact on large orders."), mp)
         value_txt = widgets.format_money(live["value"], cur) if live["value"] is not None else "—"
         widgets.draw_text(surf, value_txt, (inner.x + cols[5][1], y), fonts.small(bold=True), config.COL_TEXT)
         if live["yield_pct"] is not None:

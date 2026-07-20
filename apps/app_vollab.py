@@ -18,12 +18,18 @@ app_vollab.py — Application « Labo de vol » du bureau (NATIVE).
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import config, i18n
 from core import garch as G
 from core import regime_inference as RI
 from ui import fonts, widgets
 
-TABS = [("garch", "GARCH (prévision de vol)"), ("regimes", "RÉGIMES (inférence)")]
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
+
+TABS = [("garch", ("GARCH (prévision de vol)", "GARCH (vol forecast)")),
+        ("regimes", ("RÉGIMES (inférence)", "REGIMES (inference)"))]
 
 
 class VolLabApp(DesktopApp):
@@ -83,12 +89,13 @@ class VolLabApp(DesktopApp):
         self._ensure_computed()
         surf.fill(config.COL_BG, rect)
         pad = 14
-        widgets.draw_text(surf, "LABO DE VOL — GRAPPES, PRÉVISION, RÉGIMES",
+        widgets.draw_text(surf, _L("LABO DE VOL — GRAPPES, PRÉVISION, RÉGIMES", "VOL LAB — CLUSTERS, FORECAST, REGIMES"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         x, y = rect.x + pad, rect.y + 32
         self._tab_rects = {}
-        for tab, lbl in TABS:
+        for tab, lblpair in TABS:
+            lbl = _L(*lblpair)
             w = fonts.tiny(bold=True).size(lbl)[0] + 18
             r = pygame.Rect(x, y, w, 22)
             self._tab_rects[tab] = r
@@ -138,7 +145,7 @@ class VolLabApp(DesktopApp):
         top = y + 28
         g = self._garch
         if g is None:
-            widgets.draw_text(surf, "Historique insuffisant pour estimer un GARCH.",
+            widgets.draw_text(surf, _L("Historique insuffisant pour estimer un GARCH.", "Insufficient history to estimate a GARCH."),
                               (body.x, top + 8), fonts.small(), config.COL_TEXT_DIM)
             self._strat_btn = None
             return
@@ -147,15 +154,22 @@ class VolLabApp(DesktopApp):
             surf, pygame.Rect(body.x, top, body.w, body.bottom - top),
             f"GARCH(1,1) — {self.ticker}", config.COL_CYAN)
         yy = inner.y + 2
-        widgets.draw_text(surf, f"σ²_t = ω + α·r²(t−1) + β·σ²(t−1) — "
+        widgets.draw_text(surf, _L(f"σ²_t = ω + α·r²(t−1) + β·σ²(t−1) — "
                           f"α = {m['alpha']:.2f} (réaction) · β = {m['beta']:.2f} "
                           f"(mémoire) · persistance α+β = {m['persistence']:.2f}",
+                          f"σ²_t = ω + α·r²(t−1) + β·σ²(t−1) — "
+                          f"α = {m['alpha']:.2f} (reaction) · β = {m['beta']:.2f} "
+                          f"(memory) · persistence α+β = {m['persistence']:.2f}"),
                           (inner.x, yy), fonts.small(), config.COL_TEXT)
         yy += 22
-        widgets.draw_text(surf, f"Vol instantanée {g['vol_now_ann'] * 100:.0f}% → "
+        widgets.draw_text(surf, _L(f"Vol instantanée {g['vol_now_ann'] * 100:.0f}% → "
                           f"prévision 12 pas {g['vol_forecast_ann'] * 100:.0f}% → "
                           f"long terme {g['vol_lr_ann'] * 100:.0f}% · le desk price "
                           f"{g['vol_desk_ann'] * 100:.0f}%",
+                          f"Instantaneous vol {g['vol_now_ann'] * 100:.0f}% → "
+                          f"12-step forecast {g['vol_forecast_ann'] * 100:.0f}% → "
+                          f"long term {g['vol_lr_ann'] * 100:.0f}% · the desk prices "
+                          f"{g['vol_desk_ann'] * 100:.0f}%"),
                           (inner.x, yy), fonts.small(bold=True), config.COL_AMBER)
         yy += 24
         vcol = (config.COL_UP if g["edge"] > 0.03
@@ -176,8 +190,8 @@ class VolLabApp(DesktopApp):
 
         def py(v):
             return chart.bottom - 12 - int((v - lo) / rng * (chart.h - 24))
-        for ref, col, lbl in ((g["vol_lr_ann"], config.COL_TEXT_DIM, "long terme"),
-                              (g["vol_desk_ann"], config.COL_AMBER, "desk")):
+        for ref, col, lbl in ((g["vol_lr_ann"], config.COL_TEXT_DIM, _L("long terme", "long term")),
+                              (g["vol_desk_ann"], config.COL_AMBER, _L("desk", "desk"))):
             yv = py(ref)
             for x0 in range(chart.x + 8, chart.right - 8, 8):
                 pygame.draw.line(surf, col, (x0, yv), (min(x0 + 4, chart.right - 8), yv))
@@ -187,35 +201,39 @@ class VolLabApp(DesktopApp):
         pygame.draw.aalines(surf, config.COL_CYAN, False, pts)
         for pt in pts:
             pygame.draw.circle(surf, config.COL_WHITE, pt, 2)
-        widgets.draw_text(surf, "Prévision σ (annualisée) sur 12 pas — elle "
+        widgets.draw_text(surf, _L("Prévision σ (annualisée) sur 12 pas — elle "
                           "CONVERGE vers le long terme à vitesse (α+β)^h.",
+                          "σ forecast (annualized) over 12 steps — it "
+                          "CONVERGES to the long term at rate (α+β)^h."),
                           (chart.x + 8, chart.y + 4), fonts.tiny(),
                           config.COL_TEXT_DIM)
         self._strat_btn = pygame.Rect(inner.x, inner.bottom - 32, 190, 24)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._strat_btn, border_radius=4)
         pygame.draw.rect(surf, vcol, self._strat_btn, 1, border_radius=4)
-        widgets.draw_text(surf, "→ DESK OPTIONS", self._strat_btn.center,
+        widgets.draw_text(surf, _L("→ DESK OPTIONS", "→ OPTIONS DESK"), self._strat_btn.center,
                           fonts.small(bold=True), vcol, align="center")
 
     # -------------------------------------------------------------- RÉGIMES
     def _draw_regimes(self, surf, body):
         r = self._regime
         inner = widgets.draw_panel(surf, body,
-                                   "Filtre bayésien 2 états sur l'indice",
+                                   _L("Filtre bayésien 2 états sur l'indice", "2-state Bayesian filter on the index"),
                                    config.COL_CYAN)
         if r is None:
-            widgets.draw_text(surf, "Historique insuffisant.", (inner.x, inner.y + 6),
+            widgets.draw_text(surf, _L("Historique insuffisant.", "Insufficient history."), (inner.x, inner.y + 6),
                               fonts.small(), config.COL_TEXT_DIM)
             return
         y = inner.y + 2
         icol = config.COL_DOWN if r["inferred"] == "STRESS" else config.COL_UP
-        widgets.draw_text(surf, f"Inféré depuis les prix : {r['inferred']} "
+        widgets.draw_text(surf, _L(f"Inféré depuis les prix : {r['inferred']} "
                           f"(P(stress) = {r['p_now'] * 100:.0f}%)",
+                          f"Inferred from prices: {r['inferred']} "
+                          f"(P(stress) = {r['p_now'] * 100:.0f}%)"),
                           (inner.x, y), fonts.small(bold=True), icol)
         y += 20
         tcol = config.COL_DOWN if r["truth_is_stress"] else config.COL_UP
-        widgets.draw_text(surf, f"Vérité du moteur : {r['truth']} — le filtre "
-                          + ("a RAISON ✓" if r["agreement"] else "se trompe ✗"),
+        widgets.draw_text(surf, _L(f"Vérité du moteur : {r['truth']} — le filtre ", f"Engine truth: {r['truth']} — the filter ")
+                          + (_L("a RAISON ✓", "is RIGHT ✓") if r["agreement"] else _L("se trompe ✗", "is wrong ✗")),
                           (inner.x, y), fonts.small(), tcol)
         y += 26
         probs = r["probs"]
@@ -233,7 +251,10 @@ class VolLabApp(DesktopApp):
             col = config.COL_DOWN if pr >= RI.STRESS_THRESHOLD else config.COL_CYAN
             pygame.draw.line(surf, col, (x0, chart.bottom - 8),
                              (x0, chart.bottom - 8 - h))
-        widgets.draw_text(surf, "P(stress | rendements observés) dans le temps — "
+        widgets.draw_text(surf, _L("P(stress | rendements observés) dans le temps — "
                           "un régime, ça COLLE (transition 0,95), un mauvais jour "
-                          "isolé ne suffit pas.", (chart.x + 8, chart.y + 4),
+                          "isolé ne suffit pas.",
+                          "P(stress | observed returns) over time — "
+                          "a regime STICKS (transition 0.95), a single bad "
+                          "day is not enough."), (chart.x + 8, chart.y + 4),
                           fonts.tiny(), config.COL_TEXT_DIM)

@@ -25,10 +25,15 @@ on la regarde bouger et on agit dessus.
 import pygame
 
 from apps.base import DesktopApp
-from core import analytics, config
+from core import analytics, config, i18n
 from core import portfolio as pf
 from core import quant_tools as QT
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
 
 ROW_H = 20
 SNAP_PX = 14                     # rayon de capture d'un clic sur la courbe
@@ -177,12 +182,16 @@ class FrontierApp(DesktopApp):
         res = QT.apply_trades(self.app.gs.player, self.market, trades)
         if res["failed"]:
             details = ", ".join(f"{tk} ({reason})" for tk, reason in res["failed"][:3])
-            self.msg = (f"{res['done']} ordre(s) exécuté(s), "
-                        f"{len(res['failed'])} refusé(s) : {details}")
+            self.msg = _L(f"{res['done']} ordre(s) exécuté(s), "
+                        f"{len(res['failed'])} refusé(s) : {details}",
+                        f"{res['done']} order(s) executed, "
+                        f"{len(res['failed'])} rejected: {details}")
             self.msg_col = config.COL_AMBER
         else:
-            self.msg = (f"{res['done']} ordre(s) exécuté(s) — le portefeuille "
-                        "rejoint le point choisi de la frontière.")
+            self.msg = _L(f"{res['done']} ordre(s) exécuté(s) — le portefeuille "
+                        "rejoint le point choisi de la frontière.",
+                        f"{res['done']} order(s) executed — the portfolio "
+                        "reaches the chosen point on the frontier.")
             self.msg_col = config.COL_UP
         self._cache_key = None     # recalcul : le point ACTUEL a bougé
 
@@ -191,12 +200,14 @@ class FrontierApp(DesktopApp):
         self._ensure_computed()
         surf.fill(config.COL_BG, rect)
         pad = 12
-        widgets.draw_text(surf, "FRONTIÈRE EFFICIENTE — OPTIMISER PUIS EXÉCUTER",
+        widgets.draw_text(surf, _L("FRONTIÈRE EFFICIENTE — OPTIMISER PUIS EXÉCUTER", "EFFICIENT FRONTIER — OPTIMIZE THEN EXECUTE"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         widgets.draw_text(surf, widgets.fit_text(
-            "Cochez l'univers · cliquez un point de la courbe (ou ←/→) · "
-            "APPLIQUER passe les ordres réels.", fonts.tiny(), rect.w - 2 * pad),
+            _L("Cochez l'univers · cliquez un point de la courbe (ou ←/→) · "
+            "APPLIQUER passe les ordres réels.",
+            "Check the universe · click a point on the curve (or ←/→) · "
+            "APPLY places the real orders."), fonts.tiny(), rect.w - 2 * pad),
             (rect.x + pad, rect.y + 30), fonts.tiny(), config.COL_TEXT_DIM)
         body = pygame.Rect(rect.x + pad, rect.y + 50, rect.w - 2 * pad,
                            rect.bottom - pad - rect.y - 50)
@@ -215,7 +226,7 @@ class FrontierApp(DesktopApp):
 
     def _draw_universe(self, surf, rect):
         inner = widgets.draw_panel(surf, rect,
-                                   f"Univers ({len(self.selected)} sél.)",
+                                   _L(f"Univers ({len(self.selected)} sél.)", f"Universe ({len(self.selected)} sel.)"),
                                    config.COL_CYAN)
         self._row_rects = {}
         self._universe_rect = inner
@@ -224,7 +235,7 @@ class FrontierApp(DesktopApp):
         # réserve la place du conseil « ✶ = détenue... » en bas AVANT de
         # calculer la zone de défilement des lignes (sinon la dernière ligne
         # visible peut se dessiner par-dessus ce texte, cf. capture tutoriel).
-        univ_hint = "✶ = détenue · clic = inclure/exclure"
+        univ_hint = _L("✶ = détenue · clic = inclure/exclure", "✶ = held · click = include/exclude")
         univ_font = fonts.tiny()
         univ_lines = len(widgets.wrap_text_lines(univ_hint, univ_font, inner.w))
         univ_h = univ_lines * (univ_font.get_height() + 3)
@@ -254,7 +265,7 @@ class FrontierApp(DesktopApp):
                                   univ_font, config.COL_TEXT_DIM, inner.w, line_gap=3)
 
     def _draw_chart(self, surf, rect):
-        inner = widgets.draw_panel(surf, rect, "Rendement attendu vs risque (annualisés)",
+        inner = widgets.draw_panel(surf, rect, _L("Rendement attendu vs risque (annualisés)", "Expected return vs risk (annualized)"),
                                    config.COL_UP)
         self._curve_px = []
         self._chart_plot = None
@@ -266,7 +277,7 @@ class FrontierApp(DesktopApp):
                                            self._maxsharpe_btn.x - 6, inner.y - 2,
                                            config.COL_CYAN, right=True)
         if self._fr is None:
-            widgets.draw_text(surf, "Cochez au moins 2 valeurs avec assez d'historique.",
+            widgets.draw_text(surf, _L("Cochez au moins 2 valeurs avec assez d'historique.", "Check at least 2 stocks with enough history."),
                               (inner.x, inner.y + 20), fonts.small(),
                               config.COL_TEXT_DIM)
             return
@@ -312,24 +323,24 @@ class FrontierApp(DesktopApp):
         mv = pts[fr["i_min_var"]]
         ms = pts[fr["i_max_sharpe"]]
         pygame.draw.circle(surf, config.COL_CYAN, mv, 4)
-        widgets.draw_text(surf, "min var", (mv[0] + 6, mv[1] + 2), fonts.tiny(),
+        widgets.draw_text(surf, _L("min var", "min var"), (mv[0] + 6, mv[1] + 2), fonts.tiny(),
                           config.COL_CYAN)
         pygame.draw.circle(surf, config.COL_UP, ms, 4)
-        widgets.draw_text(surf, "max Sharpe", (ms[0] + 6, ms[1] - 12), fonts.tiny(),
+        widgets.draw_text(surf, _L("max Sharpe", "max Sharpe"), (ms[0] + 6, ms[1] - 12), fonts.tiny(),
                           config.COL_UP)
         if cur_pt:
             hp = px(*cur_pt)
             pygame.draw.circle(surf, config.COL_TEXT_DIM, hp, 5, 1)
-            widgets.draw_text(surf, "ACTUEL", (hp[0] + 7, hp[1] + 4), fonts.tiny(),
+            widgets.draw_text(surf, _L("ACTUEL", "CURRENT"), (hp[0] + 7, hp[1] + 4), fonts.tiny(),
                               config.COL_TEXT_DIM)
         if self.target_idx is not None and self.target_idx < len(pts):
             tp = pts[self.target_idx]
             pulse = 5
             pygame.draw.circle(surf, config.COL_AMBER, tp, pulse + 3, 2)
             pygame.draw.circle(surf, config.COL_AMBER, tp, 3)
-            widgets.draw_text(surf, "CIBLE", (tp[0] + 8, tp[1] - 14),
+            widgets.draw_text(surf, _L("CIBLE", "TARGET"), (tp[0] + 8, tp[1] - 14),
                               fonts.tiny(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Cliquez la courbe pour poser la CIBLE.",
+        widgets.draw_text(surf, _L("Cliquez la courbe pour poser la CIBLE.", "Click the curve to set the TARGET."),
                           (inner.x, plot.bottom + 18), fonts.tiny(),
                           config.COL_TEXT_DIM)
 
@@ -343,11 +354,13 @@ class FrontierApp(DesktopApp):
         return r
 
     def _draw_target(self, surf, rect):
-        inner = widgets.draw_panel(surf, rect, "Point cible → ordres", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, rect, _L("Point cible → ordres", "Target point → orders"), config.COL_AMBER)
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
         if self._fr is None or self.target_idx is None:
-            widgets.draw_text(surf, "Aucune cible : cliquez un point de la frontière, "
+            widgets.draw_text(surf, _L("Aucune cible : cliquez un point de la frontière, "
                               "ou MAX SHARPE / MIN VAR.",
+                              "No target: click a point on the frontier, "
+                              "or MAX SHARPE / MIN VAR."),
                               (inner.x, inner.y + 6), fonts.small(), config.COL_TEXT_DIM)
             if self.msg:
                 widgets.draw_text(surf, self.msg, (inner.x, inner.y + 30),
@@ -360,16 +373,22 @@ class FrontierApp(DesktopApp):
         col_w = (inner.w - 16) // 2
         # colonne gauche : stats + poids
         x0, y = inner.x, inner.y + 2
-        widgets.draw_text(surf, f"Rendement attendu {ret * 100:+.1f}% · "
+        widgets.draw_text(surf, _L(f"Rendement attendu {ret * 100:+.1f}% · "
                           f"vol {vol * 100:.1f}% · Sharpe {sh:+.2f}",
+                          f"Expected return {ret * 100:+.1f}% · "
+                          f"vol {vol * 100:.1f}% · Sharpe {sh:+.2f}"),
                           (x0, y), fonts.small(bold=True), config.COL_AMBER)
         y += 20
         budget = (self._trades or {}).get("budget", 0.0)
         proj = QT.projection(budget, ret, vol, years=1.0)
-        widgets.draw_text(surf, f"Budget {widgets.format_money(budget, cur)} → dans 1 an : "
+        widgets.draw_text(surf, _L(f"Budget {widgets.format_money(budget, cur)} → dans 1 an : "
                           f"{widgets.format_money(proj['p5'], cur)} / "
                           f"{widgets.format_money(proj['p50'], cur)} / "
                           f"{widgets.format_money(proj['p95'], cur)} (p5/p50/p95)",
+                          f"Budget {widgets.format_money(budget, cur)} → in 1 year: "
+                          f"{widgets.format_money(proj['p5'], cur)} / "
+                          f"{widgets.format_money(proj['p50'], cur)} / "
+                          f"{widgets.format_money(proj['p95'], cur)} (p5/p50/p95)"),
                           (x0, y), fonts.tiny(), config.COL_TEXT_DIM)
         y += 20
         cur_w, _tot = QT.current_weights(self.app.gs.player, self.market, fr["tickers"])
@@ -398,11 +417,11 @@ class FrontierApp(DesktopApp):
         y = inner.y + 2
         trades = (self._trades or {}).get("trades", [])
         if not trades:
-            widgets.draw_text(surf, "Déjà sur la cible (ou écarts trop petits).",
+            widgets.draw_text(surf, _L("Déjà sur la cible (ou écarts trop petits).", "Already on target (or gaps too small)."),
                               (x1, y), fonts.small(), config.COL_UP)
             self._apply_btn = None
         else:
-            widgets.draw_text(surf, f"ORDRES ({len(trades)}) :", (x1, y),
+            widgets.draw_text(surf, _L(f"ORDRES ({len(trades)}) :", f"ORDERS ({len(trades)}):"), (x1, y),
                               fonts.tiny(bold=True), config.COL_TEXT_DIM)
             y += 16
             for t in trades:
@@ -411,7 +430,7 @@ class FrontierApp(DesktopApp):
                                       config.COL_TEXT_DIM)
                     y += 12
                     break
-                side = "VENDRE" if t["side"] == "sell" else "ACHETER"
+                side = _L("VENDRE", "SELL") if t["side"] == "sell" else _L("ACHETER", "BUY")
                 col = config.COL_DOWN if t["side"] == "sell" else config.COL_UP
                 widgets.draw_text(surf, f"{side} {t['qty']} × {t['ticker']}",
                                   (x1, y), fonts.small(bold=True), col)
@@ -424,7 +443,7 @@ class FrontierApp(DesktopApp):
                              border_radius=4)
             pygame.draw.rect(surf, config.COL_AMBER, self._apply_btn, 1,
                              border_radius=4)
-            widgets.draw_text(surf, f"APPLIQUER ({len(trades)} ordres)",
+            widgets.draw_text(surf, _L(f"APPLIQUER ({len(trades)} ordres)", f"APPLY ({len(trades)} orders)"),
                               self._apply_btn.center, fonts.small(bold=True),
                               config.COL_AMBER, align="center")
         if self.msg:
@@ -443,15 +462,17 @@ class FrontierApp(DesktopApp):
         box.center = rect.center
         pygame.draw.rect(surf, config.COL_PANEL, box, border_radius=6)
         pygame.draw.rect(surf, config.COL_AMBER, box, 1, border_radius=6)
-        widgets.draw_text(surf, "Exécuter le rééquilibrage ?", (box.centerx, box.y + 16),
+        widgets.draw_text(surf, _L("Exécuter le rééquilibrage ?", "Execute the rebalancing?"), (box.centerx, box.y + 16),
                           fonts.small(bold=True), config.COL_AMBER, align="center")
-        widgets.draw_text(surf, f"{n_sell} vente(s) puis {n_buy} achat(s) — "
-                          "frais et slippage réels.", (box.centerx, box.y + 42),
+        widgets.draw_text(surf, _L(f"{n_sell} vente(s) puis {n_buy} achat(s) — "
+                          "frais et slippage réels.",
+                          f"{n_sell} sell(s) then {n_buy} buy(s) — "
+                          "real fees and slippage."), (box.centerx, box.y + 42),
                           fonts.tiny(), config.COL_TEXT, align="center")
         self._yes_btn = pygame.Rect(box.x + 40, box.bottom - 44, 120, 26)
         self._no_btn = pygame.Rect(box.right - 160, box.bottom - 44, 120, 26)
-        for r, lbl, col in ((self._yes_btn, "EXÉCUTER", config.COL_UP),
-                            (self._no_btn, "ANNULER", config.COL_TEXT_DIM)):
+        for r, lbl, col in ((self._yes_btn, _L("EXÉCUTER", "EXECUTE"), config.COL_UP),
+                            (self._no_btn, _L("ANNULER", "CANCEL"), config.COL_TEXT_DIM)):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, r, border_radius=4)
             pygame.draw.rect(surf, col, r, 1, border_radius=4)
             widgets.draw_text(surf, lbl, r.center, fonts.small(bold=True), col,

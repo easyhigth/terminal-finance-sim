@@ -19,13 +19,18 @@ Boutons TRADER / ALERTE pour agir sur le signal sans re-saisir le ticker.
 import pygame
 
 from apps.base import DesktopApp
-from core import clipboard, config
+from core import clipboard, config, i18n
 from core import quant_tools as QT
 from ui import fonts, widgets
 
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
+
 PERIODS = ["3M", "1A", "3A", "5A"]
-ANALYSES = [("price", "PRIX"), ("returns", "RENDEMENT"),
-            ("vol", "VOLATILITÉ"), ("corr", "CORRÉLATION")]
+ANALYSES = [("price", ("PRIX", "PRICE")), ("returns", ("RENDEMENT", "RETURN")),
+            ("vol", ("VOLATILITÉ", "VOLATILITY")), ("corr", ("CORRÉLATION", "CORRELATION"))]
 WINDOW = 18                      # fenêtre glissante (~1 trimestre)
 
 
@@ -80,37 +85,37 @@ class ZScoreApp(DesktopApp):
         rets = QT.simple_returns(hist)
         if self.analysis == "price":
             series = QT.rolling_zscore(hist, WINDOW)
-            desc = "cours vs sa moyenne mobile"
+            desc = _L("cours vs sa moyenne mobile", "price vs its moving average")
         elif self.analysis == "returns":
             series = QT.rolling_zscore(rets, WINDOW)
-            desc = "dernier rendement vs sa norme"
+            desc = _L("dernier rendement vs sa norme", "last return vs its norm")
         elif self.analysis == "vol":
             vols = QT.rolling_volatility(rets, WINDOW)
             series = QT.rolling_zscore(vols, WINDOW)
-            desc = "volatilité glissante vs sa norme"
+            desc = _L("volatilité glissante vs sa norme", "rolling volatility vs its norm")
         else:  # corr
             idx = QT.main_index(m, self.app.gs.player)
             bench = QT.index_returns(m, idx, len(rets))
             corrs = QT.rolling_correlation(rets, bench, WINDOW)
             series = QT.rolling_zscore(corrs, WINDOW)
-            desc = f"corrélation glissante à {idx} vs sa norme"
+            desc = _L(f"corrélation glissante à {idx} vs sa norme", f"rolling correlation to {idx} vs its norm")
         if len(series) < 2:
             return None
         z = float(series[-1])
         if abs(z) > 2:
-            verdict, col = "ÉCART EXTRÊME (> 2σ)", config.COL_DOWN
+            verdict, col = _L("ÉCART EXTRÊME (> 2σ)", "EXTREME DEVIATION (> 2σ)"), config.COL_DOWN
         elif abs(z) > 1:
-            verdict, col = "Écart notable (> 1σ)", config.COL_AMBER
+            verdict, col = _L("Écart notable (> 1σ)", "Notable deviation (> 1σ)"), config.COL_AMBER
         else:
-            verdict, col = "Dans la norme (< 1σ)", config.COL_UP
+            verdict, col = _L("Dans la norme (< 1σ)", "Within the norm (< 1σ)"), config.COL_UP
         hint = ""
         if self.analysis == "price":
             if z <= -2:
-                hint = "Très en-dessous de sa norme — candidat retour à la moyenne (à confronter aux fondamentaux)."
+                hint = _L("Très en-dessous de sa norme — candidat retour à la moyenne (à confronter aux fondamentaux).", "Well below its norm — mean-reversion candidate (cross-check the fundamentals).")
             elif z >= 2:
-                hint = "Très au-dessus de sa norme — prudence sur un achat au plus haut."
+                hint = _L("Très au-dessus de sa norme — prudence sur un achat au plus haut.", "Well above its norm — caution buying at the top.")
         elif self.analysis == "vol" and z >= 2:
-            hint = "Régime de volatilité inhabituel — voir l'app Couverture."
+            hint = _L("Régime de volatilité inhabituel — voir l'app Couverture.", "Unusual volatility regime — see the Hedge app.")
         return {"series": series, "z": z, "verdict": verdict, "col": col,
                 "desc": desc, "hint": hint, "n": len(series)}
 
@@ -180,14 +185,14 @@ class ZScoreApp(DesktopApp):
                 self.ticker = c["ticker"]
                 self.msg = ""
                 return
-        self.msg = f"« {text} » introuvable."
+        self.msg = _L(f"« {text} » introuvable.", f"'{text}' not found.")
 
     # ---------------------------------------------------------------- draw
     def draw(self, surf, rect):
         self._ensure_computed()
         surf.fill(config.COL_BG, rect)
         pad = 14
-        widgets.draw_text(surf, "Z-SCORE — ANALYSE STATISTIQUE",
+        widgets.draw_text(surf, _L("Z-SCORE — ANALYSE STATISTIQUE", "Z-SCORE — STATISTICAL ANALYSIS"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         # sélection : chips positions + watchlist + recherche
@@ -220,7 +225,7 @@ class ZScoreApp(DesktopApp):
         pygame.draw.rect(surf, config.COL_PANEL, self._search_rect, border_radius=3)
         pygame.draw.rect(surf, config.COL_CYAN if self._search_active
                          else config.COL_BORDER, self._search_rect, 1, border_radius=3)
-        label = self.search if (self.search or self._search_active) else "Autre ticker…"
+        label = self.search if (self.search or self._search_active) else _L("Autre ticker…", "Other ticker…")
         col = config.COL_TEXT if (self.search or self._search_active) else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(label, fonts.tiny(), 148),
                           (self._search_rect.x + 6, self._search_rect.y + 4),
@@ -229,7 +234,8 @@ class ZScoreApp(DesktopApp):
         y += 26
         x = rect.x + pad
         self._analysis_rects = {}
-        for a, lbl in ANALYSES:
+        for a, lblpair in ANALYSES:
+            lbl = _L(*lblpair)
             w = fonts.tiny(bold=True).size(lbl)[0] + 14
             r = pygame.Rect(x, y, w, 20)
             self._analysis_rects[a] = r
@@ -257,12 +263,14 @@ class ZScoreApp(DesktopApp):
                               config.COL_AMBER if sel else config.COL_TEXT_DIM,
                               align="center")
             x += w + 6
-        bw = fonts.tiny(bold=True).size("ALERTE")[0] + 16
+        _alert_lbl = _L("ALERTE", "ALERT")
+        _trade_lbl = _L("TRADER", "TRADE")
+        bw = fonts.tiny(bold=True).size(_alert_lbl)[0] + 16
         self._alert_btn = pygame.Rect(rect.right - pad - bw, y, bw, 20)
-        tw = fonts.tiny(bold=True).size("TRADER")[0] + 16
+        tw = fonts.tiny(bold=True).size(_trade_lbl)[0] + 16
         self._trade_btn = pygame.Rect(self._alert_btn.x - tw - 6, y, tw, 20)
-        for r, lbl, col in ((self._trade_btn, "TRADER", config.COL_UP),
-                            (self._alert_btn, "ALERTE", config.COL_AMBER)):
+        for r, lbl, col in ((self._trade_btn, _trade_lbl, config.COL_UP),
+                            (self._alert_btn, _alert_lbl, config.COL_AMBER)):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, r, border_radius=3)
             pygame.draw.rect(surf, col, r, 1, border_radius=3)
             widgets.draw_text(surf, lbl, r.center, fonts.tiny(bold=True), col,
@@ -273,8 +281,10 @@ class ZScoreApp(DesktopApp):
 
         top = y + 30
         if self._res is None:
-            widgets.draw_text(surf, "Pas assez d'historique pour cette analyse "
+            widgets.draw_text(surf, _L("Pas assez d'historique pour cette analyse "
                               "(élargissez la période).",
+                              "Not enough history for this analysis "
+                              "(widen the period)."),
                               (rect.x + pad, top + 8), fonts.small(),
                               config.COL_TEXT_DIM)
             return
@@ -292,7 +302,7 @@ class ZScoreApp(DesktopApp):
         z_w = z_font.size(z_label)[0]
         widgets.draw_text(surf, res["verdict"], (rect.x + pad + z_w + 16, top + 28),
                           fonts.small(bold=True), res["col"])
-        widgets.draw_text(surf, f"Mesure : {res['desc']} (fenêtre {WINDOW} pas).",
+        widgets.draw_text(surf, _L(f"Mesure : {res['desc']} (fenêtre {WINDOW} pas).", f"Measure: {res['desc']} ({WINDOW}-step window)."),
                           (rect.x + pad, top + 52), fonts.tiny(), config.COL_TEXT_DIM)
         chart_top = top + 72
         chart = pygame.Rect(rect.x + pad, chart_top, rect.w - 2 * pad,
@@ -304,7 +314,7 @@ class ZScoreApp(DesktopApp):
                               fonts.tiny(), config.COL_AMBER)
 
     def _draw_zchart(self, surf, rect, series):
-        inner = widgets.draw_panel(surf, rect, "Z-score dans le temps (bandes ±1σ / ±2σ)",
+        inner = widgets.draw_panel(surf, rect, _L("Z-score dans le temps (bandes ±1σ / ±2σ)", "Z-score over time (±1σ / ±2σ bands)"),
                                    config.COL_CYAN)
         if inner.h < 40 or len(series) < 2:
             return

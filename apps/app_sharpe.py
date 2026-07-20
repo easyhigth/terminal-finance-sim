@@ -18,9 +18,14 @@ par step_count) — pas de bouton « Calculer », l'app est toujours à jour.
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import config, i18n
 from core import quant_tools as QT
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
 
 PERIODS = ["3M", "1A", "3A", "5A"]     # fenêtres d'estimation proposées
 RF_MIN, RF_MAX, RF_STEP = 0.0, 0.10, 0.005
@@ -127,7 +132,7 @@ class SharpeApp(DesktopApp):
         self._ensure_computed()
         surf.fill(config.COL_BG, rect)
         pad = 14
-        widgets.draw_text(surf, "SHARPE RATIO — PERFORMANCE AJUSTÉE AU RISQUE",
+        widgets.draw_text(surf, _L("SHARPE RATIO — PERFORMANCE AJUSTÉE AU RISQUE", "SHARPE RATIO — RISK-ADJUSTED PERFORMANCE"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         # contrôles : période + taux sans risque + lien frontière
@@ -148,9 +153,10 @@ class SharpeApp(DesktopApp):
                               align="center")
             x += w + 6
         x += 12
-        widgets.draw_text(surf, f"Taux sans risque {self.rf * 100:.1f}%",
+        _rf_lbl = _L(f"Taux sans risque {self.rf * 100:.1f}%", f"Risk-free rate {self.rf * 100:.1f}%")
+        widgets.draw_text(surf, _rf_lbl,
                           (x, y + 3), fonts.tiny(), config.COL_TEXT_DIM)
-        x += fonts.tiny().size(f"Taux sans risque {self.rf * 100:.1f}%")[0] + 8
+        x += fonts.tiny().size(_rf_lbl)[0] + 8
         self._rf_minus = pygame.Rect(x, y, 20, 20)
         self._rf_plus = pygame.Rect(x + 24, y, 20, 20)
         for r, sym in ((self._rf_minus, "−"), (self._rf_plus, "+")):
@@ -158,34 +164,39 @@ class SharpeApp(DesktopApp):
             pygame.draw.rect(surf, config.COL_BORDER, r, 1, border_radius=3)
             widgets.draw_text(surf, sym, r.center, fonts.small(bold=True),
                               config.COL_TEXT, align="center")
-        fb_w = fonts.tiny(bold=True).size("→ FRONTIÈRE")[0] + 16
+        _fb_lbl = _L("→ FRONTIÈRE", "→ FRONTIER")
+        fb_w = fonts.tiny(bold=True).size(_fb_lbl)[0] + 16
         self._frontier_btn = pygame.Rect(rect.right - pad - fb_w, y, fb_w, 20)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._frontier_btn, border_radius=3)
         pygame.draw.rect(surf, config.COL_CYAN, self._frontier_btn, 1, border_radius=3)
-        widgets.draw_text(surf, "→ FRONTIÈRE", self._frontier_btn.center,
+        widgets.draw_text(surf, _fb_lbl, self._frontier_btn.center,
                           fonts.tiny(bold=True), config.COL_CYAN, align="center")
 
         top = y + 30
         if self._res is None:
-            widgets.draw_text(surf, "Détenez au moins une action (avec assez "
+            widgets.draw_text(surf, _L("Détenez au moins une action (avec assez "
                               "d'historique) pour mesurer le Sharpe du portefeuille.",
+                              "Hold at least one stock (with enough "
+                              "history) to measure the portfolio Sharpe."),
                               (rect.x + pad, top + 10), fonts.small(),
                               config.COL_TEXT_DIM)
-            widgets.draw_text(surf, "Ouvrez Trading (icône du bureau) pour "
+            widgets.draw_text(surf, _L("Ouvrez Trading (icône du bureau) pour "
                               "construire un panier, puis revenez ici.",
+                              "Open Trading (desktop icon) to "
+                              "build a basket, then come back here."),
                               (rect.x + pad, top + 32), fonts.small(),
                               config.COL_TEXT_DIM)
             return
         res = self._res
         # tuiles
         tiles = [
-            ("SHARPE PORTEF.", f"{res['port']['sharpe']:+.2f}",
+            (_L("SHARPE PORTEF.", "PORTF. SHARPE"), f"{res['port']['sharpe']:+.2f}",
              self._sharpe_color(res["port"]["sharpe"])),
-            ("REND. ANN.", f"{res['port']['ret'] * 100:+.1f}%",
+            (_L("REND. ANN.", "ANN. RETURN"), f"{res['port']['ret'] * 100:+.1f}%",
              config.COL_UP if res["port"]["ret"] >= 0 else config.COL_DOWN),
-            ("VOL. ANN.", f"{res['port']['vol'] * 100:.1f}%", config.COL_TEXT),
-            ("BÊTA vs INDICE", f"{res['beta']:.2f}", config.COL_TEXT),
-            ("ALPHA (JENSEN)", f"{res['alpha'] * 100:+.1f}%",
+            (_L("VOL. ANN.", "ANN. VOL"), f"{res['port']['vol'] * 100:.1f}%", config.COL_TEXT),
+            (_L("BÊTA vs INDICE", "BETA vs INDEX"), f"{res['beta']:.2f}", config.COL_TEXT),
+            (_L("ALPHA (JENSEN)", "ALPHA (JENSEN)"), f"{res['alpha'] * 100:+.1f}%",
              config.COL_UP if res["alpha"] >= 0 else config.COL_DOWN),
         ]
         tw = min(180, (rect.w - 2 * pad - (len(tiles) - 1) * 8) // len(tiles))
@@ -219,13 +230,13 @@ class SharpeApp(DesktopApp):
         return config.COL_DOWN
 
     def _draw_bars(self, surf, rect, res):
-        inner = widgets.draw_panel(surf, rect, "Comparaison (Sharpe annualisé)",
+        inner = widgets.draw_panel(surf, rect, _L("Comparaison (Sharpe annualisé)", "Comparison (annualized Sharpe)"),
                                    config.COL_CYAN)
-        data = [("Portef.", res["port"]["sharpe"], config.COL_AMBER)]
+        data = [(_L("Portf.", "Portf."), res["port"]["sharpe"], config.COL_AMBER)]
         if res["bench"]:
             data.append((res["index_name"], res["bench"]["sharpe"], config.COL_TEXT_DIM))
         if res["min_var"]:
-            data.append(("Min var", res["min_var"]["sharpe"], config.COL_CYAN))
+            data.append((_L("Min var", "Min var"), res["min_var"]["sharpe"], config.COL_CYAN))
         if res["max_sharpe"]:
             data.append(("Max Sharpe", res["max_sharpe"]["sharpe"], config.COL_UP))
         if not data:
@@ -256,11 +267,11 @@ class SharpeApp(DesktopApp):
 
     def _draw_rolling(self, surf, rect, res):
         inner = widgets.draw_panel(surf, rect,
-                                   "Sharpe glissant (fenêtre ~1 trimestre)",
+                                   _L("Sharpe glissant (fenêtre ~1 trimestre)", "Rolling Sharpe (~1 quarter window)"),
                                    config.COL_UP)
         series = res["rolling"]
         if len(series) < 2:
-            widgets.draw_text(surf, "Historique insuffisant pour la fenêtre glissante.",
+            widgets.draw_text(surf, _L("Historique insuffisant pour la fenêtre glissante.", "Insufficient history for the rolling window."),
                               (inner.x, inner.y + 6), fonts.tiny(), config.COL_TEXT_DIM)
             return
         lo, hi = float(min(series.min(), 0.0)), float(max(series.max(), 0.0))
@@ -281,9 +292,9 @@ class SharpeApp(DesktopApp):
                           config.COL_UP if last >= 0 else config.COL_DOWN)
 
     def _draw_table(self, surf, rect, res):
-        inner = widgets.draw_panel(surf, rect, "Par position", config.COL_AMBER)
-        cols = [("TICKER", 0), ("POIDS", int(inner.w * 0.30)),
-                ("REND.", int(inner.w * 0.48)), ("VOL", int(inner.w * 0.66)),
+        inner = widgets.draw_panel(surf, rect, _L("Par position", "Per position"), config.COL_AMBER)
+        cols = [("TICKER", 0), (_L("POIDS", "WEIGHT"), int(inner.w * 0.30)),
+                (_L("REND.", "RET."), int(inner.w * 0.48)), ("VOL", int(inner.w * 0.66)),
                 ("SHARPE", int(inner.w * 0.84))]
         for lbl, dx in cols:
             widgets.draw_text(surf, lbl, (inner.x + dx, inner.y), fonts.tiny(bold=True),
@@ -307,5 +318,5 @@ class SharpeApp(DesktopApp):
                               self._sharpe_color(row["sharpe"]))
             y += 19
         widgets.draw_text(surf,
-                          "Sharpe = (rendement − taux sans risque) / volatilité, annualisé.",
+                          _L("Sharpe = (rendement − taux sans risque) / volatilité, annualisé.", "Sharpe = (return − risk-free rate) / volatility, annualized."),
                           (inner.x, inner.bottom - 12), fonts.tiny(), config.COL_TEXT_DIM)

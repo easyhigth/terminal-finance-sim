@@ -24,20 +24,29 @@ Verrou de grade : le déblocage « options » (comme la commande OPTIONS).
 import pygame
 
 from apps.base import DesktopApp
-from core import config, unlocks
+from core import config, i18n, unlocks
 from core import option_pricing as OP
 from core import option_strategies as OS
 from core import options as opt
 from ui import fonts, widgets
 
-TABS = [("strat", "STRATÉGIE"), ("models", "MODÈLES"),
-        ("surface", "SURFACE"), ("book", "BOOK"), ("dhedge", "Δ-HEDGE")]
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
+
+TABS = [("strat", ("STRATÉGIE", "STRATEGY")), ("models", ("MODÈLES", "MODELS")),
+        ("surface", ("SURFACE", "SURFACE")), ("book", ("BOOK", "BOOK")),
+        ("dhedge", ("Δ-HEDGE", "Δ-HEDGE"))]
 MATURITIES = opt.MATURITY_CHOICES          # 0.25 / 0.5 / 1.0
 GREEK_HELP = [
-    ("Δ delta", "exposition directionnelle (équivalent actions)"),
-    ("Γ gamma", "variation du delta pour 1 % de spot"),
-    ("ν vega", "P&L pour +1 point de volatilité"),
-    ("Θ theta", "P&L par JOUR qui passe (le coût du temps)"),
+    ("Δ delta", ("exposition directionnelle (équivalent actions)",
+                 "directional exposure (share equivalent)")),
+    ("Γ gamma", ("variation du delta pour 1 % de spot",
+                 "change in delta per 1% of spot")),
+    ("ν vega", ("P&L pour +1 point de volatilité", "P&L per +1 point of volatility")),
+    ("Θ theta", ("P&L par JOUR qui passe (le coût du temps)",
+                 "P&L per DAY that passes (the cost of time)")),
 ]
 
 
@@ -143,13 +152,16 @@ class GreeksApp(DesktopApp):
             from core import delta_hedge as DH
             plan = DH.flatten_plan(self.app.gs.player, self.market)
             if not plan:
-                self._say("Delta déjà plat (ou pas d'options).", config.COL_TEXT_DIM)
+                self._say(_L("Delta déjà plat (ou pas d'options).", "Delta already flat (or no options)."), config.COL_TEXT_DIM)
             else:
                 r = DH.execute_flatten(self.app.gs.player, self.market, plan)
                 col = config.COL_UP if not r["failed"] else config.COL_AMBER
-                self._say(f"Delta aplati : {r['done']} ordre(s)"
+                self._say(_L(f"Delta aplati : {r['done']} ordre(s)"
                           + (f", {len(r['failed'])} refusé(s)" if r["failed"] else "")
-                          + " — il ne reste que Γ contre Θ.", col)
+                          + " — il ne reste que Γ contre Θ.",
+                          f"Delta flattened: {r['done']} order(s)"
+                          + (f", {len(r['failed'])} rejected" if r["failed"] else "")
+                          + " — only Γ vs Θ remains."), col)
                 self._cache_key = None
             return True
         return False
@@ -158,24 +170,30 @@ class GreeksApp(DesktopApp):
         p = self.app.gs.player
         if not unlocks.unlocked(p, "options"):
             g = unlocks.effective_required_grade(p, "options")
-            self._say(f"Options verrouillées (débloquées au grade {config.GRADES[g]}).",
+            self._say(_L(f"Options verrouillées (débloquées au grade {config.GRADES[g]}).",
+                         f"Options locked (unlocked at grade {config.GRADES[g]})."),
                       config.COL_DOWN)
             return
         r = OS.execute_strategy(p, self.market, self.ticker, self.strategy,
                                 MATURITIES[self.years_idx], self.contracts)
         if r.get("ok"):
             cur = config.CONTINENTS[p.continent]["currency"]
-            self._say(f"{r['label']} exécuté — prime "
-                      f"{widgets.format_money(r['premium'], cur)}, "
-                      f"{len(r['positions'])} jambe(s) au book.", config.COL_UP)
+            self._say(_L(f"{r['label']} exécuté — prime "
+                         f"{widgets.format_money(r['premium'], cur)}, "
+                         f"{len(r['positions'])} jambe(s) au book.",
+                         f"{r['label']} executed — premium "
+                         f"{widgets.format_money(r['premium'], cur)}, "
+                         f"{len(r['positions'])} leg(s) in the book."), config.COL_UP)
             self._cache_key = None
         else:
-            reason = {"cash": "trésorerie insuffisante pour la prime totale",
-                      "needs_stock": f"il faut détenir ≥ {self.contracts} actions "
+            reason = {"cash": _L("trésorerie insuffisante pour la prime totale", "insufficient cash for the total premium"),
+                      "needs_stock": _L(f"il faut détenir ≥ {self.contracts} actions "
                                      f"{self.ticker} (put protecteur)",
-                      "quote": "cotation impossible"}.get(r.get("reason"),
+                                     f"you must hold ≥ {self.contracts} {self.ticker} "
+                                     f"shares (protective put)"),
+                      "quote": _L("cotation impossible", "quote unavailable")}.get(r.get("reason"),
                                                           r.get("reason", "?"))
-            self._say(f"Refusé : {reason}.", config.COL_DOWN)
+            self._say(_L(f"Refusé : {reason}.", f"Rejected: {reason}."), config.COL_DOWN)
 
     def _say(self, text, col):
         self.msg, self.msg_col = text, col
@@ -185,13 +203,14 @@ class GreeksApp(DesktopApp):
         self._ensure_computed()
         surf.fill(config.COL_BG, rect)
         pad = 14
-        widgets.draw_text(surf, "DESK OPTIONS — STRATÉGIES · MODÈLES · GRECQUES",
+        widgets.draw_text(surf, _L("DESK OPTIONS — STRATÉGIES · MODÈLES · GRECQUES", "OPTIONS DESK — STRATEGIES · MODELS · GREEKS"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         # onglets
         x, y = rect.x + pad, rect.y + 32
         self._tab_rects = {}
-        for tab, lbl in TABS:
+        for tab, lblpair in TABS:
+            lbl = _L(*lblpair)
             w = fonts.tiny(bold=True).size(lbl)[0] + 18
             r = pygame.Rect(x, y, w, 22)
             self._tab_rects[tab] = r
@@ -258,7 +277,7 @@ class GreeksApp(DesktopApp):
         self._strat_rects, x = self._chip_row(
             surf, [(s, OS.STRATEGIES[s]["label"]) for s in OS.STRATEGY_ORDER],
             self.strategy, rect.x + pad, y, rect.right - pad - 230, config.COL_CYAN)
-        labels = {0.25: "3 mois", 0.5: "6 mois", 1.0: "1 an"}
+        labels = {0.25: _L("3 mois", "3mo"), 0.5: _L("6 mois", "6mo"), 1.0: _L("1 an", "1y")}
         self._years_rects, x = self._chip_row(
             surf, [(i, labels[m]) for i, m in enumerate(MATURITIES)],
             self.years_idx, x + 10, y, rect.right - pad - 90, config.COL_UP)
@@ -279,7 +298,7 @@ class GreeksApp(DesktopApp):
     def _draw_strat(self, surf, body):
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
         if self._q is None:
-            widgets.draw_text(surf, "Cotation indisponible pour cette sélection.",
+            widgets.draw_text(surf, _L("Cotation indisponible pour cette sélection.", "Quote unavailable for this selection."),
                               (body.x, body.y + 8), fonts.small(), config.COL_TEXT_DIM)
             self._exec_btn = None
             return
@@ -300,24 +319,27 @@ class GreeksApp(DesktopApp):
                               (inner.x, y), fonts.small(), config.COL_TEXT)
             y += 18
         if q["needs_stock"]:
-            widgets.draw_text(surf, f"+ vos {q['contracts']} actions {q['ticker']} détenues",
+            widgets.draw_text(surf, _L(f"+ vos {q['contracts']} actions {q['ticker']} détenues", f"+ your {q['contracts']} {q['ticker']} shares held"),
                               (inner.x, y), fonts.small(), config.COL_TEXT_DIM)
             y += 18
         y += 4
-        widgets.draw_text(surf, f"PRIME TOTALE : "
+        widgets.draw_text(surf, _L(f"PRIME TOTALE : "
                           f"{widgets.format_money(q['premium'], cur)}",
+                          f"TOTAL PREMIUM: "
+                          f"{widgets.format_money(q['premium'], cur)}"),
                           (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
         y += 22
         be = " · ".join(f"{b:,.1f}" for b in q["breakevens"]) or "—"
-        widgets.draw_text(surf, f"Points morts : {be}", (inner.x, y),
+        widgets.draw_text(surf, _L(f"Points morts : {be}", f"Breakevens: {be}"), (inner.x, y),
                           fonts.tiny(), config.COL_TEXT)
         y += 16
-        widgets.draw_text(surf, f"Perte max : {widgets.format_money(q['max_loss'], cur)}",
+        widgets.draw_text(surf, _L(f"Perte max : {widgets.format_money(q['max_loss'], cur)}", f"Max loss: {widgets.format_money(q['max_loss'], cur)}"),
                           (inner.x, y), fonts.tiny(), config.COL_DOWN)
         y += 22
         gvals = [q["greeks"]["delta"], q["greeks"]["gamma"],
                  q["greeks"]["vega"], q["greeks"]["theta"]]
-        for (lbl, help_txt), v in zip(GREEK_HELP, gvals):
+        for (lbl, help_pair), v in zip(GREEK_HELP, gvals):
+            help_txt = _L(*help_pair)
             widgets.draw_text(surf, f"{lbl} {v:+.2f}", (inner.x, y),
                               fonts.tiny(bold=True), config.COL_CYAN)
             widgets.draw_text(surf, widgets.fit_text(help_txt, fonts.tiny(),
@@ -328,11 +350,11 @@ class GreeksApp(DesktopApp):
         self._exec_btn = pygame.Rect(inner.x, min(y, inner.bottom - 30), 210, 26)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._exec_btn, border_radius=4)
         pygame.draw.rect(surf, config.COL_UP, self._exec_btn, 1, border_radius=4)
-        widgets.draw_text(surf, "EXÉCUTER LE PAQUET", self._exec_btn.center,
+        widgets.draw_text(surf, _L("EXÉCUTER LE PAQUET", "EXECUTE THE PACKAGE"), self._exec_btn.center,
                           fonts.small(bold=True), config.COL_UP, align="center")
 
     def _draw_payoff(self, surf, rect, q, cur):
-        inner = widgets.draw_panel(surf, rect, "P&L à l'échéance vs cours final",
+        inner = widgets.draw_panel(surf, rect, _L("P&L à l'échéance vs cours final", "P&L at expiry vs final price"),
                                    config.COL_UP)
         spots, pnl = q["spots"], q["pnl"]
         lo, hi = float(pnl.min()), float(pnl.max())
@@ -353,31 +375,37 @@ class GreeksApp(DesktopApp):
         for y0 in range(plot.y, plot.bottom, 8):
             pygame.draw.line(surf, config.COL_TEXT_DIM, (sx, y0),
                              (sx, min(y0 + 4, plot.bottom)))
-        widgets.draw_text(surf, f"spot {q['spot']:,.1f}", (sx + 4, plot.y),
+        widgets.draw_text(surf, _L(f"spot {q['spot']:,.1f}", f"spot {q['spot']:,.1f}"), (sx + 4, plot.y),
                           fonts.tiny(), config.COL_TEXT_DIM)
         pts = [(px(i), py(float(v))) for i, v in enumerate(pnl)]
         pygame.draw.aalines(surf, config.COL_UP, False, pts)
         for b in q["breakevens"]:
             bx = plot.x + int((b - spots[0]) / (spots[-1] - spots[0]) * plot.w)
             pygame.draw.circle(surf, config.COL_AMBER, (bx, zero_y), 4)
-        widgets.draw_text(surf, f"grille {spots[0]:,.0f} → {spots[-1]:,.0f} · "
+        widgets.draw_text(surf, _L(f"grille {spots[0]:,.0f} → {spots[-1]:,.0f} · "
                           "points ambre = points morts",
+                          f"grid {spots[0]:,.0f} → {spots[-1]:,.0f} · "
+                          "amber points = breakevens"),
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)
 
     # ----------------------------------------------------- onglet MODÈLES
     def _draw_models(self, surf, body):
         if self._q is None or self._models is None:
-            widgets.draw_text(surf, "Cotation indisponible.", (body.x, body.y + 8),
+            widgets.draw_text(surf, _L("Cotation indisponible.", "Quote unavailable."), (body.x, body.y + 8),
                               fonts.small(), config.COL_TEXT_DIM)
             return
         leg = self._q["legs"][0]
         inner = widgets.draw_panel(
             surf, body,
-            f"La même option ({leg['option_type'].upper()} {self.ticker} "
-            f"strike {leg['strike']:,.1f}) sous 5 modèles", config.COL_CYAN)
-        widgets.draw_text(surf, "Un seul contrat, mêmes entrées (S, K, T, r, σ) — "
+            _L(f"La même option ({leg['option_type'].upper()} {self.ticker} "
+            f"strike {leg['strike']:,.1f}) sous 5 modèles",
+            f"The same option ({leg['option_type'].upper()} {self.ticker} "
+            f"strike {leg['strike']:,.1f}) under 5 models"), config.COL_CYAN)
+        widgets.draw_text(surf, _L("Un seul contrat, mêmes entrées (S, K, T, r, σ) — "
                           "seules les HYPOTHÈSES changent.",
+                          "One contract, same inputs (S, K, T, r, σ) — "
+                          "only the ASSUMPTIONS change."),
                           (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
         y = inner.y + 22
         prices = [r["price"] for r in self._models["rows"]]
@@ -403,12 +431,18 @@ class GreeksApp(DesktopApp):
             y += 30
         y += 8
         notes = [
-            "· Binomial ≈ BS : l'arbre CRR converge vers la formule fermée (européen).",
-            "· Américain ≥ européen : l'écart est la prime d'exercice anticipé "
+            _L("· Binomial ≈ BS : l'arbre CRR converge vers la formule fermée (européen).",
+               "· Binomial ≈ BS: the CRR tree converges to the closed form (European)."),
+            _L("· Américain ≥ européen : l'écart est la prime d'exercice anticipé "
             "(≈ 0 pour un call sans dividende — résultat classique).",
-            "· Monte-Carlo : mêmes hypothèses que BS, mais estimation ± erreur-type.",
-            "· Merton à sauts : un marché qui peut SAUTER (crises du jeu) vaut plus "
+            "· American ≥ European: the gap is the early-exercise premium "
+            "(≈ 0 for a call without dividend — classic result)."),
+            _L("· Monte-Carlo : mêmes hypothèses que BS, mais estimation ± erreur-type.",
+               "· Monte-Carlo: same assumptions as BS, but an estimate ± standard error."),
+            _L("· Merton à sauts : un marché qui peut SAUTER (crises du jeu) vaut plus "
             "cher sur les ailes — c'est l'origine du smile de volatilité.",
+            "· Merton jumps: a market that can JUMP (game crises) is worth more "
+            "on the wings — this is the origin of the volatility smile."),
         ]
         for n in notes:
             if y > inner.bottom - 14:
@@ -425,12 +459,17 @@ class GreeksApp(DesktopApp):
             return
         sf = self._surface
         inner = widgets.draw_panel(
-            surf, body, f"Surface de volatilité implicite — {self.ticker} "
-            "(modèle à sauts inversé en vols BS)", config.COL_CYAN)
-        widgets.draw_text(surf, "Chaque cellule : la vol qu'il FAUT mettre dans "
+            surf, body, _L(f"Surface de volatilité implicite — {self.ticker} "
+            "(modèle à sauts inversé en vols BS)",
+            f"Implied volatility surface — {self.ticker} "
+            "(jump model inverted to BS vols)"), config.COL_CYAN)
+        widgets.draw_text(surf, _L("Chaque cellule : la vol qu'il FAUT mettre dans "
                           "Black-Scholes pour retrouver le prix du modèle à "
                           "sauts — les ailes coûtent plus cher (smile/skew), "
                           "l'effet s'estompe avec la maturité.",
+                          "Each cell: the vol you must feed into Black-Scholes to "
+                          "recover the jump-model price — the wings cost more "
+                          "(smile/skew), the effect fades with maturity."),
                           (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
         grid_top = inner.y + 34
         strikes = sf["strikes_pct"]
@@ -451,7 +490,7 @@ class GreeksApp(DesktopApp):
                               align="center")
         for i, T in enumerate(mats):
             yy = grid_top + i * cell_h
-            widgets.draw_text(surf, f"{int(T * 12)} mois", (inner.x, yy + cell_h // 2 - 6),
+            widgets.draw_text(surf, _L(f"{int(T * 12)} mois", f"{int(T * 12)}mo"), (inner.x, yy + cell_h // 2 - 6),
                               fonts.tiny(bold=True), config.COL_TEXT_DIM)
             for j, _k in enumerate(strikes):
                 iv = sf["iv"][i][j]
@@ -466,26 +505,30 @@ class GreeksApp(DesktopApp):
                 widgets.draw_text(surf, f"{iv * 100:.1f}%", r0.center,
                                   fonts.tiny(bold=True), config.COL_WHITE,
                                   align="center")
-        widgets.draw_text(surf, "strike (% du spot) → · plus c'est ROUGE, plus "
+        widgets.draw_text(surf, _L("strike (% du spot) → · plus c'est ROUGE, plus "
                           "la vol implicite est haute (queues de crise pricées).",
+                          "strike (% of spot) → · the REDDER it is, the higher "
+                          "the implied vol (crisis tails priced)."),
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)
 
     # ----------------------------------------------------- onglet Δ-HEDGE
     def _draw_dhedge(self, surf, body):
         inner = widgets.draw_panel(surf, body,
-                                   "Couverture dynamique — gamma scalping",
+                                   _L("Couverture dynamique — gamma scalping", "Dynamic hedging — gamma scalping"),
                                    config.COL_UP)
         rows = getattr(self, "_dh_rows", [])
         self._flatten_btn = None
         if not rows:
-            widgets.draw_text(surf, "Pas d'options au book — achetez un straddle "
+            widgets.draw_text(surf, _L("Pas d'options au book — achetez un straddle "
                               "(onglet STRATÉGIE) puis revenez aplatir son delta.",
+                              "No options in the book — buy a straddle "
+                              "(STRATEGY tab) then come back to flatten its delta."),
                               (inner.x, inner.y + 6), fonts.small(),
                               config.COL_TEXT_DIM)
             return
         y = inner.y + 2
-        widgets.draw_text(surf, "Delta net par sous-jacent (options + actions, en titres) :",
+        widgets.draw_text(surf, _L("Delta net par sous-jacent (options + actions, en titres) :", "Net delta per underlying (options + shares, in units):"),
                           (inner.x, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         y += 16
         for r in rows[:6]:
@@ -499,9 +542,9 @@ class GreeksApp(DesktopApp):
         plan = getattr(self, "_dh_plan", [])
         y += 6
         if plan:
-            txt = " · ".join(f"{'ACHETER' if t['trade'] > 0 else 'VENDRE/SHORT'} "
+            txt = " · ".join(f"{_L('ACHETER', 'BUY') if t['trade'] > 0 else _L('VENDRE/SHORT', 'SELL/SHORT')} "
                              f"{abs(t['trade'])} {t['ticker']}" for t in plan[:4])
-            widgets.draw_text(surf, widgets.fit_text(f"Plan : {txt}", fonts.tiny(),
+            widgets.draw_text(surf, widgets.fit_text(_L(f"Plan : {txt}", f"Plan: {txt}"), fonts.tiny(),
                                                      inner.w),
                               (inner.x, y), fonts.tiny(), config.COL_TEXT)
             y += 18
@@ -510,21 +553,23 @@ class GreeksApp(DesktopApp):
                              border_radius=4)
             pygame.draw.rect(surf, config.COL_UP, self._flatten_btn, 1,
                              border_radius=4)
-            widgets.draw_text(surf, "APLATIR LE DELTA", self._flatten_btn.center,
+            widgets.draw_text(surf, _L("APLATIR LE DELTA", "FLATTEN THE DELTA"), self._flatten_btn.center,
                               fonts.small(bold=True), config.COL_UP, align="center")
             y += 32
         else:
-            widgets.draw_text(surf, "Delta plat — votre P&L ne dépend plus de la "
-                              "direction : Γ contre Θ.", (inner.x, y),
+            widgets.draw_text(surf, _L("Delta plat — votre P&L ne dépend plus de la "
+                              "direction : Γ contre Θ.",
+                              "Delta flat — your P&L no longer depends on "
+                              "direction: Γ vs Θ."), (inner.x, y),
                               fonts.small(bold=True), config.COL_UP)
             y += 22
         # décomposition ex-post par position
-        widgets.draw_text(surf, "P&L décomposé depuis l'achat (chemin réel rejoué) :",
+        widgets.draw_text(surf, _L("P&L décomposé depuis l'achat (chemin réel rejoué) :", "P&L decomposed since purchase (real path replayed):"),
                           (inner.x, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         y += 16
-        cols = [("POSITION", 0), ("Δ dir.", int(inner.w * 0.34)),
-                ("Γ scalp", int(inner.w * 0.48)), ("Θ temps", int(inner.w * 0.62)),
-                ("résidu", int(inner.w * 0.76)), ("RÉEL", int(inner.w * 0.89))]
+        cols = [(_L("POSITION", "POSITION"), 0), (_L("Δ dir.", "Δ dir."), int(inner.w * 0.34)),
+                (_L("Γ scalp", "Γ scalp"), int(inner.w * 0.48)), (_L("Θ temps", "Θ time"), int(inner.w * 0.62)),
+                (_L("résidu", "resid."), int(inner.w * 0.76)), (_L("RÉEL", "ACTUAL"), int(inner.w * 0.89))]
         for lbl, dx in cols:
             widgets.draw_text(surf, lbl, (inner.x + dx, y), fonts.tiny(bold=True),
                               config.COL_TEXT_DIM)
@@ -542,34 +587,38 @@ class GreeksApp(DesktopApp):
                 widgets.draw_text(surf, f"{v:+,.0f}", (inner.x + dx, y),
                                   fonts.small(), col)
             y += 18
-        widgets.draw_text(surf, "Hedgé : le Δ directionnel disparaît — on gagne "
+        widgets.draw_text(surf, _L("Hedgé : le Δ directionnel disparaît — on gagne "
                           "si le Γ encaissé bat le Θ payé (vol réalisée > implicite).",
+                          "Hedged: the directional Δ disappears — you win "
+                          "if the Γ collected beats the Θ paid (realized vol > implied)."),
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)
 
     # -------------------------------------------------------- onglet BOOK
     def _draw_book(self, surf, body):
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
-        inner = widgets.draw_panel(surf, body, "Grecques agrégées du book d'options",
+        inner = widgets.draw_panel(surf, body, _L("Grecques agrégées du book d'options", "Aggregated greeks of the options book"),
                                    config.COL_AMBER)
         book = self._book or {"rows": [], "totals": {}}
         if not book["rows"]:
-            widgets.draw_text(surf, "Aucune option en portefeuille — construisez un "
+            widgets.draw_text(surf, _L("Aucune option en portefeuille — construisez un "
                               "paquet dans l'onglet STRATÉGIE.",
+                              "No options in portfolio — build a "
+                              "package in the STRATEGY tab."),
                               (inner.x, inner.y + 6), fonts.small(),
                               config.COL_TEXT_DIM)
             return
         t = book["totals"]
         tiles = [
             ("Δ CASH", widgets.format_money(t["delta_cash"], cur),
-             "exposition action équivalente"),
-            ("Γ CASH (1 %)", widgets.format_money(t["gamma_cash"], cur),
-             "variation du Δ pour 1 % de spot"),
+             _L("exposition action équivalente", "equivalent share exposure")),
+            (_L("Γ CASH (1 %)", "Γ CASH (1%)"), widgets.format_money(t["gamma_cash"], cur),
+             _L("variation du Δ pour 1 % de spot", "change in Δ per 1% of spot")),
             ("ν VEGA (+1 pt)", widgets.format_money(t["vega"], cur),
-             "P&L pour +1 point de vol"),
-            ("Θ / JOUR", widgets.format_money(t["theta_day"], cur),
-             "le temps qui passe"),
-            ("VALEUR", widgets.format_money(t["value"], cur), "mark-to-model"),
+             _L("P&L pour +1 point de vol", "P&L per +1 point of vol")),
+            (_L("Θ / JOUR", "Θ / DAY"), widgets.format_money(t["theta_day"], cur),
+             _L("le temps qui passe", "the passing of time")),
+            (_L("VALEUR", "VALUE"), widgets.format_money(t["value"], cur), "mark-to-model"),
         ]
         tx = inner.x
         for lbl, val, sub in tiles:
@@ -587,8 +636,8 @@ class GreeksApp(DesktopApp):
                               (tr.x + 8, tr.y + 36), fonts.tiny(), config.COL_TEXT_DIM)
             tx += tw + 8
         y = inner.y + 62
-        cols = [("POSITION", 0), ("ÉCH. (pas)", int(inner.w * 0.34)),
-                ("VALEUR", int(inner.w * 0.47)), ("Δ", int(inner.w * 0.62)),
+        cols = [(_L("POSITION", "POSITION"), 0), (_L("ÉCH. (pas)", "EXP. (steps)"), int(inner.w * 0.34)),
+                (_L("VALEUR", "VALUE"), int(inner.w * 0.47)), ("Δ", int(inner.w * 0.62)),
                 ("Γ", int(inner.w * 0.72)), ("ν", int(inner.w * 0.82)),
                 ("Θ", int(inner.w * 0.92))]
         for lbl, dx in cols:
@@ -614,7 +663,7 @@ class GreeksApp(DesktopApp):
         # l'edge de vol : implicite payée vs réalisée depuis l'achat
         if self._edge and y < inner.bottom - 40:
             y += 6
-            widgets.draw_text(surf, "VOL PAYÉE vs RÉALISÉE (gagne-t-on en vol ?) :",
+            widgets.draw_text(surf, _L("VOL PAYÉE vs RÉALISÉE (gagne-t-on en vol ?) :", "VOL PAID vs REALIZED (are we winning on vol?):"),
                               (inner.x, y), fonts.tiny(bold=True),
                               config.COL_TEXT_DIM)
             y += 16
@@ -622,9 +671,13 @@ class GreeksApp(DesktopApp):
                 if y > inner.bottom - 14:
                     break
                 col = config.COL_UP if e["edge"] >= 0 else config.COL_DOWN
-                widgets.draw_text(surf, f"{e['type'].upper()} {e['ticker']} — payé "
+                widgets.draw_text(surf, _L(f"{e['type'].upper()} {e['ticker']} — payé "
                                   f"{e['entry_iv'] * 100:.0f}% impl., réalisé "
                                   f"{e['realized'] * 100:.0f}% → edge "
                                   f"{e['edge'] * 100:+.0f} pts",
+                                  f"{e['type'].upper()} {e['ticker']} — paid "
+                                  f"{e['entry_iv'] * 100:.0f}% impl., realized "
+                                  f"{e['realized'] * 100:.0f}% → edge "
+                                  f"{e['edge'] * 100:+.0f} pts"),
                                   (inner.x, y), fonts.tiny(), col)
                 y += 15

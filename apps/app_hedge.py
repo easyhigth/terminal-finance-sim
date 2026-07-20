@@ -22,13 +22,17 @@ Deux stratégies RÉELLES (exécutables, pas des maquettes) :
 import pygame
 
 from apps.base import DesktopApp
-from core import config, unlocks
+from core import config, i18n, unlocks
 from core import hedging as H
 from core import portfolio as pf
 from core import quant_tools as QT
 from ui import fonts, widgets
 
 NOTIONAL_STEPS = [0.5, 1.0]      # fractions du notionnel bêta proposées
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
 
 
 class HedgeApp(DesktopApp):
@@ -197,47 +201,51 @@ class HedgeApp(DesktopApp):
         p = self.app.gs.player
         if not unlocks.unlocked(p, "hedge"):
             g = unlocks.effective_required_grade(p, "hedge")
-            self._say(f"Couverture verrouillée (débloquée au grade {config.GRADES[g]}).",
+            self._say(_L(f"Couverture verrouillée (débloquée au grade {config.GRADES[g]}).", f"Hedging locked (unlocked at grade {config.GRADES[g]})."),
                       config.COL_DOWN)
             return
         ctx = self._ctx or {}
         notional = ctx.get("notional", 0.0)
         if notional <= 0:
-            self._say("Rien à couvrir : aucune exposition longue.", config.COL_DOWN)
+            self._say(_L("Rien à couvrir : aucune exposition longue.", "Nothing to hedge: no long exposure."), config.COL_DOWN)
             return
         r = H.buy_put(p, self.market, notional,
                       H.STRIKE_CHOICES[self.strike_idx],
                       H.MATURITY_CHOICES[self.years_idx])
         if r.get("ok"):
-            self._say(f"Put souscrit : {widgets.format_money(notional, self._cur())} "
-                      f"couverts, prime {widgets.format_money(r['premium'], self._cur())}.",
+            self._say(_L(f"Put souscrit : {widgets.format_money(notional, self._cur())} "
+                         f"couverts, prime {widgets.format_money(r['premium'], self._cur())}.",
+                         f"Put bought: {widgets.format_money(notional, self._cur())} "
+                         f"hedged, premium {widgets.format_money(r['premium'], self._cur())}."),
                       config.COL_UP)
             self._cache_key = None
         else:
-            reason = {"cash": "trésorerie insuffisante pour la prime",
-                      "notional": "notionnel invalide"}.get(r.get("reason"),
+            reason = {"cash": _L("trésorerie insuffisante pour la prime", "insufficient cash for the premium"),
+                      "notional": _L("notionnel invalide", "invalid notional")}.get(r.get("reason"),
                                                             r.get("reason", "?"))
-            self._say(f"Refusé : {reason}.", config.COL_DOWN)
+            self._say(_L(f"Refusé : {reason}.", f"Rejected: {reason}."), config.COL_DOWN)
 
     def _exec_pair(self):
         p = self.app.gs.player
         if not unlocks.unlocked(p, "leverage"):
             g = unlocks.effective_required_grade(p, "leverage")
-            self._say(f"Vente à découvert verrouillée (grade {config.GRADES[g]}).",
+            self._say(_L(f"Vente à découvert verrouillée (grade {config.GRADES[g]}).", f"Short selling locked (grade {config.GRADES[g]})."),
                       config.COL_DOWN)
             return
         ctx = self._ctx or {}
         qty = ctx.get("hedge_qty", 0)
         if qty < 1 or not self.pair_hedge:
-            self._say("Ratio trop faible : rien à shorter.", config.COL_DOWN)
+            self._say(_L("Ratio trop faible : rien à shorter.", "Ratio too low: nothing to short."), config.COL_DOWN)
             return
         r = pf.short(p, self.market, self.pair_hedge, qty)
         if r.get("ok"):
-            self._say(f"Couverture posée : short {qty} × {self.pair_hedge} "
-                      f"(ratio {ctx['hr']['ratio']:.2f}).", config.COL_UP)
+            self._say(_L(f"Couverture posée : short {qty} × {self.pair_hedge} "
+                         f"(ratio {ctx['hr']['ratio']:.2f}).",
+                         f"Hedge set: short {qty} × {self.pair_hedge} "
+                         f"(ratio {ctx['hr']['ratio']:.2f})."), config.COL_UP)
             self._cache_key = None
         else:
-            self._say(f"Short refusé : {r.get('reason', '?')}.", config.COL_DOWN)
+            self._say(_L(f"Short refusé : {r.get('reason', '?')}.", f"Short rejected: {r.get('reason', '?')}."), config.COL_DOWN)
 
     def _say(self, text, col):
         self.msg, self.msg_col = text, col
@@ -252,14 +260,14 @@ class HedgeApp(DesktopApp):
         pad = 14
         cur = self._cur()
         ctx = self._ctx or {}
-        widgets.draw_text(surf, "COUVERTURE — PROTECTION DU PORTEFEUILLE",
+        widgets.draw_text(surf, _L("COUVERTURE — PROTECTION DU PORTEFEUILLE", "HEDGE — PORTFOLIO PROTECTION"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         # tuiles d'exposition
         tiles = [
-            ("EXPOSITION LONGUE", widgets.format_money(ctx.get("long_value", 0.0), cur)),
-            (f"BÊTA vs {ctx.get('index', '—')}", f"{ctx.get('beta', 0.0):.2f}"),
-            ("DÉJÀ COUVERT", f"{ctx.get('coverage', 0.0) * 100:.0f}%"),
+            (_L("EXPOSITION LONGUE", "LONG EXPOSURE"), widgets.format_money(ctx.get("long_value", 0.0), cur)),
+            (_L(f"BÊTA vs {ctx.get('index', '—')}", f"BETA vs {ctx.get('index', '—')}"), f"{ctx.get('beta', 0.0):.2f}"),
+            (_L("DÉJÀ COUVERT", "ALREADY HEDGED"), f"{ctx.get('coverage', 0.0) * 100:.0f}%"),
         ]
         tx, ty = rect.x + pad, rect.y + 34
         for label, val in tiles:
@@ -276,8 +284,8 @@ class HedgeApp(DesktopApp):
         self._mode_rects = {}
         mx = rect.x + pad
         my = ty + 54
-        for mode, lbl in (("put", "PUT INDICE (portefeuille)"),
-                          ("pair", "PAIRE (position)")):
+        for mode, lbl in (("put", _L("PUT INDICE (portefeuille)", "INDEX PUT (portfolio)")),
+                          ("pair", _L("PAIRE (position)", "PAIR (position)"))):
             w = fonts.tiny(bold=True).size(lbl)[0] + 18
             r = pygame.Rect(mx, my, w, 22)
             self._mode_rects[mode] = r
@@ -306,10 +314,10 @@ class HedgeApp(DesktopApp):
         col_w = (body.w - 12) // 2
         left = pygame.Rect(body.x, body.y, col_w, body.h)
         right = pygame.Rect(left.right + 12, body.y, col_w, body.h)
-        inner = widgets.draw_panel(surf, left, "Nouveau put protecteur",
+        inner = widgets.draw_panel(surf, left, _L("Nouveau put protecteur", "New protective put"),
                                    config.COL_CYAN)
         y = inner.y + 2
-        widgets.draw_text(surf, "Strike (% de l'indice) :", (inner.x, y),
+        widgets.draw_text(surf, _L("Strike (% de l'indice) :", "Strike (% of index):"), (inner.x, y),
                           fonts.tiny(bold=True), config.COL_TEXT_DIM)
         x = inner.x + 150
         self._strike_rects = {}
@@ -328,12 +336,13 @@ class HedgeApp(DesktopApp):
                               align="center")
             x += w + 6
         y += 28
-        widgets.draw_text(surf, "Maturité :", (inner.x, y), fonts.tiny(bold=True),
+        widgets.draw_text(surf, _L("Maturité :", "Maturity:"), (inner.x, y), fonts.tiny(bold=True),
                           config.COL_TEXT_DIM)
         x = inner.x + 150
         self._years_rects = {}
         for i, yr in enumerate(H.MATURITY_CHOICES):
-            lbl = f"{int(yr * 12)} mois" if yr < 1 else f"{yr:.0f} an"
+            lbl = (_L(f"{int(yr * 12)} mois", f"{int(yr * 12)}mo") if yr < 1
+                   else _L(f"{yr:.0f} an", f"{yr:.0f}y"))
             w = fonts.tiny(bold=True).size(lbl)[0] + 14
             r = pygame.Rect(x, y - 3, w, 20)
             self._years_rects[i] = r
@@ -347,7 +356,7 @@ class HedgeApp(DesktopApp):
                               align="center")
             x += w + 6
         y += 28
-        widgets.draw_text(surf, "Taille (× notionnel bêta) :", (inner.x, y),
+        widgets.draw_text(surf, _L("Taille (× notionnel bêta) :", "Size (× beta notional):"), (inner.x, y),
                           fonts.tiny(bold=True), config.COL_TEXT_DIM)
         x = inner.x + 150
         self._frac_rects = {}
@@ -368,18 +377,26 @@ class HedgeApp(DesktopApp):
         y += 30
         q = ctx.get("quote")
         if q:
-            widgets.draw_text(surf, f"Indice {q['underlying']} : {q['spot']:,.0f} — "
+            widgets.draw_text(surf, _L(f"Indice {q['underlying']} : {q['spot']:,.0f} — "
                               f"strike {q['strike']:,.0f} · vol {q['sigma'] * 100:.0f}% "
                               f"· taux {q['rate'] * 100:.1f}%",
+                              f"Index {q['underlying']}: {q['spot']:,.0f} — "
+                              f"strike {q['strike']:,.0f} · vol {q['sigma'] * 100:.0f}% "
+                              f"· rate {q['rate'] * 100:.1f}%"),
                               (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
             y += 20
-            widgets.draw_text(surf, f"Notionnel couvert : "
+            widgets.draw_text(surf, _L(f"Notionnel couvert : "
                               f"{widgets.format_money(ctx.get('notional', 0.0), cur)}",
+                              f"Notional hedged: "
+                              f"{widgets.format_money(ctx.get('notional', 0.0), cur)}"),
                               (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
             y += 22
-            widgets.draw_text(surf, f"Prime à payer : "
+            widgets.draw_text(surf, _L(f"Prime à payer : "
                               f"{widgets.format_money(ctx.get('premium', 0.0), cur)} "
                               f"({q['premium_rate'] * 100:.2f}% du notionnel)",
+                              f"Premium to pay: "
+                              f"{widgets.format_money(ctx.get('premium', 0.0), cur)} "
+                              f"({q['premium_rate'] * 100:.2f}% of notional)"),
                               (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
             y += 22
             # LA pédagogie du hedge : la perte à -10 % AVANT / APRÈS le put
@@ -387,8 +404,10 @@ class HedgeApp(DesktopApp):
             ba = self._hedge_before_after(ctx)
             if ba:
                 widgets.draw_text(surf, widgets.fit_text(
-                    f"Si marché -10 % : {ba['before']:+,.0f} sans couverture "
-                    f"-> {ba['after']:+,.0f} avec ce put", fonts.tiny(), inner.w),
+                    _L(f"Si marché -10 % : {ba['before']:+,.0f} sans couverture "
+                    f"-> {ba['after']:+,.0f} avec ce put",
+                    f"If market -10%: {ba['before']:+,.0f} unhedged "
+                    f"-> {ba['after']:+,.0f} with this put"), fonts.tiny(), inner.w),
                     (inner.x, y), fonts.tiny(), config.COL_WARN)
                 y += 20
             else:
@@ -396,21 +415,23 @@ class HedgeApp(DesktopApp):
         self._buy_btn = pygame.Rect(inner.x, y, 190, 26)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._buy_btn, border_radius=4)
         pygame.draw.rect(surf, config.COL_UP, self._buy_btn, 1, border_radius=4)
-        widgets.draw_text(surf, "SOUSCRIRE LE PUT", self._buy_btn.center,
+        widgets.draw_text(surf, _L("SOUSCRIRE LE PUT", "BUY THE PUT"), self._buy_btn.center,
                           fonts.small(bold=True), config.COL_UP, align="center")
-        hint = ("Si l'indice finit sous le strike à l'échéance, le put paie la "
-               "différence — la prime est le coût de l'assurance.")
+        hint = _L("Si l'indice finit sous le strike à l'échéance, le put paie la "
+               "différence — la prime est le coût de l'assurance.",
+               "If the index ends below the strike at expiry, the put pays the "
+               "difference — the premium is the cost of the insurance.")
         hint_font = fonts.tiny()
         n_lines = len(widgets.wrap_text_lines(hint, hint_font, inner.w))
         hint_h = n_lines * (hint_font.get_height() + 4)
         widgets.draw_text_wrapped(surf, hint, (inner.x, inner.bottom - hint_h),
                                   hint_font, config.COL_TEXT_DIM, inner.w)
         # puts en cours
-        rinner = widgets.draw_panel(surf, right, "Couvertures en cours",
+        rinner = widgets.draw_panel(surf, right, _L("Couvertures en cours", "Active hedges"),
                                     config.COL_AMBER)
         hedges = ctx.get("hedges", [])
         if not hedges:
-            widgets.draw_text(surf, "Aucun put en cours.", (rinner.x, rinner.y + 4),
+            widgets.draw_text(surf, _L("Aucun put en cours.", "No active put."), (rinner.x, rinner.y + 4),
                               fonts.tiny(), config.COL_TEXT_DIM)
         y = rinner.y + 2
         for hpos in hedges[:10]:
@@ -421,9 +442,11 @@ class HedgeApp(DesktopApp):
                               f"{hpos['strike_pct'] * 100:.0f}% · "
                               f"{widgets.format_money(hpos['notional'], cur)}",
                               (rinner.x, y), fonts.small(bold=True), config.COL_TEXT)
-            widgets.draw_text(surf, f"indice {hpos['perf']:+.1f}% depuis l'achat · "
-                              f"échéance dans {hpos['steps_left']} pas · "
-                              + ("DANS LA MONNAIE" if hpos["in_money"] else "hors monnaie"),
+            widgets.draw_text(surf, _L(f"indice {hpos['perf']:+.1f}% depuis l'achat · "
+                              f"échéance dans {hpos['steps_left']} pas · ",
+                              f"index {hpos['perf']:+.1f}% since buy · "
+                              f"expiry in {hpos['steps_left']} steps · ")
+                              + (_L("DANS LA MONNAIE", "IN THE MONEY") if hpos["in_money"] else _L("hors monnaie", "out of the money")),
                               (rinner.x + 10, y + 17), fonts.tiny(), col)
             y += 40
 
@@ -432,11 +455,11 @@ class HedgeApp(DesktopApp):
         col_w = (body.w - 12) // 2
         left = pygame.Rect(body.x, body.y, col_w, body.h)
         right = pygame.Rect(left.right + 12, body.y, col_w, body.h)
-        inner = widgets.draw_panel(surf, left, "Position à couvrir", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, left, _L("Position à couvrir", "Position to hedge"), config.COL_CYAN)
         held = ctx.get("held", [])
         self._pos_rects = {}
         if not held:
-            widgets.draw_text(surf, "Aucune position longue à couvrir.",
+            widgets.draw_text(surf, _L("Aucune position longue à couvrir.", "No long position to hedge."),
                               (inner.x, inner.y + 4), fonts.tiny(), config.COL_TEXT_DIM)
         y = inner.y + 2
         for h in held[:12]:
@@ -453,13 +476,13 @@ class HedgeApp(DesktopApp):
                               (inner.x + 90, y), fonts.small(), config.COL_TEXT_DIM)
             y += 21
         # candidats + qualité + exécution
-        rinner = widgets.draw_panel(surf, right, "Instrument de couverture (short)",
+        rinner = widgets.draw_panel(surf, right, _L("Instrument de couverture (short)", "Hedging instrument (short)"),
                                     config.COL_AMBER)
         cands = ctx.get("candidates", [])
         self._cand_rects = {}
         y = rinner.y + 2
         if not cands:
-            widgets.draw_text(surf, "Sélectionnez une position à gauche.",
+            widgets.draw_text(surf, _L("Sélectionnez une position à gauche.", "Select a position on the left."),
                               (rinner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
         for tk, corr in cands:
             r = pygame.Rect(rinner.x - 4, y - 2, rinner.w + 8, 20)
@@ -469,35 +492,43 @@ class HedgeApp(DesktopApp):
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, r, border_radius=3)
             widgets.draw_text(surf, tk, (rinner.x, y), fonts.small(bold=True),
                               config.COL_AMBER if sel else config.COL_TEXT)
-            widgets.draw_text(surf, f"corr {corr:+.2f}", (rinner.x + 90, y),
+            widgets.draw_text(surf, _L(f"corr {corr:+.2f}", f"corr {corr:+.2f}"), (rinner.x + 90, y),
                               fonts.small(), config.COL_TEXT_DIM)
             y += 21
         hr = ctx.get("hr")
         if hr and self.pair_hedge:
             y += 8
-            widgets.draw_text(surf, f"Ratio min-variance h = {hr['ratio']:.2f} · "
+            widgets.draw_text(surf, _L(f"Ratio min-variance h = {hr['ratio']:.2f} · "
                               f"R² = {hr['r2'] * 100:.0f}%",
+                              f"Min-variance ratio h = {hr['ratio']:.2f} · "
+                              f"R² = {hr['r2'] * 100:.0f}%"),
                               (rinner.x, y), fonts.small(bold=True), config.COL_TEXT)
             y += 20
-            widgets.draw_text(surf, f"Vol résiduelle attendue : "
+            widgets.draw_text(surf, _L(f"Vol résiduelle attendue : "
                               f"{hr['resid_vol_pct']:.0f}% de la vol d'origine",
+                              f"Expected residual vol: "
+                              f"{hr['resid_vol_pct']:.0f}% of original vol"),
                               (rinner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
             y += 22
             qty = ctx.get("hedge_qty", 0)
-            widgets.draw_text(surf, f"Ordre : SHORT {qty} × {self.pair_hedge} "
+            widgets.draw_text(surf, _L(f"Ordre : SHORT {qty} × {self.pair_hedge} "
                               f"(≈ {widgets.format_money(qty * ctx.get('hedge_price', 0.0), cur)})",
+                              f"Order: SHORT {qty} × {self.pair_hedge} "
+                              f"(≈ {widgets.format_money(qty * ctx.get('hedge_price', 0.0), cur)})"),
                               (rinner.x, y), fonts.small(bold=True), config.COL_DOWN)
             y += 26
             self._short_btn = pygame.Rect(rinner.x, y, 190, 26)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._short_btn,
                              border_radius=4)
             pygame.draw.rect(surf, config.COL_DOWN, self._short_btn, 1, border_radius=4)
-            widgets.draw_text(surf, "EXÉCUTER LE SHORT", self._short_btn.center,
+            widgets.draw_text(surf, _L("EXÉCUTER LE SHORT", "EXECUTE THE SHORT"), self._short_btn.center,
                               fonts.small(bold=True), config.COL_DOWN, align="center")
         else:
             self._short_btn = None
-        pair_hint = ("Plus la corrélation est forte, plus le short compense les "
-                    "variations de la position couverte.")
+        pair_hint = _L("Plus la corrélation est forte, plus le short compense les "
+                    "variations de la position couverte.",
+                    "The stronger the correlation, the more the short offsets the "
+                    "moves of the hedged position.")
         pair_font = fonts.tiny()
         pair_lines = len(widgets.wrap_text_lines(pair_hint, pair_font, rinner.w))
         pair_h = pair_lines * (pair_font.get_height() + 4)

@@ -18,7 +18,7 @@ redirigée ici (cf. DesktopScene._open_scene_window).
 import pygame
 
 from apps.base import DesktopApp
-from core import analytics, config
+from core import analytics, config, i18n
 from core import bonds as B
 from core import commodities as CM
 from core import crypto as K
@@ -31,6 +31,10 @@ from core import structured as S
 from ui import fonts, style, widgets
 from ui.order_prompt import ConditionalOrderMixin
 from ui.popups import PopupMixin
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
 
 KIND_CHIPS = ["Action", "ETF", "Obligation", "Commodity", "Crypto", "Structuré", "Crédit"]
 CLS_TO_KIND = {"Actions": "Action", "ETF": "ETF", "Obligations": "Obligation",
@@ -159,7 +163,7 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         p, m, kind, raw_key = self.app.gs.player, self.market, self.trade_kind, self.trade_key.strip()
         qty = self._qty()
         if not raw_key or qty <= 0:
-            self.msg = "Indiquez un identifiant d'actif et une quantité positive."
+            self.msg = _L("Indiquez un identifiant d'actif et une quantité positive.", "Enter an asset id and a positive quantity.")
             return
         key = self._resolve_key(kind, raw_key)
         if kind == "Action":
@@ -179,17 +183,17 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         else:
             return
         if r["ok"]:
-            self.msg = f"Acheté {qty:g} × {key.upper()} @ {r['price']:.2f}." + self._slip_suffix(r)
+            self.msg = _L(f"Acheté {qty:g} × {key.upper()} @ {r['price']:.2f}.", f"Bought {qty:g} × {key.upper()} @ {r['price']:.2f}.") + self._slip_suffix(r)
             if kind == "Action":
-                self.msg += f" Liquidité {liq.equity_tier(m, key.upper())}."
+                self.msg += _L(f" Liquidité {liq.equity_tier(m, key.upper())}.", f" Liquidity {liq.equity_tier(m, key.upper())}.")
             if not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
         elif r["reason"] == "sector_excluded":
             firm = firms_mod.get(p.firm)
             fname = firm["name"] if firm else "votre firme"
-            self.msg = f"Achat refusé : secteur {r.get('sector', '?')} exclu par l'ADN « {fname} »."
+            self.msg = _L(f"Achat refusé : secteur {r.get('sector', '?')} exclu par l'ADN « {fname} ».", f"Buy rejected: sector {r.get('sector', '?')} excluded by the « {fname} » DNA.")
         else:
-            self.msg = f"Achat refusé ({r['reason']})."
+            self.msg = _L(f"Achat refusé ({r['reason']}).", f"Buy rejected ({r['reason']}).")
 
     def _slip_suffix(self, r):
         slip = r.get("slippage")
@@ -203,7 +207,7 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         p, m, kind, raw_key = self.app.gs.player, self.market, self.trade_kind, self.trade_key.strip()
         qty = self._qty()
         if not raw_key or qty <= 0:
-            self.msg = "Indiquez un identifiant d'actif et une quantité positive."
+            self.msg = _L("Indiquez un identifiant d'actif et une quantité positive.", "Enter an asset id and a positive quantity.")
             return
         key = self._resolve_key(kind, raw_key)
         if kind == "Action":
@@ -223,12 +227,12 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         else:
             return
         if r["ok"]:
-            self.msg = (f"Vendu {r['qty']:g} × {key.upper()} @ {r['price']:.2f} "
+            self.msg = (_L(f"Vendu {r['qty']:g} × {key.upper()} @ {r['price']:.2f} ", f"Sold {r['qty']:g} × {key.upper()} @ {r['price']:.2f} ") +
                        f"(P&L {r['realized']:+.0f})." + self._slip_suffix(r))
             if not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
         else:
-            self.msg = f"Vente refusée ({r['reason']})."
+            self.msg = _L(f"Vente refusée ({r['reason']}).", f"Sell rejected ({r['reason']}).")
 
     def _do_rebalance(self):
         """Bouton « ÉQUIL. » : ramène les actions longues à poids égaux —
@@ -237,9 +241,9 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         p = self.app.gs.player
         r = pf.rebalance_equal_weights(p, self.market)
         if not r["ok"]:
-            self.msg = "Rééquilibrage : au moins 2 positions actions nécessaires."
+            self.msg = _L("Rééquilibrage : au moins 2 positions actions nécessaires.", "Rebalance: at least 2 equity positions required.")
             return
-        self.msg = f"Portefeuille rééquilibré à poids égaux ({r['lines']} lignes)."
+        self.msg = _L(f"Portefeuille rééquilibré à poids égaux ({r['lines']} lignes).", f"Portfolio rebalanced to equal weights ({r['lines']} lines).")
         if not p.hardcore:
             self.app.gs.save(config.AUTOSAVE_SLOT)
 
@@ -260,9 +264,9 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         r = pf.liquidate_all(p, self.market)
         self._liq_confirm = False
         if r["closed"] == 0:
-            self.msg = "Aucune position à liquider."
+            self.msg = _L("Aucune position à liquider.", "No position to liquidate.")
             return
-        self.msg = (f"{r['closed']} position(s) liquidée(s) — P&L réalisé "
+        self.msg = (_L(f"{r['closed']} position(s) liquidée(s) — P&L réalisé ", f"{r['closed']} position(s) liquidated — realized P&L ") +
                     f"{widgets.format_money(r['realized'], cur)}.")
         if not p.hardcore:
             self.app.gs.save(config.AUTOSAVE_SLOT)
@@ -293,8 +297,8 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
                           fonts.small(bold=True), config.COL_DOWN)
         n = self._count_positions()
         widgets.draw_text_wrapped(
-            surf, f"Liquider les {n} position(s) de toutes les classes d'actifs "
-            "aux conditions de marché actuelles (spread et impact inclus) ?",
+            surf, _L(f"Liquider les {n} position(s) de toutes les classes d'actifs aux conditions de marché actuelles (spread et impact inclus) ?",
+                     f"Liquidate all {n} position(s) across every asset class at current market conditions (spread and impact included)?"),
             (box.x + 14, box.y + 34), fonts.tiny(), config.COL_TEXT, box.w - 28)
         self._liq_yes_rect = pygame.Rect(box.x + 14, box.bottom - 36, 130, 26)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._liq_yes_rect, border_radius=4)
@@ -524,10 +528,10 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         nw = pf.net_worth(p, m)
         beta = pf.portfolio_beta(p, m)
         pos_val = nw - p.cash
-        widgets.draw_text(surf, f"Valeur nette {widgets.format_money(nw, cur)}",
+        widgets.draw_text(surf, _L(f"Valeur nette {widgets.format_money(nw, cur)}", f"Net worth {widgets.format_money(nw, cur)}"),
                           (rect.x + pad, rect.y + pad), fonts.head(bold=True), config.COL_WHITE)
-        sub = (f"Cash {widgets.format_money(p.cash, cur)} · Titres {widgets.format_money(pos_val, cur)} · "
-               f"bêta {beta:.2f} · P&L réalisé {widgets.format_money(p.realized_pnl, cur)}")
+        sub = _L(f"Cash {widgets.format_money(p.cash, cur)} · Titres {widgets.format_money(pos_val, cur)} · bêta {beta:.2f} · P&L réalisé {widgets.format_money(p.realized_pnl, cur)}",
+                 f"Cash {widgets.format_money(p.cash, cur)} · Holdings {widgets.format_money(pos_val, cur)} · beta {beta:.2f} · realized P&L {widgets.format_money(p.realized_pnl, cur)}")
         widgets.draw_text(surf, widgets.fit_text(sub, fonts.tiny(), rect.w - 2 * pad),
                           (rect.x + pad, rect.y + pad + 24), fonts.tiny(), config.COL_TEXT_DIM)
         st = pf.margin_status(p, m)
@@ -535,9 +539,9 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         lev_col = config.COL_DOWN if st["margin_call"] else (
             config.COL_WARN if st["leverage"] != float("inf") and st["leverage"] > st["max_leverage"] * 0.8
             else config.COL_TEXT_DIM)
-        marg = (f"Levier {lev}/{st['max_leverage']:.1f}x · exposition {widgets.format_money(st['gross'], cur)} · "
-                f"PA {widgets.format_money(st['buying_power'], cur)}"
-                + ("  ⚠ APPEL DE MARGE" if st["margin_call"] else ""))
+        marg = (_L(f"Levier {lev}/{st['max_leverage']:.1f}x · exposition {widgets.format_money(st['gross'], cur)} · PA {widgets.format_money(st['buying_power'], cur)}",
+                   f"Leverage {lev}/{st['max_leverage']:.1f}x · exposure {widgets.format_money(st['gross'], cur)} · BP {widgets.format_money(st['buying_power'], cur)}")
+                + (_L("  ⚠ APPEL DE MARGE", "  ⚠ MARGIN CALL") if st["margin_call"] else ""))
         widgets.draw_text(surf, widgets.fit_text(marg, fonts.tiny(), rect.w - 2 * pad - 170),
                           (rect.x + pad, rect.y + pad + 40), fonts.tiny(), lev_col)
 
@@ -562,14 +566,15 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         bx = rect.x + pad
         self._kind_rects = {}
         for kind in KIND_CHIPS:
-            w = fonts.tiny(bold=True).size(kind)[0] + 12
+            klabel = i18n.asset_class_label(kind)
+            w = fonts.tiny(bold=True).size(klabel)[0] + 12
             r2 = pygame.Rect(bx, bar_y, w, 20)
             self._kind_rects[kind] = r2
             sel = (kind == self.trade_kind)
             kcol = KIND_COLOR.get(kind, config.COL_TEXT)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_BG, r2, border_radius=3)
             pygame.draw.rect(surf, kcol if sel else config.COL_BORDER, r2, 1, border_radius=3)
-            widgets.draw_text(surf, kind, r2.center, fonts.tiny(bold=sel),
+            widgets.draw_text(surf, klabel, r2.center, fonts.tiny(bold=sel),
                               kcol if sel else config.COL_TEXT_DIM, align="center")
             bx += w + 5
             if bx > rect.right - pad - 300:   # fenêtre étroite : arrête d'ajouter des puces
@@ -581,7 +586,7 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         pygame.draw.rect(surf, config.COL_CYAN if self.text_focus == "key" else config.COL_BORDER,
                           self._key_box, 1, border_radius=4)
         kcursor = "_" if (self.text_focus == "key" and int(self._t * 2) % 2 == 0) else ""
-        klabel = (self.trade_key + kcursor) if self.trade_key else "ticker/nom…"
+        klabel = (self.trade_key + kcursor) if self.trade_key else _L("ticker/nom…", "ticker/name…")
         kcol2 = config.COL_TEXT if self.trade_key else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(klabel, fonts.small(), self._key_box.w - 10),
                           (self._key_box.x + 5, self._key_box.y + 3), fonts.small(), kcol2)
@@ -614,7 +619,7 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         self._rebalance_btn = pygame.Rect(self._liq_btn.x - 64, bar_y2, 58, 22)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._rebalance_btn, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, self._rebalance_btn, 1, border_radius=4)
-        widgets.draw_text(surf, "ÉQUIL.", self._rebalance_btn.center, fonts.tiny(bold=True),
+        widgets.draw_text(surf, _L("ÉQUIL.", "REBAL."), self._rebalance_btn.center, fonts.tiny(bold=True),
                           config.COL_CYAN, align="center")
         if self.msg:
             widgets.draw_text(surf, widgets.fit_text(self.msg, fonts.tiny(), rect.w - 2 * pad),
@@ -650,14 +655,14 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
                               fcol, align="right")
         if not rows:
             widgets.draw_text_wrapped(
-                surf, "Aucune position. Utilisez la barre de trading rapide ci-dessus, le "
-                "SHOP, ou le terminal (BUY <ticker> <qté>).",
+                surf, _L("Aucune position. Utilisez la barre de trading rapide ci-dessus, le SHOP, ou le terminal (BUY <ticker> <qté>).",
+                         "No position. Use the quick-trade bar above, the SHOP, or the terminal (BUY <ticker> <qty>)."),
                 (inner.x, inner.y), fonts.body(), config.COL_TEXT_DIM, inner.w)
         else:
             name_w = max(90, int(inner.w * 0.30))
-            cols = [("ACTIF", inner.x), ("TYPE", inner.x + name_w),
-                    ("QTÉ", inner.x + name_w + 55), ("PRU", inner.x + name_w + 105),
-                    ("COURS", inner.x + name_w + 165), ("VALEUR", inner.x + name_w + 225),
+            cols = [(_L("ACTIF", "ASSET"), inner.x), (_L("TYPE", "TYPE"), inner.x + name_w),
+                    (_L("QTÉ", "QTY"), inner.x + name_w + 55), (_L("PRU", "AVG"), inner.x + name_w + 105),
+                    (_L("COURS", "PRICE"), inner.x + name_w + 165), (_L("VALEUR", "VALUE"), inner.x + name_w + 225),
                     ("P&L", min(inner.right - 90, inner.x + name_w + 320))]
             for label, x in cols:
                 widgets.draw_text(surf, label, (x, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
@@ -716,14 +721,14 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
                         flux = self._position_flux().get((r["cls"], label))
                         tip = ""
                         if flux is not None and abs(flux) >= 0.5:
-                            verb = "rapporte" if flux >= 0 else "coûte"
+                            verb = _L("rapporte", "earns") if flux >= 0 else _L("coûte", "costs")
                             tip = (f"Cette position vous {verb} "
                                    f"{widgets.format_money(abs(flux), cur)}/tour")
                         if is_stock:
                             dy = m.metrics(label)["div_yield"]
                             if dy:
                                 tip += (" · " if tip else "") + f"rendement {dy*100:.1f}%/an"
-                        tip += (" · " if tip else "") + "clic sur le P&L : détail de la ligne"
+                        tip += (" · " if tip else "") + _L("clic sur le P&L : détail de la ligne", "click the P&L: line breakdown")
                         self._tooltip = (tip, mp)
                     name_label = widgets.fit_text(r["name"], fonts.small(bold=True), name_w - 4) \
                         + (" (S)" if r["short"] else "")
@@ -787,15 +792,15 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         box.center = rect.center
         style.draw_card(surf, box, bg=config.COL_PANEL, border=config.COL_CYAN,
                         radius=style.RADIUS_MD)
-        widgets.draw_text(surf, f"POURQUOI {s['label']} A BOUGÉ",
+        widgets.draw_text(surf, _L(f"POURQUOI {s['label']} A BOUGÉ", f"WHY {s['label']} MOVED"),
                           (box.x + 12, box.y + 10), fonts.small(bold=True), config.COL_CYAN)
         y = box.y + 36
         lines = [
-            ("Effet prix (latent)", s["price_effect"],
-             f"{s['qty']:g} × ({s['price']:.2f} − PRU {s['avg']:.2f})"),
-            ("P&L réalisé sur ce titre", s["realized"],
+            (_L("Effet prix (latent)", "Price effect (latent)"), s["price_effect"],
+             _L(f"{s['qty']:g} × ({s['price']:.2f} − PRU {s['avg']:.2f})", f"{s['qty']:g} × ({s['price']:.2f} − avg {s['avg']:.2f})")),
+            (_L("P&L réalisé sur ce titre", "Realized P&L on this name"), s["realized"],
              f"{s['trades']} trade(s) au journal"),
-            ("Frais payés sur ce titre", -s["fees"], "commissions cumulées"),
+            (_L("Frais payés sur ce titre", "Fees paid on this name"), -s["fees"], _L("commissions cumulées", "cumulative commissions")),
             ("Flux par tour actuel", s["flux"], "dividende/coupon/portage"),
         ]
         for label, val, note in lines:
@@ -825,7 +830,7 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         btn_w = (inner.w - gap) // 2
         self._side_mode_rects = {}
         x = inner.x
-        for mode, label in (("sector", "SECTEUR"), ("history", "ÉVOLUTION")):
+        for mode, label in (("sector", _L("SECTEUR", "SECTOR")), ("history", _L("ÉVOLUTION", "HISTORY"))):
             btn = pygame.Rect(x, inner.y, btn_w, btn_h)
             active = self.side_mode == mode
             accent = config.COL_AMBER if active else config.COL_TEXT_DIM
@@ -870,7 +875,7 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         self.scroll_sector = widgets.draw_scrollbar(surf, rect, list_area, self.scroll_sector,
                                self._sector_max_scroll, content_h)
         if warn:
-            widgets.draw_text(surf, "⚠ Forte concentration.", (rect.x, rect.bottom - 14),
+            widgets.draw_text(surf, _L("⚠ Forte concentration.", "⚠ High concentration."), (rect.x, rect.bottom - 14),
                               fonts.tiny(), config.COL_WARN)
 
     def _draw_history_panel(self, surf, rect):
@@ -878,7 +883,7 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
         cur = config.CONTINENTS[p.continent]["currency"]
         series = getattr(p, "cash_history", []) or []
         if len(series) < 2:
-            widgets.draw_text_wrapped(surf, "Historique insuffisant — revenez après quelques pas de marché.",
+            widgets.draw_text_wrapped(surf, _L("Historique insuffisant — revenez après quelques pas de marché.", "Not enough history — come back after a few market steps."),
                               (rect.x, rect.y), fonts.tiny(), config.COL_TEXT_DIM, rect.w)
             self._sector_list_rect = None
             return

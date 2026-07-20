@@ -14,18 +14,24 @@ from core import difficulty as difficulty_mod
 from core import hall_of_fame as hof_mod
 from core import score as score_mod
 from core.game_state import GameState
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
-# libellés FR courts pour les 7 dimensions du score (cf. core/score.py)
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
+# libellés courts (FR, EN) pour les 7 dimensions du score (cf. core/score.py)
 SCORE_DIMENSIONS = [
-    ("performance", "Performance"),
-    ("risque", "Risque"),
-    ("drawdown", "Drawdown"),
-    ("reputation", "Réputation"),
-    ("conformite", "Conformité"),
-    ("qualite_execution", "Exécution"),
-    ("survie", "Survie"),
+    ("performance", ("Performance", "Performance")),
+    ("risque", ("Risque", "Risk")),
+    ("drawdown", ("Drawdown", "Drawdown")),
+    ("reputation", ("Réputation", "Reputation")),
+    ("conformite", ("Conformité", "Compliance")),
+    ("qualite_execution", ("Exécution", "Execution")),
+    ("survie", ("Survie", "Survival")),
 ]
 
 
@@ -98,7 +104,7 @@ class GameOverScene(Scene):
         self._code_cancel_rect = None
         self.menu_btn = widgets.Button(
             (config.SCREEN_WIDTH // 2 - 150, 660, 300, 26),
-            "RETOUR AU MENU", config.COL_AMBER)
+            _L("RETOUR AU MENU", "BACK TO MENU"), config.COL_AMBER)
         # défilement (molette) des blocs "Rapport final" et "Journal de carrière"
         self.scroll_report = 0
         self.scroll_journal = 0
@@ -147,7 +153,7 @@ class GameOverScene(Scene):
             self._export_code = challenge_share.encode_entry(entry)
         from scenes.scene_commands import _try_clipboard
         _try_clipboard(self._export_code)
-        self.app.notify("Code copié — collez-le à un ami (Discord, SMS…).", "good")
+        self.app.notify(_L("Code copié — collez-le à un ami (Discord, SMS…).", "Code copied — paste it to a friend (Discord, SMS…)."), "good")
 
     def _handle_code_prompt_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -181,7 +187,8 @@ class GameOverScene(Scene):
         ok, result = hof_mod.import_friend_code(self.code_buf)
         self.code_prompt = False
         if ok:
-            msg = f"Score de {result['name']} ajouté au classement du défi."
+            msg = _L(f"Score de {result['name']} ajouté au classement du défi.",
+                     f"{result['name']}'s score added to the challenge ranking.")
             kind = "good"
             # retour social : si CE run est un défi du jour (seul cas où le
             # classement s'affiche, cf. test_non_daily_run_shows_no_export_
@@ -192,19 +199,20 @@ class GameOverScene(Scene):
                 mine, theirs = self.score.total, result.get("score", 0.0)
                 diff = abs(round(mine - theirs, 1))
                 if mine > theirs:
-                    msg += f" Vous le devancez de {diff:g} points !"
+                    msg += _L(f" Vous le devancez de {diff:g} points !", f" You're ahead by {diff:g} points!")
                 elif mine < theirs:
-                    msg += f" {result['name']} vous devance de {diff:g} points."
+                    msg += _L(f" {result['name']} vous devance de {diff:g} points.",
+                              f" {result['name']} is ahead of you by {diff:g} points.")
                     kind = "warn"
                 else:
-                    msg += " Vous êtes à égalité !"
+                    msg += _L(" Vous êtes à égalité !", " You're tied!")
             self.app.notify(msg, kind)
             if self._daily_date:
                 self.hof_daily_top = hof_mod.combined_daily_ranking(self._daily_date, n=8)
         elif result == "duplicate":
-            self.app.notify("Ce code a déjà été importé.", "warn")
+            self.app.notify(_L("Ce code a déjà été importé.", "This code has already been imported."), "warn")
         else:
-            self.app.notify("Code invalide — vérifiez le copier-coller.", "bad")
+            self.app.notify(_L("Code invalide — vérifiez le copier-coller.", "Invalid code — check the copy-paste."), "bad")
 
     def update(self, dt):
         self.t += dt
@@ -220,9 +228,9 @@ class GameOverScene(Scene):
         col = widgets._lerp_col(config.COL_DOWN, (120, 20, 24), pulse)
         widgets.draw_text(surf, "GAME OVER", (cx, 50),
                           fonts.title(bold=True), col, align="center")
-        subtitle = "FIN DE CARRIÈRE"
+        subtitle = _L("FIN DE CARRIÈRE", "CAREER OVER")
         if self.hof_rank:
-            subtitle += f" — PANTHÉON LOCAL : n°{self.hof_rank}"
+            subtitle += _L(f" — PANTHÉON LOCAL : n°{self.hof_rank}", f" — LOCAL HALL OF FAME: #{self.hof_rank}")
         widgets.draw_text(surf, subtitle, (cx, 84), fonts.small(),
                           config.COL_PRESTIGE if self.hof_rank else config.COL_TEXT_DIM,
                           align="center")
@@ -255,11 +263,11 @@ class GameOverScene(Scene):
         # panneau bas : rétrospective graphique de la valeur nette
         bottom_h = 150
         bottom = pygame.Rect(left_x, top_y + row_h + gap, 4 * col_w + 3 * gap, bottom_h)
-        binner = widgets.draw_panel(surf, bottom, "Rétrospective — valeur nette", config.COL_CYAN)
+        binner = widgets.draw_panel(surf, bottom, _L("Rétrospective — valeur nette", "Retrospective — net worth"), config.COL_CYAN)
         self._draw_networth_retrospective(surf, binner, p, cur)
 
         if p.hardcore:
-            widgets.draw_badge(surf, "HARDCORE — SAUVEGARDE EFFACÉE",
+            widgets.draw_badge(surf, _L("HARDCORE — SAUVEGARDE EFFACÉE", "HARDCORE — SAVE ERASED"),
                                (cx, bottom.bottom + 10), config.COL_DOWN, align="center")
 
         self.menu_btn.draw(surf)
@@ -275,8 +283,8 @@ class GameOverScene(Scene):
 
         box = pygame.Rect(0, 0, 520, 160)
         box.center = (config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2)
-        widgets.draw_panel(surf, box, "IMPORTER UN CODE D'AMI", config.COL_AMBER)
-        widgets.draw_text(surf, "Collez le code de score reçu (Discord, SMS…) :",
+        widgets.draw_panel(surf, box, _L("IMPORTER UN CODE D'AMI", "IMPORT A FRIEND CODE"), config.COL_AMBER)
+        widgets.draw_text(surf, _L("Collez le code de score reçu (Discord, SMS…) :", "Paste the score code you received (Discord, SMS…):"),
                           (box.x + 20, box.y + 46), fonts.small(), config.COL_TEXT_DIM)
 
         self._code_box_rect = pygame.Rect(box.x + 20, box.y + 70, box.w - 40, 30)
@@ -289,57 +297,62 @@ class GameOverScene(Scene):
         self._code_confirm_rect = pygame.Rect(box.x + 20, box.bottom - 34, 120, 26)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._code_confirm_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_AMBER, self._code_confirm_rect, 1, border_radius=4)
-        widgets.draw_text(surf, "IMPORTER", self._code_confirm_rect.center,
+        widgets.draw_text(surf, _L("IMPORTER", "IMPORT"), self._code_confirm_rect.center,
                           fonts.tiny(bold=True), config.COL_AMBER, align="center")
         self._code_cancel_rect = pygame.Rect(self._code_confirm_rect.right + 10, box.bottom - 34, 90, 26)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._code_cancel_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_TEXT_DIM, self._code_cancel_rect, 1, border_radius=4)
-        widgets.draw_text(surf, "Annuler", self._code_cancel_rect.center,
+        widgets.draw_text(surf, _L("Annuler", "Cancel"), self._code_cancel_rect.center,
                           fonts.tiny(), config.COL_TEXT_DIM, align="center")
 
     def _draw_report_panel(self, surf, rect, p, cur):
         """Rapport final + stats de run — défilable à la molette pour
         toujours pouvoir tout lire, même un motif de fin de partie long."""
-        inner = widgets.draw_panel(surf, rect, "Rapport final", config.COL_DOWN)
+        inner = widgets.draw_panel(surf, rect, _L("Rapport final", "Final report"), config.COL_DOWN)
         list_area = pygame.Rect(inner.x - 4, inner.y, inner.w + 8, inner.h)
         self._report_list_rect = list_area
         prev_clip = surf.get_clip()
         surf.set_clip(list_area)
         y = inner.y - self.scroll_report
-        h = widgets.draw_text_wrapped(surf, p.game_over_reason or "Partie terminée.",
+        h = widgets.draw_text_wrapped(surf, p.game_over_reason or _L("Partie terminée.", "Game over."),
                                       (inner.x, y), fonts.tiny(),
                                       config.COL_TEXT, inner.w, line_gap=4)
         y += h + 8
         lines = [
-            f"Nom    : {p.name}",
-            f"Grade  : {p.grade}",
-            f"Voie   : {p.track}",
-            f"Région : {p.continent}",
-            f"Durée  : {p.quarter} trim. ({p.day} j)",
+            _L(f"Nom    : {p.name}", f"Name   : {p.name}"),
+            _L(f"Grade  : {p.grade}", f"Grade  : {p.grade}"),
+            _L(f"Voie   : {p.track}", f"Track  : {p.track}"),
+            _L(f"Région : {p.continent}", f"Region : {p.continent}"),
+            _L(f"Durée  : {p.quarter} trim. ({p.day} j)", f"Length : {p.quarter} qtr ({p.day} d)"),
             f"Cash   : {widgets.format_money(p.cash, cur)}",
-            f"Record : {widgets.format_money(max(p.best_cash, p.cash), cur)}",
-            f"Rép.   : {p.reputation}/100",
-            f"Deals {p.deals_won}  Miss. {p.missions_done}",
+            _L(f"Record : {widgets.format_money(max(p.best_cash, p.cash), cur)}",
+               f"Peak   : {widgets.format_money(max(p.best_cash, p.cash), cur)}"),
+            _L(f"Rép.   : {p.reputation}/100", f"Rep.   : {p.reputation}/100"),
+            _L(f"Deals {p.deals_won}  Miss. {p.missions_done}", f"Deals {p.deals_won}  Miss. {p.missions_done}"),
             "",
-            "— P&L DU RUN —",
-            f"Réalisé : {widgets.format_money(p.realized_pnl, cur)}",
-            f"Frais   : {widgets.format_money(-p.total_fees_paid, cur)}",
-            f"Financ. : {widgets.format_money(-p.total_financing_paid, cur)}",
-            f"Marge   : {widgets.format_money(-p.total_margin_penalty, cur)}",
+            _L("— P&L DU RUN —", "— RUN P&L —"),
+            _L(f"Réalisé : {widgets.format_money(p.realized_pnl, cur)}",
+               f"Realized: {widgets.format_money(p.realized_pnl, cur)}"),
+            _L(f"Frais   : {widgets.format_money(-p.total_fees_paid, cur)}",
+               f"Fees    : {widgets.format_money(-p.total_fees_paid, cur)}"),
+            _L(f"Financ. : {widgets.format_money(-p.total_financing_paid, cur)}",
+               f"Funding : {widgets.format_money(-p.total_financing_paid, cur)}"),
+            _L(f"Marge   : {widgets.format_money(-p.total_margin_penalty, cur)}",
+               f"Margin  : {widgets.format_money(-p.total_margin_penalty, cur)}"),
         ]
         for ln in lines:
             widgets.draw_text(surf, ln, (inner.x, y), fonts.tiny(), config.COL_TEXT)
             y += 18
         if p.titles:
             y += 4
-            y += widgets.draw_text_wrapped(surf, "Titres : " + " · ".join(p.titles),
+            y += widgets.draw_text_wrapped(surf, _L("Titres : ", "Titles: ") + " · ".join(p.titles),
                                            (inner.x, y), fonts.tiny(), config.COL_WARN, inner.w)
         # panthéon local : les meilleurs runs de ce poste, toutes parties
         # confondues (core/hall_of_fame.py) — un point de comparaison qui
         # donne envie de relancer.
         if self.hof_top:
             y += 10
-            widgets.draw_text(surf, "PANTHÉON LOCAL", (inner.x, y),
+            widgets.draw_text(surf, _L("PANTHÉON LOCAL", "LOCAL HALL OF FAME"), (inner.x, y),
                               fonts.tiny(bold=True), config.COL_PRESTIGE)
             y += 18
             for i, run in enumerate(self.hof_top, start=1):
@@ -348,9 +361,9 @@ class GameOverScene(Scene):
                 # marqué pour signaler un run de défi du jour (marché
                 # différent — le score n'est pas rigoureusement comparable
                 # aux runs classiques du dessus/dessous).
-                tag = " [défi]" if run.get("daily_date") else ""
-                txt = (f"{i}. {run['name']} — {run['grade']} · "
-                       f"{run['quarters']} trim. · score {run['score']:g}{tag}")
+                tag = _L(" [défi]", " [challenge]") if run.get("daily_date") else ""
+                txt = _L(f"{i}. {run['name']} — {run['grade']} · {run['quarters']} trim. · score {run['score']:g}{tag}",
+                         f"{i}. {run['name']} — {run['grade']} · {run['quarters']} qtr · score {run['score']:g}{tag}")
                 widgets.draw_text(surf, widgets.fit_text(txt, fonts.tiny(), inner.w),
                                   (inner.x, y), fonts.tiny(bold=mine), col)
                 y += 16
@@ -363,13 +376,13 @@ class GameOverScene(Scene):
         self._import_rect = None
         if self.hof_daily_top:
             y += 10
-            widgets.draw_text(surf, "CLASSEMENT DU DÉFI DU JOUR", (inner.x, y),
+            widgets.draw_text(surf, _L("CLASSEMENT DU DÉFI DU JOUR", "DAILY CHALLENGE RANKING"), (inner.x, y),
                               fonts.tiny(bold=True), config.COL_CYAN)
             y += 18
             for run in self.hof_daily_top:
                 mine = (self._my_hof_entry_id is not None and run.get("id") == self._my_hof_entry_id)
                 col = config.COL_CYAN if mine else config.COL_TEXT
-                tag = " (ami)" if run.get("friend") else ""
+                tag = _L(" (ami)", " (friend)") if run.get("friend") else ""
                 txt = f"{run['name']} — {run['grade']} · score {run['score']:g}{tag}"
                 widgets.draw_text(surf, widgets.fit_text(txt, fonts.tiny(), inner.w),
                                   (inner.x, y), fonts.tiny(bold=mine), col)
@@ -378,17 +391,17 @@ class GameOverScene(Scene):
             self._export_rect = pygame.Rect(inner.x, y, inner.w // 2 - 4, 22)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._export_rect, border_radius=4)
             pygame.draw.rect(surf, config.COL_CYAN, self._export_rect, 1, border_radius=4)
-            widgets.draw_text(surf, "EXPORTER MON SCORE", self._export_rect.center,
+            widgets.draw_text(surf, _L("EXPORTER MON SCORE", "EXPORT MY SCORE"), self._export_rect.center,
                               fonts.tiny(bold=True), config.COL_CYAN, align="center")
             self._import_rect = pygame.Rect(self._export_rect.right + 8, y, inner.w // 2 - 4, 22)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._import_rect, border_radius=4)
             pygame.draw.rect(surf, config.COL_AMBER, self._import_rect, 1, border_radius=4)
-            widgets.draw_text(surf, "IMPORTER UN CODE", self._import_rect.center,
+            widgets.draw_text(surf, _L("IMPORTER UN CODE", "IMPORT A CODE"), self._import_rect.center,
                               fonts.tiny(bold=True), config.COL_AMBER, align="center")
             y += 26
             if self._export_code:
                 y += widgets.draw_text_wrapped(
-                    surf, "Code copié : " + self._export_code, (inner.x, y),
+                    surf, _L("Code copié : ", "Code copied: ") + self._export_code, (inner.x, y),
                     fonts.tiny(), config.COL_TEXT_DIM, inner.w, line_gap=2)
         surf.set_clip(prev_clip)
         content_h = (y + self.scroll_report) - inner.y
@@ -400,11 +413,11 @@ class GameOverScene(Scene):
     def _draw_journal_panel(self, surf, rect, p):
         """Journal de carrière intégral (plus de limite à 9 entrées) —
         défilable à la molette."""
-        inner = widgets.draw_panel(surf, rect, "Journal de carrière", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, rect, _L("Journal de carrière", "Career journal"), config.COL_AMBER)
         list_area = pygame.Rect(inner.x - 4, inner.y, inner.w + 8, inner.h)
         self._journal_list_rect = list_area
         if not p.journal:
-            widgets.draw_text_wrapped(surf, "Carrière trop courte pour laisser une trace.",
+            widgets.draw_text_wrapped(surf, _L("Carrière trop courte pour laisser une trace.", "Career too short to leave a trace."),
                               (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM, inner.w)
             self._journal_max_scroll = 0
             return
@@ -431,11 +444,11 @@ class GameOverScene(Scene):
         badges décrochés pendant le run — la mémoire NARRATIVE de la partie,
         complémentaire du journal (événements) et du score (chiffres)."""
         from core import badges as badges_mod
-        inner = widgets.draw_panel(surf, rect, "Décisions & badges", config.COL_PRESTIGE)
+        inner = widgets.draw_panel(surf, rect, _L("Décisions & badges", "Decisions & badges"), config.COL_PRESTIGE)
         y = inner.y
         decisions = getattr(p, "decisions_log", None) or []
         if decisions:
-            widgets.draw_text(surf, "DÉCISIONS MARQUANTES", (inner.x, y),
+            widgets.draw_text(surf, _L("DÉCISIONS MARQUANTES", "KEY DECISIONS"), (inner.x, y),
                               fonts.tiny(bold=True), config.COL_CYAN)
             y += 18
             for d in decisions[-6:][::-1]:
@@ -453,7 +466,7 @@ class GameOverScene(Scene):
                 y += 19
         else:
             y += widgets.draw_text_wrapped(
-                surf, "Aucun dilemme tranché pendant ce run.",
+                surf, _L("Aucun dilemme tranché pendant ce run.", "No dilemma resolved during this run."),
                 (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM, inner.w) + 6
         badge_ids = getattr(p, "badges", None) or []
         if badge_ids:
@@ -468,7 +481,7 @@ class GameOverScene(Scene):
                 if y > inner.bottom - 14:
                     remaining = len(badge_ids) - shown
                     if remaining > 0:
-                        widgets.draw_text(surf, f"… +{remaining} autres", (inner.x, y - 2),
+                        widgets.draw_text(surf, _L(f"… +{remaining} autres", f"… +{remaining} more"), (inner.x, y - 2),
                                           fonts.tiny(), config.COL_TEXT_DIM)
                     break
                 widgets.draw_text(surf,
@@ -479,7 +492,7 @@ class GameOverScene(Scene):
                 shown += 1
         if getattr(p, "investigations_count", 0):
             y += 8
-            widgets.draw_text(surf, f"Enquêtes subies : {p.investigations_count}",
+            widgets.draw_text(surf, _L(f"Enquêtes subies : {p.investigations_count}", f"Investigations faced: {p.investigations_count}"),
                               (inner.x, y), fonts.tiny(), config.COL_DOWN)
 
     def _draw_score_panel(self, surf, rect):
@@ -487,7 +500,7 @@ class GameOverScene(Scene):
         lettre + total, puis une jauge par dimension (0-100)."""
         sc = self.score
         accent = _score_color(sc.total)
-        inner = widgets.draw_panel(surf, rect, "Score de carrière", accent)
+        inner = widgets.draw_panel(surf, rect, _L("Score de carrière", "Career score"), accent)
 
         widgets.draw_text(surf, f"{sc.grade}", (inner.x, inner.y),
                           fonts.title(bold=True), accent)
@@ -501,7 +514,7 @@ class GameOverScene(Scene):
         gap = 12
         for key, label in SCORE_DIMENSIONS:
             val = getattr(sc, key)
-            widgets.draw_text(surf, label, (inner.x, bar_y), fonts.tiny(), config.COL_TEXT)
+            widgets.draw_text(surf, _L(*label), (inner.x, bar_y), fonts.tiny(), config.COL_TEXT)
             bar_rect = pygame.Rect(inner.x + 78, bar_y + 1, inner.w - 78 - 46, bar_h - 2)
             widgets.draw_progress(surf, bar_rect, val / 100.0, _score_color(val))
             widgets.draw_text(surf, f"{val:.0f}/100", (inner.right, bar_y),

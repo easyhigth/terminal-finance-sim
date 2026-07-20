@@ -7,14 +7,20 @@ import pygame
 
 from core import config
 from core import dilemmas as D
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
 _CAT = {
-    "ethique": ("ÉTHIQUE", config.COL_DOWN),
-    "reglementaire": ("RÉGLEMENTAIRE", config.COL_WARN),
-    "strategie": ("STRATÉGIE", config.COL_CYAN),
-    "signature": ("DÉCISION SIGNATURE", config.COL_AMBER),
+    "ethique": (("ÉTHIQUE", "ETHICS"), config.COL_DOWN),
+    "reglementaire": (("RÉGLEMENTAIRE", "REGULATORY"), config.COL_WARN),
+    "strategie": (("STRATÉGIE", "STRATEGY"), config.COL_CYAN),
+    "signature": (("DÉCISION SIGNATURE", "SIGNATURE CALL"), config.COL_AMBER),
 }
 
 
@@ -29,7 +35,7 @@ class DilemmaScene(Scene):
         self.focus = 0   # index de l'option ayant le focus clavier
         self.continue_btn = widgets.Button(
             (config.SCREEN_WIDTH // 2 - 130, config.SCREEN_HEIGHT - 78, 260, 48),
-            "CONTINUER", config.COL_UP)
+            _L("CONTINUER", "CONTINUE"), config.COL_UP)
 
     def handle_event(self, event):
         if self.dilemma is None:
@@ -79,14 +85,15 @@ class DilemmaScene(Scene):
     def draw(self, surf):
         surf.fill(config.COL_BG)
         if self.dilemma is None:
-            widgets.draw_text(surf, "Aucune décision en attente.", (40, 40),
+            widgets.draw_text(surf, _L("Aucune décision en attente.", "No decision pending."), (40, 40),
                               fonts.head(bold=True), config.COL_TEXT_DIM)
-            widgets.draw_text(surf, "ESC pour revenir.", (40, 90), fonts.small(),
+            widgets.draw_text(surf, _L("ESC pour revenir.", "ESC to go back."), (40, 90), fonts.small(),
                               config.COL_TEXT_DIM)
             return
         d = self.dilemma
-        label, col = _CAT.get(d["category"], ("DÉCISION", config.COL_AMBER))
-        widgets.draw_text(surf, "DÉCISION", (40, 22), fonts.title(bold=True), config.COL_AMBER)
+        pair, col = _CAT.get(d["category"], (("DÉCISION", "DECISION"), config.COL_AMBER))
+        label = _L(*pair)
+        widgets.draw_text(surf, _L("DÉCISION", "DECISION"), (40, 22), fonts.title(bold=True), config.COL_AMBER)
         widgets.draw_badge(surf, label, (config.SCREEN_WIDTH - 40, 30), col, align="right")
 
         # scénario
@@ -103,7 +110,7 @@ class DilemmaScene(Scene):
 
     def _draw_options(self, surf, d, cur):
         self.option_rects = {}
-        widgets.draw_text(surf, "Votre décision :", (120, 270), fonts.small(bold=True),
+        widgets.draw_text(surf, _L("Votre décision :", "Your decision:"), (120, 270), fonts.small(bold=True),
                           config.COL_TEXT_DIM)
         y = 300
         mp = pygame.mouse.get_pos()
@@ -124,13 +131,13 @@ class DilemmaScene(Scene):
                               widgets.format_money(o["cash"], cur),
                               config.COL_UP if o["cash"] >= 0 else config.COL_DOWN))
             if o["rep"]:
-                parts.append((f"réputation {o['rep']:+d}",
+                parts.append((_L(f"réputation {o['rep']:+d}", f"reputation {o['rep']:+d}"),
                               config.COL_UP if o["rep"] >= 0 else config.COL_DOWN))
             if o["heat"]:
-                parts.append((f"scrutin {o['heat']:+d}",
+                parts.append((_L(f"scrutin {o['heat']:+d}", f"scrutiny {o['heat']:+d}"),
                               config.COL_DOWN if o["heat"] > 0 else config.COL_UP))
             if not parts:
-                parts.append(("aucun effet immédiat", config.COL_TEXT_DIM))
+                parts.append((_L("aucun effet immédiat", "no immediate effect"), config.COL_TEXT_DIM))
             x = rect.x + 16
             for text, c in parts:
                 r = widgets.draw_text(surf, text, (x, rect.y + 44), fonts.small(bold=True), c)
@@ -143,9 +150,9 @@ class DilemmaScene(Scene):
             parts.append(("cash " + ("+" if o["cash"] >= 0 else "") + widgets.format_money(o["cash"], cur),
                           config.COL_UP if o["cash"] >= 0 else config.COL_DOWN))
         if o.get("rep"):
-            parts.append((f"réputation {o['rep']:+d}", config.COL_UP if o["rep"] >= 0 else config.COL_DOWN))
+            parts.append((_L(f"réputation {o['rep']:+d}", f"reputation {o['rep']:+d}"), config.COL_UP if o["rep"] >= 0 else config.COL_DOWN))
         if o.get("heat"):
-            parts.append((f"scrutin {o['heat']:+d}", config.COL_DOWN if o["heat"] > 0 else config.COL_UP))
+            parts.append((_L(f"scrutin {o['heat']:+d}", f"scrutiny {o['heat']:+d}"), config.COL_DOWN if o["heat"] > 0 else config.COL_UP))
         return parts
 
     def _objective_impact_lines(self, p):
@@ -169,7 +176,7 @@ class DilemmaScene(Scene):
         impact = self._objective_impact_lines(p)
         impact_h = (18 * len(impact) + 6) if impact else 0
         panel = pygame.Rect(120, 290, config.SCREEN_WIDTH - 240, 230 + 22 * len(others) + impact_h)
-        inner = widgets.draw_panel(surf, panel, "Conséquence", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Conséquence", "Consequence"), config.COL_CYAN)
         widgets.draw_text(surf, o["label"], (inner.x, inner.y), fonts.head(bold=True), config.COL_WHITE)
         widgets.draw_text_wrapped(surf, o["outcome"], (inner.x, inner.y + 36),
                                   fonts.body(), config.COL_TEXT, inner.w, line_gap=6)
@@ -189,7 +196,7 @@ class DilemmaScene(Scene):
         # ce que vous avez écarté : comparaison avec les options non choisies, pour
         # que la décision raconte une mini-histoire ("j'ai préféré X plutôt que Y").
         if others:
-            widgets.draw_text(surf, "Vous avez écarté :", (inner.x, y), fonts.small(bold=True),
+            widgets.draw_text(surf, _L("Vous avez écarté :", "You passed on:"), (inner.x, y), fonts.small(bold=True),
                               config.COL_TEXT_DIM)
             y += 20
             for opt in others:
@@ -198,13 +205,13 @@ class DilemmaScene(Scene):
                 x = r.right + 14
                 parts = self._effect_parts(opt, cur)
                 if not parts:
-                    widgets.draw_text(surf, "(aucun effet immédiat)", (x, y), fonts.tiny(), config.COL_TEXT_DIM)
+                    widgets.draw_text(surf, _L("(aucun effet immédiat)", "(no immediate effect)"), (x, y), fonts.tiny(), config.COL_TEXT_DIM)
                 else:
                     for text, c in parts:
                         r = widgets.draw_text(surf, text, (x, y), fonts.tiny(), c)
                         x = r.right + 14
                 y += 20
-        widgets.draw_text(surf, f"Scrutin réglementaire actuel : {p.heat}/100",
+        widgets.draw_text(surf, _L(f"Scrutin réglementaire actuel : {p.heat}/100", f"Current regulatory scrutiny: {p.heat}/100"),
                           (inner.x, inner.bottom - 28), fonts.small(),
                           config.COL_DOWN if p.heat >= 55 else config.COL_TEXT_DIM)
         self.continue_btn.draw(surf)

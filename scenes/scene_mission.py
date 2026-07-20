@@ -11,8 +11,13 @@ import pygame
 
 from core import config
 from core import missions as M
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 # couleurs des deux courbes des missions graphiques
 CHART_COLORS = {"A": config.COL_CYAN, "B": config.COL_AMBER}
@@ -36,11 +41,11 @@ class MissionScene(Scene):
         self.mcq_focus = 0     # index focusé au clavier parmi les choix MCQ
         self.continue_btn = widgets.Button(
             (config.SCREEN_WIDTH // 2 - 130, config.SCREEN_HEIGHT - 56, 260, 44),
-            "COMMENCER", config.COL_UP)
+            _L("COMMENCER", "START"), config.COL_UP)
         self.back_btn = widgets.Button(
-            config.back_button_rect(150), "← QUITTER", config.COL_TEXT_DIM)
+            config.back_button_rect(150), _L("← QUITTER", "← QUIT"), config.COL_TEXT_DIM)
         self.calc_btn = widgets.Button(
-            (200, config.SCREEN_HEIGHT - 50, 160, 42), "CALCULATRICE", config.COL_CYAN)
+            (200, config.SCREEN_HEIGHT - 50, 160, 42), _L("CALCULATRICE", "CALCULATOR"), config.COL_CYAN)
         self.calc = None        # calculatrice déplaçable (overlay)
 
     # ------------------------------------------------------------- events
@@ -164,7 +169,7 @@ class MissionScene(Scene):
     def draw(self, surf):
         surf.fill(config.COL_BG)
         p = self.app.gs.player
-        widgets.draw_text_scaled(surf, "MISSION — " + self.mission["title"], (40, 24),
+        widgets.draw_text_scaled(surf, _L("MISSION — ", "MISSION — ") + self.mission["title"], (40, 24),
                                  fonts.title(bold=True), config.COL_AMBER,
                                  config.SCREEN_WIDTH - 80)
         widgets.draw_text(surf, f"{p.grade}  ·  {M.grade_focus(p.grade_index)}",
@@ -183,17 +188,18 @@ class MissionScene(Scene):
 
     def _draw_intro(self, surf):
         panel = pygame.Rect(120, 150, config.SCREEN_WIDTH - 240, 420)
-        inner = widgets.draw_panel(surf, panel, "Brief", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Brief", "Brief"), config.COL_CYAN)
         widgets.draw_text_wrapped(surf, self.mission["brief"], (inner.x, inner.y),
                                   fonts.body(), config.COL_TEXT, inner.w, line_gap=6)
         lines = [
             "",
-            f"{len(self.mission['items'])} questions.",
-            "Texte à trous : tapez votre réponse chiffrée puis Entrée.",
-            "QCM / décisions : cliquez la bonne réponse.",
+            _L(f"{len(self.mission['items'])} questions.", f"{len(self.mission['items'])} questions."),
+            _L("Texte à trous : tapez votre réponse chiffrée puis Entrée.", "Fill-in: type your numeric answer then Enter."),
+            _L("QCM / décisions : cliquez la bonne réponse.", "MCQ / decisions: click the right answer."),
             "",
-            f"Récompense (au prorata du score) : jusqu'à +{self.mission['reward_rep']} réputation",
-            "et un honoraire de conseil.",
+            _L(f"Récompense (au prorata du score) : jusqu'à +{self.mission['reward_rep']} réputation",
+               f"Reward (pro-rated by score): up to +{self.mission['reward_rep']} reputation"),
+            _L("et un honoraire de conseil.", "and an advisory fee."),
             "",
         ]
         y = inner.y + 70
@@ -202,13 +208,13 @@ class MissionScene(Scene):
             y += 26
         p = self.app.gs.player
         thr = M.reputation_threshold(p.grade_index)
-        widgets.draw_text(surf, f"Seuil de réputation pour l'examen (EVAL) : {p.reputation}/{thr}",
+        widgets.draw_text(surf, _L(f"Seuil de réputation pour l'examen (EVAL) : {p.reputation}/{thr}", f"Reputation threshold for the exam (EVAL): {p.reputation}/{thr}"),
                           (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 22
         widgets.draw_progress(surf, pygame.Rect(inner.x, y, 280, 10),
                               min(1.0, p.reputation / thr) if thr else 1.0,
                               config.COL_UP if p.reputation >= thr else config.COL_AMBER)
-        self.continue_btn.label = "COMMENCER"
+        self.continue_btn.label = _L("COMMENCER", "START")
         self.continue_btn.draw(surf)
 
     def _draw_item(self, surf):
@@ -230,7 +236,7 @@ class MissionScene(Scene):
 
         # énoncé
         ppanel = pygame.Rect(40, 150, prompt_w, 150)
-        pinner = widgets.draw_panel(surf, ppanel, "Énoncé", config.COL_AMBER)
+        pinner = widgets.draw_panel(surf, ppanel, _L("Énoncé", "Question"), config.COL_AMBER)
         widgets.draw_text_wrapped(surf, item["prompt"], (pinner.x, pinner.y),
                                   fonts.body(), config.COL_WHITE, pinner.w, line_gap=6)
 
@@ -256,7 +262,7 @@ class MissionScene(Scene):
         # légende
         lx = inner.x
         for name in names:
-            widgets.draw_text(surf, f"■ Titre {name}", (lx, inner.bottom - 18),
+            widgets.draw_text(surf, _L(f"■ Titre {name}", f"■ Title {name}"), (lx, inner.bottom - 18),
                               fonts.small(bold=True), CHART_COLORS.get(name, config.COL_CYAN))
             lx += 110
 
@@ -295,13 +301,13 @@ class MissionScene(Scene):
         pygame.draw.rect(surf, border, box, 2 if active else 1)
         cursor = "_" if (active and int(self.t * 2) % 2 == 0) else ""
         shown = (self.input or "") + cursor
-        widgets.draw_text(surf, shown or "tapez un nombre…", (box.x + 12, box.y + 16),
+        widgets.draw_text(surf, shown or _L("tapez un nombre…", "type a number…"), (box.x + 12, box.y + 16),
                           fonts.head(bold=True),
                           config.COL_WHITE if self.input else config.COL_TEXT_DIM)
         if item.get("unit"):
             widgets.draw_text(surf, item["unit"], (box.right + 12, box.y + 16),
                               fonts.head(), config.COL_TEXT_DIM)
-        widgets.draw_text(surf, "Entrée pour valider.", (box.x, box.bottom + 8),
+        widgets.draw_text(surf, _L("Entrée pour valider.", "Enter to confirm."), (box.x, box.bottom + 8),
                           fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_feedback(self, surf, item):
@@ -312,14 +318,14 @@ class MissionScene(Scene):
         y = min(y, config.SCREEN_HEIGHT - 230)
         widgets.draw_text(surf, verdict, (40, y), fonts.head(bold=True), accent)
         if item["kind"] == "fill" and not ok:
-            widgets.draw_text(surf, f"Réponse attendue ≈ {item['answer']:.2f} {item['unit']}",
+            widgets.draw_text(surf, _L(f"Réponse attendue ≈ {item['answer']:.2f} {item['unit']}", f"Expected answer ≈ {item['answer']:.2f} {item['unit']}"),
                               (180, y + 4), fonts.small(), config.COL_TEXT_DIM)
         exp = pygame.Rect(40, y + 34, config.SCREEN_WIDTH - 80, 90)
-        einner = widgets.draw_panel(surf, exp, "Explication", config.COL_CYAN)
+        einner = widgets.draw_panel(surf, exp, _L("Explication", "Explanation"), config.COL_CYAN)
         widgets.draw_text_wrapped(surf, item["expl"], (einner.x, einner.y),
                                   fonts.small(), config.COL_TEXT, einner.w)
-        self.continue_btn.label = ("SUIVANT" if self.idx < len(self.mission["items"]) - 1
-                                   else "VOIR RÉSULTAT")
+        self.continue_btn.label = (_L("SUIVANT", "NEXT") if self.idx < len(self.mission["items"]) - 1
+                                   else _L("VOIR RÉSULTAT", "SEE RESULT"))
         self.continue_btn.draw(surf)
 
     def _objective_impact_lines(self, p):
@@ -341,37 +347,37 @@ class MissionScene(Scene):
         ratio = self.score / max(1, total)
         accent = config.COL_UP if ratio >= 0.5 else config.COL_WARN
         panel = pygame.Rect(240, 170, config.SCREEN_WIDTH - 480, 360)
-        inner = widgets.draw_panel(surf, panel, "Mission terminée", accent)
+        inner = widgets.draw_panel(surf, panel, _L("Mission terminée", "Mission complete"), accent)
         cx = panel.centerx
-        widgets.draw_text(surf, f"Score : {self.score} / {total}", (cx, inner.y + 10),
+        widgets.draw_text(surf, _L(f"Score : {self.score} / {total}", f"Score: {self.score} / {total}"), (cx, inner.y + 10),
                           fonts.title(bold=True), accent, align="center")
         p = self.app.gs.player
         cur = config.CONTINENTS[p.continent]["currency"]
         msg = [
-            f"Réputation : +{self.rep_gain}  (désormais {p.reputation}/100)",
-            f"Honoraire  : +{widgets.format_money(self.cash_gain, cur)}",
+            _L(f"Réputation : +{self.rep_gain}  (désormais {p.reputation}/100)", f"Reputation : +{self.rep_gain}  (now {p.reputation}/100)"),
+            _L(f"Honoraire  : +{widgets.format_money(self.cash_gain, cur)}", f"Fee        : +{widgets.format_money(self.cash_gain, cur)}"),
         ]
         if self.score < total:
             best_rep, best_cash = M.compute_rewards(self.mission, total, total)
             miss_rep, miss_cash = best_rep - self.rep_gain, best_cash - self.cash_gain
             if miss_rep > 0 or miss_cash > 0:
-                msg.append(f"Avec un score parfait : +{miss_rep} réputation et "
-                           f"+{widgets.format_money(miss_cash, cur)} de plus.")
+                msg.append(_L(f"Avec un score parfait : +{miss_rep} réputation et +{widgets.format_money(miss_cash, cur)} de plus.",
+                              f"With a perfect score: +{miss_rep} reputation and +{widgets.format_money(miss_cash, cur)} more."))
         msg.append("")
         msg.extend(self._objective_impact_lines(p))
         if msg[-1]:
             msg.append("")
         thr = M.reputation_threshold(p.grade_index)
         if p.reputation >= thr and p.can_promote():
-            msg.append(f"Réputation ≥ {thr} : vous pouvez tenter l'examen (EVAL).")
+            msg.append(_L(f"Réputation ≥ {thr} : vous pouvez tenter l'examen (EVAL).", f"Reputation ≥ {thr}: you can attempt the exam (EVAL)."))
         elif p.can_promote():
-            msg.append(f"Encore {thr - p.reputation} de réputation avant l'examen (EVAL).")
+            msg.append(_L(f"Encore {thr - p.reputation} de réputation avant l'examen (EVAL).", f"{thr - p.reputation} more reputation before the exam (EVAL)."))
         else:
-            msg.append("Grade maximal atteint.")
+            msg.append(_L("Grade maximal atteint.", "Top grade reached."))
         y = inner.y + 70
         for m in msg:
             widgets.draw_text(surf, m, (cx, y), fonts.body(), config.COL_TEXT, align="center")
             y += 32
         self.continue_btn.rect.center = (cx, inner.bottom - 36)
-        self.continue_btn.label = f"RETOUR : {self.return_to.upper()}"
+        self.continue_btn.label = _L(f"RETOUR : {self.return_to.upper()}", f"BACK: {self.return_to.upper()}")
         self.continue_btn.draw(surf)

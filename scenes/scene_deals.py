@@ -8,8 +8,13 @@ import pygame
 
 from core import config, unlocks
 from core import deals as D
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 ROW_H = 92
 KINDS = ["M&A", "Portfolio", "Risk", "Quant", "Advisory", "General"]
@@ -137,7 +142,7 @@ class DealsScene(Scene):
         btn_w, btn_h, gap = 120, 28, 8
         x = config.SCREEN_WIDTH - 40 - 2 * btn_w - gap
         self._mode_rects = {}
-        for mode, label in (("active", "EN COURS"), ("history", "HISTORIQUE")):
+        for mode, label in (("active", _L("EN COURS", "ACTIVE")), ("history", _L("HISTORIQUE", "HISTORY"))):
             rect = pygame.Rect(x, 18, btn_w, btn_h)
             active = self.view_mode == mode
             accent = config.COL_AMBER if active else config.COL_TEXT_DIM
@@ -149,12 +154,12 @@ class DealsScene(Scene):
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "DEALS — OPPORTUNITÉS EN COURS", (40, 22),
+        widgets.draw_text(surf, _L("DEALS — OPPORTUNITÉS EN COURS", "DEALS — CURRENT OPPORTUNITIES"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         p = self.app.gs.player
         if not self._can():
             g = unlocks.effective_required_grade(self.app.gs.player, "deals")
-            widgets.draw_text(surf, f"⊘ Deals débloqués au grade {config.GRADES[g]}.",
+            widgets.draw_text(surf, _L(f"⊘ Deals débloqués au grade {config.GRADES[g]}.", f"⊘ Deals unlocked at grade {config.GRADES[g]}."),
                               (42, 64), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             return
@@ -171,7 +176,7 @@ class DealsScene(Scene):
         pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, search_rect, 1, border_radius=4)
         cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        label = (self.search + cursor) if self.search else (cursor + "Tapez pour rechercher…")
+        label = (self.search + cursor) if self.search else (cursor + _L("Tapez pour rechercher…", "Type to search…"))
         col = config.COL_TEXT if self.search else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
                           (search_rect.x + 8, search_rect.y + 4), fonts.small(), col)
@@ -222,7 +227,7 @@ class DealsScene(Scene):
             self.back_btn.draw(surf)
             return
         if not deals:
-            widgets.draw_text(surf, "Aucun deal ne correspond à ce filtre.",
+            widgets.draw_text(surf, _L("Aucun deal ne correspond à ce filtre.", "No deal matches this filter."),
                               (inner.x, list_top + 4), fonts.small(), config.COL_TEXT_DIM)
 
         prev_clip = surf.get_clip()
@@ -254,15 +259,15 @@ class DealsScene(Scene):
                 # jauge de probabilité de réussite
                 px = row.x + 400
                 pcol = config.COL_UP if prob >= 0.6 else config.COL_WARN if prob >= 0.35 else config.COL_DOWN
-                calib = ("Facile" if prob >= 0.6 else "Modéré" if prob >= 0.35
-                         else "Difficile" if prob >= 0.15 else "Très difficile")
-                widgets.draw_text(surf, f"Probabilité {int(prob*100)}% — {calib} pour vous",
+                calib = (_L("Facile", "Easy") if prob >= 0.6 else _L("Modéré", "Moderate") if prob >= 0.35
+                         else _L("Difficile", "Hard") if prob >= 0.15 else _L("Très difficile", "Very hard"))
+                widgets.draw_text(surf, _L(f"Probabilité {int(prob*100)}% — {calib} pour vous", f"Probability {int(prob*100)}% — {calib} for you"),
                                   (px, row.y + 8), fonts.tiny(), pcol)
                 widgets.draw_progress(surf, pygame.Rect(px, row.y + 24, 160, 14), prob, accent=pcol)
 
-                widgets.draw_text(surf, f"Gain {widgets.format_money(d['reward_cash'], cur)} (+{d['reward_rep']} rép.)",
+                widgets.draw_text(surf, _L(f"Gain {widgets.format_money(d['reward_cash'], cur)} (+{d['reward_rep']} rép.)", f"Gain {widgets.format_money(d['reward_cash'], cur)} (+{d['reward_rep']} rep.)"),
                                   (px, row.y + 46), fonts.tiny(), config.COL_UP)
-                widgets.draw_text(surf, f"Échec -{widgets.format_money(d['penalty_cash'], cur)} (-{d['penalty_rep']} rép.)",
+                widgets.draw_text(surf, _L(f"Échec -{widgets.format_money(d['penalty_cash'], cur)} (-{d['penalty_rep']} rép.)", f"Fail -{widgets.format_money(d['penalty_cash'], cur)} (-{d['penalty_rep']} rep.)"),
                                   (px, row.y + 62), fonts.tiny(), config.COL_DOWN)
 
                 # compte à rebours d'échéance
@@ -274,8 +279,8 @@ class DealsScene(Scene):
                 widgets.draw_progress(surf, count_rect, min(1.0, d["days_left"] / 26), accent=ucol)
                 hover_rect = pygame.Rect(ux, row.y, 150, 36)
                 if hover_rect.collidepoint(mp):
-                    self._tooltip = ("Passé ce délai, l'offre est retirée — un rival peut la "
-                                      "rafler avant vous.", mp)
+                    self._tooltip = (_L("Passé ce délai, l'offre est retirée — un rival peut la rafler avant vous.",
+                                        "After this deadline the offer is withdrawn — a rival may grab it before you."), mp)
                 if urgent:
                     widgets.draw_badge(surf, "URGENT", (ux, row.y + 42), accent=config.COL_DOWN)
             y += ROW_H
@@ -291,7 +296,7 @@ class DealsScene(Scene):
 
     # --------------------------------------------------------- historique
     def _draw_history(self, surf, p):
-        widgets.draw_text(surf, "Replay des derniers deals résolus (succès, échecs, expirations).",
+        widgets.draw_text(surf, _L("Replay des derniers deals résolus (succès, échecs, expirations).", "Replay of recently resolved deals (wins, losses, expirations)."),
                           (42, 64), fonts.small(), config.COL_TEXT_DIM)
         top = 94
         panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - top)
@@ -301,7 +306,7 @@ class DealsScene(Scene):
         self._hist_list_rect = list_area
         cur = config.CONTINENTS.get(p.continent, {}).get("currency", "$")
         if not history:
-            widgets.draw_text(surf, "Aucun deal résolu pour l'instant.",
+            widgets.draw_text(surf, _L("Aucun deal résolu pour l'instant.", "No resolved deal yet."),
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
             self._max_scroll_hist = 0
             return
@@ -315,8 +320,8 @@ class DealsScene(Scene):
             if visible:
                 col = {"success": config.COL_UP, "partial": config.COL_UP,
                        "fail": config.COL_DOWN, "expired": config.COL_WARN}.get(h["outcome"], config.COL_TEXT_DIM)
-                label = {"success": "RÉUSSI", "partial": "PARTIEL",
-                         "fail": "ÉCHEC", "expired": "EXPIRÉ"}.get(h["outcome"], h["outcome"].upper())
+                label = {"success": _L("RÉUSSI", "WON"), "partial": _L("PARTIEL", "PARTIAL"),
+                         "fail": _L("ÉCHEC", "FAILED"), "expired": _L("EXPIRÉ", "EXPIRED")}.get(h["outcome"], h["outcome"].upper())
                 widgets.draw_text(surf, f"J{h['day']} (T{h['quarter']})",
                                   (inner.x, y + 6), fonts.tiny(), config.COL_TEXT_DIM)
                 widgets.draw_text(surf, widgets.fit_text(h["title"], fonts.small(), 360),
@@ -327,7 +332,7 @@ class DealsScene(Scene):
                 widgets.draw_text(surf, f"{sign}{widgets.format_money(h['cash_delta'], cur)}",
                                   (inner.right - 220, y + 6), fonts.tiny(), col)
                 rsign = "+" if h["rep_delta"] >= 0 else ""
-                widgets.draw_text(surf, f"{rsign}{h['rep_delta']} rép.",
+                widgets.draw_text(surf, _L(f"{rsign}{h['rep_delta']} rép.", f"{rsign}{h['rep_delta']} rep."),
                                   (inner.right - 90, y + 6), fonts.tiny(), col)
             y += row_h
         surf.set_clip(prev_clip)

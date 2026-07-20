@@ -535,7 +535,7 @@ class CompanyApp(DesktopApp):
         for r, line in enumerate(self.block[0]["income"]["lines"]):
             inc_rows.append((line["label"],
                              [b["income"]["lines"][r]["value"] for b in self.block]))
-        self._draw_table(surf, inc_rect, "Compte de résultat", inc_rows, config.COL_CYAN, "inc")
+        self._draw_table(surf, inc_rect, _L("Compte de résultat", "Income statement"), inc_rows, config.COL_CYAN, "inc")
 
         bal_rows = []
         n_assets = len(self.block[0]["balance"]["assets_lines"])
@@ -545,7 +545,7 @@ class CompanyApp(DesktopApp):
         for r in range(len(self.block[0]["balance"]["liab_lines"])):
             bal_rows.append((self.block[0]["balance"]["liab_lines"][r]["label"],
                              [b["balance"]["liab_lines"][r]["value"] for b in self.block]))
-        self._draw_table(surf, bal_rect, "Bilan", bal_rows, config.COL_AMBER, "bal")
+        self._draw_table(surf, bal_rect, _L("Bilan", "Balance sheet"), bal_rows, config.COL_AMBER, "bal")
 
     def _draw_table(self, surf, rect, title, rows_by_year, accent, which):
         inner = widgets.draw_panel(surf, rect, title, accent)

@@ -10,7 +10,7 @@ Ouverte via la commande COMPANY <ticker> ou en cliquant un ticker.
 import pygame
 
 from core import charts as charts
-from core import config, intraday, liquidity
+from core import config, i18n, intraday, liquidity
 from core import financials as F
 from core import market_hours as mh_mod
 from core import news as N
@@ -25,14 +25,19 @@ _EMPH = {"Marge brute", "EBITDA", "Résultat d'exploitation (EBIT)", "Résultat 
          "Total passifs courants", "Total passif (hors CP)", "Capitaux propres",
          "TOTAL PASSIF + CP"}
 
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
+
 _TABS = [
-    ("overview", "VUE D'ENSEMBLE"),
-    ("financials", "ÉTATS FINANCIERS"),
-    ("chart", "GRAPHIQUE AVANCÉ"),
-    ("news", "ACTUALITÉS"),
-    ("valuation", "VALORISATION RELATIVE"),
+    ("overview", ("VUE D'ENSEMBLE", "OVERVIEW")),
+    ("financials", ("ÉTATS FINANCIERS", "FINANCIALS")),
+    ("chart", ("GRAPHIQUE AVANCÉ", "ADVANCED CHART")),
+    ("news", ("ACTUALITÉS", "NEWS")),
+    ("valuation", ("VALORISATION RELATIVE", "RELATIVE VALUATION")),
 ]
-_CHART_KINDS = [("line", "LIGNE"), ("candles", "CHANDELLES"), ("vol", "VOLATILITÉ"), ("beta", "BÊTA")]
+_CHART_KINDS = [("line", ("LIGNE", "LINE")), ("candles", ("CHANDELLES", "CANDLES")),
+                ("vol", ("VOLATILITÉ", "VOLATILITY")), ("beta", ("BÊTA", "BETA"))]
 _KIND_COL = {"good": config.COL_UP, "bad": config.COL_DOWN, "info": config.COL_CYAN}
 _KIND_TAG = {"good": "▲", "bad": "▼", "info": "◆"}
 ROW_H = 22
@@ -108,9 +113,9 @@ class CompanyScene(Scene):
         self.sell_btn = widgets.Button(
             (config.SCREEN_WIDTH - 180, config.SCREEN_HEIGHT - 70, 140, 46), "VENTE", config.COL_DOWN)
         self.fa_btn = widgets.Button((230, config.SCREEN_HEIGHT - 70, 200, 46),
-                                     "PLEIN ÉCRAN (FA)", config.COL_CYAN)
+                                     _L("PLEIN ÉCRAN (FA)", "FULLSCREEN (FA)"), config.COL_CYAN)
         self.graph_btn = widgets.Button((230, config.SCREEN_HEIGHT - 70, 200, 46),
-                                        "PLEIN ÉCRAN (GP)", config.COL_AMBER)
+                                        _L("PLEIN ÉCRAN (GP)", "FULLSCREEN (GP)"), config.COL_AMBER)
 
     def _fiscal_year(self):
         p = self.app.gs.player
@@ -293,18 +298,18 @@ class CompanyScene(Scene):
 
     # ------------------------------------------------------ mode recherche
     def _draw_picker(self, surf):
-        widgets.draw_text(surf, "FICHE SOCIÉTÉ", (40, 22), fonts.title(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L("FICHE SOCIÉTÉ", "COMPANY SHEET"), (40, 22), fonts.title(bold=True), config.COL_AMBER)
         if self.ticker and self.search == self.ticker:
-            msg = f"Société introuvable : {self.ticker}. Recherchez-en une ci-dessous."
+            msg = _L(f"Société introuvable : {self.ticker}. Recherchez-en une ci-dessous.", f"Company not found: {self.ticker}. Search for one below.")
         else:
-            msg = "Recherchez une société par ticker ou nom pour ouvrir sa fiche."
+            msg = _L("Recherchez une société par ticker ou nom pour ouvrir sa fiche.", "Search a company by ticker or name to open its sheet.")
         widgets.draw_text(surf, msg, (42, 72), fonts.small(), config.COL_TEXT_DIM)
 
         search_rect = pygame.Rect(40, config.content_top(), 360, 26)
         pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_AMBER, search_rect, 1, border_radius=4)
         cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        label = (self.search + cursor) if self.search else (cursor + "Ticker ou nom…")
+        label = (self.search + cursor) if self.search else (cursor + _L("Ticker ou nom…", "Ticker or name…"))
         col = config.COL_TEXT if self.search else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
                           (search_rect.x + 8, search_rect.y + 5), fonts.small(), col)
@@ -319,11 +324,11 @@ class CompanyScene(Scene):
         list_top = search_rect.bottom + 16
         panel = pygame.Rect(40, list_top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - list_top)
         inner = widgets.draw_panel(
-            surf, panel, "Résultats" if self.search else "Plus grandes capitalisations",
+            surf, panel, _L("Résultats", "Results") if self.search else _L("Plus grandes capitalisations", "Largest market caps"),
             config.COL_AMBER)
         self._picker_rects = []
         if not items:
-            widgets.draw_text(surf, "Aucune société ne correspond.", (inner.x, inner.y),
+            widgets.draw_text(surf, _L("Aucune société ne correspond.", "No company matches."), (inner.x, inner.y),
                               fonts.small(), config.COL_TEXT_DIM)
         row_h = 26
         mp = pygame.mouse.get_pos()
@@ -346,13 +351,14 @@ class CompanyScene(Scene):
             widgets.draw_text(surf, f"{c['price']:,.2f} {cur}", (rect.right - 8, rect.y + 4),
                               fonts.small(), config.COL_TEXT, align="right")
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.SCREEN_HEIGHT - 56),
-                              [("↑↓", "naviguer"), ("ENTRÉE", "ouvrir"), ("ESC", "retour")])
+                              [("↑↓", _L("naviguer", "navigate")), ("ENTRÉE", _L("ouvrir", "open")), ("ESC", _L("retour", "back"))])
 
     def _draw_tabs(self, surf, y):
         self._tab_rects = {}
         x, h = 40, 30
         w = (config.SCREEN_WIDTH - 80 - (len(_TABS) - 1) * 4) // len(_TABS)
-        for tab_id, label in _TABS:
+        for tab_id, _pair in _TABS:
+            label = _L(*_pair)
             rect = pygame.Rect(x, y, w, h)
             self._tab_rects[tab_id] = rect
             sel = (tab_id == self.tab)
@@ -370,11 +376,11 @@ class CompanyScene(Scene):
         if r:
             rcol = (config.COL_UP if r["rating"] == "ACHAT" else
                     config.COL_DOWN if r["rating"] == "VENTE" else config.COL_WARN)
-            widgets.draw_text(surf, f"RECO : {r['rating']}  ·  valeur intrinsèque "
-                                    f"{r['fair']:.2f} {cur}  ·  potentiel {r['upside']:+.0f}%",
+            widgets.draw_text(surf, _L(f"RECO : {r['rating']}  ·  valeur intrinsèque {r['fair']:.2f} {cur}  ·  potentiel {r['upside']:+.0f}%",
+                                       f"RATING: {r['rating']}  ·  intrinsic value {r['fair']:.2f} {cur}  ·  upside {r['upside']:+.0f}%"),
                               (rect.x, y), fonts.small(bold=True), rcol)
         else:
-            widgets.draw_text(surf, "RESEARCH " + self.ticker + " pour une reco analyste",
+            widgets.draw_text(surf, "RESEARCH " + self.ticker + _L(" pour une reco analyste", " for an analyst rating"),
                               (rect.x, y), fonts.small(), config.COL_TEXT_DIM)
         y += 22
 
@@ -384,18 +390,18 @@ class CompanyScene(Scene):
             verb = "BEAT" if le["beat"] else "MISS"
             g_label = le.get("guidance_label")
             g_txt = f"  ·  guidance {g_label}" if g_label else ""
-            widgets.draw_text(surf, f"RÉSULTATS : {verb}  surprise {le['surprise']*100:+.0f}%  "
-                                    f"·  croissance CA {le['growth']*100:+.1f}%{g_txt}",
+            widgets.draw_text(surf, _L(f"RÉSULTATS : {verb}  surprise {le['surprise']*100:+.0f}%  ·  croissance CA {le['growth']*100:+.1f}%{g_txt}",
+                                       f"EARNINGS: {verb}  surprise {le['surprise']*100:+.0f}%  ·  revenue growth {le['growth']*100:+.1f}%{g_txt}"),
                               (rect.x, y), fonts.small(bold=True), ecol)
             y += 20
         if mt.get("earnings_anticipation"):
-            widgets.draw_text(surf, f"» Publication dans {mt['steps_to_earnings']} pas",
+            widgets.draw_text(surf, _L(f"» Publication dans {mt['steps_to_earnings']} pas", f"» Earnings in {mt['steps_to_earnings']} steps"),
                               (rect.x, y), fonts.small(), config.COL_WARN)
             y += 20
         pead = mt.get("pead_drift_remaining") or 0.0
         if abs(pead) > 1e-4:
             pcol = config.COL_UP if pead > 0 else config.COL_DOWN
-            widgets.draw_text(surf, f"↗ Drift post-résultats résiduel : {pead*100:+.2f}%",
+            widgets.draw_text(surf, _L(f"↗ Drift post-résultats résiduel : {pead*100:+.2f}%", f"↗ Residual post-earnings drift: {pead*100:+.2f}%"),
                               (rect.x, y), fonts.small(), pcol)
             y += 20
 
@@ -466,7 +472,7 @@ class CompanyScene(Scene):
                 yy += 26
 
         chart = pygame.Rect(rect.x + 580, ph_top, rect.w - 580, ph)
-        cinner = widgets.draw_panel(surf, chart, "Cours — chandeliers", accent)
+        cinner = widgets.draw_panel(surf, chart, _L("Cours — chandeliers", "Price — candles"), accent)
         m = self.app.market
         hist = (m.track_company(self.ticker, self.app.sim_clock, self.app.gs.player.day)
                 if m else [])
@@ -480,14 +486,14 @@ class CompanyScene(Scene):
                               (cinner.right, cinner.y), fonts.tiny(), config.COL_TEXT_DIM, align="right")
         else:
             widgets.draw_text_wrapped(
-                surf, "Historique en cours de constitution. Laissez le temps avancer "
-                "(le marché évolue en direct) pour voir le cours évoluer.",
+                surf, _L("Historique en cours de constitution. Laissez le temps avancer (le marché évolue en direct) pour voir le cours évoluer.",
+                         "History still building. Let time advance (the market moves live) to watch the price evolve."),
                 (cinner.x, cinner.y), fonts.small(), config.COL_TEXT_DIM, cinner.w)
 
     # --------------------------------------------------------- onglet 2
     def _draw_financials(self, surf, rect):
         if not self.block:
-            widgets.draw_text(surf, "États financiers indisponibles.", (rect.x, rect.y),
+            widgets.draw_text(surf, _L("États financiers indisponibles.", "Financial statements unavailable."), (rect.x, rect.y),
                               fonts.small(), config.COL_TEXT_DIM)
             return
         half = (rect.w - 20) // 2
@@ -496,7 +502,7 @@ class CompanyScene(Scene):
             inc_rows.append((line["label"],
                              [b["income"]["lines"][r]["value"] for b in self.block]))
         self._draw_table(surf, pygame.Rect(rect.x, rect.y, half, rect.h),
-                         "Compte de résultat", inc_rows, config.COL_CYAN, "inc")
+                         _L("Compte de résultat", "Income statement"), inc_rows, config.COL_CYAN, "inc")
 
         bal_rows = []
         n_assets = len(self.block[0]["balance"]["assets_lines"])
@@ -507,7 +513,7 @@ class CompanyScene(Scene):
             bal_rows.append((self.block[0]["balance"]["liab_lines"][r]["label"],
                              [b["balance"]["liab_lines"][r]["value"] for b in self.block]))
         self._draw_table(surf, pygame.Rect(rect.x + half + 20, rect.y, half, rect.h),
-                         "Bilan", bal_rows, config.COL_AMBER, "bal")
+                         _L("Bilan", "Balance sheet"), bal_rows, config.COL_AMBER, "bal")
 
     def _draw_table(self, surf, rect, title, rows_by_year, accent, which):
         inner = widgets.draw_panel(surf, rect, title, accent)
@@ -569,7 +575,8 @@ class CompanyScene(Scene):
         self._chart_kind_rects = {}
         x, y, h = rect.x, rect.y, 28
         w = (rect.w - (len(_CHART_KINDS) - 1) * 4) // len(_CHART_KINDS)
-        for kind, label in _CHART_KINDS:
+        for kind, _pair in _CHART_KINDS:
+            label = _L(*_pair)
             kr = pygame.Rect(x, y, w, h)
             self._chart_kind_rects[kind] = kr
             sel = (kind == self.chart_kind)
@@ -620,12 +627,12 @@ class CompanyScene(Scene):
         badge_x = panel_rect.x
         if i is not None:
             vol_mult = intraday.vol_mult_for_sigma(float(m.sigma[i]))
-            widgets.draw_text(surf, f"Volatilité relative ×{vol_mult:.1f}",
+            widgets.draw_text(surf, _L(f"Volatilité relative ×{vol_mult:.1f}", f"Relative volatility ×{vol_mult:.1f}"),
                               (badge_x, badge_y), fonts.tiny(), config.COL_TEXT_DIM)
             badge_x += 170
             region = m.companies[i].get("region")
             if region and not mh_mod.is_region_open(region, m.step_count):
-                widgets.draw_text(surf, "MARCHÉ FERMÉ — prix gelé", (badge_x, badge_y),
+                widgets.draw_text(surf, _L("MARCHÉ FERMÉ — prix gelé", "MARKET CLOSED — price frozen"), (badge_x, badge_y),
                                   fonts.tiny(bold=True), config.COL_WARN)
                 badge_x += 180
             recent = hist[-12:]
@@ -668,7 +675,7 @@ class CompanyScene(Scene):
                                     mouse_pos=pygame.mouse.get_pos(),
                                     y_fmt=lambda v: f"{v:.1f}%",
                                     line_width=2, area_alpha=25)
-                widgets.draw_text(surf, f"Vol. annualisée (20 pas) = {vol[-1]:.1f}%",
+                widgets.draw_text(surf, _L(f"Vol. annualisée (20 pas) = {vol[-1]:.1f}%", f"Annualized vol (20 steps) = {vol[-1]:.1f}%"),
                                   (inner.x, inner.y), fonts.tiny(bold=True), config.COL_WARN)
                 self._x_labels(surf, inner, len(vol))
         elif self.chart_kind == "beta":
@@ -776,7 +783,7 @@ class CompanyScene(Scene):
         ry, rx = charts.simple_returns(hist), charts.simple_returns(ridx)
         n = min(len(ry), len(rx))
         if n < 5:
-            widgets.draw_text(surf, "Historique insuffisant pour le bêta.", (rect.x, rect.y),
+            widgets.draw_text(surf, _L("Historique insuffisant pour le bêta.", "Not enough history for beta."), (rect.x, rect.y),
                               fonts.small(), config.COL_TEXT_DIM)
             return
         ry, rx = ry[-n:], rx[-n:]
@@ -806,7 +813,7 @@ class CompanyScene(Scene):
         items = N.query(p)
         needles = {self.ticker.lower(), (self.name or "").lower()}
         items = [e for e in items if any(nd and nd in e["text"].lower() for nd in needles)]
-        inner = widgets.draw_panel(surf, rect, f"Actualités — {self.ticker} ({len(items)})", self.accent)
+        inner = widgets.draw_panel(surf, rect, _L(f"Actualités — {self.ticker} ({len(items)})", f"News — {self.ticker} ({len(items)})"), self.accent)
         list_area = pygame.Rect(inner.x - 6, inner.y, inner.w + 12, inner.h)
         self._news_list_rect = list_area
         prev_clip = surf.get_clip()
@@ -814,14 +821,14 @@ class CompanyScene(Scene):
         ry = list_area.top - self.news_scroll
         last_day = None
         if not items:
-            widgets.draw_text(surf, "Aucune actualité mentionnant cette société pour l'instant.",
+            widgets.draw_text(surf, _L("Aucune actualité mentionnant cette société pour l'instant.", "No news mentioning this company yet."),
                               (inner.x, inner.y + 4), fonts.body(), config.COL_TEXT_DIM)
         for e in items:
             if e["day"] != last_day:
                 last_day = e["day"]
                 if (list_area.top - ROW_H) < ry < list_area.bottom:
                     q = (e["day"] - 1) // config.DAYS_PER_QUARTER + 1
-                    widgets.draw_text(surf, f"— Jour {e['day']}  (T{q})",
+                    widgets.draw_text(surf, _L(f"— Jour {e['day']}  (T{q})", f"— Day {e['day']}  (Q{q})"),
                                       (inner.x, ry + 2), fonts.tiny(bold=True), config.COL_AMBER)
                 ry += ROW_H
             if (list_area.top - ROW_H) < ry < list_area.bottom:
@@ -847,7 +854,7 @@ class CompanyScene(Scene):
     def _draw_valuation_tab(self, surf, rect, mt):
         half = (rect.w - 20) // 2
         left = pygame.Rect(rect.x, rect.y, half, rect.h)
-        inner = widgets.draw_panel(surf, left, "Multiples vs médiane secteur", self.accent)
+        inner = widgets.draw_panel(surf, left, _L("Multiples vs médiane secteur", "Multiples vs sector median"), self.accent)
         med = self.sector_med
         widgets.draw_text(surf, f"Secteur {mt['sector']} ({med['n'] if med else 0} pairs comparables)",
                           (inner.x, inner.y), fonts.small(bold=True), config.COL_TEXT_DIM)
@@ -860,7 +867,7 @@ class CompanyScene(Scene):
             if not val or not ref:
                 return ("—", config.COL_TEXT_DIM)
             if val < ref * 0.9:
-                return ("décoté", config.COL_UP)
+                return (_L("décoté", "cheap"), config.COL_UP)
             if val > ref * 1.1:
                 return ("cher", config.COL_DOWN)
             return ("en ligne", config.COL_TEXT)
@@ -870,7 +877,7 @@ class CompanyScene(Scene):
             v, r = mt.get(key), (med.get(key) if med else None)
             txt, col = verdict(v, r)
             self._gloss.label(surf, (inner.x, y), label, fonts.small(bold=True), config.COL_WHITE, term=term)
-            widgets.draw_text(surf, f"{fmt(v)}  /  méd. secteur {fmt(r)}", (inner.x, y + 18),
+            widgets.draw_text(surf, _L(f"{fmt(v)}  /  méd. secteur {fmt(r)}", f"{fmt(v)}  /  sector med. {fmt(r)}"), (inner.x, y + 18),
                               fonts.small(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, txt, (inner.right, y + 6), fonts.head(bold=True),
                               col, align="right")
@@ -885,12 +892,12 @@ class CompanyScene(Scene):
                                  (mid_x, bar.bottom + 2), 1)
             y += 64
 
-        widgets.draw_text(surf, "La barre représente le multiple de la société ; le repère "
-                                "vertical marque la médiane du secteur (2× = bord droit).",
+        widgets.draw_text(surf, _L("La barre représente le multiple de la société ; le repère vertical marque la médiane du secteur (2× = bord droit).",
+                                   "The bar shows the company multiple; the vertical marker is the sector median (2× = right edge)."),
                           (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
 
         right = pygame.Rect(rect.x + half + 20, rect.y, rect.w - half - 20, rect.h)
-        rinner = widgets.draw_panel(surf, right, "Profil rentabilité / risque", self.accent)
+        rinner = widgets.draw_panel(surf, right, _L("Profil rentabilité / risque", "Profitability / risk profile"), self.accent)
         rows = [
             ("Marge nette", _fmt(mt["net_margin"] * 100, "%", 1), None),
             ("Marge EBITDA", _fmt(mt["ebitda_margin"] * 100, "%", 1), None),

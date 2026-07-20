@@ -64,6 +64,11 @@ def _trade_unlocked(desktop):
     return unlocks.unlocked(desktop.app.gs.player, "trade")
 
 
+def _analyst_unlocked(desktop):
+    from core import unlocks
+    return unlocks.unlocked(desktop.app.gs.player, "analyst")
+
+
 def _first_buy_done(desktop):
     w = _win(desktop, "trading")
     if w is None:
@@ -76,36 +81,41 @@ def _stop_loss_placed(desktop):
     return any(o.get("kind") == "stop" for o in orders)
 
 
+# Ordre pensé pour la progression : le stagiaire ne voit QUE les basiques
+# (Terminal, Mission, ancrage de fenêtre) ; les étapes Recherche/Marché
+# (grade 1, gate "analyst") et Trading (grade 1, gate "trade") sont derrière un
+# gate — `active_step` met la séquence en pause dessus jusqu'au déblocage, plutôt
+# que de renvoyer vers une icône qui n'existe pas encore au grade Intern.
 STEPS = [
-    {"id": "research", "target": "research",
-     "title": ("Ouvrez l'app Recherche", "Open the Research app"),
-     "hint": ("Cliquez sur l'icône « Recherche » : chaque icône ouvre une application dans une FENÊTRE déplaçable.",
-              "Click the “Research” icon: every icon opens an application in a draggable WINDOW."),
-     "check": _research_open},
     {"id": "terminal", "target": "terminal",
      "title": ("Affichez le Terminal", "Show the Terminal"),
-     "hint": ("Ouvrez l'icône « Terminal » : c'est le moteur de la partie — le temps s'y écoule même fenêtre fermée.",
-              "Open the “Terminal” icon: it's the game engine — time flows even with its window closed."),
+     "hint": ("Ouvrez l'icône « Terminal » : c'est le moteur de la partie — le temps s'y écoule même fenêtre fermée, et vous y lisez le marché en direct.",
+              "Open the “Terminal” icon: it's the game engine — time flows even with its window closed, and you read the live market there."),
      "check": _terminal_visible},
-    {"id": "market", "target": "markethub",
-     "title": ("Consultez le Marché", "Check the Market"),
-     "hint": ("Ouvrez « Marché » pour suivre indices, secteurs et devises pendant que le temps passe.",
-              "Open “Market” to follow indices, sectors and currencies while time passes."),
-     "check": _market_open},
+    {"id": "mission", "target": "mission",
+     "title": ("Faites votre travail", "Do your job"),
+     "hint": ("Ouvrez « Mission » : accomplir le travail de votre grade rapporte cash et réputation — votre levier n° 1 pour être promu.",
+              "Open “Mission”: doing your grade's work earns cash and reputation — your #1 lever to get promoted."),
+     "check": _mission_open},
     {"id": "snap", "target": None,
      "title": ("Ancrez une fenêtre", "Snap a window"),
      "hint": ("Glissez une fenêtre vers un bord de l'écran (ou double-cliquez sa barre de titre) pour l'ancrer.",
               "Drag a window to a screen edge (or double-click its title bar) to snap it."),
      "check": _window_snapped},
-    {"id": "mission", "target": "mission",
-     "title": ("Faites votre travail", "Do your job"),
-     "hint": ("Ouvrez « Mission » : accomplir le travail de votre grade rapporte cash et réputation.",
-              "Open “Mission”: doing your grade's work earns cash and reputation."),
-     "check": _mission_open},
+    {"id": "research", "target": "research", "gate": _analyst_unlocked,
+     "title": ("Ouvrez l'app Recherche", "Open the Research app"),
+     "hint": ("Promu ! Les outils d'analyse s'ouvrent. Cliquez sur « Recherche » pour explorer une société.",
+              "Promoted! The analysis tools open up. Click “Research” to explore a company."),
+     "check": _research_open},
+    {"id": "market", "target": "markethub", "gate": _analyst_unlocked,
+     "title": ("Consultez le Marché", "Check the Market"),
+     "hint": ("Ouvrez « Marché » pour suivre indices, secteurs et devises pendant que le temps passe.",
+              "Open “Market” to follow indices, sectors and currencies while time passes."),
+     "check": _market_open},
     {"id": "first_buy", "target": "trading", "gate": _trade_unlocked,
      "title": ("Passez votre premier ordre", "Place your first order"),
-     "hint": ("Vous êtes Associate : le Trading est ouvert. Ouvrez l'app et achetez quelques actions.",
-              "You're an Associate: Trading is open. Open the app and buy a few shares."),
+     "hint": ("Le Trading est ouvert. Ouvrez l'app et achetez quelques actions.",
+              "Trading is open. Open the app and buy a few shares."),
      "check": _first_buy_done},
     {"id": "stop_loss", "target": None, "gate": _trade_unlocked,
      "title": ("Posez un stop-loss", "Place a stop-loss"),

@@ -32,7 +32,8 @@ UNLOCKS = {
     "track": 1,      # choisir une voie de spécialisation
     "deals": 1,      # traiter des deals
     "trade": 1,      # investir : acheter / vendre / allouer / rééquilibrer (+ shop, mur, journal)
-    # grade 2 (Analyst) : mesurer son risque et s'outiller.
+    # grade 2 (Analyst) : approfondir l'analyse, mesurer son risque, s'outiller.
+    "screening": 2,  # explorateur des 320 sociétés, alertes de prix, comparateur, valeur relative
     "risk": 2,       # module risk (VaR/stress) — enfin des positions à mesurer
     "quant": 2,      # module quant (pricing d'options, grecques)
     "tools": 2,      # boîte à outils quant autonome (Sharpe, Z-score, frontière, tableur, labo de crise)
@@ -82,8 +83,10 @@ def _L(fr, en):
 
 
 _LABELS_RAW = {
-    "analyst": ("Outils d'analyse (watchlist, alertes, recherche, RV, explorateur)",
-                "Analysis tools (watchlist, alerts, research, comps, explorer)"),
+    "analyst": ("Outils d'analyse (recherche, watchlist)",
+                "Analysis tools (research, watchlist)"),
+    "screening": ("Filtrage & comparaison (explorateur, alertes, comparateur, RV)",
+                  "Screening & comparison (explorer, alerts, compare, RV)"),
     "charts": ("Graphes de cours (ligne, bougies, comparaison)",
                "Price charts (line, candles, comparison)"),
     "tools": ("Boîte à outils quant (Sharpe, Z-score, frontière, tableur)",
@@ -150,10 +153,10 @@ FEATURE_TUTORIAL = {
 # commande (token majuscule) -> fonctionnalité gated
 CMD_FEATURE = {
     "WATCHLIST": "analyst", "WATCH": "analyst", "WL": "analyst",
-    "ALERT": "analyst", "ALERTE": "analyst", "ALERTS": "analyst", "ALERTES": "analyst",
-    "COMPARE": "analyst", "CMP": "analyst",
-    "RV": "analyst", "PEERS": "analyst", "COMPS": "analyst",
     "RESEARCH": "analyst", "RECHERCHE": "analyst",
+    "ALERT": "screening", "ALERTE": "screening", "ALERTS": "screening", "ALERTES": "screening",
+    "COMPARE": "screening", "CMP": "screening",
+    "RV": "screening", "PEERS": "screening", "COMPS": "screening",
     "TRACK": "track", "VOIE": "track",
     "DEALS": "deals", "DEAL": "deals",
     "BUY": "trade", "ACHETER": "trade", "SELL": "trade", "VENDRE": "trade",

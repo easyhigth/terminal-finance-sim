@@ -648,6 +648,13 @@ class DesktopWidgetsMixin:
         from core import todo as todo_mod
         p = self.app.gs.player
         items = todo_mod.suggestions(p, self.app.market)
+        # les entrées "hint" (ex. prochain déblocage) sont informatives, PAS des
+        # actions en attente : l'Assistant ne propose « Y aller » que sur du
+        # concret, et rassure quand il ne reste que des hints (cf. le widget
+        # « À FAIRE » qui, lui, les affiche tous).
+        actionable = [it for it in items if it.get("kind") != "hint"]
+        hint = next((it for it in items if it.get("kind") == "hint"), None)
+        items = actionable
         surf.blit(cached_shade(self, surf, 130), (0, 0))
         W, H = 460, 200
         x = (config.SCREEN_WIDTH - W) // 2
@@ -696,6 +703,12 @@ class DesktopWidgetsMixin:
             ly += 18
             widgets.draw_text(surf, _L("à autre chose en attendant.", "to something else meanwhile."),
                               (x + 20, ly), fonts.tiny(), config.COL_TEXT_DIM)
+            # rien d'urgent : on rappelle vers quoi on progresse (la carotte)
+            if hint:
+                ly += 22
+                for ln in widgets.wrap_text_lines(hint["label"], fonts.tiny(bold=True), W - 40):
+                    widgets.draw_text(surf, ln, (x + 20, ly), fonts.tiny(bold=True), config.COL_PRESTIGE)
+                    ly += 16
 
     def _handle_assistant_event(self, event):
         """Gère les clics/touches de la carte Assistant — appelé par

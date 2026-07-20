@@ -100,22 +100,25 @@ def test_intern_has_only_the_bare_basics():
         assert not unlocks.unlocked(p, feature), feature
     for cmd in ("WATCHLIST", "ALERT", "COMPARE", "RESEARCH", "BUY"):
         assert not unlocks.cmd_unlocked(p, cmd), cmd
-
-
-def test_analyst_and_charts_unlock_at_grade_one():
-    """Grade 1 (Junior Analyst) : on devient un analyste qui investit — les
-    outils d'analyse, les graphes et le trading arrivent ensemble."""
-    p = _player(grade=1)
-    for feature in ("analyst", "charts", "trade", "deals", "track"):
-        assert unlocks.unlocked(p, feature), feature
-    # la mesure de risque et la boîte à outils quant restent pour le grade 2
-    for feature in ("risk", "quant", "tools"):
+    for feature in ("screening",):
         assert not unlocks.unlocked(p, feature), feature
 
 
-def test_risk_and_quant_tools_unlock_at_grade_two():
+def test_analyst_and_charts_unlock_at_grade_one():
+    """Grade 1 (Junior Analyst) : on devient un analyste qui investit — la
+    recherche, la watchlist, les graphes et le trading arrivent ensemble."""
+    p = _player(grade=1)
+    for feature in ("analyst", "charts", "trade", "deals", "track"):
+        assert unlocks.unlocked(p, feature), feature
+    # le filtrage en profondeur, la mesure de risque et la boîte à outils quant
+    # restent pour le grade 2 (étalement de la marche du grade 1)
+    for feature in ("screening", "risk", "quant", "tools"):
+        assert not unlocks.unlocked(p, feature), feature
+
+
+def test_screening_risk_and_quant_tools_unlock_at_grade_two():
     p = _player(grade=2)
-    for feature in ("risk", "quant", "tools", "calendar", "ipo"):
+    for feature in ("screening", "risk", "quant", "tools", "calendar", "ipo"):
         assert unlocks.unlocked(p, feature), feature
 
 

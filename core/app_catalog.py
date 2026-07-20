@@ -31,8 +31,8 @@ SCENE_FEATURE = {
     # d'analyse (grade 1), la mesure de risque / boîte à outils quant (grade 2)
     # et l'exécution (shop/mur, grade 1) n'apparaissent qu'une fois utilisables.
     "news": "analyst", "notifications": "analyst", "achievements": "analyst",
-    "markethub": "analyst", "graph": "charts", "explorer": "analyst",
-    "compare": "analyst", "risk": "risk", "quant": "quant", "alm": "alm",
+    "markethub": "analyst", "graph": "charts", "explorer": "screening",
+    "compare": "screening", "risk": "risk", "quant": "quant", "alm": "alm",
     "spreadsheet": "tools", "frontier_lab": "tools", "portfolio": "tools",
     "book": "trade", "wall": "trade", "shop": "trade", "analytics": "trade",
     "performance": "trade", "portfolio_unified": "trade",

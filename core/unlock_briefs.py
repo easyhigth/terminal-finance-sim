@@ -132,26 +132,29 @@ INTRO_PAGES = [
     {
         "title": ("Vos outils d'aujourd'hui", "Your tools for today"),
         "body": [
-            ("Au grade Stagiaire, vous disposez des outils d'ANALYSE : "
-             "Recherche (explorer les sociétés), Watchlist (suivre des valeurs), "
-             "Alertes de prix, Comparaison, États financiers. Aucun risque : "
-             "c'est de la lecture — profitez-en pour apprendre le marché.",
-             "As an Intern you have the ANALYSIS tools: Research (explore "
-             "companies), Watchlist (follow stocks), price Alerts, Compare, "
-             "Financial statements. Zero risk: it's all read-only — use it to "
-             "learn the market."),
+            ("Au grade Stagiaire, on va à l'essentiel : le TERMINAL (le moteur "
+             "de la partie, où vous lisez le marché en direct — cours, indices, "
+             "actualités), la MISSION (votre travail), l'EXAM/CERTIF (votre "
+             "promotion) et l'INBOX. Rien d'autre à gérer : vous apprenez.",
+             "As an Intern you keep it to the essentials: the TERMINAL (the "
+             "game engine, where you read the live market — prices, indices, "
+             "news), MISSION (your work), EXAM/CERTIF (your promotion) and the "
+             "INBOX. Nothing else to manage: you're here to learn."),
             ("L'ACADÉMIE (LEARN) propose des leçons notées qui rapportent de la "
              "réputation ; le GLOSSAIRE explique chaque terme ; les TUTORIELS "
-             "illustrés détaillent chaque action clé du jeu, pas à pas.",
+             "illustrés (MANUEL) détaillent chaque action clé, pas à pas.",
              "The ACADEMY (LEARN) offers graded lessons that earn reputation; "
              "the GLOSSARY explains every term; the illustrated TUTORIALS "
-             "detail every key action in the game, step by step."),
-            ("Le reste — trading, deals, mandats, dérivés, M&A... — se débloque "
-             "grade après grade. C'est voulu : la complexité arrive quand vous "
-             "êtes prêt, et chaque déblocage vous sera expliqué à ce moment-là.",
-             "The rest — trading, deals, mandates, derivatives, M&A... — "
-             "unlocks grade after grade. That's by design: complexity arrives "
-             "when you're ready, and each unlock will be explained then."),
+             "(MANUAL) detail every key action, step by step."),
+            ("Tout le reste se débloque GRADE PAR GRADE : dès la 1re promotion "
+             "arrivent les outils d'analyse (Recherche, Watchlist, Graphes) et "
+             "le Trading ; puis la mesure du risque, les dérivés, le M&A... "
+             "C'est voulu — la complexité arrive quand vous êtes prêt, et "
+             "chaque déblocage vous sera expliqué à ce moment-là.",
+             "Everything else unlocks GRADE BY GRADE: your 1st promotion brings "
+             "the analysis tools (Research, Watchlist, Charts) and Trading; "
+             "then risk measurement, derivatives, M&A... By design — complexity "
+             "arrives when you're ready, and each unlock is explained then."),
         ],
     },
     {
@@ -712,6 +715,27 @@ FEATURE_BRIEFS = {
                   "fondez la maison que vous avez toujours voulue.",
                   "Raise the seed capital, pick a name, and found the house "
                   "you always wanted."),
+    },
+    "screening": {
+        "title": ("Filtrage & comparaison", "Screening & comparison"),
+        "what": ("L'explorateur des 320 sociétés (filtres par secteur, région, "
+                 "taille…), les alertes de prix, le comparateur et la valeur "
+                 "relative — pour trier le marché, pas seulement le lire.",
+                 "The 320-company explorer (filters by sector, region, size…), "
+                 "price alerts, the comparator and relative value — to sort the "
+                 "market, not just read it."),
+        "how": ("Icônes Explorateur/Alertes du bureau, ou EXPLORE/ALERT/COMPARE "
+                "dans le Terminal.",
+                "Explorer/Alerts desktop icons, or EXPLORE/ALERT/COMPARE in the "
+                "Terminal."),
+        "why": ("Passer de « je regarde une valeur » à « je balaie tout le "
+                "marché pour trouver la bonne ».",
+                "Move from “I look at one name” to “I sweep the whole market to "
+                "find the right one”."),
+        "first": ("Filtrez l'explorateur sur votre secteur favori et posez une "
+                  "alerte sur la valeur la plus prometteuse.",
+                  "Filter the explorer on your favorite sector and set an alert "
+                  "on the most promising name."),
     },
     "charts": {
         "title": ("Graphes de cours", "Price charts"),

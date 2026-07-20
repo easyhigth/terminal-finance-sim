@@ -77,4 +77,19 @@ def suggestions(player, market=None):
         items.append({"label": _L(f"{unread} message(s) non lu(s)",
                                   f"{unread} unread message(s)"),
                       "kind": "info", "scene": "inbox"})
+    # 6) informatif permanent : le PROCHAIN palier à débloquer — fait de la
+    #    progression une promesse VISIBLE (« voilà ce qui t'attend »), surtout
+    #    au grade Intern où le bureau est volontairement minimal. Ajouté en
+    #    dernier (priorité la plus faible) : il s'efface si des actions urgentes
+    #    remplissent déjà la liste. Clic → feuille de route (scène unlockhistory).
+    try:
+        from core import config, unlocks
+        nxt = unlocks.next_unlock(player)
+        if nxt:
+            label, grade = nxt
+            items.append({"label": _L(f"Prochain déblocage : {label} (grade {config.GRADES[grade]})",
+                                      f"Next unlock: {label} (grade {config.GRADES[grade]})"),
+                          "kind": "hint", "scene": "unlockhistory"})
+    except Exception:
+        crashlog.swallowed("core.todo.next_unlock")
     return items[:MAX_ITEMS]

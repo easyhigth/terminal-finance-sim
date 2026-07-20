@@ -10,8 +10,24 @@ def _player(**kw):
     return p
 
 
-def test_empty_player_has_no_suggestions():
-    assert todo.suggestions(_player()) == []
+def _actionable(items):
+    """Filtre les entrées informatives (hint = prochain déblocage) pour ne
+    garder que les actions réellement en attente."""
+    return [it for it in items if it.get("kind") != "hint"]
+
+
+def test_empty_player_has_no_pending_actions():
+    # un joueur neuf n'a AUCUNE action en attente — seulement le hint
+    # informatif « prochain déblocage » (la carotte de progression).
+    items = todo.suggestions(_player())
+    assert _actionable(items) == []
+    assert any(it.get("kind") == "hint" and it["scene"] == "unlockhistory" for it in items)
+
+
+def test_next_unlock_hint_disappears_at_max_grade():
+    from core import config
+    p = _player(grade_index=len(config.GRADES) - 1)
+    assert todo.suggestions(p) == []   # tout est débloqué : plus de hint
 
 
 def test_pending_dilemma_is_first_priority():
@@ -25,7 +41,7 @@ def test_pending_dilemma_is_first_priority():
 def test_review_and_stresstest_are_listed():
     p = _player(pending_review={"standard_bonus": 1000},
                 pending_stresstest={"id": 1})
-    scenes = [it["scene"] for it in todo.suggestions(p)]
+    scenes = [it["scene"] for it in _actionable(todo.suggestions(p))]
     assert scenes == ["review", "stresstest"]
 
 
@@ -44,7 +60,7 @@ def test_unread_inbox_is_listed():
     p = _player()
     from core import inbox
     inbox.push(p, "manager", "Boss", "Sujet", "Corps")
-    items = todo.suggestions(p)
+    items = _actionable(todo.suggestions(p))
     assert items and items[-1]["scene"] == "inbox"
 
 

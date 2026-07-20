@@ -12,7 +12,7 @@ REBALANCE).
 """
 import pygame
 
-from core import analytics, config
+from core import analytics, config, i18n
 from core import bonds as B
 from core import commodities as CM
 from core import crypto as K
@@ -25,6 +25,11 @@ from core import structured as S
 from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.popups import PopupMixin
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
 
 KIND_CHIPS = ["Action", "ETF", "Obligation", "Commodity", "Crypto", "Structuré", "Crédit"]
 CLS_TO_KIND = {"Actions": "Action", "ETF": "ETF", "Obligations": "Obligation",
@@ -44,7 +49,7 @@ class BookScene(Scene, PopupMixin):
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.analytics_btn = widgets.Button(
-            (250, config.SCREEN_HEIGHT - 50, 230, 42), "ANALYSE DÉTAILLÉE (PA)", config.COL_CYAN)
+            (250, config.SCREEN_HEIGHT - 50, 230, 42), _L("ANALYSE DÉTAILLÉE (PA)", "DETAILED ANALYSIS (PA)"), config.COL_CYAN)
         self.shop_btn = widgets.Button(
             (490, config.SCREEN_HEIGHT - 50, 160, 42), "SHOP", config.COL_AMBER)
         self._name_rects = {}     # label -> Rect (clic → fiche flottante)
@@ -113,7 +118,7 @@ class BookScene(Scene, PopupMixin):
         p, m, kind, raw_key = self.app.gs.player, self.market, self.trade_kind, self.trade_key.strip()
         qty = self._qty()
         if not raw_key or qty <= 0:
-            self.msg = "Indiquez un identifiant d'actif et une quantité positive."
+            self.msg = _L("Indiquez un identifiant d'actif et une quantité positive.", "Enter an asset id and a positive quantity.")
             return
         key = self._resolve_key(kind, raw_key)
         if kind == "Action":
@@ -133,17 +138,17 @@ class BookScene(Scene, PopupMixin):
         else:
             return
         if r["ok"]:
-            self.msg = f"Acheté {qty:g} × {key.upper()} @ {r['price']:.2f}." + self._slip_suffix(r)
+            self.msg = _L(f"Acheté {qty:g} × {key.upper()} @ {r['price']:.2f}.", f"Bought {qty:g} × {key.upper()} @ {r['price']:.2f}.") + self._slip_suffix(r)
             if kind == "Action":
-                self.msg += f" Liquidité {liq.equity_tier(m, key.upper())}."
+                self.msg += _L(f" Liquidité {liq.equity_tier(m, key.upper())}.", f" Liquidity {liq.equity_tier(m, key.upper())}.")
             if not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
         elif r["reason"] == "sector_excluded":
             firm = firms_mod.get(p.firm)
-            fname = firm["name"] if firm else "votre firme"
-            self.msg = f"Achat refusé : secteur {r.get('sector', '?')} exclu par l'ADN « {fname} »."
+            fname = firm["name"] if firm else _L("votre firme", "your firm")
+            self.msg = _L(f"Achat refusé : secteur {r.get('sector', '?')} exclu par l'ADN « {fname} ».", f"Buy rejected: sector {r.get('sector', '?')} excluded by the « {fname} » DNA.")
         else:
-            self.msg = f"Achat refusé ({r['reason']})."
+            self.msg = _L(f"Achat refusé ({r['reason']}).", f"Buy rejected ({r['reason']}).")
 
     def _slip_suffix(self, r):
         slip = r.get("slippage")
@@ -151,13 +156,13 @@ class BookScene(Scene, PopupMixin):
             return ""
         mid = r["price"] - slip
         pct = (slip / mid * 100.0) if mid else 0.0
-        return f" Glissement {pct:+.2f}%."
+        return _L(f" Glissement {pct:+.2f}%.", f" Slippage {pct:+.2f}%.")
 
     def _do_sell(self):
         p, m, kind, raw_key = self.app.gs.player, self.market, self.trade_kind, self.trade_key.strip()
         qty = self._qty()
         if not raw_key or qty <= 0:
-            self.msg = "Indiquez un identifiant d'actif et une quantité positive."
+            self.msg = _L("Indiquez un identifiant d'actif et une quantité positive.", "Enter an asset id and a positive quantity.")
             return
         key = self._resolve_key(kind, raw_key)
         if kind == "Action":
@@ -177,12 +182,12 @@ class BookScene(Scene, PopupMixin):
         else:
             return
         if r["ok"]:
-            self.msg = (f"Vendu {r['qty']:g} × {key.upper()} @ {r['price']:.2f} "
+            self.msg = (_L(f"Vendu {r['qty']:g} × {key.upper()} @ {r['price']:.2f} ", f"Sold {r['qty']:g} × {key.upper()} @ {r['price']:.2f} ") +
                        f"(P&L {r['realized']:+.0f})." + self._slip_suffix(r))
             if not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
         else:
-            self.msg = f"Vente refusée ({r['reason']})."
+            self.msg = _L(f"Vente refusée ({r['reason']}).", f"Sell rejected ({r['reason']}).")
 
     def _open_for(self, cls, label):
         kind = CLS_TO_KIND.get(cls)
@@ -357,16 +362,16 @@ class BookScene(Scene, PopupMixin):
         p = self.app.gs.player
         m = self.market
         cur = config.CONTINENTS[p.continent]["currency"]
-        widgets.draw_text(surf, "PORTEFEUILLE", (40, 22), fonts.title(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L("PORTEFEUILLE", "PORTFOLIO"), (40, 22), fonts.title(bold=True), config.COL_AMBER)
 
         nw = pf.net_worth(p, m)
         beta = pf.portfolio_beta(p, m)
         pos_val = nw - p.cash
-        widgets.draw_text(surf, f"Valeur nette {widgets.format_money(nw, cur)}",
+        widgets.draw_text(surf, _L(f"Valeur nette {widgets.format_money(nw, cur)}", f"Net worth {widgets.format_money(nw, cur)}"),
                           (config.SCREEN_WIDTH - 40, 26), fonts.head(bold=True),
                           config.COL_WHITE, align="right")
-        sub = (f"Cash {widgets.format_money(p.cash, cur)} · Titres {widgets.format_money(pos_val, cur)} · "
-               f"bêta {beta:.2f} · P&L réalisé {widgets.format_money(p.realized_pnl, cur)}")
+        sub = _L(f"Cash {widgets.format_money(p.cash, cur)} · Titres {widgets.format_money(pos_val, cur)} · bêta {beta:.2f} · P&L réalisé {widgets.format_money(p.realized_pnl, cur)}",
+                 f"Cash {widgets.format_money(p.cash, cur)} · Holdings {widgets.format_money(pos_val, cur)} · beta {beta:.2f} · realized P&L {widgets.format_money(p.realized_pnl, cur)}")
         widgets.draw_text(surf, sub, (config.SCREEN_WIDTH - 40, 70), fonts.small(),
                           config.COL_TEXT_DIM, align="right")
         st = pf.margin_status(p, m)
@@ -374,32 +379,32 @@ class BookScene(Scene, PopupMixin):
         lev_col = config.COL_DOWN if st["margin_call"] else (
             config.COL_WARN if st["leverage"] != float("inf") and st["leverage"] > st["max_leverage"] * 0.8
             else config.COL_TEXT_DIM)
-        marg = (f"Levier {lev} / max {st['max_leverage']:.1f}x · "
-                f"exposition {widgets.format_money(st['gross'], cur)} · "
-                f"pouvoir d'achat {widgets.format_money(st['buying_power'], cur)}"
-                + ("  ⚠ APPEL DE MARGE" if st["margin_call"] else ""))
+        marg = (_L(f"Levier {lev} / max {st['max_leverage']:.1f}x · exposition {widgets.format_money(st['gross'], cur)} · pouvoir d'achat {widgets.format_money(st['buying_power'], cur)}",
+                   f"Leverage {lev} / max {st['max_leverage']:.1f}x · exposure {widgets.format_money(st['gross'], cur)} · buying power {widgets.format_money(st['buying_power'], cur)}")
+                + (_L("  ⚠ APPEL DE MARGE", "  ⚠ MARGIN CALL") if st["margin_call"] else ""))
         widgets.draw_text(surf, marg, (config.SCREEN_WIDTH - 40, 88), fonts.tiny(),
                           lev_col, align="right")
         total_fin = getattr(p, "total_financing_paid", 0.0)
-        widgets.draw_text(surf, f"Financement cumulé payé : {widgets.format_money(total_fin, cur)}",
+        widgets.draw_text(surf, _L(f"Financement cumulé payé : {widgets.format_money(total_fin, cur)}", f"Cumulative funding paid: {widgets.format_money(total_fin, cur)}"),
                           (config.SCREEN_WIDTH - 40, 102), fonts.tiny(), config.COL_TEXT_DIM, align="right")
 
         # ---- barre de trading rapide ----
         # bar_y laisse une marge sous la ligne de financement (tiny, y=102) pour
         # que son texte (aligné à droite) ne soit pas recouvert par les chips/boîtes opaques.
         bar_y = 126
-        widgets.draw_text(surf, "TRADING RAPIDE :", (40, bar_y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("TRADING RAPIDE :", "QUICK TRADE:"), (40, bar_y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         bx = 196
         self._kind_rects = {}
         for kind in KIND_CHIPS:
-            w = fonts.tiny(bold=True).size(kind)[0] + 14
+            klabel = i18n.asset_class_label(kind)
+            w = fonts.tiny(bold=True).size(klabel)[0] + 14
             rect = pygame.Rect(bx, bar_y, w, 20)
             self._kind_rects[kind] = rect
             sel = (kind == self.trade_kind)
             kcol = KIND_COLOR.get(kind, config.COL_TEXT)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect, border_radius=3)
             pygame.draw.rect(surf, kcol if sel else config.COL_BORDER, rect, 1, border_radius=3)
-            widgets.draw_text(surf, kind, rect.center, fonts.tiny(bold=sel),
+            widgets.draw_text(surf, klabel, rect.center, fonts.tiny(bold=sel),
                               kcol if sel else config.COL_TEXT_DIM, align="center")
             bx += w + 6
         bx += 10
@@ -408,7 +413,7 @@ class BookScene(Scene, PopupMixin):
         pygame.draw.rect(surf, config.COL_CYAN if self.text_focus == "key" else config.COL_BORDER,
                           self._key_box, 1, border_radius=4)
         kcursor = "_" if (self.text_focus == "key" and int(self._t * 2) % 2 == 0) else ""
-        klabel = (self.trade_key + kcursor) if self.trade_key else (kcursor + "ticker/nom/ID…")
+        klabel = (self.trade_key + kcursor) if self.trade_key else (kcursor + _L("ticker/nom/ID…", "ticker/name/ID…"))
         kcol2 = config.COL_TEXT if self.trade_key else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(klabel, fonts.small(), self._key_box.w - 12),
                           (self._key_box.x + 6, self._key_box.y + 4), fonts.small(), kcol2)
@@ -423,12 +428,12 @@ class BookScene(Scene, PopupMixin):
         bx = self._qty_box.right + 10
         self._sell_btn = pygame.Rect(bx, bar_y - 2, 70, 24)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._sell_btn, border_radius=4)
-        widgets.draw_text(surf, "VENDRE", self._sell_btn.center, fonts.tiny(bold=True),
+        widgets.draw_text(surf, _L("VENDRE", "SELL"), self._sell_btn.center, fonts.tiny(bold=True),
                           config.COL_DOWN, align="center")
         bx = self._sell_btn.right + 8
         self._buy_btn = pygame.Rect(bx, bar_y - 2, 70, 24)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._buy_btn, border_radius=4)
-        widgets.draw_text(surf, "ACHETER", self._buy_btn.center, fonts.tiny(bold=True),
+        widgets.draw_text(surf, _L("ACHETER", "BUY"), self._buy_btn.center, fonts.tiny(bold=True),
                           config.COL_UP, align="center")
         if self.msg:
             widgets.draw_text(surf, self.msg, (40, bar_y + 26), fonts.tiny(), config.COL_TEXT_DIM)
@@ -441,12 +446,12 @@ class BookScene(Scene, PopupMixin):
         rows = analytics.holdings_table(p, m)
         if not rows:
             widgets.draw_text_wrapped(
-                surf, "Aucune position. Utilisez la barre de trading rapide ci-dessus, le "
-                "SHOP, ou le terminal (BUY <ticker> <qté>).",
+                surf, _L("Aucune position. Utilisez la barre de trading rapide ci-dessus, le SHOP, ou le terminal (BUY <ticker> <qté>).",
+                         "No position. Use the quick-trade bar above, the SHOP, or the terminal (BUY <ticker> <qty>)."),
                 (inner.x, inner.y), fonts.body(), config.COL_TEXT_DIM, inner.w)
         else:
-            cols = [("ACTIF", inner.x), ("TYPE", inner.x + 220), ("QTÉ", inner.x + 290),
-                    ("PRU", inner.x + 360), ("COURS", inner.x + 440), ("VALEUR", inner.x + 530),
+            cols = [(_L("ACTIF", "ASSET"), inner.x), (_L("TYPE", "TYPE"), inner.x + 220), (_L("QTÉ", "QTY"), inner.x + 290),
+                    (_L("PRU", "AVG"), inner.x + 360), (_L("COURS", "PRICE"), inner.x + 440), (_L("VALEUR", "VALUE"), inner.x + 530),
                     ("P&L", inner.x + 660)]
             for label, x in cols:
                 widgets.draw_text(surf, label, (x, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
@@ -500,10 +505,10 @@ class BookScene(Scene, PopupMixin):
                             if dy:
                                 sign = -1.0 if r["short"] else 1.0
                                 income = sign * live_value * dy
-                                verb = "perçu" if income >= 0 else "payé (short)"
+                                verb = _L("perçu", "received") if income >= 0 else _L("payé (short)", "paid (short)")
                                 self._tooltip = (
-                                    f"Dividende estimé : {widgets.format_money(abs(income), cur)}/an "
-                                    f"{verb} ({dy*100:.1f}% de rendement).", mp)
+                                    _L(f"Dividende estimé : {widgets.format_money(abs(income), cur)}/an {verb} ({dy*100:.1f}% de rendement).",
+                                       f"Estimated dividend: {widgets.format_money(abs(income), cur)}/yr {verb} ({dy*100:.1f}% yield)."), mp)
                     name_label = widgets.fit_text(r["name"], fonts.small(bold=True), 200) \
                         + (" (S)" if r["short"] else "")
                     name_col = config.COL_DOWN if r["short"] else kcol
@@ -555,7 +560,7 @@ class BookScene(Scene, PopupMixin):
         btn_w = (inner.w - gap) // 2
         self._side_mode_rects = {}
         x = inner.x
-        for mode, label in (("sector", "SECTEUR"), ("history", "ÉVOLUTION")):
+        for mode, label in (("sector", _L("SECTEUR", "SECTOR")), ("history", _L("ÉVOLUTION", "HISTORY"))):
             btn = pygame.Rect(x, inner.y, btn_w, btn_h)
             active = self.side_mode == mode
             accent = config.COL_AMBER if active else config.COL_TEXT_DIM
@@ -601,7 +606,7 @@ class BookScene(Scene, PopupMixin):
         self.scroll_sector = widgets.draw_scrollbar(surf, rect, list_area, self.scroll_sector,
                                self._sector_max_scroll, content_h)
         if warn:
-            widgets.draw_text(surf, "⚠ Forte concentration sectorielle.",
+            widgets.draw_text(surf, _L("⚠ Forte concentration sectorielle.", "⚠ High sector concentration."),
                               (rect.x, rect.bottom - 18), fonts.tiny(), config.COL_WARN)
 
     def _draw_history_panel(self, surf, rect):
@@ -611,7 +616,7 @@ class BookScene(Scene, PopupMixin):
         cur = config.CONTINENTS[p.continent]["currency"]
         series = getattr(p, "cash_history", []) or []
         if len(series) < 2:
-            widgets.draw_text(surf, "Historique insuffisant — revenez après quelques pas de marché.",
+            widgets.draw_text(surf, _L("Historique insuffisant — revenez après quelques pas de marché.", "Not enough history — come back after a few market steps."),
                               (rect.x, rect.y), fonts.small(), config.COL_TEXT_DIM)
             self._sector_list_rect = None
             return
@@ -626,7 +631,7 @@ class BookScene(Scene, PopupMixin):
                           f"Actuel : {widgets.format_money(current, cur)}",
                           (rect.x, rect.y), fonts.small(bold=True), config.COL_WHITE)
         widgets.draw_text(surf,
-                          f"Départ : {widgets.format_money(start_val, cur)}",
+                          _L(f"Départ : {widgets.format_money(start_val, cur)}", f"Start: {widgets.format_money(start_val, cur)}"),
                           (rect.x, rect.y + 18), fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf,
                           f"P&L total : {widgets.format_money(total_pnl, cur)} ({total_pct:+.1f}%)",
@@ -643,5 +648,5 @@ class BookScene(Scene, PopupMixin):
         widgets.draw_series(surf, chart_rect, series, color=col, baseline=True,
                             mouse_pos=pygame.mouse.get_pos(), y_fmt=y_fmt,
                             show_current_line=True, line_width=2)
-        labels = [(0.0, "début"), (1.0, "auj.")]
+        labels = [(0.0, _L("début", "start")), (1.0, _L("auj.", "now"))]
         widgets.draw_chart_x_labels(surf, chart_rect, labels)

@@ -190,7 +190,7 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
                 self.app.gs.save(config.AUTOSAVE_SLOT)
         elif r["reason"] == "sector_excluded":
             firm = firms_mod.get(p.firm)
-            fname = firm["name"] if firm else "votre firme"
+            fname = firm["name"] if firm else _L("votre firme", "your firm")
             self.msg = _L(f"Achat refusé : secteur {r.get('sector', '?')} exclu par l'ADN « {fname} ».", f"Buy rejected: sector {r.get('sector', '?')} excluded by the « {fname} » DNA.")
         else:
             self.msg = _L(f"Achat refusé ({r['reason']}).", f"Buy rejected ({r['reason']}).")
@@ -201,7 +201,7 @@ class BookApp(DesktopApp, PopupMixin, ConditionalOrderMixin):
             return ""
         mid = r["price"] - slip
         pct = (slip / mid * 100.0) if mid else 0.0
-        return f" Glissement {pct:+.2f}%."
+        return _L(f" Glissement {pct:+.2f}%.", f" Slippage {pct:+.2f}%.")
 
     def _do_sell(self):
         p, m, kind, raw_key = self.app.gs.player, self.market, self.trade_kind, self.trade_key.strip()

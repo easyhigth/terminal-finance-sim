@@ -371,6 +371,29 @@ class TerminalTimeMixin:
         if summary.get("quarter_changed"):
             legacy_mod.on_quarter_close(p, m)
             badges_mod.on_quarter_close(p)
+            # momentum de carrière (série chaude/creuse) : effet de réputation +
+            # toast (core/momentum, sur les séries que legacy vient de mettre à jour)
+            from core import momentum as _momentum
+            mom = _momentum.apply_quarter_effect(p)
+            if mom:
+                self.app.notify(mom[0], mom[1])
+            # réputation-métier : message d'inbox si on vient d'être reconnu
+            # spécialiste de sa voie (core/track_rep)
+            from core import track_rep as _trep
+            spec = _trep.check_new_specialist(p)
+            if spec:
+                from core import inbox as _inbox
+                _inbox.push(p, "manager", "Votre manager",
+                            _L(f"Reconnu comme spécialiste {spec}",
+                               f"Recognized as a {spec} specialist"),
+                            _L(f"Votre travail sur la voie {spec} vous a fait un nom : on vous "
+                               f"identifie désormais comme un spécialiste. Attendez-vous à ce "
+                               f"qu'on vienne vous confier davantage de mandats de ce métier.",
+                               f"Your work on the {spec} track has made you a name: you're now "
+                               f"seen as a specialist. Expect more mandates of this kind to come "
+                               f"your way."))
+                self.app.notify(_L(f"Spécialiste {spec} reconnu", f"{spec} specialist recognized"),
+                                "prestige")
             self._log(_L(f"  ── Nouveau trimestre : T{p.quarter} ──", f"  ── New quarter: Q{p.quarter} ──"))
             qr = summary.get("quarter_report")
             if qr and qr["total"]:

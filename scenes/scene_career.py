@@ -311,6 +311,21 @@ class CareerScene(Scene):
             ("Scrutin réglementaire", f"{p.heat}/100", config.COL_WHITE),
             ("Temps", f"jour {p.day} (T{p.quarter})", config.COL_WHITE),
         ]
+        # réputation SEGMENTÉE par métier + momentum de carrière : n'apparaissent
+        # qu'une fois pertinents (voie choisie / série en cours), pour garder la
+        # vue épurée en début de partie (cf. core/track_rep, core/momentum).
+        from core import momentum as _momentum
+        from core import track_rep as _trep
+        dom_track, dom_pts = _trep.dominant(p)
+        if dom_track:
+            is_spec = _trep.specialist_track(p) == dom_track
+            val = f"{dom_track} {dom_pts}" + (" — spécialiste" if is_spec else "")
+            rows.append(("Réputation-métier", val,
+                         config.COL_PRESTIGE if is_spec else config.COL_WHITE))
+        mom_label = _momentum.label(p)
+        if mom_label:
+            mcol = config.COL_UP if _momentum.status(p) == "hot" else config.COL_DOWN
+            rows.append(("Momentum", mom_label, mcol))
         # pas de ligne adaptatif : toutes les lignes tiennent dans le panneau
         # (plancher abaissé à 15 px — à 18, la dernière ligne « Temps » était
         # coupée par le bord bas du panneau)

@@ -344,9 +344,15 @@ def maybe_offer(player, rng=None, market=None):
     if len(player.mandates) + len(player.mandate_offers) >= MAX_ACTIVE + 1:
         return None
     from core import focus as _focus
+    from core import momentum as _momentum
+    from core import track_rep as _trep
+    # réputation-métier + momentum de carrière : un spécialiste reconnu dans SA
+    # voie, et un joueur « en forme », sont davantage sollicités (moins si en
+    # passe difficile) — ce que vous ÊTES façonne ce qu'on vient vous proposer.
     offer_mult = (tracks.perk(player, "mandate_offer_mult") * archetypes.perk(player, "mandate_offer_mult")
                   * firms.perk(player, "mandate_offer_mult")
-                  * _focus.perk(player, "offer_mult"))
+                  * _focus.perk(player, "offer_mult")
+                  * _trep.offer_mult(player) * _momentum.offer_mult(player))
     if rng.random() > OFFER_PROB * offer_mult:
         return None
     client_profile = _pick_profile(rng)

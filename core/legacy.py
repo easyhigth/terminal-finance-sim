@@ -115,8 +115,13 @@ def on_quarter_close(player, market):
     if last_nw is not None:
         if nw > last_nw:
             player.flags["profit_streak"] = player.flags.get("profit_streak", 0) + 1
+            player.flags["loss_streak"] = 0
+        elif nw < last_nw:
+            player.flags["loss_streak"] = player.flags.get("loss_streak", 0) + 1
+            player.flags["profit_streak"] = 0
         else:
             player.flags["profit_streak"] = 0
+            player.flags["loss_streak"] = 0
     player.flags["legacy_last_nw"] = nw
 
     # intégrité tenue ET performance maintenue, ensemble, sur la durée

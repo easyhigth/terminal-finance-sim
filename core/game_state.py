@@ -27,6 +27,7 @@ class PlayerState:
     firm: str = ""                  # ADN de la firme de départ (core/firms.py)
     grade_index: int = 0            # index dans config.GRADES
     reputation: int = 50            # 0–100
+    track_rep: dict = field(default_factory=dict)  # réputation SEGMENTÉE par métier ({track: points}) — cf. core/track_rep.py
     cash: float = 0.0               # capital personnel / de la firme
     firm_name: str = ""             # nom de la boîte si fondée
     day: int = 1                    # temps de jeu en jours
@@ -196,6 +197,12 @@ class PlayerState:
         applied = self.reputation - before
         if reason and applied:
             self.rep_log.append((reason, applied))
+        # réputation SEGMENTÉE : tout gain de réputation crédite AUSSI votre
+        # métier courant (cf. core/track_rep.py) — ce que vous faites façonne ce
+        # pour quoi vous êtes reconnu, et donc ce qu'on vient vous proposer. Ne
+        # s'accumule qu'après le choix d'une voie (avant, tout est "General").
+        if delta > 0 and self.track and self.track != "General":
+            self.track_rep[self.track] = self.track_rep.get(self.track, 0) + delta
 
     def quarter_of_day(self, day=None):
         d = self.day if day is None else day

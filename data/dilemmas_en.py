@@ -300,4 +300,44 @@ DILEMMAS_EN = {
              "outcome": "The stars are thrilled, but the other teams are already looking for new jobs."},
         ],
     },
+    "client_ultimatum": {
+        "title": "A major client threatens to leave",
+        "scenario": "Disappointed by a mediocre quarter, one of your biggest clients threatens "
+                    "to pull their mandate. How do you respond?",
+        "options": [
+            {"label": "Cut your fees to keep them",
+             "outcome": "They stay, reassured — but your commission takes a hit this quarter."},
+            {"label": "Reassure them with a call and a plan",
+             "outcome": "Your candor pays off: they give you a chance, no fee concession."},
+            {"label": "Let them walk",
+             "outcome": "They slam the door — and tell the street. Your name takes a hit."},
+        ],
+    },
+    "block_trade": {
+        "title": "Off-market block from the next desk",
+        "scenario": "The neighboring desk urgently needs to offload a large block and offers it "
+                    "to you below market. Tempting — but their haste may hide something.",
+        "options": [
+            {"label": "Take the whole block",
+             "outcome": "Good deal booked… but you inherit a position others were fleeing."},
+            {"label": "Negotiate a smaller share",
+             "outcome": "Caution rewarded: a net gain, a contained risk."},
+            {"label": "Politely decline",
+             "outcome": "You pass. The block clears elsewhere, without you."},
+        ],
+    },
+    "merger_rumor": {
+        "title": "Takeover rumor on one of your positions",
+        "scenario": "A takeover rumor is circulating on a company you hold. Nothing official, "
+                    "nothing public — just a persistent whisper.",
+        "options": [
+            {"label": "Load up aggressively on the rumor",
+             "outcome": "The bet pays if the deal is confirmed — but acting on non-public noise "
+                        "draws the regulator's eye."},
+            {"label": "Trim prudently to lock in",
+             "outcome": "You take a clean gain and sleep easy, whatever happens."},
+            {"label": "Do nothing",
+             "outcome": "You let the rumor run its course. No gain, no risk."},
+        ],
+    },
 }

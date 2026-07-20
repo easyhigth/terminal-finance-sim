@@ -192,3 +192,28 @@ def test_apply_choice_accept_poach_weakens_a_rival():
     dilemmas.apply_choice(p, d, 0)  # "Le recruter"
     after = [r["score"] for r in p.rivals]
     assert any(a < b for a, b in zip(after, before))
+
+
+def test_branching_business_events_flow_through_apply_choice():
+    """Les événements réactifs à choix (client qui menace de partir, bloc,
+    rumeur d'OPA) passent par le pipeline de décisions : générables et
+    applicables comme n'importe quel dilemme."""
+    import random as _random
+
+    from core.game_state import PlayerState
+    ids = {"client_ultimatum", "block_trade", "merger_rumor"}
+    assert ids <= {d["id"] for d in dilemmas.DILEMMAS}
+    for did in ids:
+        tmpl = next(d for d in dilemmas.DILEMMAS if d["id"] == did)
+        p = PlayerState(); p.grade_index = 6
+        d = dilemmas.generate(p, rng=_random.Random(0))
+        # force l'instance sur ce template précis (barème mis à l'échelle)
+        d = {"id": tmpl["id"], "category": tmpl["category"], "title": tmpl["title"],
+             "scenario": tmpl["scenario"],
+             "options": [{"label": o["label"], "cash": o["cash_k"] * 1000.0,
+                          "rep": o["rep"], "heat": o["heat"], "outcome": o["outcome"]}
+                         for o in tmpl["options"]]}
+        cash0, rep0 = p.cash, p.reputation
+        opt = dilemmas.apply_choice(p, d, 0)
+        assert "outcome" in opt
+        assert p.cash != cash0 or p.reputation != rep0 or p.heat > 0

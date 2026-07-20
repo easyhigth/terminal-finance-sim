@@ -297,6 +297,46 @@ DILEMMAS = [
           "outcome": "Les stars sont ravies, mais les autres équipes cherchent déjà "
                       "un nouveau poste."},
      ]},
+    # ---- événements RÉACTIFS à choix (business, pas éthique) : une situation
+    #      surgit, vous tranchez, chaque voie a sa suite. Passent par le même
+    #      pipeline que les dilemmes (UI, todo, apply_choice, scrutin).
+    {"id": "client_ultimatum", "category": "strategie", "min_grade": 3, "weight": 3,
+     "title": "Un gros client menace de partir",
+     "scenario": "Déçu par un trimestre médiocre, l'un de vos plus gros clients menace "
+                 "de retirer son mandat. Comment réagissez-vous ?",
+     "options": [
+         {"label": "Baisser vos frais pour le retenir", "cash_k": -25, "rep": 4, "heat": 0,
+          "outcome": "Il reste, apaisé — mais votre commission en pâtit ce trimestre."},
+         {"label": "Le rassurer par un appel et un plan", "cash_k": 0, "rep": 2, "heat": 0,
+          "outcome": "Votre franchise paie : il vous laisse une chance, sans concession de frais."},
+         {"label": "Le laisser partir", "cash_k": 0, "rep": -5, "heat": 0,
+          "outcome": "Il claque la porte — et le fait savoir sur la place. Votre nom en prend un coup."},
+     ]},
+    {"id": "block_trade", "category": "strategie", "min_grade": 4, "weight": 2,
+     "title": "Bloc hors marché proposé par le desk voisin",
+     "scenario": "Le desk voisin doit se défaire en urgence d'un gros bloc et vous l'offre "
+                 "sous le marché. Alléchant — mais leur empressement cache peut-être quelque chose.",
+     "options": [
+         {"label": "Prendre le bloc en entier", "cash_k": 45, "rep": 1, "heat": 12,
+          "outcome": "Bonne affaire encaissée… mais vous héritez d'une position que d'autres fuyaient."},
+         {"label": "Négocier une part réduite", "cash_k": 18, "rep": 3, "heat": 3,
+          "outcome": "Prudence récompensée : un gain net, un risque maîtrisé."},
+         {"label": "Décliner poliment", "cash_k": 0, "rep": 0, "heat": 0,
+          "outcome": "Vous passez votre tour. Le bloc s'écoule ailleurs, sans vous."},
+     ]},
+    {"id": "merger_rumor", "category": "strategie", "min_grade": 4, "weight": 2,
+     "title": "Rumeur d'OPA sur une de vos positions",
+     "scenario": "Une rumeur d'offre publique court sur une société que vous détenez. "
+                 "Rien d'officiel, rien de public — juste un bruit de couloir insistant.",
+     "options": [
+         {"label": "Renforcer agressivement sur la rumeur", "cash_k": 40, "rep": -2, "heat": 20,
+          "outcome": "Le pari paie si l'OPA se confirme — mais agir sur un bruit non public "
+                      "attire l'œil du régulateur."},
+         {"label": "Alléger prudemment pour sécuriser", "cash_k": 8, "rep": 3, "heat": 0,
+          "outcome": "Vous prenez un gain propre et dormez tranquille, quoi qu'il advienne."},
+         {"label": "Ne rien faire", "cash_k": 0, "rep": 0, "heat": 0,
+          "outcome": "Vous laissez la rumeur vivre sa vie. Ni gain, ni risque."},
+     ]},
 ]
 
 

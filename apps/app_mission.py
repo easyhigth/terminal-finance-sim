@@ -164,24 +164,12 @@ class MissionApp(DesktopApp):
             self.state = "question"
 
     def _finish(self):
-        from core import career, question_log
-        p = self.app.gs.player
-        # les questions de banque servies ne seront jamais reposées (mission ou examen)
-        question_log.mark_seen(p, [it for it in self.mission["items"] if it.get("src_id")])
-        total = len(self.mission["items"])
-        self.rep_gain, self.cash_gain = M.compute_rewards(self.mission, self.score, total,
-                                                  player=self.app.gs.player)
-        p.adjust_reputation(self.rep_gain, reason=f"Mission : {self.mission.get('title', '')}")
-        p.adjust_cash(self.cash_gain)
-        p.missions_done += 1
-        p.grade_missions += 1
-        if self.score == total:
-            career.log(p, "info", f"Mission '{self.mission['title']}' réussie ({self.score}/{total}).")
-        self.app.notify(f"Mission : +{self.rep_gain} réputation", "good")
-        # une mission prend du temps : le terminal avancera d'un tour
-        self.app.pending_market_steps += 1
-        if not p.hardcore:
-            self.app.gs.save(config.AUTOSAVE_SLOT)
+        # logique partagée avec la scène plein écran : core/mission_flow.
+        from core import mission_flow
+        res = mission_flow.apply_result(self.app, self.mission, self.score)
+        self.rep_gain, self.cash_gain = res["rep_gain"], res["cash_gain"]
+        for text, kind in res["toasts"]:
+            self.app.notify(text, kind)
         self.state = "result"
 
     # ------------------------------------------------------------- update

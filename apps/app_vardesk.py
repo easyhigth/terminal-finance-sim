@@ -19,9 +19,13 @@ moteur) :
 import pygame
 
 from apps.base import DesktopApp
-from core import config, risk
+from core import config, i18n, risk
 from core import risk_advanced as RA
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
 
 
 class VarDeskApp(DesktopApp):
@@ -77,13 +81,13 @@ class VarDeskApp(DesktopApp):
         self._ensure_computed()
         surf.fill(config.COL_BG, rect)
         pad = 14
-        widgets.draw_text(surf, "RISQUE — VaR · CVaR · CONTRIBUTIONS · BACKTEST",
+        widgets.draw_text(surf, _L("RISQUE — VaR · CVaR · CONTRIBUTIONS · BACKTEST", "RISK — VaR · CVaR · CONTRIBUTIONS · BACKTEST"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         x, y = rect.x + pad, rect.y + 32
         self._conf_rects = {}
         for conf in (0.95, 0.99):
-            lbl = f"{conf * 100:.0f} %"
+            lbl = f"{conf * 100:.0f}%"
             w = fonts.tiny(bold=True).size(lbl)[0] + 16
             r = pygame.Rect(x, y, w, 20)
             self._conf_rects[conf] = r
@@ -96,17 +100,20 @@ class VarDeskApp(DesktopApp):
                               config.COL_AMBER if sel else config.COL_TEXT_DIM,
                               align="center")
             x += w + 6
-        sw = fonts.tiny(bold=True).size("STRESS TEST →")[0] + 16
+        _stress_lbl = _L("STRESS TEST →", "STRESS TEST →")
+        sw = fonts.tiny(bold=True).size(_stress_lbl)[0] + 16
         self._stress_btn = pygame.Rect(rect.right - pad - sw, y, sw, 20)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._stress_btn,
                          border_radius=3)
         pygame.draw.rect(surf, config.COL_DOWN, self._stress_btn, 1, border_radius=3)
-        widgets.draw_text(surf, "STRESS TEST →", self._stress_btn.center,
+        widgets.draw_text(surf, _stress_lbl, self._stress_btn.center,
                           fonts.tiny(bold=True), config.COL_DOWN, align="center")
         top = y + 28
         if self._sim is None:
-            widgets.draw_text(surf, "Book vide — la VaR mesure le risque de VOS "
+            widgets.draw_text(surf, _L("Book vide — la VaR mesure le risque de VOS "
                               "positions (actions, obligations).",
+                              "Empty book — VaR measures the risk of YOUR "
+                              "positions (equities, bonds)."),
                               (rect.x + pad, top + 8), fonts.small(),
                               config.COL_TEXT_DIM)
             return
@@ -117,7 +124,7 @@ class VarDeskApp(DesktopApp):
              config.COL_DOWN),
             (f"CVaR {self.confidence * 100:.0f}%", f"{s['cvar']:.2f} M",
              config.COL_DOWN),
-            ("VaR PARAM.", f"{s['param_var']:.2f} M", config.COL_AMBER),
+            (_L("VaR PARAM.", "PARAM. VaR"), f"{s['param_var']:.2f} M", config.COL_AMBER),
             ("σ P&L", f"{s['sigma']:.2f} M", config.COL_TEXT),
         ]
         tx = rect.x + pad
@@ -144,7 +151,7 @@ class VarDeskApp(DesktopApp):
 
     def _draw_hist(self, surf, rect, s):
         inner = widgets.draw_panel(surf, rect,
-                                   "Distribution simulée du P&L (1 pas, en M)",
+                                   _L("Distribution simulée du P&L (1 pas, en M)", "Simulated P&L distribution (1 step, in M)"),
                                    config.COL_CYAN)
         import numpy as np
         pnl = s["pnl"]
@@ -166,36 +173,46 @@ class VarDeskApp(DesktopApp):
                 x0 = plot.x + int((val - lo) / (hi - lo) * plot.w)
                 pygame.draw.line(surf, col, (x0, plot.y), (x0, plot.bottom), 1)
                 widgets.draw_text(surf, lbl, (x0 + 3, plot.y), fonts.tiny(), col)
-        widgets.draw_text(surf, "Barres rouges : la QUEUE au-delà de la VaR — "
+        widgets.draw_text(surf, _L("Barres rouges : la QUEUE au-delà de la VaR — "
                           "leur moyenne est la CVaR.",
+                          "Red bars: the TAIL beyond the VaR — "
+                          "their mean is the CVaR."),
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)
 
     def _draw_backtest(self, surf, rect):
-        inner = widgets.draw_panel(surf, rect, "Backtest de Kupiec (VaR param.)",
+        inner = widgets.draw_panel(surf, rect, _L("Backtest de Kupiec (VaR param.)", "Kupiec backtest (param. VaR)"),
                                    config.COL_UP)
         bt = self._bt
         if bt is None:
-            widgets.draw_text(surf, "Historique insuffisant (il faut ≥ 20 pas de "
-                              "panier actions).", (inner.x, inner.y + 6),
+            widgets.draw_text(surf, _L("Historique insuffisant (il faut ≥ 20 pas de "
+                              "panier actions).",
+                              "Insufficient history (need ≥ 20 steps of "
+                              "the equity basket)."), (inner.x, inner.y + 6),
                               fonts.tiny(), config.COL_TEXT_DIM)
             return
         y = inner.y + 2
-        widgets.draw_text(surf, f"{bt['n']} pas rejoués · seuil VaR "
+        widgets.draw_text(surf, _L(f"{bt['n']} pas rejoués · seuil VaR "
                           f"{bt['var_step_pct']:.2f} %/pas",
+                          f"{bt['n']} steps replayed · VaR threshold "
+                          f"{bt['var_step_pct']:.2f}%/step"),
                           (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
         y += 18
         col = config.COL_DOWN if bt["reject"] else config.COL_UP
-        widgets.draw_text(surf, f"Exceptions : {bt['exceptions']} "
+        widgets.draw_text(surf, _L(f"Exceptions : {bt['exceptions']} "
                           f"(attendu ≈ {bt['expected']:.1f})",
+                          f"Exceptions: {bt['exceptions']} "
+                          f"(expected ≈ {bt['expected']:.1f})"),
                           (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
         y += 20
-        widgets.draw_text(surf, f"LR de Kupiec = {bt['lr']:.2f} "
+        widgets.draw_text(surf, _L(f"LR de Kupiec = {bt['lr']:.2f} "
                           f"(seuil χ² 95 % = {RA.KUPIEC_CHI2_95})",
+                          f"Kupiec LR = {bt['lr']:.2f} "
+                          f"(χ² 95% threshold = {RA.KUPIEC_CHI2_95})"),
                           (inner.x, y), fonts.tiny(), config.COL_TEXT)
         y += 18
-        verdict = ("MODÈLE REJETÉ — trop d'écarts avec l'observé"
-                   if bt["reject"] else "Modèle NON rejeté — calibrage cohérent")
+        verdict = (_L("MODÈLE REJETÉ — trop d'écarts avec l'observé", "MODEL REJECTED — too many gaps with the observed")
+                   if bt["reject"] else _L("Modèle NON rejeté — calibrage cohérent", "Model NOT rejected — consistent calibration"))
         widgets.draw_text(surf, verdict, (inner.x, y), fonts.small(bold=True), col)
         # frise des rendements avec exceptions marquées
         y += 22
@@ -214,15 +231,17 @@ class VarDeskApp(DesktopApp):
 
     def _draw_components(self, surf, rect):
         inner = widgets.draw_panel(surf, rect,
-                                   "VaR par position (allocation d'Euler)",
+                                   _L("VaR par position (allocation d'Euler)", "VaR per position (Euler allocation)"),
                                    config.COL_AMBER)
         comp = self._comp
         if comp is None or not comp["lines"]:
-            widgets.draw_text(surf, "Aucune ligne.", (inner.x, inner.y + 6),
+            widgets.draw_text(surf, _L("Aucune ligne.", "No line."), (inner.x, inner.y + 6),
                               fonts.tiny(), config.COL_TEXT_DIM)
             return
-        hint = ("Les contributions SOMMENT à la VaR totale — une contribution "
-               "négative est une couverture.")
+        hint = _L("Les contributions SOMMENT à la VaR totale — une contribution "
+               "négative est une couverture.",
+               "Contributions SUM to the total VaR — a negative "
+               "contribution is a hedge.")
         hint_font = fonts.tiny()
         hint_lines = widgets.wrap_text_lines(hint, hint_font, inner.w)
         widgets.draw_text_wrapped(surf, hint, (inner.x, inner.y), hint_font,
@@ -250,7 +269,9 @@ class VarDeskApp(DesktopApp):
                               (bx + bar_w + 8, y), fonts.tiny(), col)
             y += 18
         total = sum(x["contrib"] for x in comp["lines"])
-        widgets.draw_text(surf, f"Σ contributions = {total:.2f} M ≈ VaR "
+        widgets.draw_text(surf, _L(f"Σ contributions = {total:.2f} M ≈ VaR "
                           f"{comp['var']:.2f} M (propriété d'Euler)",
+                          f"Σ contributions = {total:.2f} M ≈ VaR "
+                          f"{comp['var']:.2f} M (Euler property)"),
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)

@@ -15,8 +15,13 @@ import pygame
 
 from apps.base import DesktopApp
 from core import backtester as BT
-from core import clipboard, config
+from core import clipboard, config, i18n
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
 
 STRATEGY_ORDER = ["buy_hold", "sma_crossover", "momentum", "mean_reversion"]
 
@@ -85,7 +90,7 @@ class BacktesterApp(DesktopApp):
                     self.ticker = tk
                     self.msg = ""
                 else:
-                    self.msg = f"Ticker inconnu : {tk}."
+                    self.msg = _L(f"Ticker inconnu : {tk}.", f"Unknown ticker: {tk}.")
                 self.search = ""
                 self._search_active = False
                 return True
@@ -108,7 +113,7 @@ class BacktesterApp(DesktopApp):
         self._ensure_computed()
         surf.fill(config.COL_BG, rect)
         pad = 14
-        widgets.draw_text(surf, "BACKTESTER — STRATÉGIES SUR L'HISTORIQUE RÉEL",
+        widgets.draw_text(surf, _L("BACKTESTER — STRATÉGIES SUR L'HISTORIQUE RÉEL", "BACKTESTER — STRATEGIES ON REAL HISTORY"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         p = self.app.gs.player
@@ -140,7 +145,7 @@ class BacktesterApp(DesktopApp):
         pygame.draw.rect(surf, config.COL_PANEL, self._search_rect, border_radius=3)
         pygame.draw.rect(surf, config.COL_CYAN if self._search_active
                          else config.COL_BORDER, self._search_rect, 1, border_radius=3)
-        label = self.search if (self.search or self._search_active) else "Autre ticker…"
+        label = self.search if (self.search or self._search_active) else _L("Autre ticker…", "Other ticker…")
         col = config.COL_TEXT if (self.search or self._search_active) else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(label, fonts.tiny(), 148),
                           (self._search_rect.x + 6, self._search_rect.y + 4),
@@ -169,7 +174,7 @@ class BacktesterApp(DesktopApp):
 
         top = y + 30
         if self._res is None:
-            widgets.draw_text(surf, "Pas assez d'historique pour ce titre.",
+            widgets.draw_text(surf, _L("Pas assez d'historique pour ce titre.", "Not enough history for this security."),
                               (rect.x + pad, top + 8), fonts.small(),
                               config.COL_TEXT_DIM)
             return
@@ -183,11 +188,11 @@ class BacktesterApp(DesktopApp):
         tot_col = config.COL_UP if res["total_return"] >= 0 else config.COL_DOWN
         bh_col = config.COL_UP if res["benchmark_return"] >= 0 else config.COL_DOWN
         stats = [
-            ("Stratégie", f"{res['total_return'] * 100:+.1f} %", tot_col),
-            ("Buy & hold", f"{res['benchmark_return'] * 100:+.1f} %", bh_col),
+            (_L("Stratégie", "Strategy"), f"{res['total_return'] * 100:+.1f}%", tot_col),
+            ("Buy & hold", f"{res['benchmark_return'] * 100:+.1f}%", bh_col),
             ("Sharpe", f"{res['sharpe']:.2f}", config.COL_CYAN),
-            ("Drawdown max", f"{res['max_drawdown'] * 100:.1f} %", config.COL_DOWN),
-            ("Exposition", f"{res['exposure'] * 100:.0f} %", config.COL_TEXT_DIM),
+            (_L("Drawdown max", "Max drawdown"), f"{res['max_drawdown'] * 100:.1f}%", config.COL_DOWN),
+            (_L("Exposition", "Exposure"), f"{res['exposure'] * 100:.0f}%", config.COL_TEXT_DIM),
         ]
         sx = rect.x + pad
         for label, val, col in stats:
@@ -202,7 +207,7 @@ class BacktesterApp(DesktopApp):
 
     def _draw_equity(self, surf, rect, equity):
         inner = widgets.draw_panel(surf, rect,
-                                   "Courbe de capital (base 1.0, stratégie vs marché)",
+                                   _L("Courbe de capital (base 1.0, stratégie vs marché)", "Equity curve (base 1.0, strategy vs market)"),
                                    config.COL_CYAN)
         if inner.h < 40 or len(equity) < 2:
             return

@@ -16,9 +16,13 @@ Fixed income de salle des marchés, sur l'univers obligataire RÉEL du jeu
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import config, i18n
 from core import rates_analytics as RT
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
 
 
 class RatesApp(DesktopApp):
@@ -88,19 +92,24 @@ class RatesApp(DesktopApp):
             p = self.app.gs.player
             dv01 = IRS.portfolio_dv01(p, self.market)
             if dv01 <= 1e-9:
-                self.msg, self.msg_col = ("DV01 net déjà nul ou négatif — rien "
-                                          "à couvrir.", config.COL_TEXT_DIM)
+                self.msg, self.msg_col = (_L("DV01 net déjà nul ou négatif — rien "
+                                          "à couvrir.",
+                                          "Net DV01 already zero or negative — "
+                                          "nothing to hedge."), config.COL_TEXT_DIM)
             else:
                 notional = IRS.hedge_notional(dv01, years=5.0)
                 r = IRS.enter_swap(p, self.market, "payer", notional, 5.0)
                 if r.get("ok"):
-                    self.msg = (f"Swap payeur 5 ans, notionnel "
+                    self.msg = _L(f"Swap payeur 5 ans, notionnel "
                                 f"{notional:,.0f} — le DV01 du book est "
-                                "neutralisé sans vendre une obligation.")
+                                "neutralisé sans vendre une obligation.",
+                                f"5y payer swap, notional "
+                                f"{notional:,.0f} — the book DV01 is "
+                                "neutralized without selling a bond.")
                     self.msg_col = config.COL_UP
                     self._cache_key = None
                 else:
-                    self.msg, self.msg_col = (f"Refusé : {r.get('reason', '?')}.",
+                    self.msg, self.msg_col = (_L(f"Refusé : {r.get('reason', '?')}.", f"Rejected: {r.get('reason', '?')}."),
                                               config.COL_DOWN)
             return True
         for pid, r in self._swap_close_rects.items():
@@ -108,7 +117,7 @@ class RatesApp(DesktopApp):
                 from core import irs as IRS
                 res = IRS.close(self.app.gs.player, self.market, pid)
                 if res.get("ok"):
-                    self.msg = f"Swap dénoué — MTM {res['mtm']:+,.0f}."
+                    self.msg = _L(f"Swap dénoué — MTM {res['mtm']:+,.0f}.", f"Swap closed — MTM {res['mtm']:+,.0f}.")
                     self.msg_col = (config.COL_UP if res["mtm"] >= 0
                                     else config.COL_DOWN)
                 return True
@@ -116,18 +125,23 @@ class RatesApp(DesktopApp):
             plan = RT.immunize_plan(self.app.gs.player, self.market,
                                     self.liability, self.horizon)
             if plan is None:
-                self.msg, self.msg_col = ("Univers insuffisant pour encadrer "
-                                          "cet horizon.", config.COL_DOWN)
+                self.msg, self.msg_col = (_L("Univers insuffisant pour encadrer "
+                                          "cet horizon.",
+                                          "Universe insufficient to bracket "
+                                          "this horizon."), config.COL_DOWN)
             else:
                 r = RT.execute_immunization(self.app.gs.player, self.market, plan)
                 if r.get("ok"):
-                    self.msg = (f"Barbell immunisant acheté : "
+                    self.msg = _L(f"Barbell immunisant acheté : "
+                                f"{plan['short']['qty']} × {plan['short']['name']} + "
+                                f"{plan['long']['qty']} × {plan['long']['name']}",
+                                f"Immunizing barbell bought: "
                                 f"{plan['short']['qty']} × {plan['short']['name']} + "
                                 f"{plan['long']['qty']} × {plan['long']['name']}")
                     self.msg_col = config.COL_UP
                     self._cache_key = None
                 else:
-                    self.msg, self.msg_col = (f"Refusé : {r.get('reason', '?')}.",
+                    self.msg, self.msg_col = (_L(f"Refusé : {r.get('reason', '?')}.", f"Rejected: {r.get('reason', '?')}."),
                                               config.COL_DOWN)
             return True
         return False
@@ -136,19 +150,26 @@ class RatesApp(DesktopApp):
         p = self.app.gs.player
         plan = RT.dv01_rotation_plan(p, self.market, direction)
         if plan is None:
-            self.msg, self.msg_col = ("Rien à tourner (book vide ou déjà à "
-                                      "l'extrême).", config.COL_TEXT_DIM)
+            self.msg, self.msg_col = (_L("Rien à tourner (book vide ou déjà à "
+                                      "l'extrême).",
+                                      "Nothing to rotate (book empty or already "
+                                      "at the extreme)."), config.COL_TEXT_DIM)
             return
         r = RT.execute_rotation(p, self.market, plan)
         if r.get("ok"):
-            self.msg = (f"Rotation : vendu {plan['sell']['qty']} × "
+            self.msg = _L(f"Rotation : vendu {plan['sell']['qty']} × "
                         f"{plan['sell']['name']} → acheté {plan['buy']['qty']} × "
-                        f"{plan['buy']['name']} (DV01 apparié)")
+                        f"{plan['buy']['name']} (DV01 apparié)",
+                        f"Rotation: sold {plan['sell']['qty']} × "
+                        f"{plan['sell']['name']} → bought {plan['buy']['qty']} × "
+                        f"{plan['buy']['name']} (matched DV01)")
             self.msg_col = config.COL_UP
             self._cache_key = None
         else:
-            self.msg, self.msg_col = (f"Refusé : {r.get('reason', '?')} "
+            self.msg, self.msg_col = (_L(f"Refusé : {r.get('reason', '?')} "
                                       f"(jambe {r.get('leg', '?')}).",
+                                      f"Rejected: {r.get('reason', '?')} "
+                                      f"(leg {r.get('leg', '?')})."),
                                       config.COL_DOWN)
 
     def draw(self, surf, rect):
@@ -157,20 +178,22 @@ class RatesApp(DesktopApp):
         surf.fill(config.COL_BG, rect)
         pad = 14
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
-        widgets.draw_text(surf, "DESK TAUX — COURBE · DURATION · DV01 · CHOCS",
+        widgets.draw_text(surf, _L("DESK TAUX — COURBE · DURATION · DV01 · CHOCS", "RATES DESK — CURVE · DURATION · DV01 · SHOCKS"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
-        bw = fonts.tiny(bold=True).size("MARCHÉ OBLIGATAIRE →")[0] + 16
+        _bonds_lbl = _L("MARCHÉ OBLIGATAIRE →", "BOND MARKET →")
+        bw = fonts.tiny(bold=True).size(_bonds_lbl)[0] + 16
         self._bonds_btn = pygame.Rect(rect.right - pad - bw, rect.y + 10, bw, 20)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._bonds_btn, border_radius=3)
         pygame.draw.rect(surf, config.COL_CYAN, self._bonds_btn, 1, border_radius=3)
-        widgets.draw_text(surf, "MARCHÉ OBLIGATAIRE →", self._bonds_btn.center,
+        widgets.draw_text(surf, _bonds_lbl, self._bonds_btn.center,
                           fonts.tiny(bold=True), config.COL_CYAN, align="center")
         # onglets TAUX / FUTURES
         x, ty = rect.x + pad, rect.y + 36
         self._tab_rects = {}
-        for tab, lbl in (("rates", "TAUX"), ("futures", "FUTURES (commodities)"),
-                         ("immun", "IMMUNISATION"), ("swaps", "SWAPS (IRS)")):
+        for tab, lblpair in (("rates", ("TAUX", "RATES")), ("futures", ("FUTURES (commodities)", "FUTURES (commodities)")),
+                         ("immun", ("IMMUNISATION", "IMMUNIZATION")), ("swaps", ("SWAPS (IRS)", "SWAPS (IRS)"))):
+            lbl = _L(*lblpair)
             w = fonts.tiny(bold=True).size(lbl)[0] + 18
             r = pygame.Rect(x, ty, w, 20)
             self._tab_rects[tab] = r
@@ -208,11 +231,11 @@ class RatesApp(DesktopApp):
         self._draw_book(surf, right, cur)
 
     def _draw_curve(self, surf, rect):
-        inner = widgets.draw_panel(surf, rect, "Courbe des taux (souverains, YTM)",
+        inner = widgets.draw_panel(surf, rect, _L("Courbe des taux (souverains, YTM)", "Yield curve (sovereign, YTM)"),
                                    config.COL_CYAN)
         pts = self._curve or []
         if len(pts) < 2:
-            widgets.draw_text(surf, "Pas assez de points de courbe.",
+            widgets.draw_text(surf, _L("Pas assez de points de courbe.", "Not enough curve points."),
                               (inner.x, inner.y + 6), fonts.tiny(),
                               config.COL_TEXT_DIM)
             return
@@ -241,22 +264,22 @@ class RatesApp(DesktopApp):
                           fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, f"{lo:.1f}%", (plot.x - 34, plot.bottom - 10),
                           fonts.tiny(), config.COL_TEXT_DIM)
-        shape = "pentue" if ytms[-1] > ytms[0] + 0.15 else \
-                ("INVERSÉE (signal récession)" if ytms[-1] < ytms[0] - 0.15
-                 else "plate")
+        shape = _L("pentue", "steep") if ytms[-1] > ytms[0] + 0.15 else \
+                (_L("INVERSÉE (signal récession)", "INVERTED (recession signal)") if ytms[-1] < ytms[0] - 0.15
+                 else _L("plate", "flat"))
         fwd_txt = " · ".join(f"{t1:.0f}→{t2:.0f}a {f * 100:.1f}%"
                              for t1, t2, f in self._forwards[:3])
         widgets.draw_text(surf, widgets.fit_text(
-            f"Courbe {shape} · forwards implicites : {fwd_txt}", fonts.tiny(), inner.w),
+            _L(f"Courbe {shape} · forwards implicites : {fwd_txt}", f"Curve {shape} · implied forwards: {fwd_txt}"), fonts.tiny(), inner.w),
             (inner.x, plot.bottom + 16), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_scenarios(self, surf, rect, cur):
         inner = widgets.draw_panel(surf, rect,
-                                   "Chocs de courbe (duration + convexité)",
+                                   _L("Chocs de courbe (duration + convexité)", "Curve shocks (duration + convexity)"),
                                    config.COL_DOWN)
         t = self._table
         if not t or not t["lines"]:
-            widgets.draw_text(surf, "Book obligataire vide.", (inner.x, inner.y + 6),
+            widgets.draw_text(surf, _L("Book obligataire vide.", "Bond book empty."), (inner.x, inner.y + 6),
                               fonts.tiny(), config.COL_TEXT_DIM)
             return
         y = inner.y + 2
@@ -281,25 +304,29 @@ class RatesApp(DesktopApp):
                               f"({s['pnl_pct']:+.1f}%)",
                               (bx + bar_w + 6, y), fonts.tiny(), col)
             y += 19
-        widgets.draw_text(surf, "ΔP ≈ V·(−D·Δy + ½·C·Δy²) — la convexité adoucit "
+        widgets.draw_text(surf, _L("ΔP ≈ V·(−D·Δy + ½·C·Δy²) — la convexité adoucit "
                           "les hausses de taux.",
+                          "ΔP ≈ V·(−D·Δy + ½·C·Δy²) — convexity softens "
+                          "rate increases."),
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)
 
     def _draw_book(self, surf, rect, cur):
-        inner = widgets.draw_panel(surf, rect, "Book obligataire", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, rect, _L("Book obligataire", "Bond book"), config.COL_AMBER)
         t = self._table
         if not t or not t["lines"]:
-            widgets.draw_text(surf, "Aucune obligation détenue — le desk Taux "
+            widgets.draw_text(surf, _L("Aucune obligation détenue — le desk Taux "
                               "s'anime avec un book (bouton MARCHÉ OBLIGATAIRE).",
+                              "No bonds held — the Rates desk "
+                              "comes alive with a book (BOND MARKET button)."),
                               (inner.x, inner.y + 6), fonts.tiny(),
                               config.COL_TEXT_DIM)
             return
         tot = t["totals"]
         tiles = [
-            ("VALEUR", widgets.format_money(tot["value"], cur)),
-            ("DURATION MOD.", f"{tot['duration']:.2f}"),
-            ("CONVEXITÉ", f"{tot['convexity']:.1f}"),
+            (_L("VALEUR", "VALUE"), widgets.format_money(tot["value"], cur)),
+            (_L("DURATION MOD.", "MOD. DURATION"), f"{tot['duration']:.2f}"),
+            (_L("CONVEXITÉ", "CONVEXITY"), f"{tot['convexity']:.1f}"),
             ("DV01", widgets.format_money(tot["dv01"], cur)),
         ]
         tx = inner.x
@@ -316,9 +343,9 @@ class RatesApp(DesktopApp):
                               fonts.small(bold=True), config.COL_TEXT)
             tx += tw + 8
         y = inner.y + 52
-        cols = [("OBLIGATION", 0), ("MAT.", int(inner.w * 0.42)),
-                ("YTM", int(inner.w * 0.52)), ("DUR.", int(inner.w * 0.64)),
-                ("CONV.", int(inner.w * 0.75)), ("DV01", int(inner.w * 0.87))]
+        cols = [(_L("OBLIGATION", "BOND"), 0), (_L("MAT.", "MAT."), int(inner.w * 0.42)),
+                ("YTM", int(inner.w * 0.52)), (_L("DUR.", "DUR."), int(inner.w * 0.64)),
+                (_L("CONV.", "CONV."), int(inner.w * 0.75)), ("DV01", int(inner.w * 0.87))]
         for lbl, dx in cols:
             widgets.draw_text(surf, lbl, (inner.x + dx, y), fonts.tiny(bold=True),
                               config.COL_TEXT_DIM)
@@ -350,16 +377,18 @@ class RatesApp(DesktopApp):
         # rotation de courbe DV01-neutre (le jeu ne shorte pas d'obligation :
         # on fait TOURNER le book, risque de taux déplacé identique des deux
         # côtés — cf. rates_analytics.dv01_rotation_plan)
-        dv01_hint = ("DV01 = P&L d'une hausse d'1 point de base — rotation "
-                    "court↔long à DV01 apparié.")
+        dv01_hint = _L("DV01 = P&L d'une hausse d'1 point de base — rotation "
+                    "court↔long à DV01 apparié.",
+                    "DV01 = P&L of a 1 basis point rise — short↔long "
+                    "rotation at matched DV01.")
         dv01_font = fonts.tiny()
         dv01_lines = len(widgets.wrap_text_lines(dv01_hint, dv01_font, inner.w))
         dv01_h = dv01_lines * (dv01_font.get_height() + 3)
         by = inner.bottom - dv01_h - 30
         self._shorten_btn = pygame.Rect(inner.x, by, 150, 24)
         self._lengthen_btn = pygame.Rect(inner.x + 158, by, 150, 24)
-        for r, lbl in ((self._shorten_btn, "↤ RACCOURCIR"),
-                       (self._lengthen_btn, "ALLONGER ↦")):
+        for r, lbl in ((self._shorten_btn, _L("↤ RACCOURCIR", "↤ SHORTEN")),
+                       (self._lengthen_btn, _L("ALLONGER ↦", "LENGTHEN ↦"))):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, r, border_radius=4)
             pygame.draw.rect(surf, config.COL_AMBER, r, 1, border_radius=4)
             widgets.draw_text(surf, lbl, r.center, fonts.tiny(bold=True),
@@ -372,10 +401,10 @@ class RatesApp(DesktopApp):
         obligataire dont la DURATION égale l'horizon — au 1er ordre, le choc
         de taux ne perce pas la couverture (rates_analytics.immunize_plan)."""
         inner = widgets.draw_panel(surf, body,
-                                   "Immuniser un passif (duration matching)",
+                                   _L("Immuniser un passif (duration matching)", "Immunize a liability (duration matching)"),
                                    config.COL_CYAN)
         y = inner.y + 2
-        widgets.draw_text(surf, "Passif à financer :", (inner.x, y + 3),
+        widgets.draw_text(surf, _L("Passif à financer :", "Liability to fund:"), (inner.x, y + 3),
                           fonts.tiny(bold=True), config.COL_TEXT_DIM)
         x = inner.x + 120
         self._liab_rects = {}
@@ -394,12 +423,12 @@ class RatesApp(DesktopApp):
                               align="center")
             x += w + 6
         x += 14
-        widgets.draw_text(surf, "Horizon :", (x, y + 3), fonts.tiny(bold=True),
+        widgets.draw_text(surf, _L("Horizon :", "Horizon:"), (x, y + 3), fonts.tiny(bold=True),
                           config.COL_TEXT_DIM)
         x += 62
         self._horizon_rects = {}
         for h in (3, 5, 7):
-            lbl = f"{h} ans"
+            lbl = _L(f"{h} ans", f"{h}y")
             w = fonts.tiny(bold=True).size(lbl)[0] + 14
             r = pygame.Rect(x, y, w, 20)
             self._horizon_rects[h] = r
@@ -416,41 +445,55 @@ class RatesApp(DesktopApp):
         plan = RT.immunize_plan(self.app.gs.player, self.market,
                                 self.liability, self.horizon)
         if plan is None:
-            widgets.draw_text(surf, "L'univers souverain n'encadre pas cet horizon.",
+            widgets.draw_text(surf, _L("L'univers souverain n'encadre pas cet horizon.", "The sovereign universe doesn't bracket this horizon."),
                               (inner.x, y), fonts.small(), config.COL_TEXT_DIM)
             self._immun_btn = None
             return
-        widgets.draw_text(surf, f"Valeur actuelle du passif : "
+        widgets.draw_text(surf, _L(f"Valeur actuelle du passif : "
                           f"{widgets.format_money(plan['pv'], cur)} "
                           f"(actualisé à {plan['y_h'] * 100:.2f}%)",
+                          f"Present value of liability: "
+                          f"{widgets.format_money(plan['pv'], cur)} "
+                          f"(discounted at {plan['y_h'] * 100:.2f}%)"),
                           (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
         y += 22
-        for leg, lbl in ((plan["short"], "Jambe courte"),
-                         (plan["long"], "Jambe longue")):
-            widgets.draw_text(surf, f"{lbl} : {leg['qty']} × {leg['name']} "
+        for leg, lbl in ((plan["short"], _L("Jambe courte", "Short leg")),
+                         (plan["long"], _L("Jambe longue", "Long leg"))):
+            widgets.draw_text(surf, _L(f"{lbl} : {leg['qty']} × {leg['name']} "
                               f"(poids {leg['weight'] * 100:.0f}%, duration "
                               f"{leg['dur']:.2f})",
+                              f"{lbl}: {leg['qty']} × {leg['name']} "
+                              f"(weight {leg['weight'] * 100:.0f}%, duration "
+                              f"{leg['dur']:.2f})"),
                               (inner.x, y), fonts.small(), config.COL_TEXT)
             y += 19
         y += 4
-        widgets.draw_text(surf, f"Duration du barbell = {plan['dur_target']:.1f} "
+        widgets.draw_text(surf, _L(f"Duration du barbell = {plan['dur_target']:.1f} "
                           "= l'horizon — c'est l'immunisation.",
+                          f"Barbell duration = {plan['dur_target']:.1f} "
+                          "= the horizon — that's immunization."),
                           (inner.x, y), fonts.tiny(bold=True), config.COL_AMBER)
         y += 20
         chk = RT.immunization_check(plan, dy=0.01)
-        widgets.draw_text(surf, f"Vérif +100 bp : actifs "
+        widgets.draw_text(surf, _L(f"Vérif +100 bp : actifs "
                           f"{widgets.format_money(chk['d_assets'], cur)} vs passif "
                           f"{widgets.format_money(chk['d_liability'], cur)} → écart "
                           f"{widgets.format_money(chk['mismatch'], cur)}",
+                          f"Check +100 bp: assets "
+                          f"{widgets.format_money(chk['d_assets'], cur)} vs liability "
+                          f"{widgets.format_money(chk['d_liability'], cur)} → gap "
+                          f"{widgets.format_money(chk['mismatch'], cur)}"),
                           (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
         y += 26
         self._immun_btn = pygame.Rect(inner.x, y, 220, 26)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._immun_btn, border_radius=4)
         pygame.draw.rect(surf, config.COL_UP, self._immun_btn, 1, border_radius=4)
-        widgets.draw_text(surf, "ACHETER LE BARBELL", self._immun_btn.center,
+        widgets.draw_text(surf, _L("ACHETER LE BARBELL", "BUY THE BARBELL"), self._immun_btn.center,
                           fonts.small(bold=True), config.COL_UP, align="center")
-        widgets.draw_text(surf, "Le prix perd ce que le réinvestissement gagne "
+        widgets.draw_text(surf, _L("Le prix perd ce que le réinvestissement gagne "
                           "(et réciproquement) — le passif reste financé.",
+                          "The price loses what reinvestment gains "
+                          "(and vice versa) — the liability stays funded."),
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)
 
@@ -461,21 +504,27 @@ class RatesApp(DesktopApp):
         from core import irs as IRS
         p = self.app.gs.player
         inner = widgets.draw_panel(surf, body,
-                                   "Swaps de taux — couvrir le DV01 sans vendre",
+                                   _L("Swaps de taux — couvrir le DV01 sans vendre", "Rate swaps — hedge DV01 without selling"),
                                    config.COL_CYAN)
         y = inner.y + 2
         book_dv01 = RT.book_totals(RT.book_lines(p, self.market))["dv01"]
         net = IRS.portfolio_dv01(p, self.market)
         ncol = (config.COL_UP if abs(net) < abs(book_dv01) * 0.2 + 1e-9
                 else config.COL_AMBER)
-        widgets.draw_text(surf, f"DV01 du book obligataire : "
+        widgets.draw_text(surf, _L(f"DV01 du book obligataire : "
                           f"{widgets.format_money(book_dv01, cur)} · DV01 NET "
                           f"(book + swaps) : {widgets.format_money(net, cur)}",
+                          f"Bond book DV01: "
+                          f"{widgets.format_money(book_dv01, cur)} · NET DV01 "
+                          f"(book + swaps): {widgets.format_money(net, cur)}"),
                           (inner.x, y), fonts.small(bold=True), ncol)
         y += 22
-        widgets.draw_text(surf, f"Taux fixe 5 ans « à la monnaie » : "
+        widgets.draw_text(surf, _L(f"Taux fixe 5 ans « à la monnaie » : "
                           f"{IRS.par_rate(self.market, 5.0) * 100:.2f}% — le "
                           "payeur gagne si les taux montent.",
+                          f"5y at-the-money fixed rate: "
+                          f"{IRS.par_rate(self.market, 5.0) * 100:.2f}% — the "
+                          "payer wins if rates rise."),
                           (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
         y += 16
         # le DV01 traduit en devise (core/impact_phrases) : ce que ±1 pt de
@@ -493,26 +542,29 @@ class RatesApp(DesktopApp):
                          border_radius=4)
         pygame.draw.rect(surf, config.COL_UP, self._hedge_swap_btn, 1,
                          border_radius=4)
-        widgets.draw_text(surf, "COUVRIR LE DV01 (swap payeur 5a)",
+        widgets.draw_text(surf, _L("COUVRIR LE DV01 (swap payeur 5a)", "HEDGE THE DV01 (5y payer swap)"),
                           self._hedge_swap_btn.center, fonts.small(bold=True),
                           config.COL_UP, align="center")
         y += 36
-        widgets.draw_text(surf, "SWAPS EN COURS :", (inner.x, y),
+        widgets.draw_text(surf, _L("SWAPS EN COURS :", "ACTIVE SWAPS:"), (inner.x, y),
                           fonts.tiny(bold=True), config.COL_TEXT_DIM)
         y += 16
         self._swap_close_rects = {}
         hh = IRS.holdings(p, self.market)
         if not hh:
-            widgets.draw_text(surf, "Aucun.", (inner.x, y), fonts.tiny(),
+            widgets.draw_text(surf, _L("Aucun.", "None."), (inner.x, y), fonts.tiny(),
                               config.COL_TEXT_DIM)
         for h in hh:
             if y > inner.bottom - 36:
                 break
             mcol = config.COL_UP if h["mtm"] >= 0 else config.COL_DOWN
-            lbl = "PAYEUR" if h["direction"] == "payer" else "RECEVEUR"
-            widgets.draw_text(surf, f"{lbl} fixe {h['fixed_rate'] * 100:.2f}% · "
+            lbl = _L("PAYEUR", "PAYER") if h["direction"] == "payer" else _L("RECEVEUR", "RECEIVER")
+            widgets.draw_text(surf, _L(f"{lbl} fixe {h['fixed_rate'] * 100:.2f}% · "
                               f"notionnel {h['notional']:,.0f} · "
                               f"{h['steps_left']} pas",
+                              f"{lbl} fixed {h['fixed_rate'] * 100:.2f}% · "
+                              f"notional {h['notional']:,.0f} · "
+                              f"{h['steps_left']} steps"),
                               (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
             widgets.draw_text(surf, f"MTM {h['mtm']:+,.0f} · DV01 "
                               f"{widgets.format_money(h['dv01'], cur)}",
@@ -523,8 +575,10 @@ class RatesApp(DesktopApp):
             widgets.draw_text(surf, "×", xr.center, fonts.small(bold=True),
                               config.COL_DOWN, align="center")
             y += 36
-        widgets.draw_text(surf, "Aucun cash à l'entrée : le flux net "
+        widgets.draw_text(surf, _L("Aucun cash à l'entrée : le flux net "
                           "(variable − fixe) est réglé à chaque pas.",
+                          "No cash upfront: the net flow "
+                          "(floating − fixed) settles each step."),
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)
 
@@ -534,11 +588,14 @@ class RatesApp(DesktopApp):
         contango même si le spot ne bouge pas (le roll)."""
         from core import commodities as C
         inner = widgets.draw_panel(surf, body,
-                                   "Structures par terme (contango / backwardation)",
+                                   _L("Structures par terme (contango / backwardation)", "Term structures (contango / backwardation)"),
                                    config.COL_WARN)
-        widgets.draw_text(surf, "Courbe MONTANTE (contango) : rouler le future "
+        widgets.draw_text(surf, _L("Courbe MONTANTE (contango) : rouler le future "
                           "coûte à chaque échéance (roll yield négatif) ; courbe "
                           "DESCENDANTE (backwardation) : le roll rapporte.",
+                          "UPWARD curve (contango): rolling the future "
+                          "costs at each expiry (negative roll yield); DOWNWARD "
+                          "curve (backwardation): the roll pays."),
                           (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
         quotes = C.all_quotes(self.market)
         if not quotes:

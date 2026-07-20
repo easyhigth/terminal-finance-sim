@@ -20,10 +20,15 @@ Deux onglets de crédit « qui s'étudient » :
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import config, i18n
 from core import credit_risk as CR
 from core import securitisation as SEC
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
 
 TABS = [("merton", "MERTON"), ("cdsdesk", "CDS"),
         ("trs", "TRS"), ("convert", "CONVERTIBLES"), ("waterfall", "WATERFALL")]
@@ -123,18 +128,20 @@ class CreditDeskApp(DesktopApp):
             r = CDS.buy_protection(self.app.gs.player, self.market, self.ticker,
                                    self.cds_notional, self.cds_tenor)
             if r.get("ok"):
-                self.msg = (f"Protection achetée : {r['quote']['spread_bps']:.0f} bp/an "
-                            "courus chaque pas — la peur du défaut se trade en MTM.")
+                self.msg = _L(f"Protection achetée : {r['quote']['spread_bps']:.0f} bp/an "
+                            "courus chaque pas — la peur du défaut se trade en MTM.",
+                            f"Protection bought: {r['quote']['spread_bps']:.0f} bp/yr "
+                            "accruing each step — default fear trades in MTM.")
                 self.msg_col = config.COL_UP
             else:
-                self.msg, self.msg_col = f"Refusé : {r.get('reason', '?')}.", config.COL_DOWN
+                self.msg, self.msg_col = _L(f"Refusé : {r.get('reason', '?')}.", f"Rejected: {r.get('reason', '?')}."), config.COL_DOWN
             return True
         for pid, r in self._cds_close_rects.items():
             if r.collidepoint(pos):
                 from core import cds as CDS
                 res = CDS.close(self.app.gs.player, self.market, pid)
                 if res.get("ok"):
-                    self.msg = f"Protection dénouée — MTM {res['mtm']:+,.0f}."
+                    self.msg = _L(f"Protection dénouée — MTM {res['mtm']:+,.0f}.", f"Protection closed — MTM {res['mtm']:+,.0f}.")
                     self.msg_col = (config.COL_UP if res["mtm"] >= 0
                                     else config.COL_DOWN)
                 return True
@@ -147,18 +154,20 @@ class CreditDeskApp(DesktopApp):
             r = CONV.buy(self.app.gs.player, self.market, self.ticker, self.conv_qty)
             if r.get("ok"):
                 q = r["quote"]
-                self.msg = (f"Convertible achetée : plancher {q['bond_floor']:,.0f} "
-                            f"+ option {q['option_value']:,.0f} = {q['price']:,.0f}/titre.")
+                self.msg = _L(f"Convertible achetée : plancher {q['bond_floor']:,.0f} "
+                            f"+ option {q['option_value']:,.0f} = {q['price']:,.0f}/titre.",
+                            f"Convertible bought: floor {q['bond_floor']:,.0f} "
+                            f"+ option {q['option_value']:,.0f} = {q['price']:,.0f}/unit.")
                 self.msg_col = config.COL_UP
             else:
-                self.msg, self.msg_col = f"Refusé : {r.get('reason', '?')}.", config.COL_DOWN
+                self.msg, self.msg_col = _L(f"Refusé : {r.get('reason', '?')}.", f"Rejected: {r.get('reason', '?')}."), config.COL_DOWN
             return True
         for pid, r in self._conv_sell_rects.items():
             if r.collidepoint(pos):
                 from core import convertibles as CONV
                 res = CONV.sell(self.app.gs.player, self.market, pid)
                 if res.get("ok"):
-                    self.msg = f"Convertible revendue — P&L {res['pnl']:+,.0f}."
+                    self.msg = _L(f"Convertible revendue — P&L {res['pnl']:+,.0f}.", f"Convertible sold — P&L {res['pnl']:+,.0f}.")
                     self.msg_col = (config.COL_UP if res["pnl"] >= 0
                                     else config.COL_DOWN)
                 return True
@@ -185,19 +194,22 @@ class CreditDeskApp(DesktopApp):
             if r.get("ok"):
                 q = r["quote"]
                 _lab = ("Receiver" if self.trs_side == "receiver" else "Payer")
-                self.msg = (f"TRS {_lab} ouvert : financement "
+                self.msg = _L(f"TRS {_lab} ouvert : financement "
                             f"{q['ref_rate']*100:.1f}% + {q['funding_bps']:.0f} bp/an "
-                            "— le rendement total se règle au MTM.")
+                            "— le rendement total se règle au MTM.",
+                            f"TRS {_lab} opened: funding "
+                            f"{q['ref_rate']*100:.1f}% + {q['funding_bps']:.0f} bp/yr "
+                            "— total return settles in MTM.")
                 self.msg_col = config.COL_UP
             else:
-                self.msg, self.msg_col = f"Refusé : {r.get('reason', '?')}.", config.COL_DOWN
+                self.msg, self.msg_col = _L(f"Refusé : {r.get('reason', '?')}.", f"Rejected: {r.get('reason', '?')}."), config.COL_DOWN
             return True
         for pid, r in self._trs_close_rects.items():
             if r.collidepoint(pos):
                 from core import trs as TRS
                 res = TRS.close(self.app.gs.player, self.market, pid)
                 if res.get("ok"):
-                    self.msg = f"TRS dénoué — MTM {res['mtm']:+,.0f}."
+                    self.msg = _L(f"TRS dénoué — MTM {res['mtm']:+,.0f}.", f"TRS closed — MTM {res['mtm']:+,.0f}.")
                     self.msg_col = (config.COL_UP if res["mtm"] >= 0
                                     else config.COL_DOWN)
                 return True
@@ -216,20 +228,22 @@ class CreditDeskApp(DesktopApp):
             return
         if not unlocks.unlocked(p, "leverage"):
             g = unlocks.effective_required_grade(p, "leverage")
-            self.msg = f"Short verrouillé (grade {config.GRADES[g]})."
+            self.msg = _L(f"Short verrouillé (grade {config.GRADES[g]}).", f"Short locked (grade {config.GRADES[g]}).")
             self.msg_col = config.COL_DOWN
             return
         plan = CONV.arb_plan(self.market, pos)
         if plan is None:
-            self.msg, self.msg_col = "Delta trop petit pour l'arbitrage.", config.COL_TEXT_DIM
+            self.msg, self.msg_col = _L("Delta trop petit pour l'arbitrage.", "Delta too small for arbitrage."), config.COL_TEXT_DIM
             return
         r = pf.short(p, self.market, plan["ticker"], plan["shares"])
         if r.get("ok"):
-            self.msg = (f"Arb posé : short {plan['shares']} × {plan['ticker']} — "
-                        "direction neutralisée, on porte le coupon.")
+            self.msg = _L(f"Arb posé : short {plan['shares']} × {plan['ticker']} — "
+                        "direction neutralisée, on porte le coupon.",
+                        f"Arb set: short {plan['shares']} × {plan['ticker']} — "
+                        "direction neutralized, carrying the coupon.")
             self.msg_col = config.COL_UP
         else:
-            self.msg, self.msg_col = f"Short refusé : {r.get('reason', '?')}.", config.COL_DOWN
+            self.msg, self.msg_col = _L(f"Short refusé : {r.get('reason', '?')}.", f"Short rejected: {r.get('reason', '?')}."), config.COL_DOWN
 
     def _set_loss_from_x(self, x):
         r = self._slider_rect
@@ -242,7 +256,7 @@ class CreditDeskApp(DesktopApp):
         self._ensure_computed()
         surf.fill(config.COL_BG, rect)
         pad = 14
-        widgets.draw_text(surf, "DESK CRÉDIT — DÉFAUT, SPREADS, TITRISATION",
+        widgets.draw_text(surf, _L("DESK CRÉDIT — DÉFAUT, SPREADS, TITRISATION", "CREDIT DESK — DEFAULT, SPREADS, SECURITIZATION"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         x, y = rect.x + pad, rect.y + 32
@@ -301,7 +315,7 @@ class CreditDeskApp(DesktopApp):
         left = pygame.Rect(body.x, body.y, col_w, body.h)
         right = pygame.Rect(left.right + 12, body.y, col_w, body.h)
         inner = widgets.draw_panel(surf, left,
-                                   f"Protection sur {self.ticker or '—'}",
+                                   _L(f"Protection sur {self.ticker or '—'}", f"Protection on {self.ticker or '—'}"),
                                    config.COL_CYAN)
         # scanner réutilisé (sélection de la société, PD décroissante)
         self._scan_rects = {}
@@ -318,7 +332,7 @@ class CreditDeskApp(DesktopApp):
             y += 20
         y += 6
         self._cds_tenor_rects = {}
-        self._chips(surf, [(t, f"{t:.0f} an{'s' if t > 1 else ''}")
+        self._chips(surf, [(t, _L(f"{t:.0f} an{'s' if t > 1 else ''}", f"{t:.0f}y"))
                            for t in CDS.TENORS],
                     self.cds_tenor, inner.x, y, config.COL_CYAN,
                     self._cds_tenor_rects)
@@ -333,9 +347,12 @@ class CreditDeskApp(DesktopApp):
              if self.ticker else None)
         self._cds_buy_btn = None
         if q:
-            widgets.draw_text(surf, f"Prime : {q['spread_bps']:.0f} bp/an "
+            widgets.draw_text(surf, _L(f"Prime : {q['spread_bps']:.0f} bp/an "
                               f"(Merton + {CDS.MARKET_SPREAD_BPS:.0f} bp de marge) "
                               f"≈ {widgets.format_money(q['spread_bps'] / 1e4 * self.cds_notional, cur)}/an",
+                              f"Premium: {q['spread_bps']:.0f} bp/yr "
+                              f"(Merton + {CDS.MARKET_SPREAD_BPS:.0f} bp margin) "
+                              f"≈ {widgets.format_money(q['spread_bps'] / 1e4 * self.cds_notional, cur)}/yr"),
                               (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
             y += 22
             # les bps traduits en concret (core/impact_phrases)
@@ -350,20 +367,23 @@ class CreditDeskApp(DesktopApp):
                              border_radius=4)
             pygame.draw.rect(surf, config.COL_UP, self._cds_buy_btn, 1,
                              border_radius=4)
-            widgets.draw_text(surf, "ACHETER LA PROTECTION",
+            widgets.draw_text(surf, _L("ACHETER LA PROTECTION", "BUY THE PROTECTION"),
                               self._cds_buy_btn.center, fonts.small(bold=True),
                               config.COL_UP, align="center")
-        widgets.draw_text(surf, "Évènement de crédit du jeu : action sous "
+        widgets.draw_text(surf, _L("Évènement de crédit du jeu : action sous "
                           f"{CDS.TRIGGER_FRAC * 100:.0f}% du niveau d'entrée → "
                           f"paie {(1 - CDS.RECOVERY) * 100:.0f}% du notionnel.",
+                          "Game credit event: stock below "
+                          f"{CDS.TRIGGER_FRAC * 100:.0f}% of entry level → "
+                          f"pays {(1 - CDS.RECOVERY) * 100:.0f}% of notional."),
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)
-        rinner = widgets.draw_panel(surf, right, "Protections en cours (MTM)",
+        rinner = widgets.draw_panel(surf, right, _L("Protections en cours (MTM)", "Active protections (MTM)"),
                                     config.COL_AMBER)
         self._cds_close_rects = {}
         hh = CDS.holdings(self.app.gs.player, self.market)
         if not hh:
-            widgets.draw_text(surf, "Aucune.", (rinner.x, rinner.y + 4),
+            widgets.draw_text(surf, _L("Aucune.", "None."), (rinner.x, rinner.y + 4),
                               fonts.tiny(), config.COL_TEXT_DIM)
         y = rinner.y + 2
         for h in hh:
@@ -376,8 +396,10 @@ class CreditDeskApp(DesktopApp):
                               (rinner.x, y), fonts.small(bold=True), config.COL_TEXT)
             cur_s = (f"{h['cur_spread_bps']:.0f}" if h["cur_spread_bps"]
                      else "—")
-            widgets.draw_text(surf, f"spread {cur_s} bp · MTM {h['mtm']:+,.0f} · "
+            widgets.draw_text(surf, _L(f"spread {cur_s} bp · MTM {h['mtm']:+,.0f} · "
                               f"{h['steps_left']} pas",
+                              f"spread {cur_s} bp · MTM {h['mtm']:+,.0f} · "
+                              f"{h['steps_left']} steps"),
                               (rinner.x + 8, y + 16), fonts.tiny(), mcol)
             xr = pygame.Rect(rinner.right - 22, y, 18, 18)
             self._cds_close_rects[h["id"]] = xr
@@ -394,7 +416,7 @@ class CreditDeskApp(DesktopApp):
         left = pygame.Rect(body.x, body.y, col_w, body.h)
         right = pygame.Rect(left.right + 12, body.y, col_w, body.h)
         inner = widgets.draw_panel(surf, left,
-                                   f"TRS sur {self.ticker or '—'}",
+                                   _L(f"TRS sur {self.ticker or '—'}", f"TRS on {self.ticker or '—'}"),
                                    config.COL_CYAN)
         # scanner réutilisé (sélection de la société, PD décroissante)
         self._scan_rects = {}
@@ -416,7 +438,7 @@ class CreditDeskApp(DesktopApp):
                     config.COL_CYAN, self._trs_side_rects)
         y += 26
         self._trs_tenor_rects = {}
-        self._chips(surf, [(t, f"{t:.0f} an{'s' if t > 1 else ''}")
+        self._chips(surf, [(t, _L(f"{t:.0f} an{'s' if t > 1 else ''}", f"{t:.0f}y"))
                            for t in TRS.TENORS],
                     self.trs_tenor, inner.x, y, config.COL_CYAN,
                     self._trs_tenor_rects)
@@ -432,9 +454,12 @@ class CreditDeskApp(DesktopApp):
         self._trs_open_btn = None
         if q:
             cost = q["ref_rate"] * 1e2 + q["funding_bps"] / 1e2
-            widgets.draw_text(surf, f"Financement : {q['ref_rate']*100:.1f}% réf. "
+            widgets.draw_text(surf, _L(f"Financement : {q['ref_rate']*100:.1f}% réf. "
                               f"+ {q['funding_bps']:.0f} bp = {cost:.2f}%/an "
                               f"≈ {widgets.format_money(cost/100 * self.trs_notional, cur)}/an",
+                              f"Funding: {q['ref_rate']*100:.1f}% ref. "
+                              f"+ {q['funding_bps']:.0f} bp = {cost:.2f}%/yr "
+                              f"≈ {widgets.format_money(cost/100 * self.trs_notional, cur)}/yr"),
                               (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
             y += 22
             from core import impact_phrases as _ip
@@ -448,21 +473,25 @@ class CreditDeskApp(DesktopApp):
                              border_radius=4)
             pygame.draw.rect(surf, config.COL_UP, self._trs_open_btn, 1,
                              border_radius=4)
-            widgets.draw_text(surf, "OUVRIR LE TRS",
+            widgets.draw_text(surf, _L("OUVRIR LE TRS", "OPEN THE TRS"),
                               self._trs_open_btn.center, fonts.small(bold=True),
                               config.COL_UP, align="center")
-        widgets.draw_text(surf, "Évènement de crédit du jeu : action sous "
+        widgets.draw_text(surf, _L("Évènement de crédit du jeu : action sous "
                           f"{TRS.TRIGGER_FRAC * 100:.0f}% de l'entrée → le receiver "
                           f"absorbe {(1 - TRS.RECOVERY) * 100:.0f}% du notionnel "
                           f"(le payer gagne symétriquement).",
+                          "Game credit event: stock below "
+                          f"{TRS.TRIGGER_FRAC * 100:.0f}% of entry → the receiver "
+                          f"absorbs {(1 - TRS.RECOVERY) * 100:.0f}% of notional "
+                          "(the payer gains symmetrically)."),
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)
-        rinner = widgets.draw_panel(surf, right, "TRS en cours (MTM vivant)",
+        rinner = widgets.draw_panel(surf, right, _L("TRS en cours (MTM vivant)", "Active TRS (live MTM)"),
                                     config.COL_AMBER)
         self._trs_close_rects = {}
         hh = TRS.holdings(self.app.gs.player, self.market)
         if not hh:
-            widgets.draw_text(surf, "Aucun.", (rinner.x, rinner.y + 4),
+            widgets.draw_text(surf, _L("Aucun.", "None."), (rinner.x, rinner.y + 4),
                               fonts.tiny(), config.COL_TEXT_DIM)
         y = rinner.y + 2
         for h in hh:
@@ -475,8 +504,10 @@ class CreditDeskApp(DesktopApp):
                               f"{h['funding_bps']:.0f} bp",
                               (rinner.x, y), fonts.small(bold=True), config.COL_TEXT)
             px = (f"{h['price']:.2f}" if h["price"] else "—")
-            widgets.draw_text(surf, f"cours {px} · MTM {h['mtm']:+,.0f} · "
+            widgets.draw_text(surf, _L(f"cours {px} · MTM {h['mtm']:+,.0f} · "
                               f"{h['steps_left']} pas",
+                              f"price {px} · MTM {h['mtm']:+,.0f} · "
+                              f"{h['steps_left']} steps"),
                               (rinner.x + 8, y + 16), fonts.tiny(), mcol)
             xr = pygame.Rect(rinner.right - 22, y, 18, 18)
             self._trs_close_rects[h["id"]] = xr
@@ -493,8 +524,10 @@ class CreditDeskApp(DesktopApp):
         left = pygame.Rect(body.x, body.y, col_w, body.h)
         right = pygame.Rect(left.right + 12, body.y, col_w, body.h)
         inner = widgets.draw_panel(surf, left,
-                                   f"Convertible sur {self.ticker or '—'} "
-                                   "(émise au spot)", config.COL_CYAN)
+                                   _L(f"Convertible sur {self.ticker or '—'} "
+                                   "(émise au spot)",
+                                   f"Convertible on {self.ticker or '—'} "
+                                   "(issued at spot)"), config.COL_CYAN)
         self._scan_rects = {}
         y = inner.y + 2
         for c in self.market.top_companies(n=6):
@@ -516,13 +549,19 @@ class CreditDeskApp(DesktopApp):
         self._conv_buy_btn = None
         if q:
             lines = [
-                (f"Plancher obligataire {q['bond_floor']:,.0f} + option "
-                 f"{q['option_value']:,.0f} = {q['price']:,.0f}", config.COL_TEXT),
-                (f"Coupon {q['coupon'] * 100:.2f}% (réduit : le droit de "
+                (_L(f"Plancher obligataire {q['bond_floor']:,.0f} + option "
+                 f"{q['option_value']:,.0f} = {q['price']:,.0f}",
+                 f"Bond floor {q['bond_floor']:,.0f} + option "
+                 f"{q['option_value']:,.0f} = {q['price']:,.0f}"), config.COL_TEXT),
+                (_L(f"Coupon {q['coupon'] * 100:.2f}% (réduit : le droit de "
                  f"conversion se paie) · strike {q['strike']:,.1f}",
+                 f"Coupon {q['coupon'] * 100:.2f}% (reduced: the conversion "
+                 f"right is paid for) · strike {q['strike']:,.1f}"),
                  config.COL_TEXT_DIM),
-                (f"Delta {q['delta']:.2f} action/titre · prime sur parité "
-                 f"{q['premium_over_parity'] * 100:+.0f}%", config.COL_AMBER),
+                (_L(f"Delta {q['delta']:.2f} action/titre · prime sur parité "
+                 f"{q['premium_over_parity'] * 100:+.0f}%",
+                 f"Delta {q['delta']:.2f} share/unit · premium over parity "
+                 f"{q['premium_over_parity'] * 100:+.0f}%"), config.COL_AMBER),
             ]
             for txt, col in lines:
                 widgets.draw_text(surf, widgets.fit_text(txt, fonts.tiny(), inner.w),
@@ -534,20 +573,22 @@ class CreditDeskApp(DesktopApp):
                              border_radius=4)
             pygame.draw.rect(surf, config.COL_UP, self._conv_buy_btn, 1,
                              border_radius=4)
-            widgets.draw_text(surf, f"ACHETER ({widgets.format_money(q['price'] * self.conv_qty, cur)})",
+            widgets.draw_text(surf, _L(f"ACHETER ({widgets.format_money(q['price'] * self.conv_qty, cur)})", f"BUY ({widgets.format_money(q['price'] * self.conv_qty, cur)})"),
                               self._conv_buy_btn.center, fonts.small(bold=True),
                               config.COL_UP, align="center")
-        widgets.draw_text(surf, "Δ ≈ 0 : c'est une obligation · Δ ≈ ratio : "
+        widgets.draw_text(surf, _L("Δ ≈ 0 : c'est une obligation · Δ ≈ ratio : "
                           "c'est une action — le plancher + le kicker.",
+                          "Δ ≈ 0: it's a bond · Δ ≈ ratio: "
+                          "it's a stock — the floor + the kicker."),
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)
-        rinner = widgets.draw_panel(surf, right, "Convertibles détenues",
+        rinner = widgets.draw_panel(surf, right, _L("Convertibles détenues", "Convertibles held"),
                                     config.COL_AMBER)
         self._conv_sell_rects = {}
         self._conv_arb_rects = {}
         hh = CONV.holdings(self.app.gs.player, self.market)
         if not hh:
-            widgets.draw_text(surf, "Aucune.", (rinner.x, rinner.y + 4),
+            widgets.draw_text(surf, _L("Aucune.", "None."), (rinner.x, rinner.y + 4),
                               fonts.tiny(), config.COL_TEXT_DIM)
         y = rinner.y + 2
         for h in hh:
@@ -577,7 +618,7 @@ class CreditDeskApp(DesktopApp):
         scan_w = 260
         scan = pygame.Rect(body.x, body.y, scan_w, body.h)
         rest = pygame.Rect(scan.right + 12, body.y, body.w - scan_w - 12, body.h)
-        inner = widgets.draw_panel(surf, scan, "Scanner (PD décroissante)",
+        inner = widgets.draw_panel(surf, scan, _L("Scanner (PD décroissante)", "Scanner (decreasing PD)"),
                                    config.COL_DOWN)
         self._scan_rects = {}
         y = inner.y + 2
@@ -600,18 +641,23 @@ class CreditDeskApp(DesktopApp):
             y += 21
         f = self._fiche
         rinner = widgets.draw_panel(
-            surf, rest, f"{self.ticker or '—'} — la dette comme option",
+            surf, rest, _L(f"{self.ticker or '—'} — la dette comme option", f"{self.ticker or '—'} — debt as an option"),
             config.COL_CYAN)
         if f is None:
             return
         y = rinner.y + 2
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
         lines = [
-            (f"Actifs V = actions {widgets.format_money(f['equity'], cur)} + "
-             f"dette {widgets.format_money(f['debt'], cur)}", config.COL_TEXT),
-            (f"Levier D/E = {f['leverage']:.2f} · vol actions "
+            (_L(f"Actifs V = actions {widgets.format_money(f['equity'], cur)} + "
+             f"dette {widgets.format_money(f['debt'], cur)}",
+             f"Assets V = equity {widgets.format_money(f['equity'], cur)} + "
+             f"debt {widgets.format_money(f['debt'], cur)}"), config.COL_TEXT),
+            (_L(f"Levier D/E = {f['leverage']:.2f} · vol actions "
              f"{f['sigma_e'] * 100:.0f}% → vol actifs {f['sigma_v'] * 100:.0f}% "
-             "(dé-leviérée)", config.COL_TEXT_DIM),
+             "(dé-leviérée)",
+             f"Leverage D/E = {f['leverage']:.2f} · equity vol "
+             f"{f['sigma_e'] * 100:.0f}% → asset vol {f['sigma_v'] * 100:.0f}% "
+             "(unlevered)"), config.COL_TEXT_DIM),
         ]
         for txt, col in lines:
             widgets.draw_text(surf, widgets.fit_text(txt, fonts.small(), rinner.w),
@@ -621,11 +667,13 @@ class CreditDeskApp(DesktopApp):
         dd_txt = "∞" if f["dd"] == float("inf") else f"{f['dd']:.2f}"
         pcol = (config.COL_DOWN if f["pd"] > 0.05
                 else config.COL_AMBER if f["pd"] > 0.01 else config.COL_UP)
-        widgets.draw_text(surf, f"Distance au défaut : {dd_txt} σ", (rinner.x, y),
+        widgets.draw_text(surf, _L(f"Distance au défaut : {dd_txt} σ", f"Distance to default: {dd_txt} σ"), (rinner.x, y),
                           fonts.head(bold=True), pcol)
         y += 26
-        widgets.draw_text(surf, f"PD 1 an : {f['pd'] * 100:.2f}% · spread "
+        widgets.draw_text(surf, _L(f"PD 1 an : {f['pd'] * 100:.2f}% · spread "
                           f"implicite ≈ {f['spread_bps']:.0f} bp (LGD 60 %)",
+                          f"1y PD: {f['pd'] * 100:.2f}% · implied "
+                          f"spread ≈ {f['spread_bps']:.0f} bp (LGD 60%)"),
                           (rinner.x, y), fonts.small(bold=True), pcol)
         y += 28
         # courbe PD vs choc action
@@ -647,17 +695,21 @@ class CreditDeskApp(DesktopApp):
                                   fonts.tiny(), config.COL_DOWN)
             if len(pts) >= 2:
                 pygame.draw.aalines(surf, config.COL_DOWN, False, pts)
-            widgets.draw_text(surf, "PD si le COURS de l'action bouge de… — le lien "
-                              "actions ↔ spreads.", (plot.x + 6, plot.y + 4),
+            widgets.draw_text(surf, _L("PD si le COURS de l'action bouge de… — le lien "
+                              "actions ↔ spreads.",
+                              "PD if the stock PRICE moves by… — the "
+                              "equity ↔ spreads link."), (plot.x + 6, plot.y + 4),
                               fonts.tiny(), config.COL_TEXT_DIM)
 
     # ----------------------------------------------------------- Waterfall
     def _draw_waterfall(self, surf, body):
         inner = widgets.draw_panel(surf, body,
-                                   "Cascade des pertes d'un pool titrisé",
+                                   _L("Cascade des pertes d'un pool titrisé", "Loss waterfall of a securitized pool"),
                                    config.COL_AMBER)
-        widgets.draw_text(surf, "Glissez le curseur : la perte du pool remonte la "
+        widgets.draw_text(surf, _L("Glissez le curseur : la perte du pool remonte la "
                           "structure — l'equity absorbe d'abord, le senior en dernier.",
+                          "Drag the slider: the pool loss climbs the "
+                          "structure — equity absorbs first, senior last."),
                           (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
         # curseur de perte de pool
         y = inner.y + 26
@@ -670,14 +722,14 @@ class CreditDeskApp(DesktopApp):
         knob = pygame.Rect(0, 0, 10, 18)
         knob.center = (sr.x + fill, sr.centery)
         pygame.draw.rect(surf, config.COL_WHITE, knob, border_radius=3)
-        widgets.draw_text(surf, f"Perte du pool : {self.pool_loss * 100:.0f}%",
+        widgets.draw_text(surf, _L(f"Perte du pool : {self.pool_loss * 100:.0f}%", f"Pool loss: {self.pool_loss * 100:.0f}%"),
                           (sr.right + 12, y), fonts.small(bold=True),
                           config.COL_DOWN)
         # perte attendue courante (macro du jeu) marquée sur la jauge
         el = SEC.expected_pool_loss(self.market)
         ex = sr.x + int(sr.w * min(1.0, el))
         pygame.draw.line(surf, config.COL_AMBER, (ex, sr.y - 6), (ex, sr.bottom + 6), 2)
-        widgets.draw_text(surf, f"attendue {el * 100:.0f}%", (ex - 26, sr.bottom + 8),
+        widgets.draw_text(surf, _L(f"attendue {el * 100:.0f}%", f"expected {el * 100:.0f}%"), (ex - 26, sr.bottom + 8),
                           fonts.tiny(), config.COL_AMBER)
         # tranches
         y += 46
@@ -695,14 +747,16 @@ class CreditDeskApp(DesktopApp):
                               f"· coupon {coupon * 100:.1f}% · {rating}",
                               (r.x + 10, r.y + 6), fonts.small(bold=True),
                               config.COL_WHITE)
-            status = ("INDEMNE" if loss == 0.0
-                      else "ANÉANTIE" if loss >= 1.0 else f"−{loss * 100:.0f}%")
+            status = (_L("INDEMNE", "UNSCATHED") if loss == 0.0
+                      else _L("ANÉANTIE", "WIPED OUT") if loss >= 1.0 else f"−{loss * 100:.0f}%")
             scol = (config.COL_UP if loss == 0.0
                     else config.COL_DOWN if loss >= 1.0 else config.COL_AMBER)
             widgets.draw_text(surf, status, (r.right - 90, r.y + 6),
                               fonts.small(bold=True), scol)
-            widgets.draw_text(surf, "le coupon paie le RISQUE de rang : plus on "
+            widgets.draw_text(surf, _L("le coupon paie le RISQUE de rang : plus on "
                               "est bas dans la cascade, plus il est gros",
+                              "the coupon pays for RANK risk: the lower "
+                              "you are in the waterfall, the bigger it is"),
                               (r.x + 10, r.y + bar_h - 16), fonts.tiny(),
                               config.COL_TEXT_DIM)
             y += bar_h + 12

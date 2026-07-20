@@ -20,8 +20,12 @@ import pygame
 
 from apps.base import DesktopApp
 from core import attribution as ATTR
-from core import config, risklimits
+from core import config, i18n, risklimits
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
 
 
 class PnlExplainApp(DesktopApp):
@@ -54,14 +58,16 @@ class PnlExplainApp(DesktopApp):
         pad = 14
         p = self.app.gs.player
         cur = config.CONTINENTS[p.continent]["currency"]
-        widgets.draw_text(surf, "P&L EXPLAIN — D'OÙ VIENT CHAQUE EURO ?",
+        widgets.draw_text(surf, _L("P&L EXPLAIN — D'OÙ VIENT CHAQUE EURO ?", "P&L EXPLAIN — WHERE DOES EACH EURO COME FROM?"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         snap = p.flags.get("pnl_explain")
         y = rect.y + 36
         if not snap:
-            widgets.draw_text(surf, "Aucun pas de marché encore joué — le "
+            widgets.draw_text(surf, _L("Aucun pas de marché encore joué — le "
                               "premier instantané tombera au prochain pas.",
+                              "No market step played yet — the "
+                              "first snapshot will drop at the next step."),
                               (rect.x + pad, y), fonts.small(), config.COL_TEXT_DIM)
             self._draw_firm_gauge(surf, pygame.Rect(rect.x + pad, y + 40,
                                                     rect.w - 2 * pad, 90), cur)
@@ -72,15 +78,20 @@ class PnlExplainApp(DesktopApp):
         dcol = config.COL_UP if delta >= 0 else config.COL_DOWN
         title_font = fonts.head(bold=True)
         widgets.draw_text(surf, widgets.fit_text(
-            f"Dernier pas (jour {snap['day']}) : Δ patrimoine "
-            f"{widgets.format_money(delta, cur)}", title_font, rect.w - 2 * pad),
+            _L(f"Dernier pas (jour {snap['day']}) : Δ patrimoine "
+            f"{widgets.format_money(delta, cur)}",
+            f"Last step (day {snap['day']}): Δ net worth "
+            f"{widgets.format_money(delta, cur)}"), title_font, rect.w - 2 * pad),
             (rect.x + pad, y), title_font, dcol)
         y += title_font.get_height() + 10
         rows = [
-            ("REVENUS PASSIFS (dividendes, coupons, carry, repo, prêt-titres, "
-             "sweep, dérivés)", passive, config.COL_UP if passive >= 0
+            (_L("REVENUS PASSIFS (dividendes, coupons, carry, repo, prêt-titres, "
+             "sweep, dérivés)",
+             "PASSIVE INCOME (dividends, coupons, carry, repo, sec. lending, "
+             "sweep, derivatives)"), passive, config.COL_UP if passive >= 0
              else config.COL_DOWN),
-            ("PRIX & RESTE (positions qui bougent, salaire, frais, vos ordres)",
+            (_L("PRIX & RESTE (positions qui bougent, salaire, frais, vos ordres)",
+             "PRICE & REST (positions moving, salary, fees, your orders)"),
              price_and_rest, config.COL_UP if price_and_rest >= 0
              else config.COL_DOWN),
         ]
@@ -103,10 +114,12 @@ class PnlExplainApp(DesktopApp):
         body = pygame.Rect(rect.x + pad, y, rect.w - 2 * pad,
                            rect.bottom - pad - y - 104)
         inner = widgets.draw_panel(surf, body,
-                                   "Effet prix du pas, par secteur "
-                                   "(core/attribution)", config.COL_CYAN)
+                                   _L("Effet prix du pas, par secteur "
+                                   "(core/attribution)",
+                                   "Price effect of the step, by sector "
+                                   "(core/attribution)"), config.COL_CYAN)
         if not self._sector:
-            widgets.draw_text(surf, "Aucune position action.",
+            widgets.draw_text(surf, _L("Aucune position action.", "No equity position."),
                               (inner.x, inner.y + 4), fonts.tiny(),
                               config.COL_TEXT_DIM)
         else:
@@ -139,13 +152,13 @@ class PnlExplainApp(DesktopApp):
     def _draw_firm_gauge(self, surf, rect, cur):
         """Jauge de la limite de VaR de la firme : votre budget de risque de
         grade, et où vous en êtes — dépasser déclenche l'escalade."""
-        inner = widgets.draw_panel(surf, rect, "Budget de risque de la firme",
+        inner = widgets.draw_panel(surf, rect, _L("Budget de risque de la firme", "Firm risk budget"),
                                    config.COL_DOWN)
         f = self._firm
         if f is None:
             return
         ratio = min(1.5, f["ratio"])
-        label = f"VaR {f['var']:.2f} M / limite du grade {f['limit']:.2f} M"
+        label = _L(f"VaR {f['var']:.2f} M / limite du grade {f['limit']:.2f} M", f"VaR {f['var']:.2f} M / grade limit {f['limit']:.2f} M")
         label_font = fonts.small(bold=True)
         label_w = label_font.size(label)[0] + 12
         gauge = pygame.Rect(inner.x, inner.y + 4,
@@ -162,8 +175,10 @@ class PnlExplainApp(DesktopApp):
                          (lim_x, gauge.bottom + 3), 2)
         widgets.draw_text(surf, label, (gauge.right + 12, gauge.y - 1),
                           label_font, col)
-        hint = ("Au-delà : avertissement → réputation → la firme COUPE votre "
-               "plus grosse ligne (5 pas de dépassement).")
+        hint = _L("Au-delà : avertissement → réputation → la firme COUPE votre "
+               "plus grosse ligne (5 pas de dépassement).",
+               "Beyond: warning → reputation → the firm CUTS your "
+               "biggest position (5 steps of breach).")
         hint_font = fonts.tiny()
         hint_lines = len(widgets.wrap_text_lines(hint, hint_font, inner.w))
         hint_h = hint_lines * (hint_font.get_height() + 3)

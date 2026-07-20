@@ -13,9 +13,14 @@ est réévalué ligne par ligne à chaque réglage, avec la comparaison
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import config, i18n
 from core import crisis_lab as CL
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
 
 EQ_MIN, EQ_MAX = -0.40, 0.0
 DY_MIN, DY_MAX = -0.010, 0.030
@@ -100,7 +105,7 @@ class CrisisLabApp(DesktopApp):
         surf.fill(config.COL_BG, rect)
         pad = 14
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
-        widgets.draw_text(surf, "LABO DE CRISE — RÉGLEZ VOTRE PROPRE SCÉNARIO",
+        widgets.draw_text(surf, _L("LABO DE CRISE — RÉGLEZ VOTRE PROPRE SCÉNARIO", "CRISIS LAB — SET YOUR OWN SCENARIO"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         y = rect.y + 38
@@ -108,14 +113,14 @@ class CrisisLabApp(DesktopApp):
         self._eq_rect = pygame.Rect(rect.x + pad, y + 4, slider_w, 8)
         t_eq = (self.eq_shock - EQ_MIN) / (EQ_MAX - EQ_MIN)
         self._slider(surf, self._eq_rect, t_eq,
-                     f"Actions {self.eq_shock * 100:+.0f}%", config.COL_DOWN)
+                     _L(f"Actions {self.eq_shock * 100:+.0f}%", f"Equities {self.eq_shock * 100:+.0f}%"), config.COL_DOWN)
         y += 30
         self._dy_rect = pygame.Rect(rect.x + pad, y + 4, slider_w, 8)
         t_dy = (self.dy - DY_MIN) / (DY_MAX - DY_MIN)
         self._slider(surf, self._dy_rect, t_dy,
-                     f"Taux {self.dy * 10000:+.0f} bp", config.COL_AMBER)
+                     _L(f"Taux {self.dy * 10000:+.0f} bp", f"Rates {self.dy * 10000:+.0f} bp"), config.COL_AMBER)
         y += 30
-        lbl = "CORRÉLATIONS → 1 (+10 pts de vol)"
+        lbl = _L("CORRÉLATIONS → 1 (+10 pts de vol)", "CORRELATIONS → 1 (+10 pts of vol)")
         w = fonts.tiny(bold=True).size(lbl)[0] + 30
         self._crunch_rect = pygame.Rect(rect.x + pad, y, w, 22)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if self.crunch
@@ -128,31 +133,35 @@ class CrisisLabApp(DesktopApp):
                           config.COL_DOWN if self.crunch else config.COL_TEXT_DIM)
         res = self._res
         if res is None or not res["lines"]:
-            widgets.draw_text(surf, "Book vide — le labo réévalue VOS positions "
+            widgets.draw_text(surf, _L("Book vide — le labo réévalue VOS positions "
                               "sous le scénario réglé.",
+                              "Empty book — the lab reprices YOUR positions "
+                              "under the set scenario."),
                               (rect.x + pad, y + 40), fonts.small(),
                               config.COL_TEXT_DIM)
             return
         # totaux (à droite des curseurs)
         tx = rect.x + pad + slider_w + 170
         tcol = config.COL_DOWN if res["total"] < 0 else config.COL_UP
-        widgets.draw_text(surf, "P&L DU SCÉNARIO", (tx, rect.y + 40),
+        widgets.draw_text(surf, _L("P&L DU SCÉNARIO", "SCENARIO P&L"), (tx, rect.y + 40),
                           fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, widgets.format_money(res["total"], cur),
                           (tx, rect.y + 56), fonts.head(bold=True), tcol)
-        widgets.draw_text(surf, f"{res['net_worth_pct']:+.1f}% du patrimoine",
+        widgets.draw_text(surf, _L(f"{res['net_worth_pct']:+.1f}% du patrimoine", f"{res['net_worth_pct']:+.1f}% of net worth"),
                           (tx, rect.y + 88), fonts.small(), tcol)
         if self.crunch:
             gap = res["total"] - res["total_normal"]
             widgets.draw_text(surf, widgets.fit_text(
-                f"Coût de l'illusion de diversification : "
+                _L(f"Coût de l'illusion de diversification : "
                 f"{widgets.format_money(gap, cur)} (vs corrélations normales)",
+                f"Cost of the diversification illusion: "
+                f"{widgets.format_money(gap, cur)} (vs normal correlations)"),
                 fonts.tiny(), rect.right - pad - tx),
                 (tx, rect.y + 108), fonts.tiny(), config.COL_AMBER)
         # table des lignes
         body = pygame.Rect(rect.x + pad, y + 34, rect.w - 2 * pad,
                            rect.bottom - pad - y - 34)
-        inner = widgets.draw_panel(surf, body, "Réévaluation ligne par ligne",
+        inner = widgets.draw_panel(surf, body, _L("Réévaluation ligne par ligne", "Line-by-line repricing"),
                                    config.COL_CYAN)
         yy = inner.y + 2
         pmax = max(abs(x["pnl"]) for x in res["lines"]) or 1.0
@@ -179,7 +188,10 @@ class CrisisLabApp(DesktopApp):
             widgets.draw_text(surf, widgets.format_money(x["pnl"], cur),
                               (bx + bar_w + 8, yy), fonts.tiny(bold=True), col)
             yy += 19
-        widgets.draw_text(surf, "En crise, les corrélations montent vers 1 et la "
+        widgets.draw_text(surf, _L("En crise, les corrélations montent vers 1 et la "
                           "vol explose — activez l'interrupteur pour voir la "
-                          "différence.", (inner.x, inner.bottom - 12),
+                          "différence.",
+                          "In a crisis, correlations rise toward 1 and "
+                          "vol explodes — flip the switch to see the "
+                          "difference."), (inner.x, inner.bottom - 12),
                           fonts.tiny(), config.COL_TEXT_DIM)

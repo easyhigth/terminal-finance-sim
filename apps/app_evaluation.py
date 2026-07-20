@@ -15,7 +15,7 @@ notation, promotion, certifications) est réutilisée telle quelle depuis
 import pygame
 
 from apps.base import DesktopApp
-from core import audio, config, exam
+from core import config, exam
 from core.i18n import get_lang
 from ui import fonts, widgets
 
@@ -62,20 +62,10 @@ class EvaluationApp(DesktopApp):
             self.cert_level = saved.get("cert_level", self.cert_level)
             self.state = "question"
         else:
-            from core import question_log
-            avoid = question_log.seen_set(p)   # jamais une question déjà vue (mission ou examen)
-            if self.mode == "cert":
-                from core import certifications as C
-                prog = C.PROGRAMS[self.cert_program]
-                tier = kwargs.get("tier", prog["tier"])
-                self.items = exam.generate(p.grade_index, difficulty=tier, n=C.EXAM_N, avoid=avoid)
-                self.pass_threshold = C.PASS_THRESHOLD
-                self.target_grade = f"{prog['name']} niveau {self.cert_level + 1}"
-            else:
-                target = min(p.grade_index + 1, len(config.GRADES) - 1)
-                self.target_grade = config.GRADES[target]
-                self.items = exam.generate(p.grade_index, avoid=avoid)
-                self.pass_threshold = exam.PASS_THRESHOLD
+            from core import exam_flow
+            self.items, self.pass_threshold, self.target_grade = exam_flow.serve(
+                p, mode=self.mode, cert_program=self.cert_program,
+                cert_level=self.cert_level, tier=kwargs.get("tier"))
             self.idx = 0
             self.score = 0
             self.missed_lessons = []
@@ -236,88 +226,15 @@ class EvaluationApp(DesktopApp):
             self.state = "question"
 
     def _finish(self):
-        from core import career, question_log
-        p = self.app.gs.player
-        question_log.mark_seen(p, self.items)   # questions de cet examen : jamais reposées
-        p.eval_state = {}
-        self.app.pending_market_steps += 1
-        ratio = self.score / max(1, len(self.items))
-        self.passed = ratio >= self.pass_threshold
-        if self.mode == "cert":
-            self._finish_cert(p)
-            self.app.gs.save(config.AUTOSAVE_SLOT)
-            self.state = "result"
-            return
-        if self.passed and p.can_promote():
-            old_grade_index = p.grade_index
-            p.promote()
-            audio.play("promotion")
-            from core import profile
-            profile.record_grade_reached(p.grade_index)
-            p.reputation = min(100, p.reputation + 8)
-            if p.grade_index >= 2 and p.track == "General":
-                p.flags["can_choose_track"] = True
-            self.new_title = career.award_promotion(p)
-            career.log(p, "promo", f"Promotion : {p.grade}"
-                       + (f" — titre « {self.new_title} »" if self.new_title else ""))
-            from core import inbox
-            inbox.on_promotion(p)
-            self.app.notify(_L(f"Promotion : {p.grade}", f"Promotion: {p.grade}"), "good")
-            if self.new_title:
-                self.app.notify(_L(f"Titre : {self.new_title}", f"Title: {self.new_title}"), "prestige")
-            from core import unlock_briefs, unlocks
-            new_feats = unlock_briefs.newly_unlocked(p, old_grade_index)
-            if new_feats:
-                p.flags["pending_unlock_briefs"] = {"grade": p.grade,
-                                                    "features": list(new_feats)}
-            for feat in new_feats:
-                self.app.notify(_L(f"⊘→✓ Débloqué : {unlocks.feature_label(feat)}",
-                                    f"⊘→✓ Unlocked: {unlocks.feature_label(feat)}"), "good")
-                tid = unlocks.FEATURE_TUTORIAL.get(feat)
-                if tid and not p.flags.get("pending_tutorial"):
-                    p.flags["pending_tutorial"] = tid
-                label = unlocks.feature_label(feat)
-                body = (f"Votre promotion au grade {p.grade} ouvre un nouveau "
-                        f"périmètre : {label}. Prenez le temps de vous y faire "
-                        "la main avant d'engager du capital.")
-                if tid:
-                    body += (" Un tutoriel dédié vous attend (écran TUTORIELS, "
-                             "ou l'icône Aide du bureau).")
-                inbox.push(p, "manager", "Votre manager",
-                           f"Nouveau périmètre : {label}", body)
-        else:
-            p.reputation = max(0, p.reputation - 5)
-            pct = int(ratio * 100)
-            req = int(self.pass_threshold * 100)
-            self.app.notify(_L(f"Évaluation échouée : {pct}% < {req}% requis (−5 réputation)",
-                                f"Evaluation failed: {pct}% < {req}% required (−5 reputation)"), "bad")
-            career.log(p, "promo", _L(
-                f"Évaluation de promotion échouée ({pct}% < seuil {req}%, −5 réputation)",
-                f"Promotion evaluation failed ({pct}% < threshold {req}%, −5 reputation)"))
-        self.app.gs.save(config.AUTOSAVE_SLOT)
+        # logique partagée avec la scène plein écran : core/exam_flow.
+        from core import exam_flow
+        res = exam_flow.apply_result(self.app, self.mode, self.items, self.score,
+                                     self.pass_threshold, self.cert_program, self.cert_level)
+        self.passed = res["passed"]
+        self.new_title = res["new_title"]
+        for text, kind in res["toasts"]:
+            self.app.notify(text, kind)
         self.state = "result"
-
-    def _finish_cert(self, p):
-        from core import badges, career
-        from core import certifications as C
-        self.new_title = None
-        name = C.PROGRAMS[self.cert_program]["name"]
-        if self.passed:
-            res = C.pass_stage(p, self.cert_program)
-            self.new_title = res.get("title") if res else None
-            self.app.notify(_L(f"{name} : niveau réussi", f"{name}: level passed"), "prestige")
-            for b in badges.check_new(p, self.app.market):
-                bname = badges.badge_name(b)
-                self.app.notify(_L(f"✶ Badge : {bname}", f"✶ Badge: {bname}"), "prestige")
-        else:
-            ratio = self.score / max(1, len(self.items))
-            pct = int(ratio * 100)
-            req = int(self.pass_threshold * 100)
-            self.app.notify(_L(f"{name} échouée : {pct}% < {req}% requis",
-                                f"{name} failed: {pct}% < {req}% required"), "bad")
-            career.log(p, "promo", _L(
-                f"Certification {name} échouée ({pct}% < seuil {req}%)",
-                f"Certification {name} failed ({pct}% < threshold {req}%)"))
 
     def update(self, dt):
         self.t += dt

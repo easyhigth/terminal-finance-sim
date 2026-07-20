@@ -17,6 +17,7 @@ from core import crashlog
 MAX_ITEMS = 4
 DEAL_URGENT_DAYS = 5          # un deal à ≤ 5 jours d'échéance devient urgent
 MARGIN_WATCH_RATIO = 1.2      # marge « sous surveillance » : equity < 120% du seuil
+HEAT_WATCH = 40               # scrutin réglementaire « à surveiller » (seuil d'enquête : 55)
 
 
 def _L(fr, en):
@@ -54,7 +55,16 @@ def suggestions(player, market=None):
                                               "Margin under watch: reduce leverage"),
                                   "kind": "bad", "scene": "book"})
         except Exception:
-            crashlog.swallowed("core.todo")  # 4) opportunités datées : offres de mandat, deals proches de l'échéance
+            crashlog.swallowed("core.todo")
+    # 3b) scrutin réglementaire proche du seuil d'enquête (55, cf.
+    #     dilemmes.maybe_investigate) : prévenir AVANT l'audit + l'amende, comme
+    #     pour la marge — la dette de conformité doit se VOIR monter.
+    heat = getattr(player, "heat", 0)
+    if heat >= HEAT_WATCH:
+        items.append({"label": _L(f"Scrutin réglementaire élevé ({heat}/100) : levez le pied",
+                                  f"Regulatory scrutiny high ({heat}/100): ease off"),
+                      "kind": "bad", "scene": "career"})
+    # 4) opportunités datées : offres de mandat, deals proches de l'échéance
     offers = getattr(player, "mandate_offers", None) or []
     if offers:
         items.append({"label": _L(f"{len(offers)} offre(s) de mandat en attente",

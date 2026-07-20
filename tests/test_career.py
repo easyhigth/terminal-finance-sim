@@ -283,3 +283,33 @@ def test_close_quarter_logs_perfect_quarter_reason():
     reason, delta = p.rep_log[0]
     assert delta == 3 + 4
     assert "parfait" in reason.lower()
+
+
+def test_pnl_objective_measures_quarter_growth():
+    """L'objectif de P&L trimestriel imposé par le boss se mesure vs l'ancre de
+    début de trimestre (quarter_nw_anchor), sans marché."""
+    p = PlayerState()
+    p.grade_index = 3
+    p.quarter_nw_anchor = 100_000.0
+    p.cash_history = [100_000.0, 118_000.0]   # +18K ce trimestre
+    obj = {"kind": "pnl", "target": 25_000.0, "done": False}
+    cur, target, met = career.objective_progress(p, obj)
+    assert cur == 18_000.0 and target == 25_000.0 and not met
+    p.cash_history[-1] = 130_000.0            # +30K -> atteint
+    _, _, met2 = career.objective_progress(p, obj)
+    assert met2
+    assert "P&L" in career.objective_label(p, obj)
+
+
+def test_pnl_objective_only_from_grade_one():
+    """Le boss n'impose un objectif de P&L qu'une fois qu'on peut investir."""
+    p0 = PlayerState(); p0.grade_index = 0
+    kinds0 = {o["kind"] for o in career.generate_objectives(p0, random.Random(1))}
+    assert "pnl" not in kinds0            # stagiaire : pas de P&L à viser
+    p3 = PlayerState(); p3.grade_index = 3
+    # sur plusieurs graines, "pnl" est un candidat possible au grade 3
+    seen = set()
+    for s in range(30):
+        for o in career.generate_objectives(p3, random.Random(s)):
+            seen.add(o["kind"])
+    assert "pnl" in seen

@@ -99,8 +99,12 @@ EXPECTED = {
     "quarter": 6,
     "grade_index": 6,
     "reputation": 84,
-    "cash": 15124731.43,
-    "net_worth": 15305972.69,
+    # cash/net_worth recalés : l'objectif trimestriel "pnl" (core/career.py)
+    # ajoute un candidat au tirage des objectifs -> le mix (et donc les
+    # récompenses cash par trimestre) change de façon déterministe. Le reste de
+    # l'empreinte (grade, réputation, positions, market_step…) est INCHANGÉ.
+    "cash": 14662260.37,
+    "net_worth": 14843501.63,
     "realized_pnl": 5173.7,
     "total_fees_paid": 158.11,
     "total_financing_paid": 0.0,

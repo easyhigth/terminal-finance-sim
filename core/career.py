@@ -155,6 +155,12 @@ def generate_objectives(player, rng=None):
     ]
     if gi >= 1:
         cands.append({"kind": "deals", "target": 1 + gi // 4, "base": player.deals_won})
+        # objectif de P&L imposé par le boss : faire CROÎTRE le patrimoine ce
+        # trimestre (mesuré vs l'ancre de début de trimestre, cf.
+        # quarter_nw_anchor) — la pression d'un desk, couplée au budget de VaR
+        # déjà en place (la jauge du bureau). N'apparaît qu'une fois qu'on peut
+        # investir (grade 1+).
+        cands.append({"kind": "pnl", "target": _round_money(25000 * (1 + gi))})
     rng.shuffle(cands)
     n = rng.randint(2, min(4, len(cands)))
     objs = []
@@ -180,6 +186,12 @@ def objective_progress(player, obj):
         return player.reputation, obj["target"], player.reputation >= obj["target"]
     if k == "cash":
         return player.cash, obj["target"], player.cash >= obj["target"]
+    if k == "pnl":
+        # P&L du trimestre = patrimoine actuel − ancre de début de trimestre
+        # (cash_history stocke la valeur nette ; cf. GameState.quarter_nw_anchor)
+        nw = player.cash_history[-1] if getattr(player, "cash_history", None) else player.cash
+        cur = nw - getattr(player, "quarter_nw_anchor", 0.0)
+        return cur, obj["target"], cur >= obj["target"]
     return 0, 1, False
 
 
@@ -195,6 +207,9 @@ def objective_label(player, obj):
         return f"Atteindre {obj['target']} de réputation ({player.reputation})"
     if obj["kind"] == "cash":
         return f"Trésorerie ≥ {cur_currency}{obj['target']/1000:.0f}K"
+    if obj["kind"] == "pnl":
+        return (f"P&L du trimestre ≥ {cur_currency}{obj['target']/1000:.0f}K "
+                f"({cur_currency}{cur/1000:+.0f}K)")
     return obj["kind"]
 
 

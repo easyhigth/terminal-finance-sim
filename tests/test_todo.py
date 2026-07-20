@@ -73,3 +73,13 @@ def test_list_is_capped_at_max_items():
     from core import inbox
     inbox.push(p, "manager", "Boss", "Sujet", "Corps")
     assert len(todo.suggestions(p)) == todo.MAX_ITEMS
+
+
+def test_high_regulatory_heat_warns_before_audit():
+    p = _player(grade_index=3, heat=48)
+    items = _actionable(todo.suggestions(p))
+    warn = next((it for it in items if it["scene"] == "career"), None)
+    assert warn is not None and "réglementaire" in warn["label"].lower()
+    # sous le seuil de surveillance : pas d'alerte
+    p2 = _player(grade_index=3, heat=10)
+    assert all(it["scene"] != "career" for it in todo.suggestions(p2))

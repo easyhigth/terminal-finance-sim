@@ -9,9 +9,14 @@ panneau droit = positions ouvertes avec MTM et sortie anticipée.
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import config, i18n
 from core import merger_arb as MA
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
 
 DEFAULT_QTY = 100
 QTY_CHOICES = [50, 100, 250, 500]
@@ -51,21 +56,25 @@ class MergerArbApp(DesktopApp):
             if r.collidepoint(pos):
                 res = MA.enter(p, market, sid, self.qty)
                 if res["ok"]:
-                    self._msg = f"Position prise sur {res['position']['ticker']} " \
-                                f"({self.qty} parts, {res['cost']:,.0f})."
+                    self._msg = _L(f"Position prise sur {res['position']['ticker']} "
+                                f"({self.qty} parts, {res['cost']:,.0f}).",
+                                f"Position taken on {res['position']['ticker']} "
+                                f"({self.qty} shares, {res['cost']:,.0f}).")
                 else:
-                    self._msg = {"cash": "Trésorerie insuffisante.",
-                                 "deja": "Position déjà ouverte sur cette opération.",
-                                 "qty": "Quantité invalide.",
-                                 "inconnue": "Opération introuvable."}.get(
-                                     res["reason"], "Refusé.")
+                    self._msg = {"cash": _L("Trésorerie insuffisante.", "Insufficient cash."),
+                                 "deja": _L("Position déjà ouverte sur cette opération.", "Position already open on this deal."),
+                                 "qty": _L("Quantité invalide.", "Invalid quantity."),
+                                 "inconnue": _L("Opération introuvable.", "Deal not found.")}.get(
+                                     res["reason"], _L("Refusé.", "Rejected."))
                 return True
         for pid, r in self._exit_rects.items():
             if r.collidepoint(pos):
                 res = MA.exit_position(p, market, pid)
                 if res["ok"]:
-                    self._msg = f"Sortie anticipée : {res['proceeds']:,.0f} " \
-                                f"({res['pnl']:+,.0f})."
+                    self._msg = _L(f"Sortie anticipée : {res['proceeds']:,.0f} "
+                                f"({res['pnl']:+,.0f}).",
+                                f"Early exit: {res['proceeds']:,.0f} "
+                                f"({res['pnl']:+,.0f}).")
                 return True
         return False
 
@@ -75,13 +84,13 @@ class MergerArbApp(DesktopApp):
         market = self.app.ensure_market()
         p = self.app.gs.player
         pad = 14
-        widgets.draw_text(surf, "ARBITRAGE DE FUSION — trading événementiel",
+        widgets.draw_text(surf, _L("ARBITRAGE DE FUSION — trading événementiel", "MERGER ARBITRAGE — event-driven trading"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         # sélecteur de quantité
         x = rect.x + pad
         y = rect.y + 32
-        widgets.draw_text(surf, "Taille :", (x, y + 3), fonts.tiny(bold=True),
+        widgets.draw_text(surf, _L("Taille :", "Size:"), (x, y + 3), fonts.tiny(bold=True),
                           config.COL_TEXT_DIM)
         x += 56
         self._qty_rects = {}
@@ -111,11 +120,11 @@ class MergerArbApp(DesktopApp):
 
     def _draw_deals(self, surf, body, market, p):
         cur = self._cur()
-        inner = widgets.draw_panel(surf, body, "Opérations en cours (OPA)", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, body, _L("Opérations en cours (OPA)", "Active deals (takeovers)"), config.COL_CYAN)
         self._enter_rects = {}
         sits = MA.active_situations(market)
         if not sits:
-            widgets.draw_text(surf, "Aucune opération annoncée pour le moment.",
+            widgets.draw_text(surf, _L("Aucune opération annoncée pour le moment.", "No deal announced at the moment."),
                               (inner.x, inner.y + 6), fonts.small(), config.COL_TEXT_DIM)
             return
         held = {pos["deal_id"] for pos in (getattr(p, "arb_positions", None) or [])}
@@ -130,19 +139,22 @@ class MergerArbApp(DesktopApp):
                               (row.x + 8, row.y + 4), fonts.small(bold=True), config.COL_TEXT)
             spread_pct = (s["offer"] / s["implied"] - 1) * 100 if s["implied"] else 0
             widgets.draw_text(surf,
-                              f"Offre {widgets.format_money(s['offer'], cur)} "
+                              _L(f"Offre {widgets.format_money(s['offer'], cur)} "
                               f"(+{s['premium'] * 100:.0f}%) · écart {spread_pct:.1f}% · "
                               f"{s['steps_left']} pas · rupture {s['break_prob'] * 100:.0f}%",
+                              f"Offer {widgets.format_money(s['offer'], cur)} "
+                              f"(+{s['premium'] * 100:.0f}%) · spread {spread_pct:.1f}% · "
+                              f"{s['steps_left']} steps · break {s['break_prob'] * 100:.0f}%"),
                               (row.x + 8, row.y + 24), fonts.tiny(), config.COL_TEXT_DIM)
             if s["id"] in held:
-                widgets.draw_text(surf, "détenue", (row.right - 12, row.y + 6),
+                widgets.draw_text(surf, _L("détenue", "held"), (row.right - 12, row.y + 6),
                                   fonts.tiny(bold=True), config.COL_UP, align="right")
             else:
                 btn = pygame.Rect(row.right - 96, row.y + 12, 88, 24)
                 self._enter_rects[s["id"]] = btn
                 pygame.draw.rect(surf, config.COL_PANEL, btn, border_radius=4)
                 pygame.draw.rect(surf, config.COL_CYAN, btn, 1, border_radius=4)
-                widgets.draw_text(surf, "PRENDRE", btn.center, fonts.tiny(bold=True),
+                widgets.draw_text(surf, _L("PRENDRE", "TAKE"), btn.center, fonts.tiny(bold=True),
                                   config.COL_CYAN, align="center")
                 if btn.collidepoint(pygame.mouse.get_pos()) and s.get("implied"):
                     # les DEUX issues chiffrées par action, AVANT de prendre
@@ -152,11 +164,13 @@ class MergerArbApp(DesktopApp):
                     from core import impact_phrases as _ip
                     self._arb_tooltip = (
                         _ip.merger_arb_impact(s["implied"], s["offer"], s["steps_left"])
-                        + f" · conclut : +{win:.2f}/action · rompt : −{loss:.2f}/action",
+                        + _L(f" · conclut : +{win:.2f}/action · rompt : −{loss:.2f}/action", f" · closes: +{win:.2f}/share · breaks: −{loss:.2f}/share"),
                         pygame.mouse.get_pos())
             yy += 56
-        widgets.draw_text(surf, "Acheter sous l'offre : gain si l'opération conclut, "
-                          "perte si elle rompt.", (inner.x, inner.bottom - 12),
+        widgets.draw_text(surf, _L("Acheter sous l'offre : gain si l'opération conclut, "
+                          "perte si elle rompt.",
+                          "Buy below the offer: gain if the deal closes, "
+                          "loss if it breaks."), (inner.x, inner.bottom - 12),
                           fonts.tiny(), config.COL_TEXT_DIM)
         if getattr(self, "_arb_tooltip", None):
             widgets.draw_tooltip(surf, *self._arb_tooltip)
@@ -164,11 +178,11 @@ class MergerArbApp(DesktopApp):
 
     def _draw_positions(self, surf, body, market, p):
         cur = self._cur()
-        inner = widgets.draw_panel(surf, body, "Mes positions d'arbitrage", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, body, _L("Mes positions d'arbitrage", "My arbitrage positions"), config.COL_AMBER)
         self._exit_rects = {}
         rows = MA.positions(p, market)
         if not rows:
-            widgets.draw_text(surf, "Aucune position ouverte.", (inner.x, inner.y + 6),
+            widgets.draw_text(surf, _L("Aucune position ouverte.", "No open position."), (inner.x, inner.y + 6),
                               fonts.small(), config.COL_TEXT_DIM)
             return
         yy = inner.y
@@ -182,13 +196,15 @@ class MergerArbApp(DesktopApp):
             widgets.draw_text(surf, f"{r['ticker']} — {r['acquirer']}",
                               (row.x + 8, row.y + 4), fonts.small(bold=True), config.COL_TEXT)
             widgets.draw_text(surf,
-                              f"{r['qty']:.0f} × {widgets.format_money(r['price'], cur)} · "
+                              _L(f"{r['qty']:.0f} × {widgets.format_money(r['price'], cur)} · "
                               f"P&L latent {r['pnl']:+,.0f} · {r['steps_left']} pas",
+                              f"{r['qty']:.0f} × {widgets.format_money(r['price'], cur)} · "
+                              f"unrealized P&L {r['pnl']:+,.0f} · {r['steps_left']} steps"),
                               (row.x + 8, row.y + 24), fonts.tiny(), pcol)
             btn = pygame.Rect(row.right - 82, row.y + 12, 74, 24)
             self._exit_rects[r["id"]] = btn
             pygame.draw.rect(surf, config.COL_PANEL, btn, border_radius=4)
             pygame.draw.rect(surf, config.COL_AMBER, btn, 1, border_radius=4)
-            widgets.draw_text(surf, "SORTIR", btn.center, fonts.tiny(bold=True),
+            widgets.draw_text(surf, _L("SORTIR", "EXIT"), btn.center, fonts.tiny(bold=True),
                               config.COL_AMBER, align="center")
             yy += 56

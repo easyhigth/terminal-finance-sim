@@ -17,9 +17,14 @@ Le change avec sa dimension de TAUX (core/fx_carry.py) :
 import pygame
 
 from apps.base import DesktopApp
-from core import config, fx
+from core import config, fx, i18n
 from core import fx_carry as FXC
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
 
 NOTIONALS = [50_000.0, 100_000.0, 250_000.0]
 
@@ -76,8 +81,10 @@ class FxDeskApp(DesktopApp):
             if r.collidepoint(pos):
                 res = fx.close_spot(self.app.gs.player, self.market, pid)
                 if res.get("ok"):
-                    self._say(f"Position fermée — P&L "
-                              f"{res.get('pnl', 0.0):+,.0f}.", config.COL_TEXT)
+                    self._say(_L(f"Position fermée — P&L "
+                              f"{res.get('pnl', 0.0):+,.0f}.",
+                              f"Position closed — P&L "
+                              f"{res.get('pnl', 0.0):+,.0f}."), config.COL_TEXT)
                 return True
         return False
 
@@ -87,10 +94,12 @@ class FxDeskApp(DesktopApp):
         if r.get("ok"):
             carry = FXC.carry_annual(self.market, self.pair, direction)
             ccol = config.COL_UP if carry > 0 else config.COL_DOWN
-            self._say(f"{direction.upper()} {self.pair} ouvert — portage "
-                      f"{carry * 100:+.1f}%/an couru chaque pas.", ccol)
+            self._say(_L(f"{direction.upper()} {self.pair} ouvert — portage "
+                      f"{carry * 100:+.1f}%/an couru chaque pas.",
+                      f"{direction.upper()} {self.pair} opened — carry "
+                      f"{carry * 100:+.1f}%/yr accruing each step."), ccol)
         else:
-            self._say(f"Refusé : {r.get('reason', '?')}.", config.COL_DOWN)
+            self._say(_L(f"Refusé : {r.get('reason', '?')}.", f"Rejected: {r.get('reason', '?')}."), config.COL_DOWN)
 
     def _say(self, text, col):
         self.msg, self.msg_col = text, col
@@ -101,12 +110,15 @@ class FxDeskApp(DesktopApp):
         surf.fill(config.COL_BG, rect)
         pad = 14
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
-        widgets.draw_text(surf, "DESK FX — CARRY & PARITÉ DES TAUX",
+        widgets.draw_text(surf, _L("DESK FX — CARRY & PARITÉ DES TAUX", "FX DESK — CARRY & INTEREST RATE PARITY"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
-        widgets.draw_text(surf, "Long la paire = long la devise de BASE → on "
+        widgets.draw_text(surf, _L("Long la paire = long la devise de BASE → on "
                           "touche (r_base − r_cotée). Le forward décote la "
                           "devise à haut taux : pas de repas gratuit couvert.",
+                          "Long the pair = long the BASE currency → you "
+                          "earn (r_base − r_quote). The forward discounts the "
+                          "high-rate currency: no covered free lunch."),
                           (rect.x + pad, rect.y + 30), fonts.tiny(),
                           config.COL_TEXT_DIM)
         body = pygame.Rect(rect.x + pad, rect.y + 52, rect.w - 2 * pad,
@@ -119,13 +131,13 @@ class FxDeskApp(DesktopApp):
 
     def _draw_table(self, surf, rect):
         inner = widgets.draw_panel(surf, rect,
-                                   "Paires (triées par |carry|) · fwd 3 mois",
+                                   _L("Paires (triées par |carry|) · fwd 3 mois", "Pairs (sorted by |carry|) · 3-month fwd"),
                                    config.COL_CYAN)
         self._row_rects = {}
-        cols = [("PAIRE", 0), ("SPOT", int(inner.w * 0.20)),
-                ("r base/cotée", int(inner.w * 0.36)),
-                ("CARRY long", int(inner.w * 0.58)),
-                ("PTS TERME", int(inner.w * 0.80))]
+        cols = [(_L("PAIRE", "PAIR"), 0), ("SPOT", int(inner.w * 0.20)),
+                (_L("r base/cotée", "r base/quote"), int(inner.w * 0.36)),
+                (_L("CARRY long", "CARRY long"), int(inner.w * 0.58)),
+                (_L("PTS TERME", "FWD PTS"), int(inner.w * 0.80))]
         y = inner.y
         for lbl, dx in cols:
             widgets.draw_text(surf, lbl, (inner.x + dx, y), fonts.tiny(bold=True),
@@ -149,14 +161,16 @@ class FxDeskApp(DesktopApp):
                               (inner.x + cols[2][1], y), fonts.small(),
                               config.COL_TEXT_DIM)
             ccol = config.COL_UP if row["carry_long"] > 0 else config.COL_DOWN
-            widgets.draw_text(surf, f"{row['carry_long'] * 100:+.1f}%/an",
+            widgets.draw_text(surf, _L(f"{row['carry_long'] * 100:+.1f}%/an", f"{row['carry_long'] * 100:+.1f}%/yr"),
                               (inner.x + cols[3][1], y), fonts.small(bold=True), ccol)
             widgets.draw_text(surf, f"{row['points_pct']:+.2f}%",
                               (inner.x + cols[4][1], y), fonts.small(),
                               config.COL_TEXT)
             y += 20
-        fwd_hint = ("Points de terme ≈ −carry × τ : la parité couverte rend "
-                   "le carry non-arbitrable sans risque.")
+        fwd_hint = _L("Points de terme ≈ −carry × τ : la parité couverte rend "
+                   "le carry non-arbitrable sans risque.",
+                   "Forward points ≈ −carry × τ: covered parity makes "
+                   "the carry non-arbitrable without risk.")
         fwd_font = fonts.tiny()
         fwd_lines = len(widgets.wrap_text_lines(fwd_hint, fwd_font, inner.w))
         fwd_h = fwd_lines * (fwd_font.get_height() + 3)
@@ -164,20 +178,24 @@ class FxDeskApp(DesktopApp):
                                   fwd_font, config.COL_TEXT_DIM, inner.w, line_gap=3)
 
     def _draw_panel(self, surf, rect, cur):
-        inner = widgets.draw_panel(surf, rect, "Exécution & positions",
+        inner = widgets.draw_panel(surf, rect, _L("Exécution & positions", "Execution & positions"),
                                    config.COL_AMBER)
         self._close_rects = {}
         y = inner.y + 2
         if self.pair:
             carry = FXC.carry_annual(self.market, self.pair, "long")
             vol = fx.pair_vol(self.pair)
-            widgets.draw_text(surf, f"{self.pair} — carry long "
+            widgets.draw_text(surf, _L(f"{self.pair} — carry long "
                               f"{carry * 100:+.1f}%/an · vol {vol * 100:.0f}%",
+                              f"{self.pair} — long carry "
+                              f"{carry * 100:+.1f}%/yr · vol {vol * 100:.0f}%"),
                               (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
             y += 18
             ratio = abs(carry) / vol if vol > 0 else 0.0
-            ratio_txt = (f"Carry/vol = {ratio:.2f} — le portage paie-t-il le "
-                        "risque de décrochage ?")
+            ratio_txt = _L(f"Carry/vol = {ratio:.2f} — le portage paie-t-il le "
+                        "risque de décrochage ?",
+                        f"Carry/vol = {ratio:.2f} — does the carry pay for the "
+                        "crash risk?")
             ratio_font = fonts.tiny()
             y += widgets.draw_text_wrapped(surf, ratio_txt, (inner.x, y), ratio_font,
                                            config.COL_TEXT_DIM, inner.w) + 2
@@ -206,8 +224,8 @@ class FxDeskApp(DesktopApp):
         y += 28
         self._long_btn = pygame.Rect(inner.x, y, 110, 24)
         self._short_btn = pygame.Rect(inner.x + 118, y, 110, 24)
-        for r, lbl, col in ((self._long_btn, "LONG", config.COL_UP),
-                            (self._short_btn, "SHORT", config.COL_DOWN)):
+        for r, lbl, col in ((self._long_btn, _L("LONG", "LONG"), config.COL_UP),
+                            (self._short_btn, _L("SHORT", "SHORT"), config.COL_DOWN)):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, r, border_radius=4)
             pygame.draw.rect(surf, col, r, 1, border_radius=4)
             widgets.draw_text(surf, lbl, r.center, fonts.small(bold=True), col,
@@ -217,12 +235,12 @@ class FxDeskApp(DesktopApp):
             widgets.draw_text(surf, widgets.fit_text(self.msg, fonts.tiny(), inner.w),
                               (inner.x, y), fonts.tiny(), self.msg_col)
             y += 18
-        widgets.draw_text(surf, "POSITIONS OUVERTES :", (inner.x, y),
+        widgets.draw_text(surf, _L("POSITIONS OUVERTES :", "OPEN POSITIONS:"), (inner.x, y),
                           fonts.tiny(bold=True), config.COL_TEXT_DIM)
         y += 16
         holdings = fx.holdings(self.app.gs.player, self.market)
         if not holdings:
-            widgets.draw_text(surf, "Aucune.", (inner.x, y), fonts.tiny(),
+            widgets.draw_text(surf, _L("Aucune.", "None."), (inner.x, y), fonts.tiny(),
                               config.COL_TEXT_DIM)
         for h in holdings:
             if y > inner.bottom - 18:
@@ -234,7 +252,7 @@ class FxDeskApp(DesktopApp):
             widgets.draw_text(surf, f"{h.get('direction', '?').upper()} {h['pair']} "
                               f"{widgets.format_money(h['notional'], cur)}",
                               (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
-            widgets.draw_text(surf, f"P&L {pnl:+,.0f} · carry {carry * 100:+.1f}%/an",
+            widgets.draw_text(surf, _L(f"P&L {pnl:+,.0f} · carry {carry * 100:+.1f}%/an", f"P&L {pnl:+,.0f} · carry {carry * 100:+.1f}%/yr"),
                               (inner.x + 8, y + 15), fonts.tiny(), pcol)
             xr = pygame.Rect(inner.right - 22, y, 18, 18)
             self._close_rects[h["id"]] = xr

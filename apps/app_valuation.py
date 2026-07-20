@@ -20,17 +20,22 @@ onglets :
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import config, i18n
 from core import valuation as VAL
 from ui import fonts, widgets
 
-TABS = [("dcf", "DCF"), ("sml", "SML (CAPM)"), ("lbo", "PONT LBO")]
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
+
+TABS = [("dcf", "DCF"), ("sml", "SML (CAPM)"), ("lbo", ("PONT LBO", "LBO BRIDGE"))]
 LBO_PARAMS = [
-    ("entry_mult", "Multiple d'entrée", 4.0, 12.0, 0.5, "×"),
-    ("debt_pct", "Levier (dette/EV)", 0.30, 0.80, 0.05, "%"),
-    ("growth", "Croissance EBITDA", -0.05, 0.15, 0.01, "%"),
-    ("exit_mult", "Multiple de sortie", 4.0, 12.0, 0.5, "×"),
-    ("years", "Durée (années)", 3, 7, 1, "a"),
+    ("entry_mult", ("Multiple d'entrée", "Entry multiple"), 4.0, 12.0, 0.5, "×"),
+    ("debt_pct", ("Levier (dette/EV)", "Leverage (debt/EV)"), 0.30, 0.80, 0.05, "%"),
+    ("growth", ("Croissance EBITDA", "EBITDA growth"), -0.05, 0.15, 0.01, "%"),
+    ("exit_mult", ("Multiple de sortie", "Exit multiple"), 4.0, 12.0, 0.5, "×"),
+    ("years", ("Durée (années)", "Duration (years)"), 3, 7, 1, "a"),
 ]
 
 
@@ -134,12 +139,13 @@ class ValuationApp(DesktopApp):
         self._ensure_computed()
         surf.fill(config.COL_BG, rect)
         pad = 14
-        widgets.draw_text(surf, "VALORISATION — DCF · CAPM · LBO",
+        widgets.draw_text(surf, _L("VALORISATION — DCF · CAPM · LBO", "VALUATION — DCF · CAPM · LBO"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         x, y = rect.x + pad, rect.y + 32
         self._tab_rects = {}
         for tab, lbl in TABS:
+            lbl = lbl if isinstance(lbl, str) else _L(*lbl)
             w = fonts.tiny(bold=True).size(lbl)[0] + 18
             r = pygame.Rect(x, y, w, 22)
             self._tab_rects[tab] = r
@@ -214,8 +220,10 @@ class ValuationApp(DesktopApp):
         top = y + 30
         d = self._dcf
         if d is None:
-            widgets.draw_text(surf, "DCF impossible ici (EBIT négatif ou données "
+            widgets.draw_text(surf, _L("DCF impossible ici (EBIT négatif ou données "
                               "manquantes) — essayez une autre société.",
+                              "DCF not possible here (negative EBIT or missing "
+                              "data) — try another company."),
                               (body.x, top + 8), fonts.small(), config.COL_TEXT_DIM)
             self._trade_btn = None
             return
@@ -223,32 +231,43 @@ class ValuationApp(DesktopApp):
         col_w = (body.w - 12) // 2
         left = pygame.Rect(body.x, top, col_w, body.bottom - top)
         right = pygame.Rect(left.right + 12, top, col_w, left.h)
-        inner = widgets.draw_panel(surf, left, f"{d['name']} — valeur intrinsèque",
+        inner = widgets.draw_panel(surf, left, _L(f"{d['name']} — valeur intrinsèque", f"{d['name']} — intrinsic value"),
                                    config.COL_CYAN)
         yy = inner.y + 2
         upcol = config.COL_UP if d["upside"] >= 0 else config.COL_DOWN
-        widgets.draw_text(surf, f"{d['per_share']:,.2f} / action",
+        widgets.draw_text(surf, _L(f"{d['per_share']:,.2f} / action", f"{d['per_share']:,.2f} / share"),
                           (inner.x, yy), fonts.title(bold=True), upcol)
         yy += 46
-        verdict = ("SOUS-ÉVALUÉE" if d["upside"] > 0.10 else
-                   "SURÉVALUÉE" if d["upside"] < -0.10 else "proche du cours")
-        widgets.draw_text(surf, f"Cours {d['price']:,.2f} → potentiel "
+        verdict = (_L("SOUS-ÉVALUÉE", "UNDERVALUED") if d["upside"] > 0.10 else
+                   _L("SURÉVALUÉE", "OVERVALUED") if d["upside"] < -0.10 else _L("proche du cours", "near the price"))
+        widgets.draw_text(surf, _L(f"Cours {d['price']:,.2f} → potentiel "
                           f"{d['upside'] * 100:+.0f}% ({verdict})",
+                          f"Price {d['price']:,.2f} → upside "
+                          f"{d['upside'] * 100:+.0f}% ({verdict})"),
                           (inner.x, yy), fonts.small(bold=True), upcol)
         yy += 26
         rows = [
-            (f"FCF année 0 (≈ NOPAT) : {widgets.format_money(d['fcf0'], cur)}",
+            (_L(f"FCF année 0 (≈ NOPAT) : {widgets.format_money(d['fcf0'], cur)}",
+             f"FCF year 0 (≈ NOPAT): {widgets.format_money(d['fcf0'], cur)}"),
              config.COL_TEXT),
-            (f"Croissance explicite : {d['growth'] * 100:+.1f}%/an sur "
-             f"{VAL.DCF_YEARS} ans", config.COL_TEXT_DIM),
-            (f"VA flux explicites : {widgets.format_money(d['pv_explicit'], cur)}",
+            (_L(f"Croissance explicite : {d['growth'] * 100:+.1f}%/an sur "
+             f"{VAL.DCF_YEARS} ans",
+             f"Explicit growth: {d['growth'] * 100:+.1f}%/yr over "
+             f"{VAL.DCF_YEARS} years"), config.COL_TEXT_DIM),
+            (_L(f"VA flux explicites : {widgets.format_money(d['pv_explicit'], cur)}",
+             f"PV explicit flows: {widgets.format_money(d['pv_explicit'], cur)}"),
              config.COL_TEXT),
-            (f"VA valeur terminale : {widgets.format_money(d['pv_terminal'], cur)} "
+            (_L(f"VA valeur terminale : {widgets.format_money(d['pv_terminal'], cur)} "
              f"({d['pv_terminal'] / d['ev'] * 100:.0f}% de l'EV !)",
+             f"PV terminal value: {widgets.format_money(d['pv_terminal'], cur)} "
+             f"({d['pv_terminal'] / d['ev'] * 100:.0f}% of EV!)"),
              config.COL_AMBER),
-            (f"EV {widgets.format_money(d['ev'], cur)} − dette nette "
+            (_L(f"EV {widgets.format_money(d['ev'], cur)} − dette nette "
              f"{widgets.format_money(d['net_debt'], cur)} = fonds propres "
-             f"{widgets.format_money(d['equity'], cur)}", config.COL_TEXT),
+             f"{widgets.format_money(d['equity'], cur)}",
+             f"EV {widgets.format_money(d['ev'], cur)} − net debt "
+             f"{widgets.format_money(d['net_debt'], cur)} = equity "
+             f"{widgets.format_money(d['equity'], cur)}"), config.COL_TEXT),
         ]
         for txt, col in rows:
             widgets.draw_text(surf, widgets.fit_text(txt, fonts.tiny(), inner.w),
@@ -258,14 +277,16 @@ class ValuationApp(DesktopApp):
         self._trade_btn = pygame.Rect(inner.x, min(yy, inner.bottom - 28), 150, 24)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._trade_btn, border_radius=4)
         pygame.draw.rect(surf, upcol, self._trade_btn, 1, border_radius=4)
-        widgets.draw_text(surf, "TRADER →", self._trade_btn.center,
+        widgets.draw_text(surf, _L("TRADER →", "TRADE →"), self._trade_btn.center,
                           fonts.small(bold=True), upcol, align="center")
-        widgets.draw_text(surf, "Hypothèses : capex ≈ dotations, ΔBFR négligé "
-                          "(FCF ≈ NOPAT).", (inner.x, inner.bottom - 12),
+        widgets.draw_text(surf, _L("Hypothèses : capex ≈ dotations, ΔBFR négligé "
+                          "(FCF ≈ NOPAT).",
+                          "Assumptions: capex ≈ D&A, ΔWC neglected "
+                          "(FCF ≈ NOPAT)."), (inner.x, inner.bottom - 12),
                           fonts.tiny(), config.COL_TEXT_DIM)
         # table de sensibilité
         rinner = widgets.draw_panel(surf, right,
-                                    "Sensibilité (valeur/action) — WACC × g∞",
+                                    _L("Sensibilité (valeur/action) — WACC × g∞", "Sensitivity (value/share) — WACC × g∞"),
                                     config.COL_AMBER)
         sens = self._sens
         cw = (rinner.w - 70) // len(sens["waccs"])
@@ -295,8 +316,10 @@ class ValuationApp(DesktopApp):
                     pygame.draw.rect(surf, config.COL_WHITE, r0, 1, border_radius=3)
                 widgets.draw_text(surf, f"{v:,.0f}", r0.center, fonts.tiny(bold=True),
                                   config.COL_WHITE, align="center")
-        sens_hint = ("Cadre blanc = cases compatibles avec le cours actuel "
-                    "(±5 %) — ce que le marché « price ».")
+        sens_hint = _L("Cadre blanc = cases compatibles avec le cours actuel "
+                    "(±5 %) — ce que le marché « price ».",
+                    "White frame = cells compatible with the current price "
+                    "(±5%) — what the market 'prices in'.")
         sens_font = fonts.tiny()
         sens_lines = len(widgets.wrap_text_lines(sens_hint, sens_font, rinner.w))
         sens_h = sens_lines * (sens_font.get_height() + 3)
@@ -308,14 +331,14 @@ class ValuationApp(DesktopApp):
         self._sml_rows_rects = {}
         s = self._sml
         if s is None:
-            widgets.draw_text(surf, "Historique insuffisant.", (body.x, body.y + 8),
+            widgets.draw_text(surf, _L("Historique insuffisant.", "Insufficient history."), (body.x, body.y + 8),
                               fonts.small(), config.COL_TEXT_DIM)
             return
         col_w = int(body.w * 0.60)
         chart = pygame.Rect(body.x, body.y, col_w, body.h)
         table = pygame.Rect(chart.right + 12, body.y, body.w - col_w - 12, body.h)
         inner = widgets.draw_panel(surf, chart,
-                                   "Security Market Line — rendement vs bêta",
+                                   _L("Security Market Line — rendement vs bêta", "Security Market Line — return vs beta"),
                                    config.COL_CYAN)
         rows = s["rows"]
         betas = [r["beta"] for r in rows]
@@ -343,13 +366,16 @@ class ValuationApp(DesktopApp):
             col = (config.COL_UP if r["alpha"] > 0 else config.COL_DOWN)
             pygame.draw.circle(surf, col, pt, 3 if r["ticker"] in held else 2,
                                0 if r["ticker"] in held else 1)
-        widgets.draw_text(surf, f"droite : r = rf {s['rf'] * 100:.0f}% + β × "
+        widgets.draw_text(surf, _L(f"droite : r = rf {s['rf'] * 100:.0f}% + β × "
                           f"(marché {s['r_market'] * 100:.0f}% − rf) · "
                           "au-dessus = alpha CAPM positif · points pleins = détenues",
+                          f"line: r = rf {s['rf'] * 100:.0f}% + β × "
+                          f"(market {s['r_market'] * 100:.0f}% − rf) · "
+                          "above = positive CAPM alpha · filled dots = held"),
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)
         # table des meilleurs alphas
-        tinner = widgets.draw_panel(surf, table, "Meilleurs alphas (clic → DCF)",
+        tinner = widgets.draw_panel(surf, table, _L("Meilleurs alphas (clic → DCF)", "Best alphas (click → DCF)"),
                                     config.COL_UP)
         yy = tinner.y + 2
         for r in rows[:14]:
@@ -371,13 +397,16 @@ class ValuationApp(DesktopApp):
         self._adj_rects = {}
         b = self._bridge
         inner = widgets.draw_panel(surf, body,
-                                   "Pont de création de valeur (EBITDA d'entrée "
-                                   "normalisé à 100)", config.COL_AMBER)
+                                   _L("Pont de création de valeur (EBITDA d'entrée "
+                                   "normalisé à 100)",
+                                   "Value-creation bridge (entry EBITDA "
+                                   "normalized to 100)"), config.COL_AMBER)
         y = inner.y + 2
-        for name, label, _lo, _hi, _step, unit in LBO_PARAMS:
+        for name, labelpair, _lo, _hi, _step, unit in LBO_PARAMS:
+            label = _L(*labelpair)
             v = self.lbo[name]
             txt = (f"{label} : {v:.0%}" if unit == "%" else
-                   f"{label} : {v:g}{'×' if unit == '×' else ' ans' if unit == 'a' else ''}")
+                   f"{label} : {v:g}{'×' if unit == '×' else (_L(' ans', ' yrs')) if unit == 'a' else ''}")
             widgets.draw_text(surf, txt, (inner.x, y + 2), fonts.tiny(bold=True),
                               config.COL_TEXT)
             x = inner.x + 230
@@ -394,11 +423,11 @@ class ValuationApp(DesktopApp):
         y += 34
         # pont en barres : equity entrée → +3 effets → equity sortie
         effects = [
-            ("Fonds propres entrée", b["equity0"], config.COL_TEXT_DIM),
-            ("+ Croissance EBITDA", b["growth_effect"], config.COL_UP),
-            ("+ Expansion multiple", b["multiple_effect"], config.COL_CYAN),
-            ("+ Désendettement", b["paydown_effect"], config.COL_AMBER),
-            ("= Fonds propres sortie", b["equity_end"], config.COL_WHITE),
+            (_L("Fonds propres entrée", "Entry equity"), b["equity0"], config.COL_TEXT_DIM),
+            (_L("+ Croissance EBITDA", "+ EBITDA growth"), b["growth_effect"], config.COL_UP),
+            (_L("+ Expansion multiple", "+ Multiple expansion"), b["multiple_effect"], config.COL_CYAN),
+            (_L("+ Désendettement", "+ Deleveraging"), b["paydown_effect"], config.COL_AMBER),
+            (_L("= Fonds propres sortie", "= Exit equity"), b["equity_end"], config.COL_WHITE),
         ]
         vmax = max(abs(v) for _l, v, _c in effects) or 1.0
         bar_w = inner.w - 330
@@ -409,14 +438,18 @@ class ValuationApp(DesktopApp):
             pygame.draw.rect(surf, col, pygame.Rect(bx, y + 2, max(2, w), 12),
                              border_radius=2)
             widgets.draw_text(surf, f"{v:+,.0f}" if "=" not in label and
-                              "entrée" not in label else f"{v:,.0f}",
+                              _L("entrée", "Entry") not in label and "Entry" not in label else f"{v:,.0f}",
                               (bx + w + 8, y), fonts.tiny(bold=True), col)
             y += 24
         y += 4
-        widgets.draw_text(surf, f"Dette : {b['debt0']:,.0f} → {b['debt_end']:,.0f} "
+        widgets.draw_text(surf, _L(f"Dette : {b['debt0']:,.0f} → {b['debt_end']:,.0f} "
                           f"(cash sweep) · EV sortie {b['exit_ev']:,.0f}",
+                          f"Debt: {b['debt0']:,.0f} → {b['debt_end']:,.0f} "
+                          f"(cash sweep) · exit EV {b['exit_ev']:,.0f}"),
                           (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
-        widgets.draw_text(surf, "Invariant : croissance + multiple + désendettement "
+        widgets.draw_text(surf, _L("Invariant : croissance + multiple + désendettement "
                           "= gain de fonds propres, exactement.",
+                          "Invariant: growth + multiple + deleveraging "
+                          "= equity gain, exactly."),
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)

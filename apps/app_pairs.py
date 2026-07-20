@@ -19,9 +19,14 @@ import math
 import pygame
 
 from apps.base import DesktopApp
-from core import config, unlocks
+from core import config, i18n, unlocks
 from core import pairs as PAIRS
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
 
 NOTIONAL_CHOICES = [50_000.0, 100_000.0, 250_000.0]
 
@@ -82,26 +87,32 @@ class PairsApp(DesktopApp):
         p = self.app.gs.player
         if not unlocks.unlocked(p, "leverage"):
             g = unlocks.effective_required_grade(p, "leverage")
-            self._say(f"Vente à découvert verrouillée (grade {config.GRADES[g]}).",
+            self._say(_L(f"Vente à découvert verrouillée (grade {config.GRADES[g]}).",
+                         f"Short selling locked (grade {config.GRADES[g]})."),
                       config.COL_DOWN)
             return
         if self._eg is None or self.pair is None:
             return
         sig = PAIRS.signal(self._eg["z_last"])
         if sig not in ("long_spread", "short_spread"):
-            self._say("Pas de signal d'entrée (|z| < 2) — patience, c'est la "
-                      "moitié du métier.", config.COL_AMBER)
+            self._say(_L("Pas de signal d'entrée (|z| < 2) — patience, c'est la "
+                      "moitié du métier.",
+                      "No entry signal (|z| < 2) — patience, that's "
+                      "half the job."), config.COL_AMBER)
             return
         r = PAIRS.execute_pair(p, self.market, self.pair[0], self.pair[1],
                                sig, self.notional)
         if r.get("ok"):
             legs = " · ".join(f"{leg['side'].upper()} {leg['qty']} {leg['ticker']}"
                               for leg in r["legs"])
-            self._say(f"Paire exécutée ({legs}) — débouclez vers z ≈ 0.",
+            self._say(_L(f"Paire exécutée ({legs}) — débouclez vers z ≈ 0.",
+                      f"Pair executed ({legs}) — unwind toward z ≈ 0."),
                       config.COL_UP)
         else:
-            self._say(f"Refusé : {r.get('reason', '?')} "
-                      f"({r.get('failed_leg', '')}).", config.COL_DOWN)
+            self._say(_L(f"Refusé : {r.get('reason', '?')} "
+                      f"({r.get('failed_leg', '')}).",
+                      f"Rejected: {r.get('reason', '?')} "
+                      f"({r.get('failed_leg', '')})."), config.COL_DOWN)
 
     def _say(self, text, col):
         self.msg, self.msg_col = text, col
@@ -111,12 +122,15 @@ class PairsApp(DesktopApp):
         self._ensure_computed()
         surf.fill(config.COL_BG, rect)
         pad = 14
-        widgets.draw_text(surf, "PAIRS TRADING — ARBITRAGE STATISTIQUE",
+        widgets.draw_text(surf, _L("PAIRS TRADING — ARBITRAGE STATISTIQUE", "PAIRS TRADING — STATISTICAL ARBITRAGE"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
-        widgets.draw_text(surf, "Deux titres cointégrés = un élastique : on "
+        widgets.draw_text(surf, _L("Deux titres cointégrés = un élastique : on "
                           "vend l'écart quand il est tendu, on encaisse quand "
-                          "il revient.", (rect.x + pad, rect.y + 30),
+                          "il revient.",
+                          "Two cointegrated stocks = a rubber band: you "
+                          "sell the gap when it's stretched, you cash in when "
+                          "it snaps back."), (rect.x + pad, rect.y + 30),
                           fonts.tiny(), config.COL_TEXT_DIM)
         body = pygame.Rect(rect.x + pad, rect.y + 52, rect.w - 2 * pad,
                            rect.bottom - pad - rect.y - 52)
@@ -132,12 +146,12 @@ class PairsApp(DesktopApp):
         self._draw_panel(surf, panel)
 
     def _draw_scanner(self, surf, rect):
-        inner = widgets.draw_panel(surf, rect, "Scanner (les + cointégrées)",
+        inner = widgets.draw_panel(surf, rect, _L("Scanner (les + cointégrées)", "Scanner (most cointegrated)"),
                                    config.COL_CYAN)
         self._pair_rects = {}
         y = inner.y + 2
         if not self._scan:
-            widgets.draw_text(surf, "Historique insuffisant.", (inner.x, y),
+            widgets.draw_text(surf, _L("Historique insuffisant.", "Insufficient history."), (inner.x, y),
                               fonts.tiny(), config.COL_TEXT_DIM)
         for tka, tkb, adf, z in self._scan:
             r = pygame.Rect(inner.x - 4, y - 2, inner.w + 8, 34)
@@ -153,7 +167,7 @@ class PairsApp(DesktopApp):
             widgets.draw_text(surf, f"ADF {adf:.2f} · z {z:+.1f}",
                               (inner.x + 8, y + 16), fonts.tiny(), zcol)
             y += 36
-        scan_hint = "ADF < −3 ⇒ spread stationnaire (cointégré)."
+        scan_hint = _L("ADF < −3 ⇒ spread stationnaire (cointégré).", "ADF < −3 ⇒ stationary spread (cointegrated).")
         scan_font = fonts.tiny()
         scan_lines = len(widgets.wrap_text_lines(scan_hint, scan_font, inner.w))
         scan_h = scan_lines * (scan_font.get_height() + 3)
@@ -162,11 +176,11 @@ class PairsApp(DesktopApp):
 
     def _draw_spread(self, surf, rect):
         title = (f"Spread ln({self.pair[0]}) − β·ln({self.pair[1]})"
-                 if self.pair else "Spread")
+                 if self.pair else "Spread")  # noqa: RUF001
         inner = widgets.draw_panel(surf, rect, title, config.COL_UP)
         eg = self._eg
         if eg is None:
-            widgets.draw_text(surf, "Sélectionnez une paire.", (inner.x, inner.y + 6),
+            widgets.draw_text(surf, _L("Sélectionnez une paire.", "Select a pair."), (inner.x, inner.y + 6),
                               fonts.tiny(), config.COL_TEXT_DIM)
             return
         z = eg["z"]
@@ -190,12 +204,12 @@ class PairsApp(DesktopApp):
                for i, v in enumerate(z)]
         pygame.draw.aalines(surf, config.COL_CYAN, False, pts)
         pygame.draw.circle(surf, config.COL_WHITE, pts[-1], 3)
-        widgets.draw_text(surf, "±2σ = entrée · retour à 0 = sortie",
+        widgets.draw_text(surf, _L("±2σ = entrée · retour à 0 = sortie", "±2σ = entry · return to 0 = exit"),
                           (inner.x, inner.bottom - 12), fonts.tiny(),
                           config.COL_TEXT_DIM)
 
     def _draw_panel(self, surf, rect):
-        inner = widgets.draw_panel(surf, rect, "Diagnostic & exécution",
+        inner = widgets.draw_panel(surf, rect, _L("Diagnostic & exécution", "Diagnostic & execution"),
                                    config.COL_AMBER)
         eg = self._eg
         if eg is None:
@@ -204,28 +218,35 @@ class PairsApp(DesktopApp):
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
         y = inner.y + 2
         ccol = config.COL_UP if eg["cointegrated"] else config.COL_DOWN
-        verdict = ("COINTÉGRÉE (spread stationnaire)" if eg["cointegrated"]
-                   else "non cointégrée — l'élastique n'est pas prouvé")
+        verdict = (_L("COINTÉGRÉE (spread stationnaire)", "COINTEGRATED (stationary spread)") if eg["cointegrated"]
+                   else _L("non cointégrée — l'élastique n'est pas prouvé", "not cointegrated — the rubber band isn't proven"))
         widgets.draw_text(surf, f"β = {eg['beta']:.2f} · ADF {eg['adf_t']:.2f} "
                           f"(seuil {PAIRS.ADF_CRITICAL}) · corr {eg['corr']:+.2f}",
                           (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 20
         widgets.draw_text(surf, verdict, (inner.x, y), fonts.small(bold=True), ccol)
         y += 20
-        hl = (f"{eg['half_life']:.0f} pas (≈ {eg['half_life'] * 5:.0f} j)"
-              if math.isfinite(eg["half_life"]) else "∞ (pas de retour)")
-        widgets.draw_text(surf, f"Half-life du retour à la moyenne : {hl}",
+        hl = (_L(f"{eg['half_life']:.0f} pas (≈ {eg['half_life'] * 5:.0f} j)", f"{eg['half_life']:.0f} steps (≈ {eg['half_life'] * 5:.0f} d)")
+              if math.isfinite(eg["half_life"]) else _L("∞ (pas de retour)", "∞ (no reversion)"))
+        widgets.draw_text(surf, _L(f"Half-life du retour à la moyenne : {hl}", f"Mean-reversion half-life: {hl}"),
                           (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
         y += 22
         sig = PAIRS.signal(eg["z_last"])
         sig_txt = {
-            "long_spread": f"z = {eg['z_last']:+.2f} → LONG SPREAD : acheter "
+            "long_spread": _L(f"z = {eg['z_last']:+.2f} → LONG SPREAD : acheter "
                            f"{self.pair[0]}, shorter {self.pair[1]}",
-            "short_spread": f"z = {eg['z_last']:+.2f} → SHORT SPREAD : shorter "
+                           f"z = {eg['z_last']:+.2f} → LONG SPREAD: buy "
+                           f"{self.pair[0]}, short {self.pair[1]}"),
+            "short_spread": _L(f"z = {eg['z_last']:+.2f} → SHORT SPREAD : shorter "
                             f"{self.pair[0]}, acheter {self.pair[1]}",
-            "exit": f"z = {eg['z_last']:+.2f} → zone de SORTIE (déboucler une "
+                            f"z = {eg['z_last']:+.2f} → SHORT SPREAD: short "
+                            f"{self.pair[0]}, buy {self.pair[1]}"),
+            "exit": _L(f"z = {eg['z_last']:+.2f} → zone de SORTIE (déboucler une "
                     "paire en cours)",
-            "hold": f"z = {eg['z_last']:+.2f} → pas de signal (|z| < 2)",
+                    f"z = {eg['z_last']:+.2f} → EXIT zone (unwind an "
+                    "open pair)"),
+            "hold": _L(f"z = {eg['z_last']:+.2f} → pas de signal (|z| < 2)",
+                    f"z = {eg['z_last']:+.2f} → no signal (|z| < 2)"),
         }[sig]
         scol = (config.COL_UP if sig in ("long_spread", "short_spread")
                 else config.COL_TEXT_DIM)
@@ -233,7 +254,7 @@ class PairsApp(DesktopApp):
                                                  inner.w),
                           (inner.x, y), fonts.small(bold=True), scol)
         y += 26
-        widgets.draw_text(surf, "Notionnel :", (inner.x, y + 3), fonts.tiny(),
+        widgets.draw_text(surf, _L("Notionnel :", "Notional:"), (inner.x, y + 3), fonts.tiny(),
                           config.COL_TEXT_DIM)
         x = inner.x + 70
         self._notional_rects = {}
@@ -254,7 +275,7 @@ class PairsApp(DesktopApp):
         self._exec_btn = pygame.Rect(x + 12, y - 2, 190, 24)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._exec_btn, border_radius=4)
         pygame.draw.rect(surf, scol, self._exec_btn, 1, border_radius=4)
-        widgets.draw_text(surf, "EXÉCUTER LA PAIRE", self._exec_btn.center,
+        widgets.draw_text(surf, _L("EXÉCUTER LA PAIRE", "EXECUTE THE PAIR"), self._exec_btn.center,
                           fonts.small(bold=True), scol, align="center")
         if self.msg:
             widgets.draw_text(surf, widgets.fit_text(self.msg, fonts.tiny(), inner.w),

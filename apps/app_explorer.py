@@ -20,7 +20,7 @@ import pygame
 from apps.base import DesktopApp
 from core import bonds as B
 from core import commodities as C
-from core import config, intraday
+from core import config, i18n, intraday
 from core import crypto as CRY
 from core import etfs as ETF
 from core import fx as FX
@@ -32,6 +32,24 @@ from ui.popups import PopupMixin
 ROW_H = 24
 SORT_FIELDS = [("name", "NOM"), ("price", "COURS"), ("value", "VALEUR"),
                ("yield_pct", "RENDEMENT"), ("change_pct", "VAR %")]
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
+
+_UI_EN = {
+    "TOUTES": "ALL", "ACTIONS": "EQUITIES", "ETF": "ETF", "OBLIGATIONS": "BONDS",
+    "COMMODITIES": "COMMODITIES", "CRYPTO": "CRYPTO", "FX": "FX",
+    "GOUVERNEMENTS": "GOVERNMENTS", "NOM": "NAME", "TYPE": "TYPE", "RÉGION": "REGION",
+    "SECTEUR / CAT.": "SECTOR / CAT.", "COURS": "PRICE", "VALEUR": "VALUE",
+    "RENDEMENT": "YIELD", "VAR %": "CHG %", "Action": "Equity", "Oblig.": "Bond",
+    "Cmdty": "Cmdty", "Gouv.": "Govt.",
+}
+
+
+def _tr(lbl):
+    return _UI_EN.get(lbl, lbl) if i18n.get_lang() == "en" else lbl
+
+
 TYPE_CHIPS = [(None, "TOUTES"), ("Action", "ACTIONS"), ("ETF", "ETF"),
               ("Obligation", "OBLIGATIONS"), ("Commodity", "COMMODITIES"),
               ("Crypto", "CRYPTO"), ("FX", "FX"), ("Gouvernement", "GOUVERNEMENTS")]
@@ -273,30 +291,30 @@ class ExplorerApp(DesktopApp, PopupMixin):
         p = self.app.gs.player
         if not self._can_watch():
             g = unlocks_mod.effective_required_grade(p, "analyst")
-            self.app.notify(f"Watchlist verrouillée (débloqué au grade {config.GRADES[g]}).", "warn")
+            self.app.notify(_L(f"Watchlist verrouillée (débloqué au grade {config.GRADES[g]}).", f"Watchlist locked (unlocked at grade {config.GRADES[g]})."), "warn")
             return
         attr = WATCHLIST_ATTR.get(kind)
         if attr is None:
-            self.app.notify(f"{kind} se consulte via sa fiche (clic), pas de watchlist dédiée.", "info")
+            self.app.notify(_L(f"{kind} se consulte via sa fiche (clic), pas de watchlist dédiée.", f"{kind} is viewed via its sheet (click), no dedicated watchlist."), "info")
             return
         lst = getattr(p, attr)
         if key in lst:
-            self.app.notify(f"{key} est déjà dans la liste de suivi.", "info")
+            self.app.notify(_L(f"{key} est déjà dans la liste de suivi.", f"{key} is already tracked."), "info")
             return
         cap = WATCHLIST_CAP.get(kind)
         if cap and len(lst) >= cap:
-            self.app.notify(f"Limite de {cap} atteinte — retirez-en un avant d'en ajouter un autre.", "warn")
+            self.app.notify(_L(f"Limite de {cap} atteinte — retirez-en un avant d'en ajouter un autre.", f"Limit of {cap} reached — remove one before adding another."), "warn")
             return
         lst.append(key)
         if kind == "Action":
             self.market.track_company(key)
-        self.app.notify(f"{key} ajouté à la liste de suivi.", "good")
+        self.app.notify(_L(f"{key} ajouté à la liste de suivi.", f"{key} added to tracking."), "good")
 
     def _bulk_add(self):
         p = self.app.gs.player
         if not self._can_watch():
             g = unlocks_mod.effective_required_grade(p, "analyst")
-            self.app.notify(f"Watchlist verrouillée (débloqué au grade {config.GRADES[g]}).", "warn")
+            self.app.notify(_L(f"Watchlist verrouillée (débloqué au grade {config.GRADES[g]}).", f"Watchlist locked (unlocked at grade {config.GRADES[g]})."), "warn")
             return
         added, dup, capped = 0, 0, 0
         for kind, key in sorted(self.selected):
@@ -319,15 +337,15 @@ class ExplorerApp(DesktopApp, PopupMixin):
         if added:
             extra = []
             if dup:
-                extra.append(f"{dup} déjà présente(s)")
+                extra.append(_L(f"{dup} déjà présente(s)", f"{dup} already tracked"))
             if capped:
-                extra.append(f"{capped} refusée(s) (limite atteinte)")
+                extra.append(_L(f"{capped} refusée(s) (limite atteinte)", f"{capped} rejected (limit reached)"))
             suffix = f" ({', '.join(extra)})" if extra else ""
-            self.app.notify(f"{added} actif(s) ajouté(s) à la liste de suivi.{suffix}", "good")
+            self.app.notify(_L(f"{added} actif(s) ajouté(s) à la liste de suivi.{suffix}", f"{added} asset(s) added to tracking.{suffix}"), "good")
         elif capped:
-            self.app.notify("Limite de watchlist atteinte pour la sélection.", "warn")
+            self.app.notify(_L("Limite de watchlist atteinte pour la sélection.", "Watchlist limit reached for the selection."), "warn")
         elif dup:
-            self.app.notify("Sélection déjà entièrement suivie.", "info")
+            self.app.notify(_L("Sélection déjà entièrement suivie.", "Selection already fully tracked."), "info")
 
     # --------------------------------------------------------------- events
     def handle_event(self, event, rect):
@@ -488,10 +506,10 @@ class ExplorerApp(DesktopApp, PopupMixin):
         p = self.app.gs.player
         cur = config.CONTINENTS[p.continent]["currency"]
         pad = 14
-        widgets.draw_text(surf, "EXPLORATEUR DE MARCHÉ", (rect.x + pad, rect.y + 8),
+        widgets.draw_text(surf, _L("EXPLORATEUR DE MARCHÉ", "MARKET EXPLORER"), (rect.x + pad, rect.y + 8),
                           fonts.head(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, widgets.fit_text(
-            "clic = détail · Ctrl+clic / Shift+clic = sélection · clic droit = ajout rapide",
+            _L("clic = détail · Ctrl+clic / Shift+clic = sélection · clic droit = ajout rapide", "click = detail · Ctrl+click / Shift+click = select · right-click = quick add"),
             fonts.tiny(), rect.w - 2 * pad - 240),
                           (rect.x + pad, rect.y + 34), fonts.tiny(), config.COL_TEXT_DIM)
         # boutons haut-droit : + AJOUTER (sélection) et SHOP (contexte conservé)
@@ -519,7 +537,7 @@ class ExplorerApp(DesktopApp, PopupMixin):
         pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, search_rect, 1, border_radius=4)
         cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        label = (self.search + cursor) if self.search else (cursor + "Rechercher…")
+        label = (self.search + cursor) if self.search else (cursor + _L("Rechercher…", "Search…"))
         col = config.COL_TEXT if self.search else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
                           (search_rect.x + 8, search_rect.y + 4), fonts.small(), col)
@@ -530,10 +548,10 @@ class ExplorerApp(DesktopApp, PopupMixin):
                               config.COL_TEXT_DIM, align="center")
 
         self._type_rects, y = self._draw_chip_row(surf, search_rect.right + 12, top,
-                                                   rect.right - pad, TYPE_CHIPS,
+                                                   rect.right - pad, [(v, _tr(l)) for v, l in TYPE_CHIPS],
                                                    self.type_filter, config.COL_AMBER)
         y = max(y, top + 28)
-        region_chips = [(None, "TOUTES")] + [(r, r) for r in self.market.regions]
+        region_chips = [(None, _tr("TOUTES"))] + [(r, r) for r in self.market.regions]
         self._region_rects, y = self._draw_chip_row(surf, x0, y + 2, rect.right - pad,
                                                      region_chips, self.region_filter, config.COL_CYAN)
         sub_opts = self._sub_options()
@@ -569,7 +587,7 @@ class ExplorerApp(DesktopApp, PopupMixin):
         if panel.h < 50:
             self.popups_draw(surf)
             return
-        inner = widgets.draw_panel(surf, panel, f"Résultats ({len(filtered)})", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L(f"Résultats ({len(filtered)})", f"Results ({len(filtered)})"), config.COL_CYAN)
         wide = inner.w >= 900
         if wide:
             cols = [("NOM", 0), ("TYPE", 270), ("SECTEUR / CAT.", 350), ("RÉGION", 540),
@@ -579,7 +597,7 @@ class ExplorerApp(DesktopApp, PopupMixin):
                     ("COURS", 380), ("VALEUR", 470), ("RENDEMENT", 580), ("VAR %", 670)]
         for lbl, dx in cols:
             if inner.x + dx < inner.right - 40:
-                widgets.draw_text(surf, lbl, (inner.x + dx, inner.y), fonts.tiny(bold=True),
+                widgets.draw_text(surf, _tr(lbl), (inner.x + dx, inner.y), fonts.tiny(bold=True),
                                   config.COL_TEXT_DIM)
 
         list_top = inner.y + 22
@@ -605,10 +623,10 @@ class ExplorerApp(DesktopApp, PopupMixin):
         self.scroll = widgets.draw_scrollbar(surf, panel, list_area, self.scroll,
                                               self._max_scroll, content_h)
 
-        sel_txt = (f"{len(self.selected)} sélectionnée(s)" if self.selected
-                   else "Aucune sélection" if self._can_watch()
-                   else f"Sélection : débloqué au grade "
-                        f"{config.GRADES[unlocks_mod.effective_required_grade(p, 'analyst')]}")
+        sel_txt = (_L(f"{len(self.selected)} sélectionnée(s)", f"{len(self.selected)} selected") if self.selected
+                   else _L("Aucune sélection", "No selection") if self._can_watch()
+                   else _L(f"Sélection : débloqué au grade {config.GRADES[unlocks_mod.effective_required_grade(p, 'analyst')]}",
+                           f"Selection: unlocked at grade {config.GRADES[unlocks_mod.effective_required_grade(p, 'analyst')]}"))
         widgets.draw_text(surf, sel_txt, (inner.x, inner.bottom - 6), fonts.tiny(), config.COL_TEXT_DIM)
         self.popups_draw(surf)
 
@@ -630,7 +648,7 @@ class ExplorerApp(DesktopApp, PopupMixin):
         name_w = col_map["TYPE"] - 10
         widgets.draw_text(surf, widgets.fit_text(r["name"], fonts.small(bold=True), name_w),
                           (inner.x, y), fonts.small(bold=True), kcol)
-        widgets.draw_text(surf, KIND_LABEL.get(kind, kind), (inner.x + col_map["TYPE"], y),
+        widgets.draw_text(surf, _tr(KIND_LABEL.get(kind, kind)), (inner.x + col_map["TYPE"], y),
                           fonts.tiny(bold=True), kcol)
         if wide:
             widgets.draw_text(surf, widgets.fit_text(str(r["sub"]), fonts.tiny(), 180),

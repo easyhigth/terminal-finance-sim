@@ -28,7 +28,7 @@ import pygame
 
 from core import bonds as B
 from core import commodities as C
-from core import config, intraday
+from core import config, i18n, intraday
 from core import crypto as CRY
 from core import etfs as ETF
 from core import fx as FX
@@ -41,6 +41,24 @@ from ui.popups import PopupMixin
 ROW_H = 24
 SORT_FIELDS = [("name", "NOM"), ("price", "COURS"), ("value", "VALEUR"),
                ("yield_pct", "RENDEMENT"), ("change_pct", "VAR %")]
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
+
+_UI_EN = {
+    "TOUTES": "ALL", "ACTIONS": "EQUITIES", "ETF": "ETF", "OBLIGATIONS": "BONDS",
+    "COMMODITIES": "COMMODITIES", "CRYPTO": "CRYPTO", "FX": "FX",
+    "GOUVERNEMENTS": "GOVERNMENTS", "NOM": "NAME", "TYPE": "TYPE", "RÉGION": "REGION",
+    "SECTEUR / CAT.": "SECTOR / CAT.", "COURS": "PRICE", "VALEUR": "VALUE",
+    "RENDEMENT": "YIELD", "VAR %": "CHG %", "Action": "Equity", "Oblig.": "Bond",
+    "Cmdty": "Cmdty", "Gouv.": "Govt.",
+}
+
+
+def _tr(lbl):
+    return _UI_EN.get(lbl, lbl) if i18n.get_lang() == "en" else lbl
+
+
 TYPE_CHIPS = [(None, "TOUTES"), ("Action", "ACTIONS"), ("ETF", "ETF"),
               ("Obligation", "OBLIGATIONS"), ("Commodity", "COMMODITIES"),
               ("Crypto", "CRYPTO"), ("FX", "FX"), ("Gouvernement", "GOUVERNEMENTS")]
@@ -274,30 +292,30 @@ class MarketExplorerScene(Scene, PopupMixin):
         p = self.app.gs.player
         if not self._can_watch():
             g = unlocks_mod.effective_required_grade(p, "analyst")
-            self.app.notify(f"Watchlist verrouillée (débloqué au grade {config.GRADES[g]}).", "warn")
+            self.app.notify(_L(f"Watchlist verrouillée (débloqué au grade {config.GRADES[g]}).", f"Watchlist locked (unlocked at grade {config.GRADES[g]})."), "warn")
             return
         attr = WATCHLIST_ATTR.get(kind)
         if attr is None:
-            self.app.notify(f"{kind} se consulte via sa fiche (clic), pas de watchlist dédiée.", "info")
+            self.app.notify(_L(f"{kind} se consulte via sa fiche (clic), pas de watchlist dédiée.", f"{kind} is viewed via its sheet (click), no dedicated watchlist."), "info")
             return
         lst = getattr(p, attr)
         if key in lst:
-            self.app.notify(f"{key} est déjà dans la liste de suivi.", "info")
+            self.app.notify(_L(f"{key} est déjà dans la liste de suivi.", f"{key} is already tracked."), "info")
             return
         cap = WATCHLIST_CAP.get(kind)
         if cap and len(lst) >= cap:
-            self.app.notify(f"Limite de {cap} atteinte — retirez-en un avant d'en ajouter un autre.", "warn")
+            self.app.notify(_L(f"Limite de {cap} atteinte — retirez-en un avant d'en ajouter un autre.", f"Limit of {cap} reached — remove one before adding another."), "warn")
             return
         lst.append(key)
         if kind == "Action":
             self.market.track_company(key)
-        self.app.notify(f"{key} ajouté à la liste de suivi.", "good")
+        self.app.notify(_L(f"{key} ajouté à la liste de suivi.", f"{key} added to tracking."), "good")
 
     def _bulk_add(self):
         p = self.app.gs.player
         if not self._can_watch():
             g = unlocks_mod.effective_required_grade(p, "analyst")
-            self.app.notify(f"Watchlist verrouillée (débloqué au grade {config.GRADES[g]}).", "warn")
+            self.app.notify(_L(f"Watchlist verrouillée (débloqué au grade {config.GRADES[g]}).", f"Watchlist locked (unlocked at grade {config.GRADES[g]})."), "warn")
             return
         added, dup, capped = 0, 0, 0
         for kind, key in sorted(self.selected):
@@ -320,15 +338,15 @@ class MarketExplorerScene(Scene, PopupMixin):
         if added:
             extra = []
             if dup:
-                extra.append(f"{dup} déjà présente(s)")
+                extra.append(_L(f"{dup} déjà présente(s)", f"{dup} already tracked"))
             if capped:
-                extra.append(f"{capped} refusée(s) (limite atteinte)")
+                extra.append(_L(f"{capped} refusée(s) (limite atteinte)", f"{capped} rejected (limit reached)"))
             suffix = f" ({', '.join(extra)})" if extra else ""
-            self.app.notify(f"{added} actif(s) ajouté(s) à la liste de suivi.{suffix}", "good")
+            self.app.notify(_L(f"{added} actif(s) ajouté(s) à la liste de suivi.{suffix}", f"{added} asset(s) added to tracking.{suffix}"), "good")
         elif capped:
-            self.app.notify("Limite de watchlist atteinte pour la sélection.", "warn")
+            self.app.notify(_L("Limite de watchlist atteinte pour la sélection.", "Watchlist limit reached for the selection."), "warn")
         elif dup:
-            self.app.notify("Sélection déjà entièrement suivie.", "info")
+            self.app.notify(_L("Sélection déjà entièrement suivie.", "Selection already fully tracked."), "info")
 
     # --------------------------------------------------------------- events
     def handle_event(self, event):
@@ -488,10 +506,9 @@ class MarketExplorerScene(Scene, PopupMixin):
         surf.fill(config.COL_BG)
         p = self.app.gs.player
         cur = config.CONTINENTS[p.continent]["currency"]
-        widgets.draw_text(surf, "EXPLORATEUR DE MARCHÉ", (40, 22), fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Actions · ETF (dont thèmes ESG) · obligations/crédit/souverains · "
-                                "commodities · crypto · FX — clic = détail · "
-                                "Ctrl+clic / Shift+clic = sélection · clic droit = ajout rapide",
+        widgets.draw_text(surf, _L("EXPLORATEUR DE MARCHÉ", "MARKET EXPLORER"), (40, 22), fonts.title(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L("Actions · ETF (dont thèmes ESG) · obligations/crédit/souverains · commodities · crypto · FX — clic = détail · Ctrl+clic / Shift+clic = sélection · clic droit = ajout rapide",
+                                   "Equities · ETFs (incl. ESG themes) · bonds/credit/sovereigns · commodities · crypto · FX — click = detail · Ctrl+click / Shift+click = select · right-click = quick add"),
                           (42, 72), fonts.tiny(), config.COL_TEXT_DIM)
 
         mp = pygame.mouse.get_pos()
@@ -515,10 +532,10 @@ class MarketExplorerScene(Scene, PopupMixin):
 
         # ---- chips TYPE ----
         self._type_rects, _ = self._draw_chip_row(surf, x0 + 310, top, config.SCREEN_WIDTH - 40,
-                                                   TYPE_CHIPS, self.type_filter, config.COL_AMBER)
+                                                   [(v, _tr(l)) for v, l in TYPE_CHIPS], self.type_filter, config.COL_AMBER)
 
         # ---- chips RÉGION ----
-        region_chips = [(None, "TOUTES")] + [(r, r) for r in self.market.regions]
+        region_chips = [(None, _tr("TOUTES"))] + [(r, r) for r in self.market.regions]
         self._region_rects, y = self._draw_chip_row(surf, x0, top + 30, config.SCREEN_WIDTH - 40,
                                                      region_chips, self.region_filter, config.COL_CYAN)
 
@@ -558,7 +575,7 @@ class MarketExplorerScene(Scene, PopupMixin):
         # ---- panneau résultats ----
         filtered = self._filtered_sorted()
         panel = pygame.Rect(x0, y, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - y)
-        inner = widgets.draw_panel(surf, panel, f"Résultats ({len(filtered)})", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L(f"Résultats ({len(filtered)})", f"Results ({len(filtered)})"), config.COL_CYAN)
         cols = [("NOM", 0), ("TYPE", 270), ("SECTEUR / CAT.", 350), ("RÉGION", 540),
                 ("COURS", 650), ("VALEUR", 750), ("RENDEMENT", 870), ("VAR %", 990)]
         for label, dx in cols:
@@ -592,9 +609,9 @@ class MarketExplorerScene(Scene, PopupMixin):
             bar_y = list_area.y + int((list_area.h - bar_h) * (self.scroll / self._max_scroll))
             pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 6, bar_h), border_radius=3)
 
-        sel_txt = (f"{len(self.selected)} sélectionnée(s)" if self.selected
-                   else "Aucune sélection" if self._can_watch()
-                   else f"Sélection : débloqué au grade "
+        sel_txt = (_L(f"{len(self.selected)} sélectionnée(s)", f"{len(self.selected)} selected") if self.selected
+                   else _L("Aucune sélection", "No selection") if self._can_watch()
+                   else _L("Sélection : débloqué au grade ", "Selection: unlocked at grade ") +
                         f"{config.GRADES[unlocks_mod.effective_required_grade(self.app.gs.player, 'analyst')]}")
         widgets.draw_text(surf, sel_txt, (inner.x, inner.bottom - 6), fonts.tiny(), config.COL_TEXT_DIM)
 
@@ -622,7 +639,7 @@ class MarketExplorerScene(Scene, PopupMixin):
         c0 = cols[0][1]
         widgets.draw_text(surf, widgets.fit_text(r["name"], fonts.small(bold=True), 260),
                           (inner.x + c0, y), fonts.small(bold=True), kcol)
-        widgets.draw_text(surf, KIND_LABEL.get(kind, kind), (inner.x + cols[1][1], y),
+        widgets.draw_text(surf, _tr(KIND_LABEL.get(kind, kind)), (inner.x + cols[1][1], y),
                           fonts.tiny(bold=True), kcol)
         widgets.draw_text(surf, widgets.fit_text(str(r["sub"]), fonts.tiny(), 180),
                           (inner.x + cols[2][1], y + 1), fonts.tiny(), config.COL_TEXT_DIM)

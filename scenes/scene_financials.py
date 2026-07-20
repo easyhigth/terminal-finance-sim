@@ -10,9 +10,13 @@ sous l'angle « santé financière ». Ouvert via FA <ticker> ou « santé finan
 import pygame
 
 from core import charts as charts
-from core import config
+from core import config, i18n
 from core import financials as F
 from core.scene_manager import Scene
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
 from ui import fonts, widgets
 
 N_YEARS = 5    # historique d'exercices affiché
@@ -54,7 +58,7 @@ class FinancialsScene(Scene):
         # spécifique/dérive du rendement du jour, en devise par action)
         self.attribution = (m.factor_attribution({self.ticker: 1.0})
                             if m and self.metrics else None)
-        self.error = None if self.block else f"Société introuvable : {self.ticker}"
+        self.error = None if self.block else _L(f"Société introuvable : {self.ticker}", f"Company not found: {self.ticker}")
         self.name = ""
         self.cur = "$"
         self.accent = config.COL_AMBER
@@ -121,12 +125,12 @@ class FinancialsScene(Scene):
     def _open_spreadsheet(self, which):
         years = [b["year"] for b in self.block]
         if which == "income":
-            title = f"{self.ticker} — Compte de résultat"
+            title = _L(f"{self.ticker} — Compte de résultat", f"{self.ticker} — Income statement")
             lines = self.block[0]["income"]["lines"]
             rows = [(line["label"], [b["income"]["lines"][r]["value"] for b in self.block])
                     for r, line in enumerate(lines)]
         else:
-            title = f"{self.ticker} — Bilan"
+            title = _L(f"{self.ticker} — Bilan", f"{self.ticker} — Balance sheet")
             rows = []
             n_assets = len(self.block[0]["balance"]["assets_lines"])
             for r in range(n_assets):
@@ -214,16 +218,15 @@ class FinancialsScene(Scene):
     def draw(self, surf):
         surf.fill(config.COL_BG)
         self._tooltip = None
-        widgets.draw_text(surf, f"SANTÉ FINANCIÈRE — {self.ticker}", (40, 22),
+        widgets.draw_text(surf, _L(f"SANTÉ FINANCIÈRE — {self.ticker}", f"FINANCIAL HEALTH — {self.ticker}"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         if self.error:
             widgets.draw_error_panel(surf, self.error,
                                      "Utilisez SEARCH <texte> depuis le terminal.", top=90)
             self.back_btn.draw(surf)
             return
-        widgets.draw_text(surf, f"{self.name} · montants en M {self.cur} · analyse complète "
-                                f"(stats, résultats, valeur relative, attribution, "
-                                f"{N_YEARS} exercices)",
+        widgets.draw_text(surf, _L(f"{self.name} · montants en M {self.cur} · analyse complète (stats, résultats, valeur relative, attribution, {N_YEARS} exercices)",
+                                   f"{self.name} · amounts in M {self.cur} · full analysis (stats, earnings, relative value, attribution, {N_YEARS} fiscal years)"),
                           (42, 74), fonts.small(), config.COL_TEXT_DIM)
 
         # ---- bandeau supérieur : stats clés, résultats/valeur relative, cours+attribution ----
@@ -240,7 +243,7 @@ class FinancialsScene(Scene):
             inc_rows.append((line["label"],
                              [b["income"]["lines"][r]["value"] for b in self.block]))
         self._draw_table(surf, pygame.Rect(40, ty, half, ph),
-                         "Compte de résultat", inc_rows, config.COL_CYAN, "inc")
+                         _L("Compte de résultat", "Income statement"), inc_rows, config.COL_CYAN, "inc")
 
         # bilan (droite) : actif puis passif + CP
         bal_rows = []
@@ -282,7 +285,7 @@ class FinancialsScene(Scene):
         self._draw_chart_panel(surf, chart, mt)
 
     def _draw_stats_panel(self, surf, rect, mt):
-        inner = widgets.draw_panel(surf, rect, "Statistiques clés", self.accent)
+        inner = widgets.draw_panel(surf, rect, _L("Statistiques clés", "Key statistics"), self.accent)
         if not mt:
             return
         f2 = lambda v, s="", d=2: ("n.m." if v is None else f"{v:.{d}f}{s}")
@@ -298,14 +301,14 @@ class FinancialsScene(Scene):
         widgets.draw_text(surf, f"{'+' if chg>=0 else ''}{chg:.1f}% (1 an)",
                           (inner.right, inner.y), fonts.small(bold=True), ccol, align="right")
         rows = [
-            ("Capitalisation", widgets.format_money(mt["mktcap"] * 1e6, self.cur)),
+            (_L("Capitalisation", "Market cap"), widgets.format_money(mt["mktcap"] * 1e6, self.cur)),
             ("P/E", f2(mt["pe"], "x", 1)), ("EV/EBITDA", f2(mt["ev_ebitda"], "x", 1)),
             ("P/Sales", f2(mt["ps"], "x", 1)),
-            ("Marge nette", f2(mt["net_margin"] * 100, "%", 1)),
+            (_L("Marge nette", "Net margin"), f2(mt["net_margin"] * 100, "%", 1)),
             ("Dette/EBITDA", f2(mt["nd_ebitda"], "x", 1)),
-            ("Notation crédit", mt["credit_rating"]),
-            ("Rendement div.", f2(mt["div_yield"] * 100, "%", 2)),
-            ("Bêta", f2(mt["beta"], "", 2)),
+            (_L("Notation crédit", "Credit rating"), mt["credit_rating"]),
+            (_L("Rendement div.", "Div. yield"), f2(mt["div_yield"] * 100, "%", 2)),
+            (_L("Bêta", "Beta"), f2(mt["beta"], "", 2)),
         ]
         y = inner.y + 28
         for label, val in rows:
@@ -318,7 +321,7 @@ class FinancialsScene(Scene):
         """Derniers résultats trimestriels (beat/miss, guidance, anticipation,
         PEAD) puis valeur relative vs médiane du secteur (mêmes champs que la
         commande RV du terminal)."""
-        inner = widgets.draw_panel(surf, rect, "Résultats & valeur relative", self.accent)
+        inner = widgets.draw_panel(surf, rect, _L("Résultats & valeur relative", "Earnings & relative value"), self.accent)
         if not mt:
             return
         y = inner.y
@@ -326,31 +329,31 @@ class FinancialsScene(Scene):
         if le:
             ecol = config.COL_UP if le["beat"] else config.COL_DOWN
             verb = "BEAT" if le["beat"] else "MISS"
-            widgets.draw_text(surf, f"Derniers résultats : {verb}", (inner.x, y),
+            widgets.draw_text(surf, _L(f"Derniers résultats : {verb}", f"Last earnings: {verb}"), (inner.x, y),
                               fonts.small(bold=True), ecol)
             y += 17
-            widgets.draw_text_fit(surf, f"Surprise {le['surprise']*100:+.1f}%  ·  "
-                                        f"croissance CA {le['growth']*100:+.1f}%",
+            widgets.draw_text_fit(surf, _L(f"Surprise {le['surprise']*100:+.1f}%  ·  croissance CA {le['growth']*100:+.1f}%",
+                                           f"Surprise {le['surprise']*100:+.1f}%  ·  revenue growth {le['growth']*100:+.1f}%"),
                                   (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM,
                                   max_width=inner.w)
             y += 15
             g_label = le.get("guidance_label")
             if g_label:
-                widgets.draw_text(surf, f"Guidance {g_label}", (inner.x, y),
+                widgets.draw_text(surf, _L(f"Guidance {g_label}", f"Guidance {g_label}"), (inner.x, y),
                                   fonts.tiny(), config.COL_TEXT_DIM)
                 y += 15
         else:
-            widgets.draw_text(surf, "Aucun résultat publié pour l'instant.", (inner.x, y),
+            widgets.draw_text(surf, _L("Aucun résultat publié pour l'instant.", "No earnings published yet."), (inner.x, y),
                               fonts.tiny(), config.COL_TEXT_DIM)
             y += 15
         if mt.get("earnings_anticipation"):
-            widgets.draw_text(surf, f"» Publication dans {mt['steps_to_earnings']} pas",
+            widgets.draw_text(surf, _L(f"» Publication dans {mt['steps_to_earnings']} pas", f"» Earnings in {mt['steps_to_earnings']} steps"),
                               (inner.x, y), fonts.tiny(), config.COL_WARN)
             y += 15
         pead = mt.get("pead_drift_remaining") or 0.0
         if abs(pead) > 1e-4:
             pcol = config.COL_UP if pead > 0 else config.COL_DOWN
-            widgets.draw_text(surf, f"↗ Drift post-résultats résiduel : {pead*100:+.2f}%",
+            widgets.draw_text(surf, _L(f"↗ Drift post-résultats résiduel : {pead*100:+.2f}%", f"↗ Residual post-earnings drift: {pead*100:+.2f}%"),
                               (inner.x, y), fonts.tiny(), pcol)
             y += 15
 
@@ -369,7 +372,7 @@ class FinancialsScene(Scene):
             if not val or not ref:
                 return ("—", config.COL_TEXT_DIM)
             if val < ref * 0.9:
-                return ("décoté", config.COL_UP)
+                return (_L("décoté", "cheap"), config.COL_UP)
             if val > ref * 1.1:
                 return ("cher", config.COL_DOWN)
             return ("en ligne", config.COL_TEXT)
@@ -377,7 +380,7 @@ class FinancialsScene(Scene):
         for label, key in [("P/E", "pe"), ("EV/EBITDA", "ev_ebitda"), ("P/S", "ps")]:
             v, r = mt.get(key), (med.get(key) if med else None)
             txt, col = verdict(v, r)
-            widgets.draw_text(surf, f"{label} {fmt(v)} / méd. {fmt(r)}", (inner.x, y),
+            widgets.draw_text(surf, _L(f"{label} {fmt(v)} / méd. {fmt(r)}", f"{label} {fmt(v)} / med. {fmt(r)}"), (inner.x, y),
                               fonts.tiny(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, txt, (inner.right, y), fonts.tiny(bold=True),
                               col, align="right")
@@ -387,7 +390,7 @@ class FinancialsScene(Scene):
         """Graphe de cours 5 ans + attribution factorielle du dernier pas
         (m.factor_attribution, déjà utilisée pour le P&L du portefeuille,
         appliquée ici à une action détenue de ce titre)."""
-        cinner = widgets.draw_panel(surf, rect, "Cours — 5 ans & attribution", self.accent)
+        cinner = widgets.draw_panel(surf, rect, _L("Cours — 5 ans & attribution", "Price — 5y & attribution"), self.accent)
         chart_h = cinner.h - 56     # réserve fixe en bas pour la ligne d'attribution
         plot_rect = pygame.Rect(cinner.x, cinner.y, cinner.w, chart_h)
         m = self.app.market
@@ -426,8 +429,8 @@ class FinancialsScene(Scene):
         attr = self.attribution
         total = attr["total"] if attr else 0.0
         if attr and abs(total) > 1e-9:
-            parts = [("Dérive", "drift"), ("Monde", "world"), ("Secteur", "sector"),
-                     ("Région", "region"), ("Spécif.", "specific")]
+            parts = [(_L("Dérive", "Drift"), "drift"), (_L("Monde", "World"), "world"), (_L("Secteur", "Sector"), "sector"),
+                     (_L("Région", "Region"), "region"), (_L("Spécif.", "Specific"), "specific")]
             seg_w = cinner.w // len(parts)
             for k, (label, key) in enumerate(parts):
                 share = attr[key] / total * 100.0

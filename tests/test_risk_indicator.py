@@ -89,3 +89,22 @@ def test_max_position_weight_ignores_ticker_with_no_price():
     p, m = _setup(cash=1_000.0)
     p.portfolio["ZZZZ"] = {"shares": 100.0, "avg": 10.0}   # ticker inexistant
     assert RI._max_position_weight(p, m) == 0.0
+
+
+def test_high_heat_raises_level():
+    p, m = _setup()
+    p.heat = 60                       # au-delà du seuil d'enquête (55)
+    r = RI.assess(p, m)
+    assert r["level"] == RI.LEVEL_DANGER
+    assert any("réglementaire" in reason.lower() for reason in r["reasons"])
+    p.heat = 45                       # zone de surveillance
+    assert RI.assess(p, m)["level"] == RI.LEVEL_WARN
+
+
+def test_var_ratio_folds_into_assessment():
+    p, m = _setup()
+    assert RI.assess(p, m, var_ratio=1.1)["level"] == RI.LEVEL_DANGER
+    assert RI.assess(p, m, var_ratio=0.8)["level"] == RI.LEVEL_WARN
+    assert RI.assess(p, m, var_ratio=0.3)["level"] == RI.LEVEL_OK
+    # None = signal ignoré (rétrocompatible)
+    assert RI.assess(p, m)["level"] == RI.LEVEL_OK

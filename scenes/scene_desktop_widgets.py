@@ -604,8 +604,9 @@ class DesktopWidgetsMixin:
 
     # --------------------------------------------------- indicateur de risque
     def _draw_risk_badge(self, surf, bar):
-        """Pastille de risque unifiée (levier/marge/concentration, cf.
-        core/risk_indicator.py) — TOUJOURS dans la barre supérieure, donc
+        """Pastille de risque unifiée (levier/marge/concentration + VaR vs
+        limite + scrutin réglementaire, cf. core/risk_indicator.py) — TOUJOURS
+        dans la barre supérieure, donc
         jamais recouverte par une fenêtre. Cliquer ouvre le portefeuille ;
         survoler détaille les raisons dans une bulle. Renvoie le bord GAUCHE
         de la zone dessinée (pour que le badge difficulté voisin s'y cale)."""
@@ -615,7 +616,12 @@ class DesktopWidgetsMixin:
         if m is None:
             self._risk_badge_rect = None
             return bar.right - 12
-        info = RI.assess(p, m)
+        # VaR/limite : réutilise la jauge déjà mise en cache par pas de marché
+        # (le badge intègre donc AUSSI la VaR et le scrutin réglementaire — une
+        # seule lecture du risque au lieu de trois demi-signaux dispersés).
+        vc = self._var_gauge()
+        var_ratio = (vc["var"] / vc["limit"]) if (vc and vc.get("limit")) else None
+        info = RI.assess(p, m, var_ratio=var_ratio)
         colors = {RI.LEVEL_OK: config.COL_UP, RI.LEVEL_WARN: config.COL_AMBER,
                   RI.LEVEL_DANGER: config.COL_DOWN}
         labels = {RI.LEVEL_OK: _L("OK", "OK"), RI.LEVEL_WARN: _L("ATTENTION", "CAUTION"),

@@ -13,6 +13,11 @@ import pygame
 from apps.base import DesktopApp
 from core import audio, config, order_confirm, unlocks
 from core import orders as ORDERS
+from core.i18n import get_lang
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 from core import portfolio as PF
 from core import portfolio_margin as PM
 from ui import fonts, style, widgets
@@ -26,7 +31,7 @@ FEED_FLASH_MS = 900    # durée du flash de fond sur le dernier ordre
 
 
 class TradingApp(DesktopApp, ConditionalOrderMixin):
-    title = "Trading — Ordres"
+    title = "Trading — Orders"
     icon_kind = "trading"
     default_size = (840, 520)
     # largeur mini 640 (pas 560) : sous ~640 px, les colonnes COURS/POSSÉDÉ
@@ -103,7 +108,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         de l'app Recherche (cf. DesktopScene.open_trading)."""
         self.search = str(ticker).upper()
         self.scroll = 0
-        self.msg = f"Prêt à trader {self.search}."
+        self.msg = _L(f"Prêt à trader {self.search}.", f"Ready to trade {self.search}.")
 
     def _can_trade(self):
         return unlocks.unlocked(self.app.gs.player, "trade")
@@ -141,11 +146,11 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
     # --------------------------------------------------------------- actions
     def _do_buy(self, tk):
         if not self._can_trade():
-            self.msg = "Trading débloqué au grade Associate."
+            self.msg = _L("Trading débloqué au grade Junior Analyst.", "Trading unlocked at Junior Analyst grade.")
             return
         qty = self._qty_for_ticker(tk)
         if qty <= 0:
-            self.msg = "Quantité invalide."
+            self.msg = _L("Quantité invalide.", "Invalid quantity.")
             return
         if self._maybe_ask_confirmation("buy", tk, qty):
             return
@@ -159,7 +164,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
             return
         qty = min(self._qty_for_ticker(tk), held)
         if qty <= 0:
-            self.msg = "Quantité invalide."
+            self.msg = _L("Quantité invalide.", "Invalid quantity.")
             return
         if self._maybe_ask_confirmation("sell", tk, qty):
             return
@@ -199,48 +204,48 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         r = PF.buy(self.app.gs.player, self.market, tk, qty)
         if r["ok"]:
             self.msg = ""
-            self._push_feed(f"ACHAT {qty:g}×{tk} @ {r['price']:.2f}", "up")
+            self._push_feed(_L(f"ACHAT {qty:g}×{tk} @ {r['price']:.2f}", f"BUY {qty:g}×{tk} @ {r['price']:.2f}"), "up")
             # undo : vendre la même quantité
             self._last_trade = {"side": "buy", "ticker": tk, "qty": qty,
                                 "price": r["price"], "step": self.market.step_count}
         else:
-            self.msg = f"Achat refusé ({r['reason']})."
+            self.msg = _L(f"Achat refusé ({r['reason']}).", f"Buy rejected ({r['reason']}).")
 
     def _execute_sell(self, tk, qty):
         r = PF.sell(self.app.gs.player, self.market, tk, qty)
         if r["ok"]:
             self.msg = ""
-            self._push_feed(f"VENTE {r['qty']:g}×{tk} @ {r['price']:.2f} "
-                            f"(P&L {r['realized']:+,.0f})",
+            self._push_feed(_L(f"VENTE {r['qty']:g}×{tk} @ {r['price']:.2f} (P&L {r['realized']:+,.0f})",
+                               f"SELL {r['qty']:g}×{tk} @ {r['price']:.2f} (P&L {r['realized']:+,.0f})"),
                             "up" if r["realized"] >= 0 else "down")
             # undo : racheter la même quantité
             self._last_trade = {"side": "sell", "ticker": tk, "qty": r["qty"],
                                 "price": r["price"], "step": self.market.step_count}
         else:
-            self.msg = f"Vente refusée ({r['reason']})."
+            self.msg = _L(f"Vente refusée ({r['reason']}).", f"Sell rejected ({r['reason']}).")
 
     def _undo_last_trade(self):
         """Annule le dernier trade exécuté (Ctrl+Z). Ne fonctionne que dans
         le même pas de marché (pas après une avance du temps)."""
         lt = getattr(self, "_last_trade", None)
         if lt is None:
-            self.msg = "Aucun trade à annuler."
+            self.msg = _L("Aucun trade à annuler.", "No trade to undo.")
             return
         if lt["step"] != self.market.step_count:
-            self.msg = "Trade trop ancien (le marché a avancé)."
+            self.msg = _L("Trade trop ancien (le marché a avancé).", "Trade too old (the market has moved on).")
             self._last_trade = None
             return
         if lt["side"] == "buy":
             r = PF.sell(self.app.gs.player, self.market, lt["ticker"], lt["qty"])
             if r["ok"]:
-                self._push_feed(f"↩ ANNULÉ : vente {r['qty']:g}×{lt['ticker']} @ {r['price']:.2f}", "info")
+                self._push_feed(_L(f"↩ ANNULÉ : vente {r['qty']:g}×{lt['ticker']} @ {r['price']:.2f}", f"↩ UNDONE: sell {r['qty']:g}×{lt['ticker']} @ {r['price']:.2f}"), "info")
                 self._last_trade = None
             else:
                 self.msg = f"Annulation impossible ({r['reason']})."
         else:
             r = PF.buy(self.app.gs.player, self.market, lt["ticker"], lt["qty"])
             if r["ok"]:
-                self._push_feed(f"↩ ANNULÉ : achat {lt['qty']:g}×{lt['ticker']} @ {r['price']:.2f}", "info")
+                self._push_feed(_L(f"↩ ANNULÉ : achat {lt['qty']:g}×{lt['ticker']} @ {r['price']:.2f}", f"↩ UNDONE: buy {lt['qty']:g}×{lt['ticker']} @ {r['price']:.2f}"), "info")
                 self._last_trade = None
             else:
                 self.msg = f"Annulation impossible ({r['reason']})."
@@ -291,18 +296,18 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
             return
         qty = self._qty_for_ticker(t["ticker"])
         if qty <= 0:
-            self.msg = "Quantité invalide."
+            self.msg = _L("Quantité invalide.", "Invalid quantity.")
             return
         r = ORDERS.place_twap(self.app.gs.player, self.market, "Action", t["ticker"],
                               t["side"], qty, steps, label=t["ticker"])
         if r["ok"]:
-            side_label = "Achat" if t["side"] == "buy" else "Vente"
-            self.msg = f"TWAP posé : {side_label} {qty:g} {t['ticker']} sur {steps} pas."
+            side_label = _L("Achat", "Buy") if t["side"] == "buy" else _L("Vente", "Sell")
+            self.msg = _L(f"TWAP posé : {side_label} {qty:g} {t['ticker']} sur {steps} pas.", f"TWAP set: {side_label} {qty:g} {t['ticker']} over {steps} steps.")
             self._twap_prompt = None
             self._twap_focus = False
             self._autosave()
         else:
-            self.msg = f"TWAP refusé ({r['reason']})."
+            self.msg = _L(f"TWAP refusé ({r['reason']}).", f"TWAP rejected ({r['reason']}).")
 
     def _cancel_twap_prompt(self):
         self._twap_prompt = None
@@ -457,7 +462,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         pygame.draw.rect(surf, config.COL_BG, sr, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, sr, 1, border_radius=4)
         curc = "_" if pygame.time.get_ticks() % 1000 < 500 else " "
-        lbl = (self.search + curc) if self.search else "Rechercher une action…"
+        lbl = (self.search + curc) if self.search else _L("Rechercher une action…", "Search a stock…")
         widgets.draw_text(surf, widgets.fit_text(lbl, fonts.small(), sr.w - 16),
                           (sr.x + 8, sr.y + 4), fonts.small(),
                           config.COL_TEXT if self.search else config.COL_TEXT_DIM)
@@ -482,7 +487,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         # le jeu calcule la quantité correspondante au moment de l'ordre) :
         # évite au joueur de calculer lui-même "combien d'actions pour 5000€".
         qy = sr.bottom + 8
-        widgets.draw_text(surf, "QUANTITÉ", (rect.x + pad, qy + 4), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("QUANTITÉ", "QUANTITY"), (rect.x + pad, qy + 4), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         mx = rect.x + pad + 76
         self._qty_mode_rects = {}
         for mode, label in (("shares", "Titres"), ("amount", cur)):
@@ -522,7 +527,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         self._journal_btn = pygame.Rect(rect.right - pad - 72, qy, 72, 22)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._journal_btn, border_radius=3)
         pygame.draw.rect(surf, config.COL_PRESTIGE, self._journal_btn, 1, border_radius=3)
-        widgets.draw_text(surf, "JOURNAL", self._journal_btn.center, fonts.tiny(bold=True),
+        widgets.draw_text(surf, _L("JOURNAL", "JOURNAL"), self._journal_btn.center, fonts.tiny(bold=True),
                           config.COL_PRESTIGE, align="center")
 
         # liste (rétrécie si des ordres conditionnels sont en cours, pour leur
@@ -538,10 +543,10 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         self._list_rect = list_area
         style.draw_card(surf, list_area, bg=config.COL_BG, border=config.COL_BORDER,
                         radius=style.RADIUS_MD)
-        widgets.draw_text(surf, "VALEUR", (list_area.x + 8, list_area.y + 4), fonts.tiny(bold=True), config.COL_TEXT_DIM)
-        widgets.draw_text(surf, "COURS", (list_area.x + int(list_area.w * 0.52), list_area.y + 4),
+        widgets.draw_text(surf, _L("VALEUR", "ASSET"), (list_area.x + 8, list_area.y + 4), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("COURS", "PRICE"), (list_area.x + int(list_area.w * 0.52), list_area.y + 4),
                           fonts.tiny(bold=True), config.COL_TEXT_DIM)
-        widgets.draw_text(surf, "POSSÉDÉ", (list_area.x + int(list_area.w * 0.66), list_area.y + 4),
+        widgets.draw_text(surf, _L("POSSÉDÉ", "HELD"), (list_area.x + int(list_area.w * 0.66), list_area.y + 4),
                           fonts.tiny(bold=True), config.COL_TEXT_DIM)
         rows = self._rows()
         self._buy_rects, self._sell_rects, self._order_rects, self._twap_rects = {}, {}, {}, {}
@@ -592,7 +597,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
                     txt += f" · prix moyen {avg_px:.2f}"
                     if o.get("start_price"):
                         drift = (avg_px / o["start_price"] - 1.0) * 100.0
-                        txt += f" ({drift:+.2f}% vs départ)"
+                        txt += _L(f" ({drift:+.2f}% vs départ)", f" ({drift:+.2f}% vs start)")
                 widgets.draw_text(surf, widgets.fit_text(txt, fonts.tiny(), list_area.w - 8),
                                   (list_area.x + 4, ty), fonts.tiny(), config.COL_TEXT_DIM)
                 ty += 16
@@ -613,8 +618,8 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
                 from core import trade_preview as _tp
                 cost = _tp.execution_cost(p, self.market, tk, qty, side)
                 if cost:
-                    txt = (f"Coût réel ≈ {widgets.format_money(cost['total'], cur)} "
-                           f"({cost['total_pct']:.2f}%)")
+                    txt = _L(f"Coût réel ≈ {widgets.format_money(cost['total'], cur)} ({cost['total_pct']:.2f}%)",
+                             f"Real cost ≈ {widgets.format_money(cost['total'], cur)} ({cost['total_pct']:.2f}%)")
                     if side == "buy":
                         w_after = _tp.position_weight_after(p, self.market, tk, qty)
                         if w_after is not None:
@@ -634,18 +639,18 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         border_col = config.COL_WARN if is_large else config.COL_AMBER
         style.draw_card(surf, box, bg=config.COL_PANEL, border=border_col,
                         radius=style.RADIUS_MD)
-        side_label = "ACHAT" if c["side"] == "buy" else "VENTE"
-        title = "⚠ VENTE IMPORTANTE" if is_large else "⚠ ORDRE À FORT IMPACT"
+        side_label = _L("ACHAT", "BUY") if c["side"] == "buy" else _L("VENTE", "SELL")
+        title = _L("⚠ VENTE IMPORTANTE", "⚠ LARGE SELL") if is_large else _L("⚠ ORDRE À FORT IMPACT", "⚠ HIGH-IMPACT ORDER")
         widgets.draw_text(surf, f"{title} — {side_label} {c['ticker']}",
                           (box.x + 12, box.y + 8), fonts.small(bold=True), border_col)
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
-        widgets.draw_text(surf, f"{c['qty']:g} titres — {widgets.format_money(c['notional'], cur)}",
+        widgets.draw_text(surf, _L(f"{c['qty']:g} titres — {widgets.format_money(c['notional'], cur)}", f"{c['qty']:g} shares — {widgets.format_money(c['notional'], cur)}"),
                           (box.x + 12, box.y + 32), fonts.small(), config.COL_TEXT)
         if is_large:
-            widgets.draw_text(surf, "Vous vendez plus de 50% de votre position. Confirmer ?",
+            widgets.draw_text(surf, _L("Vous vendez plus de 50% de votre position. Confirmer ?", "You are selling more than 50% of your position. Confirm?"),
                               (box.x + 12, box.y + 54), fonts.tiny(), config.COL_TEXT_DIM)
         else:
-            widgets.draw_text(surf, f"Soit {c['ratio']*100:.0f}% de votre patrimoine net en un seul ordre.",
+            widgets.draw_text(surf, _L(f"Soit {c['ratio']*100:.0f}% de votre patrimoine net en un seul ordre.", f"That's {c['ratio']*100:.0f}% of your net worth in a single order."),
                               (box.x + 12, box.y + 54), fonts.tiny(), config.COL_TEXT_DIM)
         # coût d'exécution réel (commission + spread + impact)
         y = box.y + 74
@@ -653,10 +658,8 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         if cost:
             widgets.draw_text_wrapped(
                 surf,
-                f"Coût réel ≈ {widgets.format_money(cost['total'], cur)} "
-                f"({cost['total_pct']:.2f}% de l'ordre) — commission "
-                f"{widgets.format_money(cost['fee'], cur)}, spread+impact "
-                f"{widgets.format_money(cost['spread_impact'], cur)}",
+                _L(f"Coût réel ≈ {widgets.format_money(cost['total'], cur)} ({cost['total_pct']:.2f}% de l'ordre) — commission {widgets.format_money(cost['fee'], cur)}, spread+impact {widgets.format_money(cost['spread_impact'], cur)}",
+                   f"Real cost ≈ {widgets.format_money(cost['total'], cur)} ({cost['total_pct']:.2f}% of the order) — commission {widgets.format_money(cost['fee'], cur)}, spread+impact {widgets.format_money(cost['spread_impact'], cur)}"),
                 (box.x + 12, y), fonts.tiny(), config.COL_WARN, box.w - 24)
             y += 32
         # panneau AVANT -> APRÈS + stress (ui/preview_panel)
@@ -670,7 +673,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         self._confirm_yes_rect = pygame.Rect(box.x + 12, box.bottom - 32, box.w - 88, 24)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._confirm_yes_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_AMBER, self._confirm_yes_rect, 1, border_radius=4)
-        widgets.draw_text(surf, "CONFIRMER", self._confirm_yes_rect.center,
+        widgets.draw_text(surf, _L("CONFIRMER", "CONFIRM"), self._confirm_yes_rect.center,
                           fonts.tiny(bold=True), config.COL_AMBER, align="center")
         self._confirm_no_rect = pygame.Rect(self._confirm_yes_rect.right + 6, box.bottom - 32, 60, 24)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._confirm_no_rect, border_radius=4)
@@ -692,7 +695,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         box.center = rect.center
         style.draw_card(surf, box, bg=config.COL_PANEL, border=config.COL_WARN,
                         radius=style.RADIUS_MD)
-        widgets.draw_text(surf, f"PROFONDEUR — {self._depth_ticker}",
+        widgets.draw_text(surf, _L(f"PROFONDEUR — {self._depth_ticker}", f"DEPTH — {self._depth_ticker}"),
                           (box.x + 12, box.y + 8), fonts.small(bold=True),
                           config.COL_WARN)
         if ladder is None:
@@ -702,7 +705,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
                           (box.x + 12, box.y + 28), fonts.tiny(),
                           config.COL_TEXT_DIM)
         y = box.y + 48
-        cols = [("TAILLE", 0), ("BID", 110), ("ASK", 210), ("COÛT (bp)", 320)]
+        cols = [(_L("TAILLE", "SIZE"), 0), ("BID", 110), ("ASK", 210), (_L("COÛT (bp)", "COST (bp)"), 320)]
         for lbl, dx in cols:
             widgets.draw_text(surf, lbl, (box.x + 14 + dx, y), fonts.tiny(bold=True),
                               config.COL_TEXT_DIM)
@@ -720,8 +723,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
                               (box.x + 14 + cols[3][1], y), fonts.small(bold=True),
                               bcol)
             y += 19
-        widgets.draw_text(surf, "Un gros ordre mange le carnet — d'où le TWAP. "
-                          "Clic pour fermer.", (box.x + 12, box.bottom - 20),
+        widgets.draw_text(surf, _L("Un gros ordre mange le carnet — d'où le TWAP. Clic pour fermer.", "A large order eats through the book — hence TWAP. Click to close."), (box.x + 12, box.bottom - 20),
                           fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_twap_prompt(self, surf, rect):
@@ -731,7 +733,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         surf.blit(overlay, rect.topleft)
         t = self._twap_prompt
         tk = t["ticker"]
-        side_label = "ACHAT" if t["side"] == "buy" else "VENTE"
+        side_label = _L("ACHAT", "BUY") if t["side"] == "buy" else _L("VENTE", "SELL")
         box = pygame.Rect(0, 0, min(340, rect.w - 40), 172)
         box.center = rect.center
         style.draw_card(surf, box, bg=config.COL_PANEL, border=config.COL_CYAN,
@@ -740,19 +742,17 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
                           (box.x + 12, box.y + 8), fonts.small(bold=True), config.COL_CYAN)
         qty = self._qty_for_ticker(tk)
         steps = int(self._twap_steps_str) if self._twap_steps_str.isdigit() else 1
-        widgets.draw_text(surf, f"Qté totale : {qty:g}  ·  tranche ≈ {qty / max(1, steps):.0f}",
+        widgets.draw_text(surf, _L(f"Qté totale : {qty:g}  ·  tranche ≈ {qty / max(1, steps):.0f}", f"Total qty: {qty:g}  ·  slice ≈ {qty / max(1, steps):.0f}"),
                           (box.x + 12, box.y + 32), fonts.tiny(), config.COL_TEXT_DIM)
         # devis d'impact (microstructure) : bloc vs tranches — la raison
         # d'être du TWAP, chiffrée sur le vrai modèle Almgren-Chriss du jeu
         est = ORDERS.compare_cost(self.market, tk, qty, t["side"], max(1, steps))
         if est and est["savings"] > 0:
             cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
-            widgets.draw_text(surf, f"Impact estimé : bloc "
-                              f"{widgets.format_money(est['block_cost'], cur)} → "
-                              f"tranches {widgets.format_money(est['sliced_cost'], cur)} "
-                              f"(≈ −{widgets.format_money(est['savings'], cur)})",
+            widgets.draw_text(surf, _L(f"Impact estimé : bloc {widgets.format_money(est['block_cost'], cur)} → tranches {widgets.format_money(est['sliced_cost'], cur)} (≈ −{widgets.format_money(est['savings'], cur)})",
+                                       f"Estimated impact: block {widgets.format_money(est['block_cost'], cur)} → slices {widgets.format_money(est['sliced_cost'], cur)} (≈ −{widgets.format_money(est['savings'], cur)})"),
                               (box.x + 12, box.y + 50), fonts.tiny(), config.COL_UP)
-        widgets.draw_text(surf, "Répartir sur combien de pas ?", (box.x + 12, box.y + 72),
+        widgets.draw_text(surf, _L("Répartir sur combien de pas ?", "Split over how many steps?"), (box.x + 12, box.y + 72),
                           fonts.tiny(), config.COL_TEXT_DIM)
         self._twap_price_rect = pygame.Rect(box.x + 12, box.y + 92, box.w - 24, 26)
         pygame.draw.rect(surf, config.COL_BG, self._twap_price_rect, border_radius=4)
@@ -765,7 +765,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
         self._twap_confirm_rect = pygame.Rect(box.x + 12, box.bottom - 32, box.w - 88, 24)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._twap_confirm_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, self._twap_confirm_rect, 1, border_radius=4)
-        widgets.draw_text(surf, "POSER TWAP", self._twap_confirm_rect.center,
+        widgets.draw_text(surf, _L("POSER TWAP", "PLACE TWAP"), self._twap_confirm_rect.center,
                           fonts.tiny(bold=True), config.COL_CYAN, align="center")
         self._twap_cancel_rect = pygame.Rect(self._twap_confirm_rect.right + 6, box.bottom - 32, 60, 24)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._twap_cancel_rect, border_radius=4)
@@ -829,7 +829,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
             br = pygame.Rect(r.right - 66, r.y, 64, ROW_H - 4)
             self._buy_rects[tk] = br
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, br, border_radius=3)
-            widgets.draw_text(surf, "ACHETER", br.center, fonts.tiny(bold=True), config.COL_UP, align="center")
+            widgets.draw_text(surf, _L("ACHETER", "BUY"), br.center, fonts.tiny(bold=True), config.COL_UP, align="center")
             # survol ACHETER : coût réel + poids de la ligne après l'ordre —
             # l'impact se lit AVANT de cliquer (cf. core/trade_preview)
             if br.collidepoint(pygame.mouse.get_pos()):
@@ -838,7 +838,7 @@ class TradingApp(DesktopApp, ConditionalOrderMixin):
                 sre = pygame.Rect(r.right - 134, r.y, 62, ROW_H - 4)
                 self._sell_rects[tk] = sre
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, sre, border_radius=3)
-                widgets.draw_text(surf, "VENDRE", sre.center, fonts.tiny(bold=True), config.COL_DOWN, align="center")
+                widgets.draw_text(surf, _L("VENDRE", "SELL"), sre.center, fonts.tiny(bold=True), config.COL_DOWN, align="center")
             if held != 0:
                 # ordre conditionnel (stop-loss/take-profit) sur cette position,
                 # LONGUE ou COURTE — pour un short, le stop couvre si le cours

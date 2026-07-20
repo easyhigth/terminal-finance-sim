@@ -62,6 +62,27 @@ def t(key, **kwargs):
     return s.format(**kwargs) if kwargs else s
 
 
+# Libellés de CLASSE D'ACTIF pour l'affichage. Les clés (français) sont des clés
+# de DONNÉES (portfolio/analytics/risk s'en servent comme identifiants — elles
+# ne doivent JAMAIS changer) ; seul le libellé montré à l'écran se localise.
+_ASSET_CLASS_EN = {
+    "Actions": "Equities", "Action": "Equity", "Obligations": "Bonds",
+    "Obligation": "Bond", "Matières": "Commodities", "Matière": "Commodity",
+    "Commodity": "Commodity", "Crypto": "Crypto", "ETF": "ETF",
+    "Structurés": "Structured", "Structuré": "Structured",
+    "Crédit": "Credit", "Trésorerie": "Cash", "Cash": "Cash",
+    "Actions (net)": "Equities (net)",
+}
+
+
+def asset_class_label(cls):
+    """Libellé localisé d'une classe d'actif pour l'AFFICHAGE (la clé FR reste
+    la clé de données). Inconnu -> renvoyé tel quel."""
+    if _LANG == "en":
+        return _ASSET_CLASS_EN.get(cls, cls)
+    return cls
+
+
 # ---------------------------------------------------------------------------
 # Table de traductions (chrome UI)
 # ---------------------------------------------------------------------------

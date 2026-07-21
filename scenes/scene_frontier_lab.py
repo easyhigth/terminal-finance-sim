@@ -11,8 +11,14 @@ import pygame
 
 from core import analytics, config
 from core import portfolio as pf
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
 
 ROW_H = 22
 
@@ -38,9 +44,9 @@ class FrontierLabScene(Scene):
         self.back_btn = widgets.Button(
             config.back_button_rect(180), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.reset_btn = widgets.Button(
-            (240, config.SCREEN_HEIGHT - 50, 220, 42), "RÉINITIALISER", config.COL_TEXT_DIM)
+            (240, config.SCREEN_HEIGHT - 50, 220, 42), _L("RÉINITIALISER", "RESET"), config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button(
-            (470, config.SCREEN_HEIGHT - 50, 150, 42), "TUTO", config.COL_CYAN)
+            (470, config.SCREEN_HEIGHT - 50, 150, 42), _L("TUTO", "GUIDE"), config.COL_CYAN)
 
     def refresh_data(self):
         p = self.app.gs.player
@@ -88,10 +94,12 @@ class FrontierLabScene(Scene):
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "LABORATOIRE — FRONTIÈRE EFFICIENTE", (40, 20),
+        widgets.draw_text(surf, _L("LABORATOIRE — FRONTIÈRE EFFICIENTE", "LAB — EFFICIENT FRONTIER"), (40, 20),
                           fonts.title(bold=True), config.COL_UP)
-        widgets.draw_text(surf, "Cochez/décochez des actions pour simuler leur ajout ou "
+        widgets.draw_text(surf, _L("Cochez/décochez des actions pour simuler leur ajout ou "
                           "retrait du portefeuille et observer l'effet sur la diversification.",
+                          "Check/uncheck stocks to simulate adding or removing them from "
+                          "the portfolio and observe the effect on diversification."),
                           (42, 68), fonts.small(), config.COL_TEXT_DIM)
 
         top = 100
@@ -107,7 +115,7 @@ class FrontierLabScene(Scene):
         self.tuto_btn.draw(surf)
 
     def _draw_universe(self, surf, rect):
-        inner = widgets.draw_panel(surf, rect, f"Univers d'actifs ({len(self.selected)} sél.)",
+        inner = widgets.draw_panel(surf, rect, _L(f"Univers d'actifs ({len(self.selected)} sél.)", f"Asset universe ({len(self.selected)} sel.)"),
                                    config.COL_CYAN)
         self._row_rects = {}
         self._universe_rect = inner
@@ -132,7 +140,7 @@ class FrontierLabScene(Scene):
         self._max_scroll = max(0, content_h - inner.h)
         self.scroll = max(0, min(self._max_scroll, self.scroll))
         self.scroll = widgets.draw_scrollbar(surf, rect, inner, self.scroll, self._max_scroll, content_h)
-        widgets.draw_text(surf, "✶ = détenue actuellement · clic = inclure/exclure",
+        widgets.draw_text(surf, _L("✶ = détenue actuellement · clic = inclure/exclure", "✶ = currently held · click = include/exclude"),
                           (inner.x, inner.bottom - 12), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_lab(self, surf, rect):
@@ -143,11 +151,11 @@ class FrontierLabScene(Scene):
         self._draw_recommendations(surf, corr_rect)
 
     def _draw_frontier(self, surf, rect):
-        inner = widgets.draw_panel(surf, rect, "Frontière efficiente — simulation", config.COL_UP)
+        inner = widgets.draw_panel(surf, rect, _L("Frontière efficiente — simulation", "Efficient frontier — simulation"), config.COL_UP)
         sel = [tk for tk in self.universe if tk in self.selected]
         fr = analytics.frontier_for_universe(self.market, sel)
         if not fr:
-            widgets.draw_text(surf, "Cochez ≥ 2 actions avec historique suffisant.",
+            widgets.draw_text(surf, _L("Cochez ≥ 2 actions avec historique suffisant.", "Check ≥ 2 stocks with sufficient history."),
                               (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
             return
         held_fr = analytics.equity_frontier(self.app.gs.player, self.market)
@@ -172,24 +180,26 @@ class FrontierLabScene(Scene):
         if held_fr:
             hp = px(*held_fr["cur"])
             pygame.draw.circle(surf, config.COL_TEXT_DIM, hp, 4, 1)
-            widgets.draw_text(surf, "ACTUEL", (hp[0] + 6, hp[1] + 4), fonts.tiny(), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, _L("ACTUEL", "CURRENT"), (hp[0] + 6, hp[1] + 4), fonts.tiny(), config.COL_TEXT_DIM)
         sp = px(svol, sret)
         pygame.draw.circle(surf, config.COL_AMBER, sp, 5)
         widgets.draw_text(surf, "SIMULATION", (sp[0] + 6, sp[1] - 10), fonts.tiny(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, f"vol {svol:.0f}%  ·  rdt att. {sret:.0f}%  ·  {len(sel)} actifs (équipondéré)",
+        widgets.draw_text(surf, _L(f"vol {svol:.0f}%  ·  rdt att. {sret:.0f}%  ·  {len(sel)} actifs (équipondéré)", f"vol {svol:.0f}%  ·  exp. ret {sret:.0f}%  ·  {len(sel)} assets (equal-weighted)"),
                           (inner.x, inner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_recommendations(self, surf, rect):
-        inner = widgets.draw_panel(surf, rect, "Suggestions de diversification", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, rect, _L("Suggestions de diversification", "Diversification suggestions"), config.COL_AMBER)
         self._reco_rect = inner
         cands = [tk for tk in self._candidates_sorted if tk not in self.selected]
         if not cands:
-            widgets.draw_text(surf, "Toutes les candidates suggérées sont déjà incluses.",
+            widgets.draw_text(surf, _L("Toutes les candidates suggérées sont déjà incluses.", "All suggested candidates are already included."),
                               (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
             self._reco_max_scroll = 0
             return
-        widgets.draw_text(surf, "Actions peu corrélées à vos positions actuelles — "
+        widgets.draw_text(surf, _L("Actions peu corrélées à vos positions actuelles — "
                           "cochez-les à gauche pour voir l'effet sur la frontière.",
+                          "Stocks weakly correlated with your current positions — "
+                          "check them on the left to see the effect on the frontier."),
                           (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
         list_area = pygame.Rect(inner.x - 4, inner.y + 18, inner.w + 8, inner.h - 18)
         prev_clip = surf.get_clip()

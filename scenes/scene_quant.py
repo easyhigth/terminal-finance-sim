@@ -13,8 +13,13 @@ import pygame
 
 from core import config, unlocks
 from core import finmath as fm
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 
 class QuantScene(Scene):
@@ -29,9 +34,9 @@ class QuantScene(Scene):
         self.back_btn = widgets.Button(
             (40, config.SCREEN_HEIGHT-66, 160, 44), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.toggle_btn = widgets.Button(
-            (220, config.SCREEN_HEIGHT-66, 200, 44), "TYPE : CALL", config.COL_UP)
+            (220, config.SCREEN_HEIGHT-66, 200, 44), _L("TYPE : CALL", "TYPE: CALL"), config.COL_UP)
         self.tuto_btn = widgets.Button(
-            (440, config.SCREEN_HEIGHT-66, 150, 44), "TUTO", config.COL_CYAN)
+            (440, config.SCREEN_HEIGHT-66, 150, 44), _L("TUTO", "GUIDE"), config.COL_CYAN)
         self._params = {}
 
     def _can(self):
@@ -67,19 +72,19 @@ class QuantScene(Scene):
     def update(self, dt):
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp)
-        self.toggle_btn.label = f"TYPE : {self.option.upper()}"
+        self.toggle_btn.label = _L(f"TYPE : {self.option.upper()}", f"TYPE: {self.option.upper()}")
         self.toggle_btn.accent = config.COL_UP if self.option == "call" else config.COL_DOWN
         self.toggle_btn.update(mp)
         self.tuto_btn.update(mp)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "MODULE QUANT — PRICING D'OPTIONS (BLACK-SCHOLES)",
+        widgets.draw_text(surf, _L("MODULE QUANT — PRICING D'OPTIONS (BLACK-SCHOLES)", "QUANT MODULE — OPTION PRICING (BLACK-SCHOLES)"),
                           (40, 24), fonts.title(bold=True), config.COL_AMBER)
         self._params = {}
         if not self._can():
             g = unlocks.effective_required_grade(self.app.gs.player, "quant")
-            widgets.draw_text(surf, f"⊘ Module Quant débloqué au grade {config.GRADES[g]}.",
+            widgets.draw_text(surf, _L(f"⊘ Module Quant débloqué au grade {config.GRADES[g]}.", f"⊘ Quant module unlocked at {config.GRADES[g]} grade."),
                               (42, 76), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             return
@@ -88,7 +93,7 @@ class QuantScene(Scene):
         self._draw_price_curve(surf)
         self._draw_payoff(surf)
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("souris", "ajuster les paramètres")])
+                              [(_L("souris", "mouse"), _L("ajuster les paramètres", "adjust the parameters"))])
         self.back_btn.draw(surf)
         self.toggle_btn.draw(surf)
         self.tuto_btn.draw(surf)
@@ -108,22 +113,22 @@ class QuantScene(Scene):
 
     def _draw_inputs(self, surf):
         panel = pygame.Rect(40, 110, 340, 280)
-        inner = widgets.draw_panel(surf, panel, "Paramètres", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Paramètres", "Parameters"), config.COL_CYAN)
         x, y = inner.x, inner.y
         self._slider(surf, x, y, "Spot (S)", self.S, "S", 5, "{:.0f}"); y += 44
         self._slider(surf, x, y, "Strike (K)", self.K, "K", 5, "{:.0f}"); y += 44
-        self._slider(surf, x, y, "Maturité T (ans)", self.T, "T", 0.05, "{:.2f}"); y += 44
-        self._slider(surf, x, y, "Taux r", self.r, "r", 0.005, "{:.1%}"); y += 44
-        self._slider(surf, x, y, "Volatilité σ", self.sigma, "sigma", 0.01, "{:.0%}"); y += 44
+        self._slider(surf, x, y, _L("Maturité T (ans)", "Maturity T (yrs)"), self.T, "T", 0.05, "{:.2f}"); y += 44
+        self._slider(surf, x, y, _L("Taux r", "Rate r"), self.r, "r", 0.005, "{:.1%}"); y += 44
+        self._slider(surf, x, y, _L("Volatilité σ", "Volatility σ"), self.sigma, "sigma", 0.01, "{:.0%}"); y += 44
 
     def _draw_outputs(self, surf):
         panel = pygame.Rect(396, 110, 340, 280)
-        inner = widgets.draw_panel(surf, panel, "Prix & Greeks", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, panel, _L("Prix & Greeks", "Price & Greeks"), config.COL_AMBER)
         price = fm.black_scholes(self.S, self.K, self.T, self.r, self.sigma, self.option)
         greeks = fm.bs_greeks(self.S, self.K, self.T, self.r, self.sigma, self.option)
         # prix mis en avant
         col = config.COL_UP if self.option == "call" else config.COL_DOWN
-        widgets.draw_text(surf, f"Prix {self.option.upper()}", (inner.x, inner.y),
+        widgets.draw_text(surf, _L(f"Prix {self.option.upper()}", f"Price {self.option.upper()}"), (inner.x, inner.y),
                           fonts.small(), config.COL_TEXT_DIM)
         # autre type, en haut à droite (hors de portée du gros prix)
         other = "put" if self.option == "call" else "call"
@@ -135,11 +140,11 @@ class QuantScene(Scene):
         # greeks
         y = inner.y+80
         greek_rows = [
-            ("Delta (Δ)", greeks["delta"], "sensibilité au spot"),
-            ("Gamma (Γ)", greeks["gamma"], "variation du delta"),
-            ("Vega (ν)", greeks["vega"], "par +1% de vol"),
-            ("Theta (Θ)", greeks["theta"], "par jour"),
-            ("Rho (ρ)", greeks["rho"], "par +1% de taux"),
+            ("Delta (Δ)", greeks["delta"], _L("sensibilité au spot", "sensitivity to spot")),
+            ("Gamma (Γ)", greeks["gamma"], _L("variation du delta", "delta variation")),
+            ("Vega (ν)", greeks["vega"], _L("par +1% de vol", "per +1% vol")),
+            ("Theta (Θ)", greeks["theta"], _L("par jour", "per day")),
+            ("Rho (ρ)", greeks["rho"], _L("par +1% de taux", "per +1% rate")),
         ]
         for label, val, note in greek_rows:
             widgets.draw_text(surf, label, (inner.x, y), fonts.small(bold=True), config.COL_CYAN)
@@ -150,20 +155,20 @@ class QuantScene(Scene):
 
     def _draw_price_curve(self, surf):
         panel = pygame.Rect(752, 110, config.SCREEN_WIDTH-792, 280)
-        inner = widgets.draw_panel(surf, panel, "Prix de l'option vs Spot", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, panel, _L("Prix de l'option vs Spot", "Option price vs Spot"), config.COL_AMBER)
         spots = np.linspace(self.K*0.4, self.K*1.6, 80)
         prices = [fm.black_scholes(s, self.K, self.T, self.r, self.sigma, self.option)
                   for s in spots]
         intrinsics = [max(0, (s-self.K) if self.option == "call" else (self.K-s))
                       for s in spots]
         self._plot_lines(surf, inner, spots,
-                         [(prices, config.COL_AMBER, "Valeur BS"),
-                          (intrinsics, config.COL_TEXT_DIM, "Valeur intrinsèque")],
+                         [(prices, config.COL_AMBER, _L("Valeur BS", "BS value")),
+                          (intrinsics, config.COL_TEXT_DIM, _L("Valeur intrinsèque", "Intrinsic value"))],
                          vline=self.S, vlabel="Spot")
 
     def _draw_payoff(self, surf):
         panel = pygame.Rect(40, 400, config.SCREEN_WIDTH-80, 270)
-        inner = widgets.draw_panel(surf, panel, "Diagramme de payoff à l'échéance (net de prime)",
+        inner = widgets.draw_panel(surf, panel, _L("Diagramme de payoff à l'échéance (net de prime)", "Payoff diagram at maturity (net of premium)"),
                                    config.COL_UP)
         spots = np.linspace(self.K*0.4, self.K*1.6, 120)
         premium = fm.black_scholes(self.S, self.K, self.T, self.r, self.sigma, self.option)
@@ -172,8 +177,8 @@ class QuantScene(Scene):
         else:
             payoff = [max(0, self.K-s) - premium for s in spots]
         self._plot_lines(surf, inner, spots,
-                         [(payoff, config.COL_UP, "P&L à maturité")],
-                         vline=self.S, vlabel="Spot actuel", zero_line=True)
+                         [(payoff, config.COL_UP, _L("P&L à maturité", "P&L at maturity"))],
+                         vline=self.S, vlabel=_L("Spot actuel", "Current spot"), zero_line=True)
 
     def _plot_lines(self, surf, inner, xs, series, vline=None, vlabel="",
                     zero_line=False):

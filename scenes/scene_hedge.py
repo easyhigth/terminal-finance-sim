@@ -10,8 +10,14 @@ import pygame
 
 from core import config, unlocks
 from core import hedging as H
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
 
 NOTIONAL = 100_000.0    # notionnel couvert par clic
 
@@ -26,7 +32,7 @@ class HedgeScene(Scene):
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
                                         config.back_button_rect(160)[1], 150, 42),
-                                       "TUTO", config.COL_CYAN)
+                                       _L("TUTO", "GUIDE"), config.COL_CYAN)
         self.buy_btn = None
         self.strike_rects = {}
         self.years_rects = {}
@@ -63,9 +69,11 @@ class HedgeScene(Scene):
             strike_pct = H.STRIKE_CHOICES[self.strike_idx]
             years = H.MATURITY_CHOICES[self.years_idx]
             r = H.buy_put(p, m, NOTIONAL, strike_pct, years)
-            self.msg = (f"Couverture souscrite ({widgets.format_money(NOTIONAL, self._cur())}, "
-                        f"prime {widgets.format_money(r['premium'], self._cur())})."
-                        if r["ok"] else f"Refusé ({r['reason']}).")
+            self.msg = (_L(f"Couverture souscrite ({widgets.format_money(NOTIONAL, self._cur())}, "
+                        f"prime {widgets.format_money(r['premium'], self._cur())}).",
+                        f"Hedge subscribed ({widgets.format_money(NOTIONAL, self._cur())}, "
+                        f"premium {widgets.format_money(r['premium'], self._cur())}).")
+                        if r["ok"] else _L(f"Refusé ({r['reason']}).", f"Rejected ({r['reason']})."))
             if r["ok"] and not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
 
@@ -102,9 +110,11 @@ class HedgeScene(Scene):
                 strike_pct = H.STRIKE_CHOICES[self.strike_idx]
                 years = H.MATURITY_CHOICES[self.years_idx]
                 r = H.buy_put(p, m, NOTIONAL, strike_pct, years)
-                self.msg = (f"Couverture souscrite ({widgets.format_money(NOTIONAL, self._cur())}, "
-                            f"prime {widgets.format_money(r['premium'], self._cur())})."
-                            if r["ok"] else f"Refusé ({r['reason']}).")
+                self.msg = (_L(f"Couverture souscrite ({widgets.format_money(NOTIONAL, self._cur())}, "
+                            f"prime {widgets.format_money(r['premium'], self._cur())}).",
+                            f"Hedge subscribed ({widgets.format_money(NOTIONAL, self._cur())}, "
+                            f"premium {widgets.format_money(r['premium'], self._cur())}).")
+                            if r["ok"] else _L(f"Refusé ({r['reason']}).", f"Rejected ({r['reason']})."))
                 if r["ok"] and not p.hardcore:
                     self.app.gs.save(config.AUTOSAVE_SLOT)
 
@@ -115,12 +125,12 @@ class HedgeScene(Scene):
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "DESK DE COUVERTURE — PUT PROTECTEUR", (40, 22),
+        widgets.draw_text(surf, _L("DESK DE COUVERTURE — PUT PROTECTEUR", "HEDGING DESK — PROTECTIVE PUT"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         if not self._can():
             p = self.app.gs.player
             g = unlocks.effective_required_grade(p, "hedge")
-            widgets.draw_text(surf, f"⊘ Couverture débloquée au grade {config.GRADES[g]}.",
+            widgets.draw_text(surf, _L(f"⊘ Couverture débloquée au grade {config.GRADES[g]}.", f"⊘ Hedging unlocked at {config.GRADES[g]} grade."),
                               (42, 74), fonts.small(), config.COL_TEXT_DIM)
             note = unlocks.track_lock_note(p, "hedge")
             if note:
@@ -128,8 +138,10 @@ class HedgeScene(Scene):
             self.back_btn.draw(surf)
             self.tuto_btn.draw(surf)
             return
-        widgets.draw_text(surf, "Achetez un put sur l'indice de votre région pour réduire le bêta net "
-                                "sans vendre vos positions. " + self.msg,
+        widgets.draw_text(surf, _L("Achetez un put sur l'indice de votre région pour réduire le bêta net "
+                                "sans vendre vos positions. ",
+                                "Buy a put on your region's index to reduce net beta "
+                                "without selling your positions. ") + self.msg,
                           (42, 74), fonts.small(), config.COL_TEXT_DIM)
 
         m, p = self.app.market, self.app.gs.player
@@ -139,9 +151,9 @@ class HedgeScene(Scene):
 
         # ---- cotation / souscription (gauche) ----
         quote_rect = pygame.Rect(40, 110, 440, 280)
-        inner = widgets.draw_panel(surf, quote_rect, "Nouvelle couverture", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, quote_rect, _L("Nouvelle couverture", "New hedge"), config.COL_CYAN)
         y = inner.y
-        widgets.draw_text(surf, "Strike (% du niveau courant)", (inner.x, y),
+        widgets.draw_text(surf, _L("Strike (% du niveau courant)", "Strike (% of current level)"), (inner.x, y),
                           fonts.small(), config.COL_TEXT)
         y += 22
         self.strike_rects = {}
@@ -161,7 +173,7 @@ class HedgeScene(Scene):
             x += 100
         y += 40
 
-        widgets.draw_text(surf, "Maturité", (inner.x, y), fonts.small(), config.COL_TEXT)
+        widgets.draw_text(surf, _L("Maturité", "Maturity"), (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 22
         self.years_rects = {}
         x = inner.x
@@ -186,45 +198,47 @@ class HedgeScene(Scene):
         premium = NOTIONAL * q["premium_rate"]
         live_spot = self._live_index(idx)
         spot_col = self._flash.tick(idx, live_spot, config.COL_UP, config.COL_DOWN, config.COL_TEXT_DIM)
-        widgets.draw_text(surf, f"Sous-jacent : {q['underlying']} @ {live_spot:.1f} "
+        widgets.draw_text(surf, _L(f"Sous-jacent : {q['underlying']} @ {live_spot:.1f} "
                                 f"(strike {q['strike']:.1f}, vol {q['sigma']*100:.0f}%)",
+                                f"Underlying: {q['underlying']} @ {live_spot:.1f} "
+                                f"(strike {q['strike']:.1f}, vol {q['sigma']*100:.0f}%)"),
                           (inner.x, y), fonts.tiny(), spot_col)
         y += 20
-        widgets.draw_text(surf, f"Notionnel couvert : {widgets.format_money(NOTIONAL, cur)}",
+        widgets.draw_text(surf, _L(f"Notionnel couvert : {widgets.format_money(NOTIONAL, cur)}", f"Hedged notional: {widgets.format_money(NOTIONAL, cur)}"),
                           (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 22
-        widgets.draw_text(surf, f"Prime à payer : {widgets.format_money(premium, cur)}",
+        widgets.draw_text(surf, _L(f"Prime à payer : {widgets.format_money(premium, cur)}", f"Premium to pay: {widgets.format_money(premium, cur)}"),
                           (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
         y += 36
         self.buy_btn = pygame.Rect(inner.x, y, 200, 32)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self.buy_btn, border_radius=4)
         pygame.draw.rect(surf, config.COL_UP, self.buy_btn, 1, border_radius=4)
-        widgets.draw_text(surf, "SOUSCRIRE", self.buy_btn.center, fonts.small(bold=True),
+        widgets.draw_text(surf, _L("SOUSCRIRE", "SUBSCRIBE"), self.buy_btn.center, fonts.small(bold=True),
                           config.COL_UP, align="center")
         self._all_rects["buy"] = self.buy_btn
         keynav.draw_focus_ring(surf, self.buy_btn, self.focus == "buy")
 
         # ---- contexte risque (milieu) ----
         risk_rect = pygame.Rect(500, 110, 320, 150)
-        rinner = widgets.draw_panel(surf, risk_rect, "Exposition", config.COL_AMBER)
+        rinner = widgets.draw_panel(surf, risk_rect, _L("Exposition", "Exposure"), config.COL_AMBER)
         from core import portfolio as pf
         beta = pf.portfolio_beta(p, m)
         coverage = H.coverage_ratio(p, m)
         bcol = config.COL_DOWN if beta > 1.3 else (config.COL_WARN if beta > 1.0 else config.COL_UP)
-        widgets.draw_text(surf, f"Bêta net du portefeuille : {beta:.2f}",
+        widgets.draw_text(surf, _L(f"Bêta net du portefeuille : {beta:.2f}", f"Net portfolio beta: {beta:.2f}"),
                           (rinner.x, rinner.y), fonts.small(bold=True), bcol)
-        widgets.draw_text(surf, "(marché neutre = 1.00 · prudent ≤ 0.80)",
+        widgets.draw_text(surf, _L("(marché neutre = 1.00 · prudent ≤ 0.80)", "(market-neutral = 1.00 · conservative ≤ 0.80)"),
                           (rinner.x, rinner.y + 18), fonts.tiny(), config.COL_TEXT_DIM)
-        widgets.draw_text_wrapped(surf, f"Couverture en cours : {coverage*100:.0f}% de l'exposition brute",
+        widgets.draw_text_wrapped(surf, _L(f"Couverture en cours : {coverage*100:.0f}% de l'exposition brute", f"Current hedge: {coverage*100:.0f}% of gross exposure"),
                           (rinner.x, rinner.y + 40), fonts.small(),
                           config.COL_UP if coverage > 0 else config.COL_TEXT_DIM, rinner.w)
 
         # ---- positions en cours (droite) ----
         pos_rect = pygame.Rect(840, 110, config.SCREEN_WIDTH - 880, 280)
-        pinner = widgets.draw_panel(surf, pos_rect, "Couvertures en cours", config.COL_UP)
+        pinner = widgets.draw_panel(surf, pos_rect, _L("Couvertures en cours", "Active hedges"), config.COL_UP)
         hold = H.holdings(p, m)
         if not hold:
-            widgets.draw_text(surf, "Aucune couverture active.", (pinner.x, pinner.y),
+            widgets.draw_text(surf, _L("Aucune couverture active.", "No active hedge."), (pinner.x, pinner.y),
                               fonts.small(), config.COL_TEXT_DIM)
         else:
             yy = pinner.y
@@ -238,12 +252,12 @@ class HedgeScene(Scene):
                 pcol = self._flash.tick(f"hedge:{h['underlying']}", live_spot,
                                         config.COL_UP, config.COL_DOWN,
                                         config.COL_UP if in_money else config.COL_TEXT_DIM)
-                widgets.draw_text(surf, f"sous-jacent {live_perf:+.1f}% · échéance {h['years_left']:.1f} an"
-                                        + (" · DANS LA MONNAIE" if in_money else ""),
+                widgets.draw_text(surf, _L(f"sous-jacent {live_perf:+.1f}% · échéance {h['years_left']:.1f} an", f"underlying {live_perf:+.1f}% · expiry {h['years_left']:.1f}y")
+                                        + (_L(" · DANS LA MONNAIE", " · IN THE MONEY") if in_money else ""),
                                   (pinner.x, yy + 18), fonts.tiny(), pcol)
                 yy += 40
 
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("↑↓", "paramètres"), ("ENTRÉE", "couvrir")])
+                              [("↑↓", _L("paramètres", "settings")), (_L("ENTRÉE", "ENTER"), _L("couvrir", "hedge"))])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)

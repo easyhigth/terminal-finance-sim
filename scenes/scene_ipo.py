@@ -9,8 +9,14 @@ import pygame
 
 from core import config, unlocks
 from core import ipo as IPO
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
 
 DEFAULT_AMOUNT = 50_000.0
 
@@ -34,7 +40,7 @@ class IPOScene(Scene):
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
                                         config.back_button_rect(160)[1], 150, 42),
-                                       "TUTO", config.COL_CYAN)
+                                       _L("TUTO", "GUIDE"), config.COL_CYAN)
 
     def _can(self):
         return unlocks.unlocked(self.app.gs.player, "ipo")
@@ -57,20 +63,24 @@ class IPOScene(Scene):
         if key[0] == "sub":
             amount = self._amount()
             if amount <= 0:
-                self.msg = "Montant invalide."
+                self.msg = _L("Montant invalide.", "Invalid amount.")
                 return
             res = IPO.subscribe(p, key[1], amount, market)
             if res["ok"]:
                 cur = self._cur()
-                self.msg = (f"Souscrit : {widgets.format_money(res['allocated_cash'], cur)} alloués "
+                self.msg = (_L(f"Souscrit : {widgets.format_money(res['allocated_cash'], cur)} alloués "
                             f"({res['shares']:.0f} actions {res['offer']['ticker']}), "
-                            f"remboursé {widgets.format_money(res['refund'], cur)}.")
+                            f"remboursé {widgets.format_money(res['refund'], cur)}.",
+                            f"Subscribed: {widgets.format_money(res['allocated_cash'], cur)} allocated "
+                            f"({res['shares']:.0f} shares {res['offer']['ticker']}), "
+                            f"refunded {widgets.format_money(res['refund'], cur)}."))
                 if not p.hardcore:
                     self.app.gs.save(config.AUTOSAVE_SLOT)
             else:
-                reasons = {"cash": "trésorerie insuffisante.", "offer": "offre introuvable.",
-                           "amount": "montant invalide."}
-                self.msg = f"Refusé ({reasons.get(res['reason'], res['reason'])})."
+                reasons = {"cash": _L("trésorerie insuffisante.", "insufficient cash."),
+                           "offer": _L("offre introuvable.", "offer not found."),
+                           "amount": _L("montant invalide.", "invalid amount.")}
+                self.msg = _L(f"Refusé ({reasons.get(res['reason'], res['reason'])}).", f"Rejected ({reasons.get(res['reason'], res['reason'])}).")
         elif key[0] == "decline":
             IPO.decline(p, key[1])
 
@@ -124,20 +134,24 @@ class IPOScene(Scene):
                 if rect.collidepoint(event.pos):
                     amount = self._amount()
                     if amount <= 0:
-                        self.msg = "Montant invalide."
+                        self.msg = _L("Montant invalide.", "Invalid amount.")
                         return
                     res = IPO.subscribe(p, oid, amount, market)
                     if res["ok"]:
                         cur = self._cur()
-                        self.msg = (f"Souscrit : {widgets.format_money(res['allocated_cash'], cur)} alloués "
+                        self.msg = (_L(f"Souscrit : {widgets.format_money(res['allocated_cash'], cur)} alloués "
                                     f"({res['shares']:.0f} actions {res['offer']['ticker']}), "
-                                    f"remboursé {widgets.format_money(res['refund'], cur)}.")
+                                    f"remboursé {widgets.format_money(res['refund'], cur)}.",
+                                    f"Subscribed: {widgets.format_money(res['allocated_cash'], cur)} allocated "
+                                    f"({res['shares']:.0f} shares {res['offer']['ticker']}), "
+                                    f"refunded {widgets.format_money(res['refund'], cur)}."))
                         if not p.hardcore:
                             self.app.gs.save(config.AUTOSAVE_SLOT)
                     else:
-                        reasons = {"cash": "trésorerie insuffisante.", "offer": "offre introuvable.",
-                                   "amount": "montant invalide."}
-                        self.msg = f"Refusé ({reasons.get(res['reason'], res['reason'])})."
+                        reasons = {"cash": _L("trésorerie insuffisante.", "insufficient cash."),
+                                   "offer": _L("offre introuvable.", "offer not found."),
+                                   "amount": _L("montant invalide.", "invalid amount.")}
+                        self.msg = _L(f"Refusé ({reasons.get(res['reason'], res['reason'])}).", f"Rejected ({reasons.get(res['reason'], res['reason'])}).")
                     return
             for oid, rect in self._decline_rects.items():
                 if rect.collidepoint(event.pos):
@@ -153,18 +167,20 @@ class IPOScene(Scene):
     # ------------------------------------------------------------- draw
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "DESK D'IPO — INTRODUCTIONS EN BOURSE", (40, 22),
+        widgets.draw_text(surf, _L("DESK D'IPO — INTRODUCTIONS EN BOURSE", "IPO DESK — PUBLIC LISTINGS"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         p = self.app.gs.player
         if not self._can():
             g = unlocks.effective_required_grade(self.app.gs.player, "ipo")
-            widgets.draw_text(surf, f"⊘ Desk d'IPO débloqué au grade {config.GRADES[g]}.",
+            widgets.draw_text(surf, _L(f"⊘ Desk d'IPO débloqué au grade {config.GRADES[g]}.", f"⊘ IPO desk unlocked at {config.GRADES[g]} grade."),
                               (42, 74), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             self.tuto_btn.draw(surf)
             return
-        widgets.draw_text(surf, "Souscrivez une allocation avant cotation : en cas de sursouscription, "
-                                "l'allocation reçue est partielle (le surplus est remboursé). " + self.msg,
+        widgets.draw_text(surf, _L("Souscrivez une allocation avant cotation : en cas de sursouscription, "
+                                "l'allocation reçue est partielle (le surplus est remboursé). ",
+                                "Subscribe to an allocation before listing: if oversubscribed, "
+                                "the received allocation is partial (the surplus is refunded). ") + self.msg,
                           (42, 74), fonts.small(), config.COL_TEXT_DIM)
 
         market = self.app.ensure_market()
@@ -175,7 +191,7 @@ class IPOScene(Scene):
 
         # ---- montant à souscrire ----
         amt_y = 104
-        widgets.draw_text(surf, "Montant à souscrire :", (40, amt_y + 6), fonts.small(), config.COL_TEXT)
+        widgets.draw_text(surf, _L("Montant à souscrire :", "Amount to subscribe:"), (40, amt_y + 6), fonts.small(), config.COL_TEXT)
         self._amount_rect = pygame.Rect(230, amt_y, 160, 28)
         pygame.draw.rect(surf, config.COL_PANEL, self._amount_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN if self.amount_focus else config.COL_BORDER,
@@ -191,9 +207,9 @@ class IPOScene(Scene):
         off_h = 50 + len(offers) * 70 if offers else 50
         off_h = min(off_h, 260)
         off_panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, off_h)
-        inner = widgets.draw_panel(surf, off_panel, f"Offres en attente ({len(offers)})", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, off_panel, _L(f"Offres en attente ({len(offers)})", f"Pending offers ({len(offers)})"), config.COL_CYAN)
         if not offers:
-            widgets.draw_text(surf, "Aucune offre en attente. Patientez, le temps avance en direct.",
+            widgets.draw_text(surf, _L("Aucune offre en attente. Patientez, le temps avance en direct.", "No pending offer. Wait, time advances live."),
                               (inner.x, inner.y + 4), fonts.small(), config.COL_TEXT_DIM)
         else:
             y = inner.y
@@ -203,22 +219,25 @@ class IPOScene(Scene):
                 pygame.draw.rect(surf, config.COL_CYAN, row, 1, border_radius=4)
                 widgets.draw_text(surf, f"#{o['id']} {o['company_name']} ({o['ticker']}) · {o['sector']}",
                                   (row.x + 12, row.y + 6), fonts.small(bold=True), config.COL_AMBER)
-                widgets.draw_text(surf, f"Fourchette : {o['price_min']:.2f}–{o['price_max']:.2f} {cur}  ·  "
+                widgets.draw_text(surf, _L(f"Fourchette : {o['price_min']:.2f}–{o['price_max']:.2f} {cur}  ·  "
                                         f"Sursouscription estimée : {o['demand_multiple']:.2f}x  ·  "
                                         f"Cotation dans {max(0, o['listing_step'] - market.step_count)} pas",
+                                        f"Range: {o['price_min']:.2f}–{o['price_max']:.2f} {cur}  ·  "
+                                        f"Estimated oversubscription: {o['demand_multiple']:.2f}x  ·  "
+                                        f"Listing in {max(0, o['listing_step'] - market.step_count)} steps"),
                                   (row.x + 12, row.y + 26), fonts.tiny(), config.COL_TEXT)
                 sent_col = {"bullish": config.COL_UP, "bearish": config.COL_DOWN,
                             "neutral": config.COL_TEXT_DIM}.get(o["sentiment"], config.COL_TEXT_DIM)
-                widgets.draw_text(surf, f"Sentiment marché : {o['sentiment']}",
+                widgets.draw_text(surf, _L(f"Sentiment marché : {o['sentiment']}", f"Market sentiment: {o['sentiment']}"),
                                   (row.x + 12, row.y + 44), fonts.tiny(), sent_col)
                 sub = pygame.Rect(row.right - 196, row.y + 16, 90, 30)
                 dec = pygame.Rect(row.right - 100, row.y + 16, 90, 30)
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, sub, border_radius=4)
                 pygame.draw.rect(surf, config.COL_UP, sub, 1, border_radius=4)
-                widgets.draw_text(surf, "SOUSCRIRE", sub.center, fonts.tiny(bold=True), config.COL_UP, align="center")
+                widgets.draw_text(surf, _L("SOUSCRIRE", "SUBSCRIBE"), sub.center, fonts.tiny(bold=True), config.COL_UP, align="center")
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, dec, border_radius=4)
                 pygame.draw.rect(surf, config.COL_DOWN, dec, 1, border_radius=4)
-                widgets.draw_text(surf, "DÉCLINER", dec.center, fonts.tiny(bold=True), config.COL_DOWN, align="center")
+                widgets.draw_text(surf, _L("DÉCLINER", "DECLINE"), dec.center, fonts.tiny(bold=True), config.COL_DOWN, align="center")
                 self._subscribe_rects[o["id"]] = sub
                 self._decline_rects[o["id"]] = dec
                 sub_fk, dec_fk = ("sub", o["id"]), ("decline", o["id"])
@@ -231,12 +250,12 @@ class IPOScene(Scene):
         # ---- positions IPO en cours ----
         pos_top = off_panel.bottom + 10
         pos_panel = pygame.Rect(40, pos_top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - pos_top)
-        pinner = widgets.draw_panel(surf, pos_panel, "Positions IPO", config.COL_PRESTIGE)
+        pinner = widgets.draw_panel(surf, pos_panel, _L("Positions IPO", "IPO positions"), config.COL_PRESTIGE)
         list_area = pygame.Rect(pinner.x - 6, pinner.y, pinner.w + 12, pinner.bottom - pinner.y - 4)
         self._list_rect = list_area
         hold = IPO.holdings(p, market)
         if not hold:
-            widgets.draw_text(surf, "Aucune position IPO en cours.",
+            widgets.draw_text(surf, _L("Aucune position IPO en cours.", "No IPO position in progress."),
                               (pinner.x, pinner.y + 4), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             self.tuto_btn.draw(surf)
@@ -254,10 +273,10 @@ class IPOScene(Scene):
                 pygame.draw.rect(surf, config.COL_BORDER, row, 1, border_radius=4)
                 widgets.draw_text(surf, f"{h['company_name']} ({h['ticker']})",
                                   (row.x + 12, row.y + 6), fonts.small(bold=True), config.COL_TEXT)
-                widgets.draw_text(surf, f"{h['shares']:.0f} actions · coût {widgets.format_money(h['cost_basis'], cur)} "
+                widgets.draw_text(surf, _L(f"{h['shares']:.0f} actions · coût {widgets.format_money(h['cost_basis'], cur)} ", f"{h['shares']:.0f} shares · cost {widgets.format_money(h['cost_basis'], cur)} ") +
                                         f"@ {h['issue_price']:.2f} {cur}",
                                   (row.x + 12, row.y + 26), fonts.tiny(), config.COL_TEXT_DIM)
-                status = "Cotation imminente" if h["listed"] else f"Cotation dans {h['steps_left']} pas"
+                status = _L("Cotation imminente", "Listing imminent") if h["listed"] else _L(f"Cotation dans {h['steps_left']} pas", f"Listing in {h['steps_left']} steps")
                 widgets.draw_badge(surf, status, (row.right - 200, row.y + 14),
                                    accent=config.COL_UP if h["listed"] else config.COL_TEXT_DIM)
             y += ROW
@@ -268,6 +287,6 @@ class IPOScene(Scene):
         self.scroll = widgets.draw_scrollbar(surf, pos_panel, list_area, self.scroll, self._max_scroll, content_h)
 
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("↑↓", "naviguer"), ("ENTRÉE", "souscrire")])
+                              [("↑↓", _L("naviguer", "navigate")), (_L("ENTRÉE", "ENTER"), _L("souscrire", "subscribe"))])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)

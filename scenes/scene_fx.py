@@ -11,8 +11,14 @@ import pygame
 
 from core import config, intraday, unlocks
 from core import fx as FX
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
 
 NOTIONAL_STEP = 5000
 
@@ -29,7 +35,7 @@ class FXScene(Scene):
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
                                         config.back_button_rect(160)[1], 150, 42),
-                                       "TUTO", config.COL_CYAN)
+                                       _L("TUTO", "GUIDE"), config.COL_CYAN)
         self.pair_rects = {}
         self.dir_rects = {}
         self.tenor_rects = {}
@@ -74,9 +80,11 @@ class FXScene(Scene):
             pair = self._pair()
             direction = self._direction()
             r = FX.open_spot(p, m, pair, direction, self.notional)
-            self.msg = (f"Position spot {direction.upper()} {pair} ouverte "
-                        f"(notionnel {widgets.format_money(self.notional, self._cur())})."
-                        if r["ok"] else f"Refusé ({r['reason']}).")
+            self.msg = (_L(f"Position spot {direction.upper()} {pair} ouverte "
+                        f"(notionnel {widgets.format_money(self.notional, self._cur())}).",
+                        f"Spot position {direction.upper()} {pair} opened "
+                        f"(notional {widgets.format_money(self.notional, self._cur())}).")
+                        if r["ok"] else _L(f"Refusé ({r['reason']}).", f"Rejected ({r['reason']})."))
             if r["ok"] and not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
         elif key == "forward" and self.forward_btn:
@@ -85,15 +93,15 @@ class FXScene(Scene):
             direction = self._direction()
             tenor = FX.FORWARD_TENORS[self.tenor_idx % len(FX.FORWARD_TENORS)]
             r = FX.open_forward(p, m, pair, direction, self.notional, tenor)
-            self.msg = (f"Forward {direction.upper()} {pair} {tenor}m verrouillé."
-                        if r["ok"] else f"Refusé ({r['reason']}).")
+            self.msg = (_L(f"Forward {direction.upper()} {pair} {tenor}m verrouillé.", f"Forward {direction.upper()} {pair} {tenor}m locked.")
+                        if r["ok"] else _L(f"Refusé ({r['reason']}).", f"Rejected ({r['reason']})."))
             if r["ok"] and not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
         elif isinstance(key, tuple) and key[0] == "close":
             p, m = self.app.gs.player, self.app.market
             r = FX.close_spot(p, m, key[1])
             if r["ok"]:
-                self.msg = f"Position fermée, P&L {widgets.format_money(r['pnl'], self._cur())}."
+                self.msg = _L(f"Position fermée, P&L {widgets.format_money(r['pnl'], self._cur())}.", f"Position closed, P&L {widgets.format_money(r['pnl'], self._cur())}.")
                 if not p.hardcore:
                     self.app.gs.save(config.AUTOSAVE_SLOT)
 
@@ -140,9 +148,11 @@ class FXScene(Scene):
                 pair = self._pair()
                 direction = self._direction()
                 r = FX.open_spot(p, m, pair, direction, self.notional)
-                self.msg = (f"Position spot {direction.upper()} {pair} ouverte "
-                            f"(notionnel {widgets.format_money(self.notional, self._cur())})."
-                            if r["ok"] else f"Refusé ({r['reason']}).")
+                self.msg = (_L(f"Position spot {direction.upper()} {pair} ouverte "
+                            f"(notionnel {widgets.format_money(self.notional, self._cur())}).",
+                            f"Spot position {direction.upper()} {pair} opened "
+                            f"(notional {widgets.format_money(self.notional, self._cur())}).")
+                            if r["ok"] else _L(f"Refusé ({r['reason']}).", f"Rejected ({r['reason']})."))
                 if r["ok"] and not p.hardcore:
                     self.app.gs.save(config.AUTOSAVE_SLOT)
                 return
@@ -151,8 +161,8 @@ class FXScene(Scene):
                 direction = self._direction()
                 tenor = FX.FORWARD_TENORS[self.tenor_idx % len(FX.FORWARD_TENORS)]
                 r = FX.open_forward(p, m, pair, direction, self.notional, tenor)
-                self.msg = (f"Forward {direction.upper()} {pair} {tenor}m verrouillé."
-                            if r["ok"] else f"Refusé ({r['reason']}).")
+                self.msg = (_L(f"Forward {direction.upper()} {pair} {tenor}m verrouillé.", f"Forward {direction.upper()} {pair} {tenor}m locked.")
+                            if r["ok"] else _L(f"Refusé ({r['reason']}).", f"Rejected ({r['reason']})."))
                 if r["ok"] and not p.hardcore:
                     self.app.gs.save(config.AUTOSAVE_SLOT)
                 return
@@ -160,7 +170,7 @@ class FXScene(Scene):
                 if rect.collidepoint(event.pos):
                     r = FX.close_spot(p, m, pid)
                     if r["ok"]:
-                        self.msg = f"Position fermée, P&L {widgets.format_money(r['pnl'], self._cur())}."
+                        self.msg = _L(f"Position fermée, P&L {widgets.format_money(r['pnl'], self._cur())}.", f"Position closed, P&L {widgets.format_money(r['pnl'], self._cur())}.")
                         if not p.hardcore:
                             self.app.gs.save(config.AUTOSAVE_SLOT)
                     return
@@ -172,10 +182,10 @@ class FXScene(Scene):
         l'évolution de la monnaie en temps réel."""
         m = self.app.market
         pair = self._pair()
-        inner = widgets.draw_panel(surf, rect, f"{pair} — cours & évolution", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, rect, _L(f"{pair} — cours & évolution", f"{pair} — rate & evolution"), config.COL_CYAN)
         hist = FX.history(m, pair, 80)
         if len(hist) < 2:
-            widgets.draw_text(surf, "Historique en constitution (avancez le temps).",
+            widgets.draw_text(surf, _L("Historique en constitution (avancez le temps).", "History building up (advance time)."),
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
             return
         # amplitude d'animation proportionnelle à la volatilité de la paire
@@ -186,7 +196,7 @@ class FXScene(Scene):
         chg = FX.change_pct(m, pair, 1)
         col = config.COL_UP if chg >= 0 else config.COL_DOWN
         widgets.draw_text(surf, f"{cur:.4f}", (inner.x, inner.y - 2), fonts.head(bold=True), col)
-        widgets.draw_text(surf, f"{chg:+.2f}% / pas · vol {FX.pair_vol(pair)*100:.0f}%",
+        widgets.draw_text(surf, _L(f"{chg:+.2f}% / pas · vol {FX.pair_vol(pair)*100:.0f}%", f"{chg:+.2f}% / step · vol {FX.pair_vol(pair)*100:.0f}%"),
                           (inner.x + 160, inner.y + 6), fonts.small(), config.COL_TEXT_DIM)
         chart = pygame.Rect(inner.x, inner.y + 36, inner.w, inner.bottom - (inner.y + 36))
         widgets.draw_series(surf, chart, series, col, mouse_pos=pygame.mouse.get_pos(),
@@ -200,16 +210,16 @@ class FXScene(Scene):
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "DESK FX — SPOT / FORWARD", (40, 22),
+        widgets.draw_text(surf, _L("DESK FX — SPOT / FORWARD", "FX DESK — SPOT / FORWARD"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         if not self._can():
             g = unlocks.effective_required_grade(self.app.gs.player, "fx")
-            widgets.draw_text(surf, f"⊘ Desk FX débloqué au grade {config.GRADES[g]}.",
+            widgets.draw_text(surf, _L(f"⊘ Desk FX débloqué au grade {config.GRADES[g]}.", f"⊘ FX desk unlocked at {config.GRADES[g]} grade."),
                               (42, 74), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             self.tuto_btn.draw(surf)
             return
-        widgets.draw_text(surf, "Tradez une paire de devises au comptant ou à terme. " + self.msg,
+        widgets.draw_text(surf, _L("Tradez une paire de devises au comptant ou à terme. ", "Trade a currency pair spot or forward. ") + self.msg,
                           (42, 74), fonts.small(), config.COL_TEXT_DIM)
 
         m, p = self.app.market, self.app.gs.player
@@ -218,10 +228,10 @@ class FXScene(Scene):
 
         # ---- cotation / ouverture (gauche) ----
         quote_rect = pygame.Rect(40, 110, 460, 420)
-        inner = widgets.draw_panel(surf, quote_rect, "Nouvelle position", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, quote_rect, _L("Nouvelle position", "New position"), config.COL_CYAN)
         y = inner.y
 
-        widgets.draw_text(surf, "Paire", (inner.x, y), fonts.small(), config.COL_TEXT)
+        widgets.draw_text(surf, _L("Paire", "Pair"), (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 22
         # Tableau des paires : chaque case montre la paire, son cours courant et
         # sa variation depuis le pas précédent (indicateur de change permanent).
@@ -253,7 +263,8 @@ class FXScene(Scene):
                 y += 42
         y += 48
 
-        widgets.draw_text(surf, "Sens (long = pari sur hausse de la devise de base)",
+        widgets.draw_text(surf, _L("Sens (long = pari sur hausse de la devise de base)",
+                          "Direction (long = bet on base currency rising)"),
                           (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 22
         self.dir_rects = {}
@@ -273,7 +284,7 @@ class FXScene(Scene):
             x += 100
         y += 40
 
-        widgets.draw_text(surf, "Notionnel", (inner.x, y), fonts.small(), config.COL_TEXT)
+        widgets.draw_text(surf, _L("Notionnel", "Notional"), (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 22
         self.notional_minus_btn = pygame.Rect(inner.x, y, 32, 28)
         self.notional_plus_btn = pygame.Rect(inner.x + 180, y, 32, 28)
@@ -302,13 +313,13 @@ class FXScene(Scene):
         self.spot_btn = pygame.Rect(inner.x, y, 200, 32)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self.spot_btn, border_radius=4)
         pygame.draw.rect(surf, config.COL_UP, self.spot_btn, 1, border_radius=4)
-        widgets.draw_text(surf, "OUVRIR SPOT", self.spot_btn.center, fonts.small(bold=True),
+        widgets.draw_text(surf, _L("OUVRIR SPOT", "OPEN SPOT"), self.spot_btn.center, fonts.small(bold=True),
                           config.COL_UP, align="center")
         self._all_rects["spot"] = self.spot_btn
         keynav.draw_focus_ring(surf, self.spot_btn, self.focus == "spot")
         y += 46
 
-        widgets.draw_text(surf, "Tenor forward (mois)", (inner.x, y), fonts.small(), config.COL_TEXT)
+        widgets.draw_text(surf, _L("Tenor forward (mois)", "Forward tenor (months)"), (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 22
         self.tenor_rects = {}
         x = inner.x
@@ -330,14 +341,14 @@ class FXScene(Scene):
             self.forward_btn = pygame.Rect(inner.x, y, 200, 32)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD, self.forward_btn, border_radius=4)
             pygame.draw.rect(surf, config.COL_AMBER, self.forward_btn, 1, border_radius=4)
-            widgets.draw_text(surf, "VERROUILLER FORWARD", self.forward_btn.center, fonts.small(bold=True),
+            widgets.draw_text(surf, _L("VERROUILLER FORWARD", "LOCK FORWARD"), self.forward_btn.center, fonts.small(bold=True),
                               config.COL_AMBER, align="center")
             self._all_rects["forward"] = self.forward_btn
             keynav.draw_focus_ring(surf, self.forward_btn, self.focus == "forward")
         else:
             g = FX.FORWARD_MIN_GRADE
             grade_label = config.GRADES[g] if g < len(config.GRADES) else str(g)
-            widgets.draw_text(surf, f"⊘ Forward débloqué au grade {grade_label}.",
+            widgets.draw_text(surf, _L(f"⊘ Forward débloqué au grade {grade_label}.", f"⊘ Forward unlocked at {grade_label} grade."),
                               (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
             self.forward_btn = None
 
@@ -346,12 +357,12 @@ class FXScene(Scene):
 
         # ---- positions en cours (droite, bas) ----
         pos_rect = pygame.Rect(540, 354, config.SCREEN_WIDTH - 580, 176)
-        pinner = widgets.draw_panel(surf, pos_rect, "Positions en cours", config.COL_UP)
+        pinner = widgets.draw_panel(surf, pos_rect, _L("Positions en cours", "Open positions"), config.COL_UP)
         yy = pinner.y
         self.close_rects = {}
         spot_hold = FX.holdings(p, m)
         if not spot_hold:
-            widgets.draw_text(surf, "Aucune position spot ouverte.", (pinner.x, yy),
+            widgets.draw_text(surf, _L("Aucune position spot ouverte.", "No open spot position."), (pinner.x, yy),
                               fonts.small(), config.COL_TEXT_DIM)
             yy += 26
         else:
@@ -362,7 +373,7 @@ class FXScene(Scene):
                 widgets.draw_text(surf, f"{h['direction'].upper()} {h['pair']} · "
                                         f"{widgets.format_money(h['notional'], cur)}",
                                   (pinner.x, yy), fonts.small(bold=True), config.COL_TEXT)
-                widgets.draw_text(surf, f"entrée {h['entry_rate']:.4f} → ",
+                widgets.draw_text(surf, _L(f"entrée {h['entry_rate']:.4f} → ", f"entry {h['entry_rate']:.4f} → "),
                                   (pinner.x, yy + 18), fonts.tiny(), config.COL_TEXT_DIM)
                 widgets.draw_text(surf, f"{h['spot']:.4f}",
                                   (pinner.x + 172, yy + 18), fonts.tiny(), spot_col)
@@ -371,7 +382,7 @@ class FXScene(Scene):
                 close_rect = pygame.Rect(pinner.right - 90, yy, 86, 30)
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, close_rect, border_radius=4)
                 pygame.draw.rect(surf, config.COL_DOWN, close_rect, 1, border_radius=4)
-                widgets.draw_text(surf, "FERMER", close_rect.center, fonts.tiny(bold=True),
+                widgets.draw_text(surf, _L("FERMER", "CLOSE"), close_rect.center, fonts.tiny(bold=True),
                                   config.COL_DOWN, align="center")
                 self.close_rects[h["id"]] = close_rect
                 fk = ("close", h["id"])
@@ -380,23 +391,25 @@ class FXScene(Scene):
                 yy += 42
 
         yy += 10
-        widgets.draw_text(surf, "Forwards en cours", (pinner.x, yy), fonts.small(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L("Forwards en cours", "Open forwards"), (pinner.x, yy), fonts.small(bold=True), config.COL_AMBER)
         yy += 24
         fwd_hold = FX.forward_holdings(p, m)
         if not fwd_hold:
-            widgets.draw_text(surf, "Aucun forward en cours.", (pinner.x, yy),
+            widgets.draw_text(surf, _L("Aucun forward en cours.", "No open forward."), (pinner.x, yy),
                               fonts.small(), config.COL_TEXT_DIM)
         else:
             for h in fwd_hold:
                 widgets.draw_text(surf, f"{h['direction'].upper()} {h['pair']} {h['tenor_months']}m · "
                                         f"{widgets.format_money(h['notional'], cur)}",
                                   (pinner.x, yy), fonts.small(bold=True), config.COL_TEXT)
-                widgets.draw_text(surf, f"verrouillé {h['locked_rate']:.4f} · spot {h['spot']:.4f} · "
+                widgets.draw_text(surf, _L(f"verrouillé {h['locked_rate']:.4f} · spot {h['spot']:.4f} · "
                                         f"{h['steps_left']} pas restants",
+                                        f"locked {h['locked_rate']:.4f} · spot {h['spot']:.4f} · "
+                                        f"{h['steps_left']} steps left"),
                                   (pinner.x, yy + 18), fonts.tiny(), config.COL_TEXT_DIM)
                 yy += 42
 
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("↑↓", "paire/sens"), ("ENTRÉE", "ouvrir")])
+                              [("↑↓", _L("paire/sens", "pair/dir")), (_L("ENTRÉE", "ENTER"), _L("ouvrir", "open"))])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)

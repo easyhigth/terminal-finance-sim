@@ -26,7 +26,9 @@ from scenes.scene_desktop_common import (
     TASKBAR_H,
     TOPBAR_H,
     TRACK_APP,
+    app_label,
     icon_category,
+    section_label,
 )
 from ui import desktop_icons, fonts, keynav, style, widgets
 
@@ -170,8 +172,8 @@ class DesktopIconsMixin:
                if k not in seen and k != "qdecide"]
         for k, label in new:
             cat = icon_category(k)
-            self.app.notify(_L(f"Nouvelle app dans « {cat} » : {label}",
-                               f"New app in “{cat}”: {label}"), "prestige")
+            self.app.notify(_L(f"Nouvelle app dans « {section_label(cat)} » : {app_label(label)}",
+                               f"New app in “{section_label(cat)}”: {app_label(label)}"), "prestige")
         if new:
             p.flags["desktop_seen_apps"] = keys
 
@@ -219,7 +221,7 @@ class DesktopIconsMixin:
             pts = [(cx - 5, cy - 3), (cx + 5, cy - 3), (cx, cy + 4)]
         pygame.draw.polygon(surf, config.COL_AMBER if hov else config.COL_TEXT_DIM, pts)
         suffix = f" ({n_items})" if collapsed else ""
-        widgets.draw_text(surf, widgets.fit_text(label.upper() + suffix,
+        widgets.draw_text(surf, widgets.fit_text(section_label(label).upper() + suffix,
                                                   fonts.tiny(bold=True), w - 28),
                           (r.x + 24, r.y + 5), fonts.tiny(bold=True),
                           config.COL_AMBER if hov else config.COL_TEXT_DIM)
@@ -297,11 +299,11 @@ class DesktopIconsMixin:
                            size=36, alpha=110 if ghost else 255)
         label_col = config.COL_TEXT_DIM if ghost else (
             style._lerp_color(config.COL_TEXT, accent, 0.3 * hov_t))
-        widgets.draw_text(surf, widgets.fit_text(label, fonts.small(bold=True), ICON_W - 6),
+        widgets.draw_text(surf, widgets.fit_text(app_label(label), fonts.small(bold=True), ICON_W - 6),
                           (r.centerx, r.bottom - 18), fonts.small(bold=True),
                           label_col, align="center")
         # tooltip raccourci clavier (seulement si aucune fenêtre ne
         # recouvre l'icône — sinon le survol appartient à la fenêtre)
         sc_label = _ICON_SHORTCUT.get(key)
         if hov and sc_label and self.wm._topmost_at(mp) is None:
-            widgets.draw_tooltip(surf, f"{label} · {sc_label}", (r.x, r.bottom + 2))
+            widgets.draw_tooltip(surf, f"{app_label(label)} · {sc_label}", (r.x, r.bottom + 2))

@@ -274,6 +274,49 @@ ICON_CATEGORY = {
 def icon_category(key):
     return ICON_CATEGORY.get(key, DEFAULT_ICON_CATEGORY)
 
+
+# Traductions d'AFFICHAGE (les libellés FR restent les clés canoniques des
+# registres ci-dessus : sections repliées persistées, ordre d'icônes…) —
+# localisées uniquement au dessin (cf. scene_desktop_icons).
+_SECTION_LABEL_EN = {
+    "Essentiels": "Essentials", "Marché & Analyse": "Market & Analysis",
+    "Quant & Risque": "Quant & Risk", "Crédit & Financement": "Credit & Funding",
+    "Carrière": "Career", "Outils du bureau": "Desktop tools", "Autres": "Other",
+}
+_APP_LABEL_EN = {
+    "Recherche": "Research", "Tableur": "Spreadsheet", "Alertes": "Alerts",
+    "Marché": "Market", "Portefeuille": "Portfolio", "Calculatrice": "Calculator",
+    "Manuel": "Manual", "Notifications": "Notifications", "Décision": "Decision",
+    "Revue de performance": "Performance review", "Journal de trading": "Trading journal",
+    "Évaluation": "Evaluation", "Carnet clients": "Client book",
+    "Fiche société": "Company sheet", "Boutique": "Shop",
+    "Analyse du portefeuille": "Portfolio analysis", "Explorateur": "Explorer",
+    "Couverture": "Hedge", "Frontière efficiente": "Efficient frontier",
+    "Desk Options": "Options Desk", "Risque (VaR)": "Risk (VaR)",
+    "Desk Taux": "Rates Desk", "Attribution (Brinson)": "Attribution (Brinson)",
+    "Desk Crédit": "Credit Desk", "Labo de crise": "Crisis Lab",
+    "Valorisation": "Valuation", "Desk FX (carry)": "FX Desk (carry)",
+    "Labo de vol": "Vol Lab", "Desk Financement": "Funding Desk",
+    "Allocation stratégique": "Strategic Allocation",
+    "Arbitrage de fusion": "Merger Arbitrage", "Thématiques": "Themes",
+    # QUICK_APPS
+    "Mandats": "Mandates", "Décide": "Decide", "Exam/Certif": "Exam/Cert",
+    "Mur": "Wall", "Explorateur ": "Explorer", "Graphes": "Charts",
+    "Succès": "Achievements", "Sauver": "Save", "Aide": "Help",
+    # TRACK_APP
+    "Risque": "Risk",
+}
+
+
+def section_label(fr):
+    from core.i18n import get_lang
+    return _SECTION_LABEL_EN.get(fr, fr) if get_lang() == "en" else fr
+
+
+def app_label(fr):
+    from core.i18n import get_lang
+    return _APP_LABEL_EN.get(fr, fr) if get_lang() == "en" else fr
+
 # Raccourcis Ctrl+<lettre> des icônes du bureau — mêmes mnémoniques que les
 # raccourcis du terminal (RAIL_SHORTCUTS, scenes/scene_terminal.py, garder
 # synchronisé) pour ne pas avoir deux dialectes. Ctrl+T/W/Tab sont réservés

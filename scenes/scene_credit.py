@@ -10,8 +10,14 @@ import pygame
 
 from core import config, unlocks
 from core import securitisation as SEC
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
 
 LOT = SEC.LOT
 
@@ -32,7 +38,7 @@ class CreditScene(Scene):
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
                                         config.back_button_rect(160)[1], 150, 42),
-                                       "TUTO", config.COL_CYAN)
+                                       _L("TUTO", "GUIDE"), config.COL_CYAN)
 
     def _can_trade(self):
         return unlocks.unlocked(self.app.gs.player, "credit")
@@ -45,7 +51,7 @@ class CreditScene(Scene):
             return
         tid = self._row_list[self.row_cursor]
         r = SEC.invest(self.app.gs.player, self.app.market, tid, LOT)
-        self.msg = ("Investi dans " + tid if r["ok"] else f"Refusé ({r['reason']}).")
+        self.msg = (_L("Investi dans ", "Invested in ") + tid if r["ok"] else _L(f"Refusé ({r['reason']}).", f"Rejected ({r['reason']})."))
         if r["ok"] and not self.app.gs.player.hardcore:
             self.app.gs.save(config.AUTOSAVE_SLOT)
 
@@ -84,16 +90,16 @@ class CreditScene(Scene):
                 if rect.collidepoint(event.pos):
                     r = SEC.sell(self.app.gs.player, self.app.market, tid,
                                  min(LOT, SEC.held_notional(self.app.gs.player, tid)))
-                    self.msg = (f"Vendu {tid} (P&L {r['realized']:+.0f})." if r["ok"]
-                                else f"Vente refusée ({r['reason']}).")
+                    self.msg = (_L(f"Vendu {tid} (P&L {r['realized']:+.0f}).", f"Sold {tid} (P&L {r['realized']:+.0f}).") if r["ok"]
+                                else _L(f"Vente refusée ({r['reason']}).", f"Sale rejected ({r['reason']})."))
                     if r["ok"] and not self.app.gs.player.hardcore:
                         self.app.gs.save(config.AUTOSAVE_SLOT)
                     return
             for tid, rect in self.invest_rects.items():
                 if rect.collidepoint(event.pos):
                     r = SEC.invest(self.app.gs.player, self.app.market, tid, LOT)
-                    self.msg = ("Investi dans " + tid if r["ok"]
-                                else f"Refusé ({r['reason']}).")
+                    self.msg = (_L("Investi dans ", "Invested in ") + tid if r["ok"]
+                                else _L(f"Refusé ({r['reason']}).", f"Rejected ({r['reason']})."))
                     if r["ok"] and not self.app.gs.player.hardcore:
                         self.app.gs.save(config.AUTOSAVE_SLOT)
 
@@ -106,12 +112,14 @@ class CreditScene(Scene):
         surf.fill(config.COL_BG)
         m, p = self.app.market, self.app.gs.player
         cur = config.CONTINENTS[p.continent]["currency"]
-        widgets.draw_text(surf, "DESK CRÉDIT — TITRISATION", (40, 22),
+        widgets.draw_text(surf, _L("DESK CRÉDIT — TITRISATION", "CREDIT DESK — SECURITISATION"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         el = SEC.expected_pool_loss(m) * 100
-        regime_note = f" · régime : {m.regime_label()}" if m else ""
-        widgets.draw_text(surf, f"Pool de prêts · perte attendue ≈ {el:.1f}%{regime_note} · cascade : "
-                                "l'equity encaisse les premières pertes, le senior est protégé. "
+        regime_note = _L(f" · régime : {m.regime_label()}", f" · regime: {m.regime_label()}") if m else ""
+        widgets.draw_text(surf, _L(f"Pool de prêts · perte attendue ≈ {el:.1f}%{regime_note} · cascade : "
+                                "l'equity encaisse les premières pertes, le senior est protégé. ",
+                                f"Loan pool · expected loss ≈ {el:.1f}%{regime_note} · waterfall: "
+                                "equity absorbs first losses, senior is protected. ")
                                 + self.msg,
                           (42, 74), fonts.small(), config.COL_TEXT_DIM)
 
@@ -119,7 +127,7 @@ class CreditScene(Scene):
         pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, search_rect, 1, border_radius=4)
         cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        slabel = (self.search + cursor) if self.search else (cursor + "Rechercher une tranche…")
+        slabel = (self.search + cursor) if self.search else (cursor + _L("Rechercher une tranche…", "Search a tranche…"))
         scol = config.COL_TEXT if self.search else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(slabel, fonts.small(), search_rect.w - 30),
                           (search_rect.x + 8, search_rect.y + 4), fonts.small(), scol)
@@ -133,10 +141,10 @@ class CreditScene(Scene):
         top = search_rect.bottom + 8
         ph = config.footer_y() - 8 - top
         panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, ph)
-        inner = widgets.draw_panel(surf, panel, "Tranches", config.COL_CYAN)
-        cols = [("TRANCHE", inner.x), ("ATTACHE-DÉTACHE", inner.x + 240),
-                ("ÉPAISSEUR", inner.x + 440), ("COUPON", inner.x + 560),
-                ("RATING", inner.x + 660), ("PERTE ATT.", inner.x + 760)]
+        inner = widgets.draw_panel(surf, panel, _L("Tranches", "Tranches"), config.COL_CYAN)
+        cols = [(_L("TRANCHE", "TRANCHE"), inner.x), (_L("ATTACHE-DÉTACHE", "ATTACH-DETACH"), inner.x + 240),
+                (_L("ÉPAISSEUR", "THICKNESS"), inner.x + 440), ("COUPON", inner.x + 560),
+                ("RATING", inner.x + 660), (_L("PERTE ATT.", "EXP. LOSS"), inner.x + 760)]
         for label, x in cols:
             widgets.draw_text(surf, label, (x, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         self.invest_rects = {}
@@ -167,28 +175,28 @@ class CreditScene(Scene):
                 self.invest_rects[q["id"]] = rect
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect, border_radius=4)
                 pygame.draw.rect(surf, config.COL_UP, rect, 1, border_radius=4)
-                widgets.draw_text(surf, f"INVESTIR {LOT/1000:.0f}k", (rect.x + 8, y),
+                widgets.draw_text(surf, _L(f"INVESTIR {LOT/1000:.0f}k", f"INVEST {LOT/1000:.0f}k"), (rect.x + 8, y),
                                   fonts.tiny(bold=True), config.COL_UP)
                 if SEC.held_notional(p, q["id"]) > 0:
                     srect = pygame.Rect(rect.right + 8, y - 3, 90, 24)
                     self.sell_rects[q["id"]] = srect
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, srect, border_radius=4)
                     pygame.draw.rect(surf, config.COL_DOWN, srect, 1, border_radius=4)
-                    widgets.draw_text(surf, "VENDRE", srect.center, fonts.tiny(bold=True),
+                    widgets.draw_text(surf, _L("VENDRE", "SELL"), srect.center, fonts.tiny(bold=True),
                                       config.COL_DOWN, align="center")
             y += 36
 
         hv = SEC.holdings_value(p, m)
         held = SEC.holdings(p, m)
-        sub = f"Tranches détenues : {widgets.format_money(hv, cur)}"
+        sub = _L(f"Tranches détenues : {widgets.format_money(hv, cur)}", f"Tranches held: {widgets.format_money(hv, cur)}")
         if held:
-            sub += "  ·  " + ", ".join(f"{h['name']} ({h['years_left']:.1f}a)" for h in held)
+            sub += "  ·  " + ", ".join(_L(f"{h['name']} ({h['years_left']:.1f}a)", f"{h['name']} ({h['years_left']:.1f}y)") for h in held)
         if not self._can_trade():
             g = unlocks.effective_required_grade(p, "credit")
-            sub = f"⊘ trading débloqué au grade {config.GRADES[g]}."
+            sub = _L(f"⊘ trading débloqué au grade {config.GRADES[g]}.", f"⊘ trading unlocked at {config.GRADES[g]} grade.")
         widgets.draw_text(surf, sub, (inner.x, inner.bottom - 22), fonts.small(bold=True),
                           config.COL_UP if hv else config.COL_TEXT_DIM)
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("↑↓", "naviguer"), ("ENTRÉE", "investir/vendre")])
+                              [("↑↓", _L("naviguer", "navigate")), (_L("ENTRÉE", "ENTER"), _L("investir/vendre", "invest/sell"))])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)

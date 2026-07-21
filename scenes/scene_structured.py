@@ -9,12 +9,19 @@ import pygame
 
 from core import config, unlocks
 from core import structured as S
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
 
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
 LOT = S.LOT     # notionnel souscrit par clic
-FAMILY_CHIPS = [(None, "TOUTES"), ("Classique", "CLASSIQUE"),
-                ("Exotique", "EXOTIQUE"), ("Volatilité", "VOLATILITÉ")]
+# (clé de famille FR = clé de données tpl["family"] ; libellé d'affichage bilingue)
+FAMILY_CHIPS = [(None, ("TOUTES", "ALL")), ("Classique", ("CLASSIQUE", "CLASSIC")),
+                ("Exotique", ("EXOTIQUE", "EXOTIC")), ("Volatilité", ("VOLATILITÉ", "VOLATILITY"))]
 _CHART_W, _CHART_H = 110, 38
 
 
@@ -65,7 +72,7 @@ class StructuredScene(Scene):
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
                                         config.back_button_rect(160)[1], 150, 42),
-                                       "TUTO", config.COL_CYAN)
+                                       _L("TUTO", "GUIDE"), config.COL_CYAN)
 
     def _can_trade(self):
         return unlocks.unlocked(self.app.gs.player, "structured")
@@ -92,8 +99,8 @@ class StructuredScene(Scene):
             return
         tid = self._row_list[self.row_cursor]
         r = S.invest(self.app.gs.player, self.app.market, tid, LOT)
-        self.msg = ("Souscrit pour " + widgets.format_money(LOT, self._cur())
-                    if r["ok"] else f"Refusé ({r['reason']}).")
+        self.msg = (_L("Souscrit pour ", "Subscribed for ") + widgets.format_money(LOT, self._cur())
+                    if r["ok"] else _L(f"Refusé ({r['reason']}).", f"Rejected ({r['reason']})."))
         if r["ok"] and not self.app.gs.player.hardcore:
             self.app.gs.save(config.AUTOSAVE_SLOT)
 
@@ -147,16 +154,16 @@ class StructuredScene(Scene):
                 if rect.collidepoint(event.pos):
                     r = S.sell_by_type(self.app.gs.player, self.app.market, tid,
                                        min(LOT, S.held_notional(self.app.gs.player, tid)))
-                    self.msg = (f"Vendu (P&L {r['realized']:+.0f})." if r["ok"]
-                                else f"Vente refusée ({r['reason']}).")
+                    self.msg = (_L(f"Vendu (P&L {r['realized']:+.0f}).", f"Sold (P&L {r['realized']:+.0f}).") if r["ok"]
+                                else _L(f"Vente refusée ({r['reason']}).", f"Sale rejected ({r['reason']})."))
                     if r["ok"] and not self.app.gs.player.hardcore:
                         self.app.gs.save(config.AUTOSAVE_SLOT)
                     return
             for tid, rect in self.invest_rects.items():
                 if rect.collidepoint(event.pos):
                     r = S.invest(self.app.gs.player, self.app.market, tid, LOT)
-                    self.msg = ("Souscrit pour " + widgets.format_money(LOT, self._cur())
-                                if r["ok"] else f"Refusé ({r['reason']}).")
+                    self.msg = (_L("Souscrit pour ", "Subscribed for ") + widgets.format_money(LOT, self._cur())
+                                if r["ok"] else _L(f"Refusé ({r['reason']}).", f"Rejected ({r['reason']})."))
                     if r["ok"] and not self.app.gs.player.hardcore:
                         self.app.gs.save(config.AUTOSAVE_SLOT)
 
@@ -172,9 +179,11 @@ class StructuredScene(Scene):
         surf.fill(config.COL_BG)
         m, p = self.app.market, self.app.gs.player
         cur = self._cur()
-        widgets.draw_text(surf, "PRODUITS STRUCTURÉS", (40, 22), fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Payoff non linéaire sur l'indice régional, évalué à l'échéance. "
-                                f"Risque émetteur. Régime : {m.regime_label()} (✶ = recommandé par le desk). "
+        widgets.draw_text(surf, _L("PRODUITS STRUCTURÉS", "STRUCTURED PRODUCTS"), (40, 22), fonts.title(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L("Payoff non linéaire sur l'indice régional, évalué à l'échéance. "
+                                f"Risque émetteur. Régime : {m.regime_label()} (✶ = recommandé par le desk). ",
+                                "Non-linear payoff on the regional index, valued at maturity. "
+                                f"Issuer risk. Regime: {m.regime_label()} (✶ = recommended by the desk). ")
                                 + self.msg,
                           (42, 74), fonts.small(), config.COL_TEXT_DIM)
 
@@ -182,7 +191,7 @@ class StructuredScene(Scene):
         pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, search_rect, 1, border_radius=4)
         cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        slabel = (self.search + cursor) if self.search else (cursor + "Rechercher un produit…")
+        slabel = (self.search + cursor) if self.search else (cursor + _L("Rechercher un produit…", "Search a product…"))
         scol = config.COL_TEXT if self.search else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(slabel, fonts.small(), search_rect.w - 30),
                           (search_rect.x + 8, search_rect.y + 4), fonts.small(), scol)
@@ -197,7 +206,8 @@ class StructuredScene(Scene):
         fy = search_rect.bottom + 8
         self._family_rects = {}
         fx = 40
-        for fam, label in FAMILY_CHIPS:
+        for fam, label_pair in FAMILY_CHIPS:
+            label = _L(*label_pair)
             w = fonts.tiny(bold=True).size(label)[0] + 14
             rect = pygame.Rect(fx, fy, w, 20)
             self._family_rects[fam] = rect
@@ -212,7 +222,7 @@ class StructuredScene(Scene):
         ph = config.footer_y() - 8 - top
         # catalogue (gauche)
         cat = pygame.Rect(40, top, 700, ph)
-        inner = widgets.draw_panel(surf, cat, "Catalogue", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, cat, _L("Catalogue", "Catalog"), config.COL_CYAN)
         list_area = pygame.Rect(inner.x - 6, inner.y, inner.w + 12, inner.h)
         self._list_rect = list_area
         self.invest_rects = {}
@@ -237,7 +247,7 @@ class StructuredScene(Scene):
             name = ("✶ " + tpl["name"]) if tpl["featured"] else tpl["name"]
             widgets.draw_text(surf, name, (inner.x, y), fonts.small(bold=True),
                               config.COL_UP if tpl["featured"] else config.COL_AMBER)
-            widgets.draw_text(surf, f"{tpl['family']} · {tpl['years']} ans", (inner.right - 160, y),
+            widgets.draw_text(surf, _L(f"{tpl['family']} · {tpl['years']} ans", f"{tpl['family']} · {tpl['years']}y"), (inner.right - 160, y),
                               fonts.tiny(), config.COL_TEXT_DIM)
             y += 20
             desc_h = widgets.draw_text_wrapped(surf, tpl["desc"], (inner.x, y),
@@ -254,7 +264,7 @@ class StructuredScene(Scene):
                     self.invest_rects[tpl["id"]] = rect
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect, border_radius=4)
                 pygame.draw.rect(surf, config.COL_UP, rect, 1, border_radius=4)
-                widgets.draw_text(surf, f"SOUSCRIRE {LOT/1000:.0f}k", (rect.x + 12, y + 4),
+                widgets.draw_text(surf, _L(f"SOUSCRIRE {LOT/1000:.0f}k", f"SUBSCRIBE {LOT/1000:.0f}k"), (rect.x + 12, y + 4),
                                   fonts.tiny(bold=True), config.COL_UP)
                 if S.held_notional(p, tpl["id"]) > 0:
                     srect = pygame.Rect(rect.left - 96, y, 88, 26)
@@ -262,7 +272,7 @@ class StructuredScene(Scene):
                         self.sell_rects[tpl["id"]] = srect
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, srect, border_radius=4)
                     pygame.draw.rect(surf, config.COL_DOWN, srect, 1, border_radius=4)
-                    widgets.draw_text(surf, "VENDRE", srect.center, fonts.tiny(bold=True),
+                    widgets.draw_text(surf, _L("VENDRE", "SELL"), srect.center, fonts.tiny(bold=True),
                                       config.COL_DOWN, align="center")
             y += 40
             if visible:
@@ -278,14 +288,14 @@ class StructuredScene(Scene):
 
         # positions en cours (droite)
         posp = pygame.Rect(760, top, config.SCREEN_WIDTH - 800, ph)
-        pinner = widgets.draw_panel(surf, posp, "Vos produits", config.COL_AMBER)
+        pinner = widgets.draw_panel(surf, posp, _L("Vos produits", "Your products"), config.COL_AMBER)
         hold = S.holdings(p, m)
         if not hold:
             if self._can_trade():
-                lock_msg = "Aucun produit en cours."
+                lock_msg = _L("Aucun produit en cours.", "No product in progress.")
             else:
                 g = unlocks.effective_required_grade(p, "structured")
-                lock_msg = f"⊘ trading débloqué au grade {config.GRADES[g]}."
+                lock_msg = _L(f"⊘ trading débloqué au grade {config.GRADES[g]}.", f"⊘ trading unlocked at {config.GRADES[g]} grade.")
                 note = unlocks.track_lock_note(p, "structured")
                 if note:
                     lock_msg += " " + note.strip()
@@ -295,8 +305,10 @@ class StructuredScene(Scene):
             for h in hold:
                 widgets.draw_text(surf, h["name"], (pinner.x, y), fonts.small(bold=True), config.COL_TEXT)
                 pcol = config.COL_UP if h["perf"] >= 0 else config.COL_DOWN
-                widgets.draw_text(surf, f"{widgets.format_money(h['notional'], cur)} · "
+                widgets.draw_text(surf, _L(f"{widgets.format_money(h['notional'], cur)} · "
                                         f"sous-jacent {h['perf']:+.1f}% · échéance {h['years_left']:.1f} an",
+                                        f"{widgets.format_money(h['notional'], cur)} · "
+                                        f"underlying {h['perf']:+.1f}% · expiry {h['years_left']:.1f}y"),
                                   (pinner.x, y + 18), fonts.tiny(), pcol)
                 bd = h.get("barrier_dist_pct")
                 if bd is not None:
@@ -304,14 +316,14 @@ class StructuredScene(Scene):
                     close = abs(bd) < 10.0
                     bcol = config.COL_DOWN if close else config.COL_TEXT_DIM
                     if bd < 0:
-                        btxt = f"barrière à {bd:.0f}% du niveau actuel"
+                        btxt = _L(f"barrière à {bd:.0f}% du niveau actuel", f"barrier at {bd:.0f}% from current level")
                     else:
-                        btxt = f"BARRIÈRE FRANCHIE (knock à +{bd:.0f}%)"
+                        btxt = _L(f"BARRIÈRE FRANCHIE (knock à +{bd:.0f}%)", f"BARRIER BREACHED (knock at +{bd:.0f}%)")
                         bcol = config.COL_DOWN
                     widgets.draw_text(surf, btxt, (pinner.x, y + 32), fonts.tiny(bold=close), bcol)
                     y += 14
                 y += 44
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("↑↓", "naviguer"), ("ENTRÉE", "investir/vendre")])
+                              [("↑↓", _L("naviguer", "navigate")), (_L("ENTRÉE", "ENTER"), _L("investir/vendre", "invest/sell"))])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)

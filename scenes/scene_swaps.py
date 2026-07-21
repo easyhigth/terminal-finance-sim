@@ -10,8 +10,14 @@ import pygame
 
 from core import config, unlocks
 from core import swaps as SW
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
 
 NOTIONAL_STEP = 100_000.0
 NOTIONAL_MIN = 100_000.0
@@ -39,7 +45,7 @@ class SwapsScene(Scene):
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
                                         config.back_button_rect(160)[1], 150, 42),
-                                       "TUTO", config.COL_CYAN)
+                                       _L("TUTO", "GUIDE"), config.COL_CYAN)
 
     def _can_trade(self):
         return unlocks.unlocked(self.app.gs.player, "trade")
@@ -67,12 +73,14 @@ class SwapsScene(Scene):
             p = self.app.gs.player
             r = SW.enter_swap(p, self.app.market, self.region, self.direction, self.notional, self.years)
             if r["ok"]:
-                self.msg = f"Swap conclu : {self.region} / {self.years} ans / " \
-                          f"{widgets.format_money(self.notional, self._cur())}."
+                self.msg = _L(f"Swap conclu : {self.region} / {self.years} ans / "
+                          f"{widgets.format_money(self.notional, self._cur())}.",
+                          f"Swap entered: {self.region} / {self.years}y / "
+                          f"{widgets.format_money(self.notional, self._cur())}.")
                 if not p.hardcore:
                     self.app.gs.save(config.AUTOSAVE_SLOT)
             else:
-                self.msg = f"Refusé ({r['reason']})."
+                self.msg = _L(f"Refusé ({r['reason']}).", f"Rejected ({r['reason']}).")
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -116,12 +124,14 @@ class SwapsScene(Scene):
             p = self.app.gs.player
             r = SW.enter_swap(p, self.app.market, self.region, self.direction, self.notional, self.years)
             if r["ok"]:
-                self.msg = f"Swap conclu : {self.region} / {self.years} ans / " \
-                          f"{widgets.format_money(self.notional, self._cur())}."
+                self.msg = _L(f"Swap conclu : {self.region} / {self.years} ans / "
+                          f"{widgets.format_money(self.notional, self._cur())}.",
+                          f"Swap entered: {self.region} / {self.years}y / "
+                          f"{widgets.format_money(self.notional, self._cur())}.")
                 if not p.hardcore:
                     self.app.gs.save(config.AUTOSAVE_SLOT)
             else:
-                self.msg = f"Refusé ({r['reason']})."
+                self.msg = _L(f"Refusé ({r['reason']}).", f"Rejected ({r['reason']}).")
 
     def update(self, dt):
         self.back_btn.update(pygame.mouse.get_pos(), dt)
@@ -130,43 +140,45 @@ class SwapsScene(Scene):
     # ------------------------------------------------------------- draw
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "SWAPS DE DEVISES (CROSS-CURRENCY)", (40, 22),
+        widgets.draw_text(surf, _L("SWAPS DE DEVISES (CROSS-CURRENCY)", "CURRENCY SWAPS (CROSS-CURRENCY)"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         if not self._can_trade():
             g = unlocks.effective_required_grade(self.app.gs.player, "trade")
-            widgets.draw_text(surf, f"⊘ Swaps débloqués au grade {config.GRADES[g]}.",
+            widgets.draw_text(surf, _L(f"⊘ Swaps débloqués au grade {config.GRADES[g]}.", f"⊘ Swaps unlocked at {config.GRADES[g]} grade."),
                               (42, 64), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             self.tuto_btn.draw(surf)
             return
-        widgets.draw_text(surf, "Échange le différentiel de taux entre votre devise et une devise "
+        widgets.draw_text(surf, _L("Échange le différentiel de taux entre votre devise et une devise "
                                 f"étrangère, sans échange de principal. {self.msg}",
+                                "Swaps the rate differential between your currency and a foreign "
+                                f"currency, with no principal exchange. {self.msg}"),
                           (42, 64), fonts.small(), config.COL_TEXT_DIM)
 
         p, m = self.app.gs.player, self.app.market
         ph = config.footer_y() - 8 - 96
         cat = pygame.Rect(40, 96, 660, ph)
-        inner = widgets.draw_panel(surf, cat, "Nouveau swap", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, cat, _L("Nouveau swap", "New swap"), config.COL_CYAN)
         self._draw_builder(surf, inner, p, m)
 
         posp = pygame.Rect(720, 96, config.SCREEN_WIDTH - 760, ph)
-        pinner = widgets.draw_panel(surf, posp, "Vos swaps", config.COL_PRESTIGE)
+        pinner = widgets.draw_panel(surf, posp, _L("Vos swaps", "Your swaps"), config.COL_PRESTIGE)
         self._draw_holdings(surf, pinner, p, m)
 
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("↑↓", "naviguer"), ("ENTRÉE", "conclure")])
+                              [("↑↓", _L("naviguer", "navigate")), (_L("ENTRÉE", "ENTER"), _L("conclure", "enter"))])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)
 
     def _draw_builder(self, surf, inner, p, m):
         cur_home = self._cur()
         x, y = inner.x, inner.y
-        widgets.draw_text(surf, f"Devise domestique : {p.continent} ({cur_home})",
+        widgets.draw_text(surf, _L(f"Devise domestique : {p.continent} ({cur_home})", f"Domestic currency: {p.continent} ({cur_home})"),
                           (x, y), fonts.small(), config.COL_TEXT_DIM)
         y += 26
 
         # ---- choix de la devise étrangère ----
-        widgets.draw_text(surf, "Devise étrangère :", (x, y), fonts.small(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L("Devise étrangère :", "Foreign currency:"), (x, y), fonts.small(bold=True), config.COL_AMBER)
         y += 22
         self._region_rects = {}
         self._all_rects = {}
@@ -183,13 +195,13 @@ class SwapsScene(Scene):
             widgets.draw_text(surf, f"{region} ({self._cur(region)})", (row.x + 8, row.y + 4),
                               fonts.tiny(bold=sel), config.COL_TEXT)
             dcol = config.COL_UP if q["diff"] >= 0 else config.COL_DOWN
-            widgets.draw_text(surf, f"taux {q['foreign_rate']*100:.2f}%  écart {q['diff']*100:+.2f}%",
+            widgets.draw_text(surf, _L(f"taux {q['foreign_rate']*100:.2f}%  écart {q['diff']*100:+.2f}%", f"rate {q['foreign_rate']*100:.2f}%  gap {q['diff']*100:+.2f}%"),
                               (row.right - 12, row.y + 4), fonts.tiny(), dcol, align="right")
             y += 27
         y += 10
 
         # ---- sens du swap ----
-        widgets.draw_text(surf, "Sens :", (x, y), fonts.small(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L("Sens :", "Direction:"), (x, y), fonts.small(bold=True), config.COL_AMBER)
         y += 22
         self._dir_rects = {}
         for direction in SW.DIRECTIONS:
@@ -202,18 +214,18 @@ class SwapsScene(Scene):
             fk = ("dir", direction)
             self._all_rects[fk] = row
             keynav.draw_focus_ring(surf, row, self.focus == fk)
-            widgets.draw_text(surf, SW.DIRECTION_LABEL[direction], row.center, fonts.tiny(bold=sel),
+            widgets.draw_text(surf, SW.direction_label(direction), row.center, fonts.tiny(bold=sel),
                               config.COL_TEXT, align="center")
             y += 30
         y += 6
 
         # ---- maturité ----
-        widgets.draw_text(surf, "Maturité :", (x, y), fonts.small(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L("Maturité :", "Maturity:"), (x, y), fonts.small(bold=True), config.COL_AMBER)
         ty = y
         self._tenor_rects = {}
         tx = x + 110
         for years in SW.TENORS:
-            label = f"{years} ans"
+            label = _L(f"{years} ans", f"{years}y")
             w = fonts.small(bold=True).size(label)[0] + 24
             rect = pygame.Rect(tx, ty - 3, w, 24)
             sel = (years == self.years)
@@ -229,7 +241,7 @@ class SwapsScene(Scene):
         y += 36
 
         # ---- notionnel ----
-        widgets.draw_text(surf, "Notionnel :", (x, y), fonts.small(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L("Notionnel :", "Notional:"), (x, y), fonts.small(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, widgets.format_money(self.notional, cur_home), (x + 110, y),
                           fonts.small(bold=True), config.COL_WHITE)
         minus = pygame.Rect(x + 260, y - 3, 26, 24)
@@ -252,9 +264,9 @@ class SwapsScene(Scene):
             box = pygame.Rect(x, y, inner.w, 56)
             pygame.draw.rect(surf, config.COL_PANEL, box, border_radius=4)
             pygame.draw.rect(surf, ccol, box, 1, border_radius=4)
-            widgets.draw_text(surf, f"Écart de taux net : {net*100:+.2f}%/an", (box.x + 12, box.y + 8),
+            widgets.draw_text(surf, _L(f"Écart de taux net : {net*100:+.2f}%/an", f"Net rate gap: {net*100:+.2f}%/yr"), (box.x + 12, box.y + 8),
                               fonts.small(), config.COL_TEXT)
-            widgets.draw_text(surf, f"Carry annuel estimé : {widgets.format_money(carry, cur_home)}",
+            widgets.draw_text(surf, _L(f"Carry annuel estimé : {widgets.format_money(carry, cur_home)}", f"Estimated annual carry: {widgets.format_money(carry, cur_home)}"),
                               (box.x + 12, box.y + 28), fonts.small(bold=True), ccol)
             y += 64
 
@@ -263,27 +275,31 @@ class SwapsScene(Scene):
         pygame.draw.rect(surf, config.COL_UP, self._enter_rect, 1, border_radius=4)
         self._all_rects["enter"] = self._enter_rect
         keynav.draw_focus_ring(surf, self._enter_rect, self.focus == "enter")
-        widgets.draw_text(surf, "CONCLURE LE SWAP", self._enter_rect.center, fonts.small(bold=True),
+        widgets.draw_text(surf, _L("CONCLURE LE SWAP", "ENTER THE SWAP"), self._enter_rect.center, fonts.small(bold=True),
                           config.COL_UP, align="center")
 
     def _draw_holdings(self, surf, pinner, p, m):
         hold = SW.holdings(p, m)
         if not hold:
-            widgets.draw_text(surf, "Aucun swap en cours.", (pinner.x, pinner.y),
+            widgets.draw_text(surf, _L("Aucun swap en cours.", "No swap in progress."), (pinner.x, pinner.y),
                               fonts.small(), config.COL_TEXT_DIM)
             return
         cur_home = self._cur()
         y = pinner.y
         for h in hold:
-            dir_lbl = "REÇOIT ÉTR." if h["direction"] == "receive_foreign" else "REÇOIT DOM."
+            dir_lbl = _L("REÇOIT ÉTR.", "RECV FGN") if h["direction"] == "receive_foreign" else _L("REÇOIT DOM.", "RECV DOM")
             widgets.draw_text(surf, f"#{h['id']} {h['home_region']} ↔ {h['foreign_region']}",
                               (pinner.x, y), fonts.small(bold=True), config.COL_TEXT)
             widgets.draw_badge(surf, dir_lbl, (pinner.right, y), accent=config.COL_CYAN, align="right")
             ccol = config.COL_UP if h["annual_carry"] >= 0 else config.COL_DOWN
-            widgets.draw_text(surf, f"Notionnel {widgets.format_money(h['notional'], cur_home)} · "
+            widgets.draw_text(surf, _L(f"Notionnel {widgets.format_money(h['notional'], cur_home)} · "
                                     f"écart {h['net_rate']*100:+.2f}%/an",
+                                    f"Notional {widgets.format_money(h['notional'], cur_home)} · "
+                                    f"gap {h['net_rate']*100:+.2f}%/yr"),
                               (pinner.x, y + 20), fonts.tiny(), config.COL_TEXT_DIM)
-            widgets.draw_text(surf, f"Carry annuel {widgets.format_money(h['annual_carry'], cur_home)} · "
+            widgets.draw_text(surf, _L(f"Carry annuel {widgets.format_money(h['annual_carry'], cur_home)} · "
                                     f"{h['years_left']:.1f} an(s) restant(es)",
+                                    f"Annual carry {widgets.format_money(h['annual_carry'], cur_home)} · "
+                                    f"{h['years_left']:.1f}y left"),
                               (pinner.x, y + 36), fonts.tiny(), ccol)
             y += 56

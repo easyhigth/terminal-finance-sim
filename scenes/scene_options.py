@@ -10,10 +10,15 @@ import pygame
 
 from core import config, unlocks
 from core import options as O
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
 
 CONTRACTS_STEP = 10
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 
 class OptionsScene(Scene):
@@ -29,7 +34,7 @@ class OptionsScene(Scene):
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
                                         config.back_button_rect(160)[1], 150, 42),
-                                       "TUTO", config.COL_CYAN)
+                                       _L("TUTO", "GUIDE"), config.COL_CYAN)
         self.buy_btn = None
         self.ticker_rects = {}
         self.type_rects = {}
@@ -84,15 +89,17 @@ class OptionsScene(Scene):
             p, m = self.app.gs.player, self.app.market
             ticker = self._ticker()
             if ticker is None:
-                self.msg = "Aucun titre suivi (ajoutez-en un à la watchlist)."
+                self.msg = _L("Aucun titre suivi (ajoutez-en un à la watchlist).", "No watched security (add one to the watchlist).")
                 return
             option_type = "call" if self.type_idx == 0 else "put"
             strike_pct = O.STRIKE_CHOICES[self.strike_idx]
             years = O.MATURITY_CHOICES[self.years_idx]
             r = O.buy(p, m, ticker, option_type, strike_pct, years, self.contracts)
-            self.msg = (f"{self.contracts} {option_type} {ticker} achetés "
-                        f"(prime {widgets.format_money(r['premium'], self._cur())})."
-                        if r["ok"] else f"Refusé ({r['reason']}).")
+            self.msg = (_L(f"{self.contracts} {option_type} {ticker} achetés "
+                        f"(prime {widgets.format_money(r['premium'], self._cur())}).",
+                        f"{self.contracts} {option_type} {ticker} bought "
+                        f"(premium {widgets.format_money(r['premium'], self._cur())}).")
+                        if r["ok"] else _L(f"Refusé ({r['reason']}).", f"Rejected ({r['reason']})."))
             if r["ok"] and not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
 
@@ -142,15 +149,17 @@ class OptionsScene(Scene):
                 p, m = self.app.gs.player, self.app.market
                 ticker = self._ticker()
                 if ticker is None:
-                    self.msg = "Aucun titre suivi (ajoutez-en un à la watchlist)."
+                    self.msg = _L("Aucun titre suivi (ajoutez-en un à la watchlist).", "No watched security (add one to the watchlist).")
                     return
                 option_type = "call" if self.type_idx == 0 else "put"
                 strike_pct = O.STRIKE_CHOICES[self.strike_idx]
                 years = O.MATURITY_CHOICES[self.years_idx]
                 r = O.buy(p, m, ticker, option_type, strike_pct, years, self.contracts)
-                self.msg = (f"{self.contracts} {option_type} {ticker} achetés "
-                            f"(prime {widgets.format_money(r['premium'], self._cur())})."
-                            if r["ok"] else f"Refusé ({r['reason']}).")
+                self.msg = (_L(f"{self.contracts} {option_type} {ticker} achetés "
+                            f"(prime {widgets.format_money(r['premium'], self._cur())}).",
+                            f"{self.contracts} {option_type} {ticker} bought "
+                            f"(premium {widgets.format_money(r['premium'], self._cur())}).")
+                            if r["ok"] else _L(f"Refusé ({r['reason']}).", f"Rejected ({r['reason']})."))
                 if r["ok"] and not p.hardcore:
                     self.app.gs.save(config.AUTOSAVE_SLOT)
 
@@ -161,12 +170,12 @@ class OptionsScene(Scene):
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "DESK D'OPTIONS — CALLS / PUTS ACTIONS", (40, 22),
+        widgets.draw_text(surf, _L("DESK D'OPTIONS — CALLS / PUTS ACTIONS", "OPTIONS DESK — EQUITY CALLS / PUTS"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         if not self._can():
             p = self.app.gs.player
             g = unlocks.effective_required_grade(p, "options")
-            widgets.draw_text(surf, f"⊘ Desk d'options débloqué au grade {config.GRADES[g]}.",
+            widgets.draw_text(surf, _L(f"⊘ Desk d'options débloqué au grade {config.GRADES[g]}.", f"⊘ Options desk unlocked at {config.GRADES[g]} grade."),
                               (42, 74), fonts.small(), config.COL_TEXT_DIM)
             note = unlocks.track_lock_note(p, "options")
             if note:
@@ -174,8 +183,10 @@ class OptionsScene(Scene):
             self.back_btn.draw(surf)
             self.tuto_btn.draw(surf)
             return
-        widgets.draw_text(surf, "Achetez un call ou un put sur un titre suivi pour parier sur sa "
-                                "direction avec un risque borné à la prime. " + self.msg,
+        widgets.draw_text(surf, _L("Achetez un call ou un put sur un titre suivi pour parier sur sa "
+                                "direction avec un risque borné à la prime. ",
+                                "Buy a call or a put on a watched security to bet on its "
+                                "direction with risk capped at the premium. ") + self.msg,
                           (42, 74), fonts.small(), config.COL_TEXT_DIM)
 
         m, p = self.app.market, self.app.gs.player
@@ -185,16 +196,16 @@ class OptionsScene(Scene):
 
         # ---- cotation / souscription (gauche) ----
         quote_rect = pygame.Rect(40, 110, 460, 410)
-        inner = widgets.draw_panel(surf, quote_rect, "Nouvelle position", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, quote_rect, _L("Nouvelle position", "New position"), config.COL_CYAN)
         y = inner.y
 
-        widgets.draw_text(surf, "Titre (watchlist / portefeuille)", (inner.x, y),
+        widgets.draw_text(surf, _L("Titre (watchlist / portefeuille)", "Security (watchlist / portfolio)"), (inner.x, y),
                           fonts.small(), config.COL_TEXT)
         y += 22
         self.ticker_rects = {}
         self._all_rects = {}
         if not tickers:
-            widgets.draw_text(surf, "Aucun titre suivi — ajoutez-en via WATCH <ticker>.",
+            widgets.draw_text(surf, _L("Aucun titre suivi — ajoutez-en via WATCH <ticker>.", "No watched security — add one via WATCH <ticker>."),
                               (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
             y += 30
         else:
@@ -216,13 +227,15 @@ class OptionsScene(Scene):
                     y += 30
             y += 30
             if len(all_tickers) > len(tickers):
-                widgets.draw_text(surf, f"+{len(all_tickers) - len(tickers)} autre(s) titre(s) suivi(s) "
+                widgets.draw_text(surf, _L(f"+{len(all_tickers) - len(tickers)} autre(s) titre(s) suivi(s) "
                                         "(gérez votre watchlist pour réduire la liste).",
+                                        f"+{len(all_tickers) - len(tickers)} more watched security(ies) "
+                                        "(manage your watchlist to shorten the list)."),
                                   (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
                 y += 14
             y += 6
 
-        widgets.draw_text(surf, "Sens", (inner.x, y), fonts.small(), config.COL_TEXT)
+        widgets.draw_text(surf, _L("Sens", "Direction"), (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 22
         self.type_rects = {}
         x = inner.x
@@ -241,7 +254,7 @@ class OptionsScene(Scene):
             x += 100
         y += 40
 
-        widgets.draw_text(surf, "Strike (% du spot)", (inner.x, y), fonts.small(), config.COL_TEXT)
+        widgets.draw_text(surf, _L("Strike (% du spot)", "Strike (% of spot)"), (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 22
         self.strike_rects = {}
         x = inner.x
@@ -259,7 +272,7 @@ class OptionsScene(Scene):
             x += 100
         y += 40
 
-        widgets.draw_text(surf, "Maturité", (inner.x, y), fonts.small(), config.COL_TEXT)
+        widgets.draw_text(surf, _L("Maturité", "Maturity"), (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 22
         self.years_rects = {}
         x = inner.x
@@ -278,7 +291,7 @@ class OptionsScene(Scene):
             x += 100
         y += 40
 
-        widgets.draw_text(surf, "Contrats (1 = 1 action)", (inner.x, y), fonts.small(), config.COL_TEXT)
+        widgets.draw_text(surf, _L("Contrats (1 = 1 action)", "Contracts (1 = 1 share)"), (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 22
         self.contract_minus_btn = pygame.Rect(inner.x, y, 32, 28)
         self.contract_plus_btn = pygame.Rect(inner.x + 150, y, 32, 28)
@@ -310,7 +323,7 @@ class OptionsScene(Scene):
                                         f"vol {q['sigma']*100:.0f}%)",
                                   (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
                 y += 20
-                widgets.draw_text(surf, f"Prime totale : {widgets.format_money(total_premium, cur)}",
+                widgets.draw_text(surf, _L(f"Prime totale : {widgets.format_money(total_premium, cur)}", f"Total premium: {widgets.format_money(total_premium, cur)}"),
                                   (inner.x, y), fonts.small(bold=True), config.COL_AMBER)
                 y += 22
                 g = q["greeks"]
@@ -328,15 +341,17 @@ class OptionsScene(Scene):
                     breakeven = q["strike"] - q["premium"]
                 be_pct = (breakeven / q["spot"] - 1.0) * 100.0 if q["spot"] else 0.0
                 widgets.draw_text(surf, widgets.fit_text(
-                    f"Si rien ne bouge : ~-{theta_step:,.0f}/tour (thêta) · "
+                    _L(f"Si rien ne bouge : ~-{theta_step:,.0f}/tour (thêta) · "
                     f"point mort : {breakeven:.2f} ({be_pct:+.1f}%)",
+                    f"If nothing moves: ~-{theta_step:,.0f}/step (theta) · "
+                    f"breakeven: {breakeven:.2f} ({be_pct:+.1f}%)"),
                     fonts.tiny(), inner.w),
                     (inner.x, y), fonts.tiny(), config.COL_WARN)
                 y += 22
                 self.buy_btn = pygame.Rect(inner.x, y, 200, 32)
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, self.buy_btn, border_radius=4)
                 pygame.draw.rect(surf, config.COL_UP, self.buy_btn, 1, border_radius=4)
-                widgets.draw_text(surf, "ACHETER", self.buy_btn.center, fonts.small(bold=True),
+                widgets.draw_text(surf, _L("ACHETER", "BUY"), self.buy_btn.center, fonts.small(bold=True),
                                   config.COL_UP, align="center")
                 self._all_rects["buy"] = self.buy_btn
                 keynav.draw_focus_ring(surf, self.buy_btn, self.focus == "buy")
@@ -347,10 +362,10 @@ class OptionsScene(Scene):
 
         # ---- positions en cours (droite) ----
         pos_rect = pygame.Rect(540, 110, config.SCREEN_WIDTH - 580, 410)
-        pinner = widgets.draw_panel(surf, pos_rect, "Positions en cours", config.COL_UP)
+        pinner = widgets.draw_panel(surf, pos_rect, _L("Positions en cours", "Open positions"), config.COL_UP)
         hold = O.holdings(p, m)
         if not hold:
-            widgets.draw_text(surf, "Aucune position ouverte.", (pinner.x, pinner.y),
+            widgets.draw_text(surf, _L("Aucune position ouverte.", "No open position."), (pinner.x, pinner.y),
                               fonts.small(), config.COL_TEXT_DIM)
         else:
             yy = pinner.y
@@ -359,9 +374,11 @@ class OptionsScene(Scene):
                 widgets.draw_text(surf, f"{h['contracts']:.0f}x {h['option_type'].upper()} "
                                         f"{h['ticker']} · strike {h['strike_pct']*100:.0f}%",
                                   (pinner.x, yy), fonts.small(bold=True), col)
-                widgets.draw_text(surf, f"spot {h['spot']:.2f} ({h['perf']:+.1f}%) · échéance "
-                                        f"{h['years_left']:.2f} an"
-                                        + (" · DANS LA MONNAIE" if h["in_money"] else ""),
+                widgets.draw_text(surf, _L(f"spot {h['spot']:.2f} ({h['perf']:+.1f}%) · échéance "
+                                        f"{h['years_left']:.2f} an",
+                                        f"spot {h['spot']:.2f} ({h['perf']:+.1f}%) · expiry "
+                                        f"{h['years_left']:.2f}y")
+                                        + (_L(" · DANS LA MONNAIE", " · IN THE MONEY") if h["in_money"] else ""),
                                   (pinner.x, yy + 18), fonts.tiny(),
                                   config.COL_UP if h["in_money"] else config.COL_TEXT_DIM)
                 g = h["greeks"]
@@ -371,6 +388,6 @@ class OptionsScene(Scene):
                 yy += 56
 
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("↑↓", "paramètres"), ("ENTRÉE", "ouvrir")])
+                              [("↑↓", _L("paramètres", "settings")), (_L("ENTRÉE", "ENTER"), _L("ouvrir", "open"))])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)

@@ -25,6 +25,17 @@ DIRECTION_LABEL = {
     "receive_foreign": "Reçoit taux étranger / Paie taux domestique",
     "receive_domestic": "Reçoit taux domestique / Paie taux étranger",
 }
+_DIRECTION_LABEL_EN = {
+    "receive_foreign": "Receives foreign rate / Pays domestic rate",
+    "receive_domestic": "Receives domestic rate / Pays foreign rate",
+}
+
+
+def direction_label(direction):
+    """Libellé localisé du sens du swap (les clés restent FR-agnostiques)."""
+    from core.i18n import get_lang
+    table = _DIRECTION_LABEL_EN if get_lang() == "en" else DIRECTION_LABEL
+    return table.get(direction, direction)
 
 
 def regional_rate(market, region):

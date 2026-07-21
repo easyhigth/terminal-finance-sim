@@ -210,7 +210,7 @@ class SavesScene(Scene):
         self.confirm = None
         if kind == "delete":
             GameState.delete(slot)
-            self.message = f"Slot '{slot}' supprimé."
+            self.message = _L(f"Slot '{slot}' supprimé.", f"Slot '{slot}' deleted.")
             self._refresh()
         elif kind == "save":
             self._save(slot)
@@ -218,7 +218,7 @@ class SavesScene(Scene):
     def _load(self, slot):
         gs = GameState.load(slot)
         if not gs:
-            self.message = "Échec du chargement."
+            self.message = _L("Échec du chargement.", "Load failed.")
             return
         self.app.gs = gs
         gs.attach_app(self.app)
@@ -230,7 +230,7 @@ class SavesScene(Scene):
 
     def _save(self, slot):
         self.app.gs.save(slot)
-        self.message = f"Partie enregistrée dans '{slot}'."
+        self.message = _L(f"Partie enregistrée dans '{slot}'.", f"Game saved to '{slot}'.")
         self._refresh()
 
     def update(self, dt):
@@ -248,9 +248,9 @@ class SavesScene(Scene):
         surf.fill(config.COL_BG)
         widgets.draw_text(surf, "GESTION DES SAUVEGARDES", (40, 28),
                           fonts.title(bold=True), config.COL_AMBER)
-        subtitle = "Cliquez sur CHARGER pour reprendre une partie, ou SUPPRIMER pour libérer un slot."
+        subtitle = _L("Cliquez sur CHARGER pour reprendre une partie, ou SUPPRIMER pour libérer un slot.", "Click LOAD to resume a game, or DELETE to free a slot.")
         if self.can_save:
-            subtitle = "Cliquez sur ENREGISTRER pour sauvegarder ici, CHARGER pour reprendre, ou SUPPRIMER pour libérer un slot."
+            subtitle = _L("Cliquez sur ENREGISTRER pour sauvegarder ici, CHARGER pour reprendre, ou SUPPRIMER pour libérer un slot.", "Click SAVE to save here, LOAD to resume, or DELETE to free a slot.")
         widgets.draw_text(surf, subtitle, (42, 80), fonts.small(), config.COL_TEXT_DIM)
         self._import_btn.draw(surf)
 
@@ -330,9 +330,9 @@ class SavesScene(Scene):
         is_delete = self.confirm["kind"] == "delete"
         label = "AUTOSAVE" if slot == config.AUTOSAVE_SLOT else slot.upper()
         if is_delete:
-            msg = f"Supprimer définitivement le slot « {label} » ?"
+            msg = _L(f"Supprimer définitivement le slot « {label} » ?", f"Permanently delete slot “{label}”?")
         else:
-            msg = f"Écraser la sauvegarde existante du slot « {label} » ?"
+            msg = _L(f"Écraser la sauvegarde existante du slot « {label} » ?", f"Overwrite the existing save in slot “{label}”?")
 
         box = pygame.Rect(0, 0, 480, 160)
         box.center = (config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT // 2)
@@ -340,7 +340,7 @@ class SavesScene(Scene):
         widgets.draw_panel(surf, box, "CONFIRMATION", accent)
         widgets.draw_text_wrapped(surf, msg, (box.x + 20, box.y + 50),
                                   fonts.body(), config.COL_TEXT, box.w - 40)
-        widgets.draw_text(surf, "Y = confirmer, N/Échap = annuler", (box.x + 20, box.y + 96),
+        widgets.draw_text(surf, _L("Y = confirmer, N/Échap = annuler", "Y = confirm, N/Esc = cancel"), (box.x + 20, box.y + 96),
                           fonts.tiny(), config.COL_TEXT_DIM)
 
         self._yes_btn.accent = accent
@@ -371,8 +371,10 @@ class SavesScene(Scene):
         cur = config.CONTINENTS.get(meta["continent"], {}).get("currency", "$")
         line1 = (f"{meta['name']} · {meta['grade']} · {meta['track']} · "
                  f"{meta['continent']}")
-        line2 = (f"Jour {meta['day']} · {widgets.format_money(meta['cash'], cur)} · "
-                 f"Rép. dispo")
+        line2 = _L(f"Jour {meta['day']} · {widgets.format_money(meta['cash'], cur)} · "
+                 f"Rép. dispo",
+                 f"Day {meta['day']} · {widgets.format_money(meta['cash'], cur)} · "
+                 f"Rep. avail.")
         widgets.draw_text(surf, line1, (rect.x + 16, rect.y + 50),
                           fonts.body(), config.COL_TEXT)
         widgets.draw_text(surf, line2, (rect.x + 16, rect.y + 74),

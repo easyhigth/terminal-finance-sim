@@ -14,8 +14,13 @@ from core import badges as badges_mod
 from core import config
 from core import journal as journal_mod
 from core import score as score_mod
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 
 def _fmt_duration(seconds):
@@ -49,10 +54,12 @@ class StatsScene(Scene):
         p = self.app.gs.player
         cur = config.CONTINENTS.get(p.continent, {}).get("currency", "$")
 
-        widgets.draw_text(surf, "STATISTIQUES DE CARRIÈRE", (40, 20),
+        widgets.draw_text(surf, _L("STATISTIQUES DE CARRIÈRE", "CAREER STATISTICS"), (40, 20),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Vue d'ensemble de la session : trading, discipline, "
+        widgets.draw_text(surf, _L("Vue d'ensemble de la session : trading, discipline, "
                           "progression et score composite actuel.",
+                          "Session overview: trading, discipline, "
+                          "progression and current composite score."),
                           (42, 64), fonts.small(), config.COL_TEXT_DIM)
 
         top = 100
@@ -69,55 +76,55 @@ class StatsScene(Scene):
         self._draw_score(surf, pygame.Rect(x2, top + half_h + M, colw, half_h), p)
 
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("ESC", "retour")])
+                              [("ESC", _L("retour", "back"))])
         self.back_btn.draw(surf)
 
     def _draw_session(self, surf, rect, p, cur):
-        inner = widgets.draw_panel(surf, rect, "Session", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, rect, _L("Session", "Session"), config.COL_CYAN)
         created_at = getattr(self.app.gs, "created_at", None)
         playtime = time.time() - created_at if created_at else 0.0
         rows = [
-            ("Temps de jeu (session)", _fmt_duration(playtime)),
-            ("Jour / trimestre", f"J{p.day} · T{p.quarter}"),
-            ("Meilleur patrimoine net", widgets.format_money(p.best_cash, cur)),
-            ("Enquêtes réglementaires subies", str(p.investigations_count)),
+            (_L("Temps de jeu (session)", "Playtime (session)"), _fmt_duration(playtime)),
+            (_L("Jour / trimestre", "Day / quarter"), f"{_L('J', 'D')}{p.day} · {_L('T', 'Q')}{p.quarter}"),
+            (_L("Meilleur patrimoine net", "Best net worth"), widgets.format_money(p.best_cash, cur)),
+            (_L("Enquêtes réglementaires subies", "Regulatory investigations faced"), str(p.investigations_count)),
         ]
         self._draw_rows(surf, inner, rows)
 
     def _draw_trading(self, surf, rect, p, cur):
-        inner = widgets.draw_panel(surf, rect, "Trading", config.COL_UP)
+        inner = widgets.draw_panel(surf, rect, _L("Trading", "Trading"), config.COL_UP)
         journal = p.trade_journal
         closed = [e for e in journal if e["realized"] is not None]
         wins = sum(1 for e in closed if e["realized"] > 0)
         win_rate = (wins / len(closed) * 100.0) if closed else None
         disc = journal_mod.discipline_score(p)
         rows = [
-            ("Ordres exécutés", str(len(journal))),
-            ("Trades clôturés (gagnants/total)",
+            (_L("Ordres exécutés", "Orders executed"), str(len(journal))),
+            (_L("Trades clôturés (gagnants/total)", "Closed trades (winners/total)"),
              f"{wins}/{len(closed)}" + (f" ({win_rate:.0f}%)" if win_rate is not None else "")
              if closed else "—"),
-            ("P&L réalisé cumulé", widgets.format_money(p.realized_pnl, cur)),
-            ("Frais d'exécution payés", widgets.format_money(p.total_fees_paid, cur)),
-            ("Pénalités d'appel de marge", widgets.format_money(p.total_margin_penalty, cur)),
-            ("Score de discipline",
-             f"{disc['score']:.0f}/100" if disc is not None else "— (aucun trade clôturé)"),
+            (_L("P&L réalisé cumulé", "Cumulative realized P&L"), widgets.format_money(p.realized_pnl, cur)),
+            (_L("Frais d'exécution payés", "Execution fees paid"), widgets.format_money(p.total_fees_paid, cur)),
+            (_L("Pénalités d'appel de marge", "Margin call penalties"), widgets.format_money(p.total_margin_penalty, cur)),
+            (_L("Score de discipline", "Discipline score"),
+             f"{disc['score']:.0f}/100" if disc is not None else _L("— (aucun trade clôturé)", "— (no closed trade)")),
         ]
         self._draw_rows(surf, inner, rows)
 
     def _draw_progression(self, surf, rect, p):
-        inner = widgets.draw_panel(surf, rect, "Progression", config.COL_PRESTIGE)
+        inner = widgets.draw_panel(surf, rect, _L("Progression", "Progression"), config.COL_PRESTIGE)
         arcs_done, arcs_total = badges_mod._story_arcs_progress(p)
         rows = [
-            ("Badges débloqués", f"{len(p.badges)}/{len(badges_mod.all_badges())}"),
-            ("Badges à enjeu actifs", str(len(p.streak_badges))),
-            ("Arcs narratifs terminés", f"{arcs_done}/{arcs_total}"),
-            ("Deals remportés", str(p.deals_won)),
-            ("Missions accomplies", str(p.missions_done)),
+            (_L("Badges débloqués", "Badges unlocked"), f"{len(p.badges)}/{len(badges_mod.all_badges())}"),
+            (_L("Badges à enjeu actifs", "Active stake badges"), str(len(p.streak_badges))),
+            (_L("Arcs narratifs terminés", "Story arcs completed"), f"{arcs_done}/{arcs_total}"),
+            (_L("Deals remportés", "Deals won"), str(p.deals_won)),
+            (_L("Missions accomplies", "Missions completed"), str(p.missions_done)),
         ]
         self._draw_rows(surf, inner, rows)
 
     def _draw_score(self, surf, rect, p):
-        inner = widgets.draw_panel(surf, rect, "Score composite (si le run s'arrêtait maintenant)",
+        inner = widgets.draw_panel(surf, rect, _L("Score composite (si le run s'arrêtait maintenant)", "Composite score (if the run ended now)"),
                                    config.COL_WARN)
         fs = score_mod.compute_final_score(p, self.market)
         grade_col = config.COL_UP if fs.total >= 60 else (
@@ -128,10 +135,10 @@ class StatsScene(Scene):
                           fonts.small(), config.COL_TEXT_DIM)
         y = inner.y + 48
         for key, label in (
-            ("performance", "Performance"), ("risque", "Risque"),
-            ("drawdown", "Drawdown"), ("reputation", "Réputation"),
-            ("conformite", "Conformité"), ("qualite_execution", "Qualité d'exécution"),
-            ("survie", "Survie"),
+            ("performance", _L("Performance", "Performance")), ("risque", _L("Risque", "Risk")),
+            ("drawdown", "Drawdown"), ("reputation", _L("Réputation", "Reputation")),
+            ("conformite", _L("Conformité", "Compliance")), ("qualite_execution", _L("Qualité d'exécution", "Execution quality")),
+            ("survie", _L("Survie", "Survival")),
         ):
             v = fs.breakdown[key]
             # libellé borné à sa colonne (« Qualité d'exécution » passait sous

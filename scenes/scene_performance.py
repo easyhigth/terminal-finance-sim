@@ -10,8 +10,13 @@ Quatre axes, tous calculés par core/attribution.py (logique pure) :
 import pygame
 
 from core import attribution, config
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 _BAR_COLORS = [config.COL_CYAN, config.COL_AMBER, config.COL_PRESTIGE, config.COL_WARN,
                config.COL_UP, config.COL_DOWN, config.COL_TEXT]
@@ -44,15 +49,19 @@ class PerformanceScene(Scene):
         m = self.market
         cur = config.CONTINENTS.get(p.continent, {}).get("currency", "$")
 
-        widgets.draw_text(surf, "ANALYSE DE PERFORMANCE — ATTRIBUTION",
+        widgets.draw_text(surf, _L("ANALYSE DE PERFORMANCE — ATTRIBUTION", "PERFORMANCE ANALYSIS — ATTRIBUTION"),
                           (40, 20), fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "P&L de prix du dernier pas, ventilé par secteur, région, "
+        widgets.draw_text(surf, _L("P&L de prix du dernier pas, ventilé par secteur, région, "
                           "style, sélection de titres et timing.",
+                          "Price P&L of the last step, broken down by sector, region, "
+                          "style, stock selection and timing."),
                           (42, 64), fonts.small(), config.COL_TEXT_DIM)
 
         if not p.portfolio:
-            widgets.draw_text(surf, "Aucune position actions. Achetez des titres (BUY) "
+            widgets.draw_text(surf, _L("Aucune position actions. Achetez des titres (BUY) "
                               "pour voir l'attribution de performance.",
+                              "No equity positions. Buy securities (BUY) "
+                              "to see performance attribution."),
                               (40, 120), fonts.body(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             return
@@ -67,20 +76,20 @@ class PerformanceScene(Scene):
         half_h = (h - M) // 2
 
         self._draw_bucket(surf, pygame.Rect(x1, top, colw, half_h), cur,
-                          "Par secteur", attribution.sector_attribution(p, m))
+                          _L("Par secteur", "By sector"), attribution.sector_attribution(p, m))
         self._draw_bucket(surf, pygame.Rect(x1, top + half_h + M, colw, half_h), cur,
-                          "Par région", attribution.region_attribution(p, m))
+                          _L("Par région", "By region"), attribution.region_attribution(p, m))
         self._draw_bucket(surf, pygame.Rect(x2, top, colw, half_h), cur,
-                          "Par style (Croissance / Valeur)", attribution.style_attribution(p, m))
+                          _L("Par style (Croissance / Valeur)", "By style (Growth / Value)"), attribution.style_attribution(p, m))
         self._draw_selection_timing(surf, pygame.Rect(x2, top + half_h + M, colw, half_h), cur, p, m)
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("ESC", "retour")])
+                              [("ESC", _L("retour", "back"))])
         self.back_btn.draw(surf)
 
     def _draw_bucket(self, surf, rect, cur, title, data):
         inner = widgets.draw_panel(surf, rect, title, config.COL_CYAN)
         if not data:
-            widgets.draw_text(surf, "Aucune donnée (premier pas du marché).",
+            widgets.draw_text(surf, _L("Aucune donnée (premier pas du marché).", "No data (first market step)."),
                               (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
             return
         items = sorted(data.items(), key=lambda kv: -abs(kv[1]))
@@ -106,17 +115,17 @@ class PerformanceScene(Scene):
             y += row_h
 
     def _draw_selection_timing(self, surf, rect, cur, p, m):
-        inner = widgets.draw_panel(surf, rect, "Sélection de titres vs. timing", config.COL_WARN)
+        inner = widgets.draw_panel(surf, rect, _L("Sélection de titres vs. timing", "Stock selection vs. timing"), config.COL_WARN)
         st = attribution.selection_timing_attribution(p, m)
         if st["total"] == 0.0 and not p.portfolio:
-            widgets.draw_text(surf, "Aucune donnée.", (inner.x, inner.y),
+            widgets.draw_text(surf, _L("Aucune donnée.", "No data."), (inner.x, inner.y),
                               fonts.tiny(), config.COL_TEXT_DIM)
             return
         rows = [
-            ("Sélection de titres (spécifique)", st["selection"]),
-            ("Timing (monde + dérive)", st["timing"]),
-            ("Effet secteur (facteur)", st["sector_factor"]),
-            ("Effet région (facteur)", st["region_factor"]),
+            (_L("Sélection de titres (spécifique)", "Stock selection (specific)"), st["selection"]),
+            (_L("Timing (monde + dérive)", "Timing (world + drift)"), st["timing"]),
+            (_L("Effet secteur (facteur)", "Sector effect (factor)"), st["sector_factor"]),
+            (_L("Effet région (facteur)", "Region effect (factor)"), st["region_factor"]),
         ]
         y = inner.y
         max_abs = max(abs(v) for _, v in rows) or 1.0
@@ -135,7 +144,7 @@ class PerformanceScene(Scene):
         pygame.draw.line(surf, config.COL_BORDER, (inner.x, y), (inner.right, y), 1)
         y += 8
         tcol = config.COL_UP if st["total"] >= 0 else config.COL_DOWN
-        widgets.draw_text(surf, "P&L total (dernier pas)", (inner.x, y),
+        widgets.draw_text(surf, _L("P&L total (dernier pas)", "Total P&L (last step)"), (inner.x, y),
                           fonts.small(bold=True), config.COL_WHITE)
         widgets.draw_text(surf, _fm_signed(st["total"], cur),
                           (inner.right, y), fonts.small(bold=True), tcol, align="right")

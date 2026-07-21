@@ -22,10 +22,14 @@ import os
 import pygame
 
 from apps.base import DesktopApp
-from core import audio, config
+from core import audio, config, i18n
 from core.spreadsheet_engine import col_to_idx, idx_to_col, shift_formula
 from core.workbook import ConditionalFormat, SheetChart, Workbook, template_list
 from ui import fonts, style, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
 
 N_ROWS = 24
 N_COLS = 10
@@ -41,40 +45,40 @@ TAB_W = 108
 # insère `NOM(` dans la formule en cours. Réutilise le catalogue réel du
 # moteur (core/spreadsheet_engine.FUNCTIONS) : chaque entrée y existe bien.
 FUNCTION_CATALOG = [
-    ("Maths", [("SUM", "Somme"), ("ABS", "Valeur absolue"), ("SQRT", "Racine carrée"),
-               ("POWER", "Puissance"), ("EXP", "Exponentielle"), ("LN", "Log népérien"),
-               ("LOG", "Logarithme"), ("ROUND", "Arrondi")]),
-    ("Statistiques", [("AVERAGE", "Moyenne"), ("MEDIAN", "Médiane"), ("MIN", "Minimum"),
-                       ("MAX", "Maximum"), ("COUNT", "Nombre de valeurs"),
-                       ("STDEV", "Écart-type"), ("VAR", "Variance"),
-                       ("CORREL", "Corrélation (X;Y)")]),
-    ("Finance", [("NPV", "Valeur actuelle nette"), ("IRR", "Taux de rendement interne"),
-                 ("PMT", "Mensualité d'emprunt"), ("PV", "Valeur actuelle"),
-                 ("FV", "Valeur future")]),
-    ("Logique", [("IF", "Condition SI")]),
-    ("Recherche", [("VLOOKUP", "Recherche verticale (valeur;plage;colonne)")]),
-    ("Marché (en direct)", [("PRICE", 'Cours d\'une action ("MVC")'),
-                            ("INDEX", "Valeur d'un indice"),
-                            ("FX", 'Taux de change ("USD/JPY")'),
-                            ("SHARES", "Actions détenues d'un titre"),
-                            ("NETWORTH", "Patrimoine net (sans arg)"),
-                            ("CASH", "Trésorerie (sans arg)")]),
-    ("Desks (en direct)", [
-        ("YTM", 'Rendement à échéance d\'une obligation ("id" — cf. Desk Taux)'),
-        ("REPO_RATE", "Taux repo courant (sans arg, annuel)"),
-        ("CDS_SPREAD", 'Spread CDS théorique en bps ("MVC"; années)'),
-        ("PD", 'Probabilité de défaut de Merton ("MVC"; [années=3])'),
-        ("IV", 'Vol implicite ("MVC"; strike en % du spot; années; prime; ["call"|"put"])'),
+    (("Maths", "Math"), [("SUM", ("Somme", "Sum")), ("ABS", ("Valeur absolue", "Absolute value")), ("SQRT", ("Racine carrée", "Square root")),
+               ("POWER", ("Puissance", "Power")), ("EXP", ("Exponentielle", "Exponential")), ("LN", ("Log népérien", "Natural log")),
+               ("LOG", ("Logarithme", "Logarithm")), ("ROUND", ("Arrondi", "Round"))]),
+    (("Statistiques", "Statistics"), [("AVERAGE", ("Moyenne", "Average")), ("MEDIAN", ("Médiane", "Median")), ("MIN", ("Minimum", "Minimum")),
+                       ("MAX", ("Maximum", "Maximum")), ("COUNT", ("Nombre de valeurs", "Count of values")),
+                       ("STDEV", ("Écart-type", "Std. deviation")), ("VAR", ("Variance", "Variance")),
+                       ("CORREL", ("Corrélation (X;Y)", "Correlation (X;Y)"))]),
+    (("Finance", "Finance"), [("NPV", ("Valeur actuelle nette", "Net present value")), ("IRR", ("Taux de rendement interne", "Internal rate of return")),
+                 ("PMT", ("Mensualité d'emprunt", "Loan payment")), ("PV", ("Valeur actuelle", "Present value")),
+                 ("FV", ("Valeur future", "Future value"))]),
+    (("Logique", "Logic"), [("IF", ("Condition SI", "IF condition"))]),
+    (("Recherche", "Lookup"), [("VLOOKUP", ("Recherche verticale (valeur;plage;colonne)", "Vertical lookup (value;range;column)"))]),
+    (("Marché (en direct)", "Market (live)"), [("PRICE", ('Cours d\'une action ("MVC")', 'Stock price ("MVC")')),
+                            ("INDEX", ("Valeur d'un indice", "Index value")),
+                            ("FX", ('Taux de change ("USD/JPY")', 'Exchange rate ("USD/JPY")')),
+                            ("SHARES", ("Actions détenues d'un titre", "Shares held of a ticker")),
+                            ("NETWORTH", ("Patrimoine net (sans arg)", "Net worth (no arg)")),
+                            ("CASH", ("Trésorerie (sans arg)", "Cash (no arg)"))]),
+    (("Desks (en direct)", "Desks (live)"), [
+        ("YTM", ('Rendement à échéance d\'une obligation ("id" — cf. Desk Taux)', 'Bond yield to maturity ("id" — see Rates Desk)')),
+        ("REPO_RATE", ("Taux repo courant (sans arg, annuel)", "Current repo rate (no arg, annual)")),
+        ("CDS_SPREAD", ('Spread CDS théorique en bps ("MVC"; années)', 'Theoretical CDS spread in bps ("MVC"; years)')),
+        ("PD", ('Probabilité de défaut de Merton ("MVC"; [années=3])', 'Merton default probability ("MVC"; [years=3])')),
+        ("IV", ('Vol implicite ("MVC"; strike en % du spot; années; prime; ["call"|"put"])', 'Implied vol ("MVC"; strike as % of spot; years; premium; ["call"|"put"])')),
     ]),
 ]
 
-CHART_TYPES = [("line", "Ligne"), ("bar", "Barres"), ("scatter", "Nuage")]
+CHART_TYPES = [("line", ("Ligne", "Line")), ("bar", ("Barres", "Bars")), ("scatter", ("Nuage", "Scatter"))]
 
 # Mise en forme conditionnelle : opérateurs et couleurs proposés (façon Excel,
 # simplifié à un seuil numérique — le cas d'usage courant en finance : repérer
 # d'un coup d'œil les dépassements/manquements par rapport à un objectif).
 CF_OPS = [">", "<", ">=", "<="]
-CF_COLORS = [("up", "Vert"), ("down", "Rouge"), ("amber", "Ambre")]
+CF_COLORS = [("up", ("Vert", "Green")), ("down", ("Rouge", "Red")), ("amber", ("Ambre", "Amber"))]
 _CF_RGB = {"up": config.COL_UP, "down": config.COL_DOWN, "amber": config.COL_AMBER}
 UNDO_LIMIT = 50
 
@@ -288,7 +292,7 @@ class SheetApp(DesktopApp):
         while row <= N_ROWS and sheet.get_raw(f"A{row}") != "":
             row += 1
         if row > N_ROWS:
-            self.msg = "Feuille pleine : ajoutez une nouvelle feuille (+)."
+            self.msg = _L("Feuille pleine : ajoutez une nouvelle feuille (+).", "Sheet full: add a new sheet (+).")
             return
         sheet.set(f"A{row}", ticker)
         sheet.set(f"B{row}", f'=PRICE("{ticker}")')
@@ -318,7 +322,7 @@ class SheetApp(DesktopApp):
 
     def _fmt(self, val):
         if isinstance(val, bool):
-            return "VRAI" if val else "FAUX"
+            return _L("VRAI", "TRUE") if val else _L("FAUX", "FALSE")
         if isinstance(val, (int, float)):
             return f"{val:,.2f}" if abs(val) >= 1000 else f"{val:.4g}"
         return str(val)
@@ -354,7 +358,7 @@ class SheetApp(DesktopApp):
         self.tpl_open = False
         if tab is not None:
             self.sel = "A1"
-            self.msg = f"Modèle inséré : {tab.name}"
+            self.msg = _L(f"Modèle inséré : {tab.name}", f"Template inserted: {tab.name}")
 
     # ------------------------------------------------------- annuler/rétablir
     def _record_undo(self, refs):
@@ -369,25 +373,25 @@ class SheetApp(DesktopApp):
 
     def _undo_action(self):
         if not self._undo:
-            self.msg = "Rien à annuler."
+            self.msg = _L("Rien à annuler.", "Nothing to undo.")
             return
         entry = self._undo.pop()
         redo_entry = [(r, self.sheet.get_raw(r)) for r, _ in entry]
         for r, old in entry:
             self.sheet.set(r, old)
         self._redo.append(redo_entry)
-        self.msg = "Annulé."
+        self.msg = _L("Annulé.", "Undone.")
 
     def _redo_action(self):
         if not self._redo:
-            self.msg = "Rien à rétablir."
+            self.msg = _L("Rien à rétablir.", "Nothing to redo.")
             return
         entry = self._redo.pop()
         undo_entry = [(r, self.sheet.get_raw(r)) for r, _ in entry]
         for r, old in entry:
             self.sheet.set(r, old)
         self._undo.append(undo_entry)
-        self.msg = "Rétabli."
+        self.msg = _L("Rétabli.", "Redone.")
 
     # --------------------------------------------------- copier/coller de plage
     def _copy_range(self):
@@ -400,12 +404,12 @@ class SheetApp(DesktopApp):
                      for r in range(r1, r2 + 1)],
         }
         n = (c2 - c1 + 1) * (r2 - r1 + 1)
-        self.msg = f"{n} cellule(s) copiée(s)."
+        self.msg = _L(f"{n} cellule(s) copiée(s).", f"{n} cell(s) copied.")
         audio.play("click")
 
     def _paste_range(self):
         if not self._clipboard:
-            self.msg = "Presse-papiers vide (Ctrl+C d'abord)."
+            self.msg = _L("Presse-papiers vide (Ctrl+C d'abord).", "Clipboard empty (Ctrl+C first).")
             return
         c0, r0 = _split_ref(self.sel)
         oc, orow = self._clipboard["origin"]
@@ -420,7 +424,7 @@ class SheetApp(DesktopApp):
         self._record_undo([ref for ref, _ in targets])
         for ref, raw in targets:
             self.sheet.set(ref, raw)
-        self.msg = f"{len(targets)} cellule(s) collée(s)."
+        self.msg = _L(f"{len(targets)} cellule(s) collée(s).", f"{len(targets)} cell(s) pasted.")
         audio.play("click")
 
     # ------------------------------------------------------------- export CSV
@@ -437,7 +441,7 @@ class SheetApp(DesktopApp):
             c, r = _split_ref(ref)
             max_r, max_c = max(max_r, r), max(max_c, c)
         if max_r == 0:
-            self.msg = "Feuille vide : rien à exporter."
+            self.msg = _L("Feuille vide : rien à exporter.", "Empty sheet: nothing to export.")
             return
         fname = "".join(ch if ch.isalnum() else "_" for ch in tab.name) + ".csv"
         path = os.path.join(os.path.expanduser("~"), fname)
@@ -450,10 +454,10 @@ class SheetApp(DesktopApp):
                         v = sheet.get_value(f"{idx_to_col(c)}{r}")
                         row.append("" if v == "" else self._fmt(v))
                     w.writerow(row)
-            self.msg = f"Exporté vers « {path} »."
+            self.msg = _L(f"Exporté vers « {path} ».", f"Exported to '{path}'.")
             audio.play("click")
         except OSError:
-            self.msg = "Échec de l'export CSV (chemin inaccessible)."
+            self.msg = _L("Échec de l'export CSV (chemin inaccessible).", "CSV export failed (path inaccessible).")
 
     # ------------------------------------------------------------- import CSV
     def _confirm_csv_import(self):
@@ -463,23 +467,23 @@ class SheetApp(DesktopApp):
         path = self._csv_import_buf.strip()
         self.csv_import_prompt = False
         if not path:
-            self.msg = "Chemin vide."
+            self.msg = _L("Chemin vide.", "Empty path.")
             return
         try:
             with open(path, "r", newline="", encoding="utf-8") as f:
                 rows = list(csv.reader(f))
         except OSError:
-            self.msg = f"Échec de l'import CSV (chemin inaccessible : {path})."
+            self.msg = _L(f"Échec de l'import CSV (chemin inaccessible : {path}).", f"CSV import failed (path inaccessible: {path}).")
             return
         except csv.Error:
-            self.msg = "Échec de l'import CSV (fichier mal formé)."
+            self.msg = _L("Échec de l'import CSV (fichier mal formé).", "CSV import failed (malformed file).")
             return
         name = os.path.splitext(os.path.basename(path))[0] or None
         tab = self.workbook.import_csv(rows, name=name)
         if tab is None:
-            self.msg = "Fichier CSV vide : rien à importer."
+            self.msg = _L("Fichier CSV vide : rien à importer.", "Empty CSV file: nothing to import.")
             return
-        self.msg = f"Importé « {tab.name} » ({len(rows)} ligne(s))."
+        self.msg = _L(f"Importé « {tab.name} » ({len(rows)} ligne(s)).", f"Imported '{tab.name}' ({len(rows)} row(s)).")
         audio.play("click")
 
     def _handle_csv_import_prompt_event(self, event):
@@ -518,9 +522,9 @@ class SheetApp(DesktopApp):
         box.center = rect.center
         style.draw_card(surf, box, bg=config.COL_PANEL, border=config.COL_CYAN,
                         radius=style.RADIUS_MD)
-        widgets.draw_text(surf, "IMPORTER UN CSV", (box.x + 12, box.y + 8),
+        widgets.draw_text(surf, _L("IMPORTER UN CSV", "IMPORT A CSV"), (box.x + 12, box.y + 8),
                           fonts.small(bold=True), config.COL_CYAN)
-        widgets.draw_text(surf, "Chemin du fichier :", (box.x + 12, box.y + 32),
+        widgets.draw_text(surf, _L("Chemin du fichier :", "File path:"), (box.x + 12, box.y + 32),
                           fonts.tiny(), config.COL_TEXT_DIM)
         self._csv_import_box_rect = pygame.Rect(box.x + 12, box.y + 48, box.w - 24, 26)
         pygame.draw.rect(surf, config.COL_BG, self._csv_import_box_rect, border_radius=4)
@@ -533,13 +537,13 @@ class SheetApp(DesktopApp):
         self._csv_import_confirm_rect = pygame.Rect(box.x + 12, box.bottom - 30, 100, 24)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._csv_import_confirm_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_UP, self._csv_import_confirm_rect, 1, border_radius=4)
-        widgets.draw_text(surf, "IMPORTER", self._csv_import_confirm_rect.center,
+        widgets.draw_text(surf, _L("IMPORTER", "IMPORT"), self._csv_import_confirm_rect.center,
                           fonts.tiny(bold=True), config.COL_UP, align="center")
         self._csv_import_cancel_rect = pygame.Rect(self._csv_import_confirm_rect.right + 8,
                                                     box.bottom - 30, 90, 24)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._csv_import_cancel_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_TEXT_DIM, self._csv_import_cancel_rect, 1, border_radius=4)
-        widgets.draw_text(surf, "Annuler", self._csv_import_cancel_rect.center,
+        widgets.draw_text(surf, _L("Annuler", "Cancel"), self._csv_import_cancel_rect.center,
                           fonts.tiny(), config.COL_TEXT_DIM, align="center")
 
     # ---------------------------------------------- mise en forme conditionnelle
@@ -552,13 +556,13 @@ class SheetApp(DesktopApp):
     def _apply_cf_rule(self):
         val = self._cf_value()
         if val is None:
-            self.msg = "Seuil invalide."
+            self.msg = _L("Seuil invalide.", "Invalid threshold.")
             return
         c1, c2, r1, r2 = self._range_bounds()
         range_str = f"{idx_to_col(c1)}{r1}:{idx_to_col(c2)}{r2}"
         self.workbook.active.cf_rules.append(
             ConditionalFormat(range_str, self._cf_op, val, self._cf_color))
-        self.msg = f"Règle ajoutée sur {range_str}."
+        self.msg = _L(f"Règle ajoutée sur {range_str}.", f"Rule added on {range_str}.")
 
     def _handle_cf_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -608,21 +612,21 @@ class SheetApp(DesktopApp):
     def _add_chart(self, kind):
         c1, c2, r1, r2 = self._range_bounds()
         if c1 == c2 and r1 == r2:
-            self.msg = "Glissez la souris sur une plage de cellules avant d'insérer un graphique."
+            self.msg = _L("Glissez la souris sur une plage de cellules avant d'insérer un graphique.", "Drag across a range of cells before inserting a chart.")
             return
         range_str = f"{idx_to_col(c1)}{r1}:{idx_to_col(c2)}{r2}"
         ncols = c2 - c1 + 1
         if kind == "scatter" and ncols != 2:
-            self.msg = "Nuage de points : sélectionnez une plage à 2 colonnes (X ; Y)."
+            self.msg = _L("Nuage de points : sélectionnez une plage à 2 colonnes (X ; Y).", "Scatter: select a 2-column range (X ; Y).")
             return
         n = len(self.workbook.active.charts)
         chart = SheetChart(kind, range_str, x=24 + 18 * (n % 6), y=24 + 18 * (n % 6))
         data = self._chart_data(chart)
         if not data:
-            self.msg = "Plage invalide ou vide pour ce graphique."
+            self.msg = _L("Plage invalide ou vide pour ce graphique.", "Invalid or empty range for this chart.")
             return
         self.workbook.active.charts.append(chart)
-        self.msg = f"Graphique « {dict(CHART_TYPES)[kind]} » ajouté ({range_str})."
+        self.msg = _L(f"Graphique « {_L(*dict(CHART_TYPES)[kind])} » ajouté ({range_str}).", f"Chart '{_L(*dict(CHART_TYPES)[kind])}' added ({range_str}).")
 
     def _chart_data(self, chart):
         try:
@@ -1001,12 +1005,13 @@ class SheetApp(DesktopApp):
         hov = self._tpl_rect.collidepoint(mp) or self.tpl_open
         pygame.draw.rect(surf, config.COL_PANEL if hov else config.COL_BG, self._tpl_rect, border_radius=3)
         pygame.draw.rect(surf, config.COL_AMBER, self._tpl_rect, 1, border_radius=3)
-        widgets.draw_text(surf, "Modèle ▾", self._tpl_rect.center, fonts.tiny(bold=True),
+        widgets.draw_text(surf, _L("Modèle ▾", "Template ▾"), self._tpl_rect.center, fonts.tiny(bold=True),
                           config.COL_AMBER, align="center")
         x = self._tpl_rect.right + 10
         pygame.draw.line(surf, config.COL_BORDER, (x - 5, bar.y + 3), (x - 5, bar.bottom - 3), 1)
         self._chart_btn_rects = {}
-        for kind, label in CHART_TYPES:
+        for kind, labelpair in CHART_TYPES:
+            label = _L(*labelpair)
             w = fonts.tiny(bold=True).size(label)[0] + 16
             r = pygame.Rect(x, bar.y + 2, w, TOOLBAR_H - 4)
             self._chart_btn_rects[kind] = r
@@ -1054,10 +1059,11 @@ class SheetApp(DesktopApp):
         mp = pygame.mouse.get_pos()
         prev_clip = surf.get_clip()
         surf.set_clip(panel)
-        for cat, funcs in FUNCTION_CATALOG:
-            widgets.draw_text(surf, cat.upper(), (panel.x + 6, y), fonts.tiny(bold=True), config.COL_CYAN)
+        for catpair, funcs in FUNCTION_CATALOG:
+            widgets.draw_text(surf, _L(*catpair).upper(), (panel.x + 6, y), fonts.tiny(bold=True), config.COL_CYAN)
             y += 16
-            for name, hint in funcs:
+            for name, hintpair in funcs:
+                hint = _L(*hintpair)
                 r = pygame.Rect(panel.x + 4, y, panel.w - 8, 16)
                 self._fx_item_rects[name] = r
                 if r.collidepoint(mp):
@@ -1109,9 +1115,9 @@ class SheetApp(DesktopApp):
         self._cf_panel_rect = panel
         mp = pygame.mouse.get_pos()
 
-        widgets.draw_text(surf, "MISE EN FORME CONDITIONNELLE", (panel.x + 8, panel.y + 6),
+        widgets.draw_text(surf, _L("MISE EN FORME CONDITIONNELLE", "CONDITIONAL FORMATTING"), (panel.x + 8, panel.y + 6),
                           fonts.tiny(bold=True), config.COL_PRESTIGE)
-        widgets.draw_text(surf, f"Plage : {range_str}", (panel.x + 8, panel.y + 22),
+        widgets.draw_text(surf, _L(f"Plage : {range_str}", f"Range: {range_str}"), (panel.x + 8, panel.y + 22),
                           fonts.tiny(), config.COL_TEXT_DIM)
 
         # opérateur
@@ -1140,7 +1146,8 @@ class SheetApp(DesktopApp):
         # couleur
         self._cf_color_rects = {}
         x = panel.x + 8
-        for color, label in CF_COLORS:
+        for color, labelpair in CF_COLORS:
+            label = _L(*labelpair)
             w = 70
             r = pygame.Rect(x, panel.y + 66, w, 20)
             self._cf_color_rects[color] = r
@@ -1155,14 +1162,14 @@ class SheetApp(DesktopApp):
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if hov else config.COL_BG,
                          self._cf_apply_rect, border_radius=3)
         pygame.draw.rect(surf, config.COL_PRESTIGE, self._cf_apply_rect, 1, border_radius=3)
-        widgets.draw_text(surf, "APPLIQUER SUR LA PLAGE", self._cf_apply_rect.center,
+        widgets.draw_text(surf, _L("APPLIQUER SUR LA PLAGE", "APPLY TO RANGE"), self._cf_apply_rect.center,
                           fonts.tiny(bold=True), config.COL_PRESTIGE, align="center")
 
         # règles existantes
         self._cf_remove_rects = {}
         y = panel.y + 122
         if rules:
-            widgets.draw_text(surf, f"RÈGLES ({len(rules)})", (panel.x + 8, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, _L(f"RÈGLES ({len(rules)})", f"RULES ({len(rules)})"), (panel.x + 8, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
             y += 16
             for rule in rules:
                 label = f"{rule.range_str} {rule.op} {rule.value:g}"
@@ -1192,7 +1199,7 @@ class SheetApp(DesktopApp):
         self._chart_title_rects[chart.id] = title_r
         self._chart_rects[chart.id] = r
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, title_r)
-        label = dict(CHART_TYPES).get(chart.kind, chart.kind)
+        label = _L(*dict(CHART_TYPES)[chart.kind]) if chart.kind in dict(CHART_TYPES) else chart.kind
         widgets.draw_text(surf, widgets.fit_text(f"{label} · {chart.range_str}", fonts.tiny(), r.w - 26),
                           (title_r.x + 4, title_r.y + 2), fonts.tiny(bold=True), config.COL_AMBER)
         close_r = pygame.Rect(title_r.right - 16, title_r.y + 1, 14, 14)
@@ -1207,7 +1214,7 @@ class SheetApp(DesktopApp):
         body = pygame.Rect(r.x + 4, title_r.bottom + 2, r.w - 8, r.bottom - title_r.bottom - 6)
         data = self._chart_data(chart)
         if not data:
-            widgets.draw_text(surf, "Plage invalide", body.center, fonts.tiny(), config.COL_DOWN, align="center")
+            widgets.draw_text(surf, _L("Plage invalide", "Invalid range"), body.center, fonts.tiny(), config.COL_DOWN, align="center")
         elif chart.kind == "scatter":
             self._draw_scatter(surf, body, data["x"], data["y"])
         elif chart.kind == "bar":

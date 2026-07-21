@@ -15,8 +15,12 @@ désormais retirée : une seule maison pour la watchlist).
 import pygame
 
 from apps.base import DesktopApp
-from core import audio, config
+from core import audio, config, i18n
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
 
 ROW_H = 26
 TILE_W, TILE_H = 180, 92
@@ -93,7 +97,7 @@ class WatchlistApp(DesktopApp):
         surf.fill(config.COL_PANEL, rect)
         pad = 10
         wl = list(self.app.gs.player.watchlist)
-        title = f"VALEURS SUIVIES ({len(wl)}/10)"
+        title = _L(f"VALEURS SUIVIES ({len(wl)}/10)", f"WATCHLIST ({len(wl)}/10)")
         widgets.draw_text(surf, widgets.fit_text(title, fonts.small(bold=True),
                                                  max(60, rect.w - 2 * pad - 134)),
                           (rect.x + pad, rect.y + pad),
@@ -102,7 +106,7 @@ class WatchlistApp(DesktopApp):
         self._view_rects = {}
         mp = pygame.mouse.get_pos()
         bx = rect.right - pad - 62
-        for mode, label in (("grid", "GRILLE"), ("list", "LISTE")):
+        for mode, label in (("grid", _L("GRILLE", "GRID")), ("list", _L("LISTE", "LIST"))):
             r = pygame.Rect(bx, rect.y + pad - 2, 58, 20)
             self._view_rects[mode] = r
             active = (self.view == mode)
@@ -121,11 +125,11 @@ class WatchlistApp(DesktopApp):
         self._row_rects, self._del_rects, self._earnings_rects = {}, {}, {}
         self._tooltip = None
         if not wl:
-            widgets.draw_text(surf, "Aucune valeur suivie.", (area.x + 10, area.y + 12),
+            widgets.draw_text(surf, _L("Aucune valeur suivie.", "No watched securities."), (area.x + 10, area.y + 12),
                               fonts.small(), config.COL_TEXT_DIM)
-            widgets.draw_text(surf, "Ajoutez-en avec l'étoile ✶ de l'app Recherche,",
+            widgets.draw_text(surf, _L("Ajoutez-en avec l'étoile ✶ de l'app Recherche,", "Add some with the ✶ star in the Research app,"),
                               (area.x + 10, area.y + 34), fonts.tiny(), config.COL_TEXT_DIM)
-            widgets.draw_text(surf, "ou la commande WATCHLIST du terminal.",
+            widgets.draw_text(surf, _L("ou la commande WATCHLIST du terminal.", "or the terminal WATCHLIST command."),
                               (area.x + 10, area.y + 48), fonts.tiny(), config.COL_TEXT_DIM)
             return
         if self.view == "grid":
@@ -152,7 +156,7 @@ class WatchlistApp(DesktopApp):
                 self._earnings_rects[tk] = dot
                 pygame.draw.circle(surf, config.COL_PRESTIGE, dot.center, 4)
                 if dot.inflate(6, 6).collidepoint(mp):
-                    label = "Publie aujourd'hui" if days == 0 else f"Publie dans {days} j"
+                    label = _L("Publie aujourd'hui", "Reports today") if days == 0 else _L(f"Publie dans {days} j", f"Reports in {days} d")
                     self._tooltip = (label, mp)
             name = self.market.companies[i]["name"]
             # largeur du nom : espace réel entre la colonne ticker (x+68) et le

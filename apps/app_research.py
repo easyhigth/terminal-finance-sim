@@ -11,8 +11,13 @@ sans dupliquer de logique.
 import pygame
 
 from apps.base import DesktopApp
-from core import audio, config
+from core import audio, config, i18n
 from ui import fonts, style, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
 
 ROW_H = 22
 
@@ -131,7 +136,7 @@ class ResearchApp(DesktopApp):
         pygame.draw.rect(surf, config.COL_BG, sr, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, sr, 1, border_radius=4)
         cur = "_" if pygame.time.get_ticks() % 1000 < 500 else " "
-        label = (self.search + cur) if self.search else "Rechercher une société (nom, ticker)…"
+        label = (self.search + cur) if self.search else _L("Rechercher une société (nom, ticker)…", "Search a company (name, ticker)…")
         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), sr.w - 16),
                           (sr.x + 8, sr.y + 4), fonts.small(),
                           config.COL_TEXT if self.search else config.COL_TEXT_DIM)
@@ -186,7 +191,7 @@ class ResearchApp(DesktopApp):
                        radius=style.RADIUS_MD)
         self._action_rects = {}
         if not self.sel:
-            widgets.draw_text(surf, "Sélectionnez une société.", (rect.x + 12, rect.y + 12),
+            widgets.draw_text(surf, _L("Sélectionnez une société.", "Select a company."), (rect.x + 12, rect.y + 12),
                               fonts.small(), config.COL_TEXT_DIM)
             return
         m = self.market
@@ -220,14 +225,14 @@ class ResearchApp(DesktopApp):
         fy = graph.bottom + 12
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
         fields = [
-            ("Capitalisation", widgets.format_money(mt["mktcap"], cur)),
-            ("PER", f"{mt['pe']:.1f}" if mt["pe"] else "—"),
-            ("VE/EBITDA", f"{mt['ev_ebitda']:.1f}" if mt["ev_ebitda"] else "—"),
-            ("Rendement div.", f"{mt['div_yield']*100:.2f}%"),
-            ("Marge nette", f"{mt['net_margin']*100:.1f}%"),
-            ("Bêta", f"{mt['beta']:.2f}"),
-            ("Notation", mt["credit_rating"]),
-            ("BPA", f"{mt['eps']:.2f}"),
+            (_L("Capitalisation", "Market cap"), widgets.format_money(mt["mktcap"], cur)),
+            (_L("PER", "P/E"), f"{mt['pe']:.1f}" if mt["pe"] else "—"),
+            ("VE/EBITDA" if i18n.get_lang() != "en" else "EV/EBITDA", f"{mt['ev_ebitda']:.1f}" if mt["ev_ebitda"] else "—"),
+            (_L("Rendement div.", "Div. yield"), f"{mt['div_yield']*100:.2f}%"),
+            (_L("Marge nette", "Net margin"), f"{mt['net_margin']*100:.1f}%"),
+            (_L("Bêta", "Beta"), f"{mt['beta']:.2f}"),
+            (_L("Notation", "Rating"), mt["credit_rating"]),
+            (_L("BPA", "EPS"), f"{mt['eps']:.2f}"),
         ]
         # 2 colonnes si la place le permet, 1 seule en fenêtre étroite (les
         # libellés passaient sous les valeurs à la taille minimale) ; libellé

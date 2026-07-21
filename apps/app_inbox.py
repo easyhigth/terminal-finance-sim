@@ -12,8 +12,12 @@ bureau est redirigée ici (cf. DesktopScene._open_scene_window).
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import config, i18n
 from scenes.scene_inbox import _KIND, FILTER_CHIPS
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
 from ui import fonts, keynav, widgets
 
 ROW_H = 40
@@ -263,5 +267,5 @@ class InboxApp(DesktopApp):
                                       read_area.w - 24, line_gap=5)
             surf.set_clip(prev_clip)
         else:
-            widgets.draw_text(surf, "Sélectionnez un message.", (rx, ry),
+            widgets.draw_text(surf, _L("Sélectionnez un message.", "Select a message."), (rx, ry),
                               fonts.small(), config.COL_TEXT_DIM)

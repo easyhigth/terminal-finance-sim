@@ -12,14 +12,19 @@ est redirigée ici (cf. DesktopScene._open_scene_window).
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import config, i18n
 from core import review as R
 from ui import fonts, widgets
 
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
+
 _CHOICES = [
-    ("accept", "Accepter le bonus standard"),
-    ("negotiate_up", "Négocier à la hausse"),
-    ("ask_fixed", "Demander une augmentation fixe"),
+    ("accept", ("Accepter le bonus standard", "Accept the standard bonus")),
+    ("negotiate_up", ("Négocier à la hausse", "Negotiate upward")),
+    ("ask_fixed", ("Demander une augmentation fixe", "Ask for a fixed raise")),
 ]
 
 
@@ -92,22 +97,26 @@ class ReviewApp(DesktopApp):
     def draw(self, surf, rect):
         surf.fill(config.COL_BG, rect)
         if self.offer is None:
-            widgets.draw_text(surf, "Aucune revue de performance en attente.",
+            widgets.draw_text(surf, _L("Aucune revue de performance en attente.", "No pending performance review."),
                               (rect.x + 20, rect.y + 20), fonts.head(bold=True), config.COL_TEXT_DIM)
             return
-        widgets.draw_text(surf, "REVUE DE PERFORMANCE", (rect.x + 20, rect.y + 12),
+        widgets.draw_text(surf, _L("REVUE DE PERFORMANCE", "PERFORMANCE REVIEW"), (rect.x + 20, rect.y + 12),
                           fonts.head(bold=True), config.COL_AMBER)
-        widgets.draw_badge(surf, "ANNUELLE", (rect.right - 20, rect.y + 18), config.COL_CYAN, align="right")
+        widgets.draw_badge(surf, _L("ANNUELLE", "ANNUAL"), (rect.right - 20, rect.y + 18), config.COL_CYAN, align="right")
 
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
         panel = pygame.Rect(rect.x + 20, rect.y + 50, rect.w - 40, 130)
-        inner = widgets.draw_panel(surf, panel, "Bilan annuel", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Bilan annuel", "Annual review"), config.COL_CYAN)
         o = self.offer
-        lines = (
+        lines = _L(
             f"Réputation actuelle : {o['reputation']}/100\n"
             f"Missions réalisées ce grade : {o['grade_missions']}\n"
             f"P&L réalisé récent : {widgets.format_money(o['realized_pnl'], cur)}\n"
-            f"Bonus standard proposé : {widgets.format_money(o['standard_bonus'], cur)}"
+            f"Bonus standard proposé : {widgets.format_money(o['standard_bonus'], cur)}",
+            f"Current reputation: {o['reputation']}/100\n"
+            f"Missions completed this grade: {o['grade_missions']}\n"
+            f"Recent realized P&L: {widgets.format_money(o['realized_pnl'], cur)}\n"
+            f"Standard bonus offered: {widgets.format_money(o['standard_bonus'], cur)}"
         )
         widgets.draw_text_wrapped(surf, lines, (inner.x, inner.y), fonts.small(),
                                   config.COL_TEXT, inner.w, line_gap=5)
@@ -120,12 +129,13 @@ class ReviewApp(DesktopApp):
 
     def _draw_options(self, surf, rect, cur, top):
         self.option_rects = {}
-        widgets.draw_text(surf, "Votre réponse :", (rect.x + 20, top), fonts.small(bold=True),
+        widgets.draw_text(surf, _L("Votre réponse :", "Your response:"), (rect.x + 20, top), fonts.small(bold=True),
                           config.COL_TEXT_DIM)
         y = top + 26
         mp = pygame.mouse.get_pos()
         opt_h = 56
-        for i, (_, label) in enumerate(_CHOICES):
+        for i, (_, labelpair) in enumerate(_CHOICES):
+            label = _L(*labelpair)
             option_rect = pygame.Rect(rect.x + 20, y, rect.w - 40, opt_h)
             if option_rect.bottom > rect.bottom - 12:
                 break
@@ -143,7 +153,7 @@ class ReviewApp(DesktopApp):
         r = self.result
         panel_h = min(rect.bottom - top - 60, 220)
         panel = pygame.Rect(rect.x + 20, top, rect.w - 40, panel_h)
-        inner = widgets.draw_panel(surf, panel, "Issue de la négociation", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Issue de la négociation", "Negotiation outcome"), config.COL_CYAN)
         widgets.draw_text_wrapped(surf, r.get("message", ""), (inner.x, inner.y),
                                   fonts.small(), config.COL_TEXT, inner.w, line_gap=5)
         eff = []
@@ -152,7 +162,7 @@ class ReviewApp(DesktopApp):
             eff.append((f"bonus +{widgets.format_money(bonus_paid, cur)}", config.COL_UP))
         rep_delta = r.get("rep_delta", 0)
         if rep_delta:
-            eff.append((f"réputation {rep_delta:+d}",
+            eff.append((_L(f"réputation {rep_delta:+d}", f"reputation {rep_delta:+d}"),
                         config.COL_UP if rep_delta >= 0 else config.COL_DOWN))
         x = inner.x
         for text, c in eff:
@@ -161,5 +171,5 @@ class ReviewApp(DesktopApp):
         self._continue_rect = pygame.Rect(rect.centerx - 110, rect.bottom - 46, 220, 36)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._continue_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_UP, self._continue_rect, 2, border_radius=4)
-        widgets.draw_text(surf, "CONTINUER", self._continue_rect.center, fonts.small(bold=True),
+        widgets.draw_text(surf, _L("CONTINUER", "CONTINUE"), self._continue_rect.center, fonts.small(bold=True),
                           config.COL_UP, align="center")

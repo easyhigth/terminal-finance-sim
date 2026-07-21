@@ -13,9 +13,14 @@ import pygame
 
 from apps.base import DesktopApp
 from core import alerts as ALERTS
-from core import config, unlocks
+from core import config, i18n, unlocks
 from scenes.scene_alerts import _ALERT_KINDS
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
 
 ROW_H = 24
 
@@ -69,7 +74,7 @@ class AlertsApp(DesktopApp):
         for name, region in getattr(m, "index_region", {}).items():
             hist = m.index_history(name)
             pct = intraday.window_pct(hist) if hist else 0.0
-            rows.append({"ticker": name, "name": f"Indice {region}", "sector": "Indice",
+            rows.append({"ticker": name, "name": _L(f"Indice {region}", f"Index {region}"), "sector": _L("Indice", "Index"),
                          "price": m.index_value(name), "change_pct": pct})
         companies = []
         for c in m.companies:
@@ -92,31 +97,31 @@ class AlertsApp(DesktopApp):
     def _post_alert(self):
         if not self._can_alert():
             g = unlocks.effective_required_grade(self.app.gs.player, "analyst")
-            self.msg = f"⊘ Alertes débloquées au grade {config.GRADES[g]}."
+            self.msg = _L(f"⊘ Alertes débloquées au grade {config.GRADES[g]}.", f"⊘ Alerts unlocked at grade {config.GRADES[g]}.")
             return
         if not self.sel_ticker:
-            self.msg = "Sélectionnez d'abord un actif dans la liste."
+            self.msg = _L("Sélectionnez d'abord un actif dans la liste.", "Select an asset from the list first.")
             return
         value = self.price_text.replace(",", ".")
         r = ALERTS.place(self.app.gs.player, self.market, self.sel_ticker, self.kind, value)
         if not r["ok"]:
             self.msg = {
-                "ticker": "Ticker inconnu.",
-                "price": "Aucune cotation pour cet actif.",
-                "value": "Seuil invalide : indiquez un nombre positif.",
-                "kind": "Type d'alerte invalide.",
-            }.get(r["reason"], f"Refusé ({r['reason']}).")
+                "ticker": _L("Ticker inconnu.", "Unknown ticker."),
+                "price": _L("Aucune cotation pour cet actif.", "No quote for this asset."),
+                "value": _L("Seuil invalide : indiquez un nombre positif.", "Invalid threshold: enter a positive number."),
+                "kind": _L("Type d'alerte invalide.", "Invalid alert type."),
+            }.get(r["reason"], _L(f"Refusé ({r['reason']}).", f"Rejected ({r['reason']})."))
             return
         a = r["alert"]
         self.market.track_company(self.sel_ticker)
         if self.kind == "level":
-            sens = "au-dessus de" if a["above"] else "en-dessous de"
-            self.msg = f"Alerte posée : {a['ticker']} {sens} {a['value']:.2f}."
+            sens = _L("au-dessus de", "above") if a["above"] else _L("en-dessous de", "below")
+            self.msg = _L(f"Alerte posée : {a['ticker']} {sens} {a['value']:.2f}.", f"Alert set: {a['ticker']} {sens} {a['value']:.2f}.")
         elif self.kind == "pct":
-            sign = "hausse" if a["above"] else "baisse"
-            self.msg = f"Alerte posée : {a['ticker']} sur {sign} de {a['value']:.1f}%."
+            sign = _L("hausse", "rise") if a["above"] else _L("baisse", "fall")
+            self.msg = _L(f"Alerte posée : {a['ticker']} sur {sign} de {a['value']:.1f}%.", f"Alert set: {a['ticker']} on {sign} of {a['value']:.1f}%.")
         else:
-            self.msg = f"Stop suiveur posé sur {a['ticker']} à {a['value']:.1f}%."
+            self.msg = _L(f"Stop suiveur posé sur {a['ticker']} à {a['value']:.1f}%.", f"Trailing stop set on {a['ticker']} at {a['value']:.1f}%.")
         self.price_text = ""
 
     def update(self, dt):
@@ -198,8 +203,8 @@ class AlertsApp(DesktopApp):
                     return True
             for aid, r in self._delete_rects.items():
                 if r.collidepoint(event.pos):
-                    self.msg = ("Alerte supprimée." if ALERTS.cancel(self.app.gs.player, aid)
-                                else "Alerte introuvable.")
+                    self.msg = (_L("Alerte supprimée.", "Alert deleted.") if ALERTS.cancel(self.app.gs.player, aid)
+                                else _L("Alerte introuvable.", "Alert not found."))
                     return True
         return False
 
@@ -209,16 +214,16 @@ class AlertsApp(DesktopApp):
         pad = 10
         p = self.app.gs.player
         mp = pygame.mouse.get_pos()
-        widgets.draw_text(surf, "ALERTES DE PRIX", (rect.x + pad, rect.y + pad),
+        widgets.draw_text(surf, _L("ALERTES DE PRIX", "PRICE ALERTS"), (rect.x + pad, rect.y + pad),
                           fonts.small(bold=True), config.COL_AMBER)
         if self.sel_ticker:
             price = self.market.price_of(self.sel_ticker)
             ptxt = f"{price:.2f}" if price is not None else "—"
-            widgets.draw_text(surf, f"ACTIF : {self.sel_ticker} (cours {ptxt})",
+            widgets.draw_text(surf, _L(f"ACTIF : {self.sel_ticker} (cours {ptxt})", f"ASSET: {self.sel_ticker} (price {ptxt})"),
                               (rect.x + pad + 150, rect.y + pad), fonts.tiny(bold=True),
                               config.COL_WHITE)
         else:
-            widgets.draw_text(surf, "ACTIF : aucun — cliquez une ligne",
+            widgets.draw_text(surf, _L("ACTIF : aucun — cliquez une ligne", "ASSET: none — click a row"),
                               (rect.x + pad + 150, rect.y + pad), fonts.tiny(),
                               config.COL_TEXT_DIM)
 
@@ -229,7 +234,7 @@ class AlertsApp(DesktopApp):
         pygame.draw.rect(surf, config.COL_CYAN if self.text_focus == "search" else config.COL_BORDER,
                          self._search_box, 1, border_radius=4)
         cursor = "_" if (self.text_focus == "search" and int(self._t * 2) % 2 == 0) else " "
-        label = (self.search + cursor) if self.search else (cursor + "Rechercher un actif…")
+        label = (self.search + cursor) if self.search else (cursor + _L("Rechercher un actif…", "Search an asset…"))
         scol = config.COL_TEXT if self.search else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), self._search_box.w - 30),
                           (self._search_box.x + 8, self._search_box.y + 4), fonts.small(), scol)
@@ -241,7 +246,8 @@ class AlertsApp(DesktopApp):
                               fonts.small(bold=True), config.COL_TEXT_DIM, align="center")
         self._kind_rects = {}
         kx = self._search_box.right + 10
-        for kind, klabel in _ALERT_KINDS:
+        for kind, kpair in _ALERT_KINDS:
+            klabel = _L(*kpair)
             w = max(70, fonts.tiny(bold=True).size(klabel)[0] + 12)
             r = pygame.Rect(kx, y1 + 2, w, 20)
             self._kind_rects[kind] = r
@@ -254,8 +260,8 @@ class AlertsApp(DesktopApp):
 
         # ligne 2 : seuil + POSER + message
         y2 = y1 + 30
-        unit = "%" if self.kind in ("pct", "trailing") else "prix"
-        widgets.draw_text(surf, f"SEUIL ({unit}) :", (rect.x + pad, y2 + 4),
+        unit = "%" if self.kind in ("pct", "trailing") else _L("prix", "price")
+        widgets.draw_text(surf, _L(f"SEUIL ({unit}) :", f"THRESHOLD ({unit}):"), (rect.x + pad, y2 + 4),
                           fonts.tiny(bold=True), config.COL_TEXT_DIM)
         self._price_box = pygame.Rect(rect.x + pad + 100, y2, 80, 24)
         pygame.draw.rect(surf, config.COL_BG, self._price_box, border_radius=4)
@@ -270,12 +276,12 @@ class AlertsApp(DesktopApp):
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._post_btn, border_radius=4)
         pygame.draw.rect(surf, config.COL_AMBER if can else config.COL_BORDER,
                          self._post_btn, 1, border_radius=4)
-        widgets.draw_text(surf, "POSER L'ALERTE", self._post_btn.center, fonts.tiny(bold=True),
+        widgets.draw_text(surf, _L("POSER L'ALERTE", "SET THE ALERT"), self._post_btn.center, fonts.tiny(bold=True),
                           config.COL_AMBER if can else config.COL_TEXT_DIM, align="center")
         info = self.msg
         if not can and not info:
             g = unlocks.effective_required_grade(p, "analyst")
-            info = f"⊘ Alertes débloquées au grade {config.GRADES[g]}."
+            info = _L(f"⊘ Alertes débloquées au grade {config.GRADES[g]}.", f"⊘ Alerts unlocked at grade {config.GRADES[g]}.")
         if info:
             widgets.draw_text(surf, widgets.fit_text(info, fonts.tiny(),
                                                      rect.right - pad - self._post_btn.right - 16),
@@ -310,14 +316,14 @@ class AlertsApp(DesktopApp):
         pygame.draw.rect(surf, config.COL_BG, alerts_area)
         pygame.draw.rect(surf, config.COL_BORDER, alerts_area, 1)
         alerts = getattr(p, "alerts", None) or []
-        widgets.draw_text(surf, f"ACTIVES ({len(alerts)})", (alerts_area.x + 8, alerts_area.y + 4),
+        widgets.draw_text(surf, _L(f"ACTIVES ({len(alerts)})", f"ACTIVE ({len(alerts)})"), (alerts_area.x + 8, alerts_area.y + 4),
                           fonts.tiny(bold=True), config.COL_AMBER)
         self._delete_rects = {}
         inner = pygame.Rect(alerts_area.x, alerts_area.y + 22, alerts_area.w,
                             alerts_area.h - 24)
         self._alerts_list_rect = inner
         if not alerts:
-            widgets.draw_text(surf, "Aucune alerte active.", (inner.x + 8, inner.y + 4),
+            widgets.draw_text(surf, _L("Aucune alerte active.", "No active alert."), (inner.x + 8, inner.y + 4),
                               fonts.tiny(), config.COL_TEXT_DIM)
             self._alerts_max_scroll = 0
         else:
@@ -374,11 +380,11 @@ class AlertsApp(DesktopApp):
         if cur is not None and kind == "level" and a["value"]:
             dist_pct = abs(cur - a["value"]) / a["value"] * 100
             if dist_pct <= 2:
-                pcol, ptxt = config.COL_DOWN, "imminent"
+                pcol, ptxt = config.COL_DOWN, _L("imminent", "imminent")
             elif dist_pct <= 8:
-                pcol, ptxt = config.COL_WARN, "proche"
+                pcol, ptxt = config.COL_WARN, _L("proche", "near")
             else:
-                pcol, ptxt = config.COL_TEXT_DIM, "loin"
+                pcol, ptxt = config.COL_TEXT_DIM, _L("loin", "far")
             widgets.draw_text(surf, ptxt, (row.right - 34, y + 4), fonts.tiny(bold=True),
                               pcol, align="right")
         dr = pygame.Rect(row.right - 24, y + 2, 18, 18)

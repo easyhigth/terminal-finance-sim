@@ -15,9 +15,22 @@ redirigée ici (cf. DesktopScene._open_scene_window).
 import pygame
 
 from apps.base import DesktopApp
-from core import analytics, config
+from core import analytics, config, i18n
 from ui import fonts, widgets
 from ui.popups import PopupMixin
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
+
+_LIQ_EN = {"Liquide": "Liquid", "Peu liquide": "Illiquid-ish",
+           "Illiquide": "Illiquid"}
+
+
+def _liq_label(v):
+    return _LIQ_EN.get(v, v) if i18n.get_lang() == "en" else v
+
 
 _CLASS_COL = {"Actions": config.COL_AMBER, "Obligations": config.COL_CYAN,
               "Matières": config.COL_WARN, "Crypto": config.COL_PRESTIGE,
@@ -142,7 +155,7 @@ class AnalyticsApp(DesktopApp, PopupMixin):
                 return True
             if self._corr_rect and self._corr_rect.collidepoint(event.pos):
                 p, m = self.app.gs.player, self.market
-                self.open_custom_chart("CORRÉLATIONS — actions",
+                self.open_custom_chart(_L("CORRÉLATIONS — actions", "CORRELATIONS — equities"),
                                        lambda surf, r: self._draw_corr(surf, r, p, m, max_labels=None),
                                        accent=config.COL_DOWN, size=(560, 420))
                 return True
@@ -162,20 +175,24 @@ class AnalyticsApp(DesktopApp, PopupMixin):
         s = analytics.summary(p, m)
         pad = 14
 
-        widgets.draw_text(surf, "ANALYSE DU PORTEFEUILLE", (rect.x + pad, rect.y + 8),
+        widgets.draw_text(surf, _L("ANALYSE DU PORTEFEUILLE", "PORTFOLIO ANALYSIS"), (rect.x + pad, rect.y + 8),
                           fonts.head(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, f"{s['n_positions']} positions · "
+        widgets.draw_text(surf, _L(f"{s['n_positions']} positions · "
                           f"{config.GRADES[p.grade_index]} · valeur nette en {cur}",
+                          f"{s['n_positions']} positions · "
+                          f"{config.GRADES[p.grade_index]} · net worth in {cur}"),
                           (rect.x + pad, rect.y + 34), fonts.tiny(), config.COL_TEXT_DIM)
         # liens (haut-droit) : Portefeuille / Stress test / Shop
         bx = rect.right - pad
-        self._book_btn = self._link_btn(surf, bx - 88, rect.y + 8, 88, "PORTEF.", config.COL_AMBER)
-        self._stress_btn = self._link_btn(surf, self._book_btn.x - 82, rect.y + 8, 76, "STRESS", config.COL_DOWN)
-        self._shop_btn = self._link_btn(surf, self._stress_btn.x - 66, rect.y + 8, 60, "SHOP", config.COL_CYAN)
+        self._book_btn = self._link_btn(surf, bx - 88, rect.y + 8, 88, _L("PORTEF.", "PORTF."), config.COL_AMBER)
+        self._stress_btn = self._link_btn(surf, self._book_btn.x - 82, rect.y + 8, 76, _L("STRESS", "STRESS"), config.COL_DOWN)
+        self._shop_btn = self._link_btn(surf, self._stress_btn.x - 66, rect.y + 8, 60, _L("SHOP", "SHOP"), config.COL_CYAN)
 
         if s["n_positions"] == 0:
-            widgets.draw_text_wrapped(surf, "Portefeuille vide. Achetez des actifs (Boutique, "
+            widgets.draw_text_wrapped(surf, _L("Portefeuille vide. Achetez des actifs (Boutique, "
                               "Trading, terminal) pour voir l'analyse détaillée.",
+                              "Empty portfolio. Buy assets (Shop, "
+                              "Trading, terminal) to see the detailed analysis."),
                               (rect.x + pad, rect.y + 70), fonts.small(), config.COL_TEXT_DIM,
                               rect.w - 2 * pad)
             self.popups_draw(surf)
@@ -233,26 +250,26 @@ class AnalyticsApp(DesktopApp, PopupMixin):
         fm = lambda v: widgets.format_money(v, cur)
         lev = "∞" if s["leverage"] == float("inf") else f"{s['leverage']:.2f}x"
         return [
-            ("Valeur nette", fm(s["net_worth"]), config.COL_WHITE),
-            ("Trésorerie", fm(s["cash"]), config.COL_TEXT),
-            ("P&L latent", fm(s["unrealized_pnl"]),
+            (_L("Valeur nette", "Net worth"), fm(s["net_worth"]), config.COL_WHITE),
+            (_L("Trésorerie", "Cash"), fm(s["cash"]), config.COL_TEXT),
+            (_L("P&L latent", "Unrealized P&L"), fm(s["unrealized_pnl"]),
              config.COL_UP if s["unrealized_pnl"] >= 0 else config.COL_DOWN),
-            ("P&L réalisé", fm(s["realized_pnl"]),
+            (_L("P&L réalisé", "Realized P&L"), fm(s["realized_pnl"]),
              config.COL_UP if s["realized_pnl"] >= 0 else config.COL_DOWN),
-            ("Bêta", f"{s['beta']:.2f}", config.COL_CYAN),
-            ("Levier", lev, config.COL_WARN if s["leverage"] > 1.5 else config.COL_TEXT),
-            ("Vol. annu.", f"{s['volatility']:.1f}%", config.COL_WARN),
+            (_L("Bêta", "Beta"), f"{s['beta']:.2f}", config.COL_CYAN),
+            (_L("Levier", "Leverage"), lev, config.COL_WARN if s["leverage"] > 1.5 else config.COL_TEXT),
+            (_L("Vol. annu.", "Ann. vol."), f"{s['volatility']:.1f}%", config.COL_WARN),
             ("Max DD", f"{s['max_drawdown']:.1f}%",
              _alert_color(s["max_drawdown"], "max_drawdown")),
-            ("Concentration", f"top {s['top_weight']:.0f}%",
+            (_L("Concentration", "Concentration"), f"top {s['top_weight']:.0f}%",
              _alert_color(s["top_weight"], "top_weight")),
-            ("Expo. nette", fm(s["net_exposure"]),
+            (_L("Expo. nette", "Net expo."), fm(s["net_exposure"]),
              config.COL_UP if s["net_exposure"] >= 0 else config.COL_DOWN),
         ]
 
     def _risk_tiles(self, s):
         return [
-            ("Rdt annualisé", f"{s['annualized_return']:+.1f}%",
+            (_L("Rdt annualisé", "Ann. return"), f"{s['annualized_return']:+.1f}%",
              config.COL_UP if s["annualized_return"] >= 0 else config.COL_DOWN),
             ("Sharpe", f"{s['sharpe']:.2f}",
              config.COL_UP if s["sharpe"] >= 0 else config.COL_DOWN),
@@ -264,23 +281,23 @@ class AnalyticsApp(DesktopApp, PopupMixin):
              config.COL_UP if s["calmar"] >= 0 else config.COL_DOWN),
             ("VaR 95%", f"{s['var95']:.1f}%", config.COL_DOWN),
             ("CVaR 95%", f"{s['cvar95']:.1f}%", config.COL_DOWN),
-            ("Tracking err.", f"{s['tracking_error']:.1f}%", config.COL_TEXT),
-            ("Récup.", "—" if s["recovery_time"] is None else f"{s['recovery_time']} pas",
+            (_L("Tracking err.", "Tracking err."), f"{s['tracking_error']:.1f}%", config.COL_TEXT),
+            (_L("Récup.", "Recovery"), "—" if s["recovery_time"] is None else _L(f"{s['recovery_time']} pas", f"{s['recovery_time']} steps"),
              config.COL_WARN if s["recovery_time"] is None else config.COL_TEXT),
-            ("Lignes eff.", f"{s['effective_positions']:.1f}", config.COL_TEXT),
+            (_L("Lignes eff.", "Eff. lines"), f"{s['effective_positions']:.1f}", config.COL_TEXT),
         ]
 
     def _draw_holdings(self, surf, rect, s, cur):
-        inner = widgets.draw_panel(surf, rect, "Positions détaillées", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, rect, _L("Positions détaillées", "Detailed positions"), config.COL_CYAN)
         # colonnes proportionnelles à la largeur du panneau (l'original
         # utilisait des offsets fixes calibrés pour 560 px)
         w = inner.w
         c_qty = inner.x + int(w * 0.54)
         c_price = inner.x + int(w * 0.70)
         c_value = inner.x + int(w * 0.87)
-        cols = [("Cl.", inner.x, "left"), ("Actif", inner.x + 46, "left"),
-                ("Qté", c_qty, "right"), ("Cours", c_price, "right"),
-                ("Valeur", c_value, "right"), ("Poids", inner.right, "right")]
+        cols = [(_L("Cl.", "Cl."), inner.x, "left"), (_L("Actif", "Asset"), inner.x + 46, "left"),
+                (_L("Qté", "Qty"), c_qty, "right"), (_L("Cours", "Price"), c_price, "right"),
+                (_L("Valeur", "Value"), c_value, "right"), (_L("Poids", "Weight"), inner.right, "right")]
         for label, cx, al in cols:
             widgets.draw_text(surf, label, (cx, inner.y), fonts.tiny(bold=True),
                               config.COL_TEXT_DIM, align=al)
@@ -344,7 +361,7 @@ class AnalyticsApp(DesktopApp, PopupMixin):
                                   fonts.tiny(), config.COL_TEXT_DIM, align="right")
                 liq_col = {"Liquide": config.COL_UP, "Peu liquide": config.COL_WARN,
                            "Illiquide": config.COL_DOWN}.get(h["liquidity"], config.COL_TEXT_DIM)
-                widgets.draw_text(surf, h["liquidity"], (c_value, y + 13),
+                widgets.draw_text(surf, _liq_label(h["liquidity"]), (c_value, y + 13),
                                   fonts.tiny(), liq_col, align="right")
                 sign = "+" if live_pnl_pct >= 0 else ""
                 widgets.draw_text(surf, f"{sign}{live_pnl_pct:.1f}%", (inner.right, y + 13),
@@ -357,44 +374,44 @@ class AnalyticsApp(DesktopApp, PopupMixin):
         self.scroll_holdings = widgets.draw_scrollbar(surf, rect, list_area, self.scroll_holdings,
                                self._holdings_max_scroll, content_h)
         widgets.draw_text(surf, widgets.fit_text(
-            "clic actif → fiche · clic cours/valeur (actions) → graphe", fonts.tiny(), inner.w),
+            _L("clic actif → fiche · clic cours/valeur (actions) → graphe", "click asset → sheet · click price/value (equities) → chart"), fonts.tiny(), inner.w),
                           (inner.x, inner.bottom - 12), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_allocations(self, surf, rect, s, cur):
-        inner = widgets.draw_panel(surf, rect, "Répartition & diversification", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, rect, _L("Répartition & diversification", "Allocation & diversification"), config.COL_AMBER)
         self._alloc_list_rect = inner
         prev_clip = surf.get_clip()
         surf.set_clip(inner)
         y0 = inner.y - self.scroll_alloc
         y = y0
-        y = self._alloc_block(surf, inner, y, "Par classe d'actifs", s["by_class"],
+        y = self._alloc_block(surf, inner, y, _L("Par classe d'actifs", "By asset class"), s["by_class"],
                               lambda k: _CLASS_COL.get(k, config.COL_TEXT))
         y += 6
-        y = self._alloc_block(surf, inner, y, "Par secteur", s["by_sector"],
+        y = self._alloc_block(surf, inner, y, _L("Par secteur", "By sector"), s["by_sector"],
                               lambda k: config.COL_CYAN)
         y += 6
-        y = self._alloc_block(surf, inner, y, "Par région", s["by_region"],
+        y = self._alloc_block(surf, inner, y, _L("Par région", "By region"), s["by_region"],
                               lambda k: config.COL_PRESTIGE)
         y += 6
         liq_col = {"Liquide": config.COL_UP, "Peu liquide": config.COL_WARN,
                    "Illiquide": config.COL_DOWN}
-        y = self._alloc_block(surf, inner, y, "Par liquidité", s["by_liquidity"],
+        y = self._alloc_block(surf, inner, y, _L("Par liquidité", "By liquidity"), s["by_liquidity"],
                               lambda k: liq_col.get(k, config.COL_TEXT))
         y += 4
         pygame.draw.line(surf, config.COL_BORDER, (inner.x, y), (inner.right, y), 1)
         y += 6
-        widgets.draw_text(surf, f"Lignes effectives (1/HHI) : {s['effective_positions']:.1f}",
+        widgets.draw_text(surf, _L(f"Lignes effectives (1/HHI) : {s['effective_positions']:.1f}", f"Effective lines (1/HHI): {s['effective_positions']:.1f}"),
                           (inner.x, y), fonts.tiny(), config.COL_TEXT)
         y += 15
         red, amber = widgets.ALERT_THRESHOLDS["top_weight"]
-        conc = "forte" if s["top_weight"] > red else "modérée" if s["top_weight"] > amber else "saine"
+        conc = _L("forte", "high") if s["top_weight"] > red else _L("modérée", "moderate") if s["top_weight"] > amber else _L("saine", "healthy")
         ccol = _alert_color(s["top_weight"], "top_weight")
-        widgets.draw_text(surf, f"Concentration : {conc} (top {s['top_weight']:.0f}%)",
+        widgets.draw_text(surf, _L(f"Concentration : {conc} (top {s['top_weight']:.0f}%)", f"Concentration: {conc} (top {s['top_weight']:.0f}%)"),
                           (inner.x, y), fonts.tiny(bold=True), ccol)
         y += 18
         top_risk = sorted(s["rows"], key=lambda r: -r["risk_contribution_pct"])[:3]
         if top_risk:
-            widgets.draw_text(surf, "Top contributeurs au risque",
+            widgets.draw_text(surf, _L("Top contributeurs au risque", "Top risk contributors"),
                               (inner.x, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
             y += 16
             for r in top_risk:
@@ -439,14 +456,14 @@ class AnalyticsApp(DesktopApp, PopupMixin):
         for r in (self._frontier_rect, self._corr_rect):
             if r.collidepoint(mp):
                 pygame.draw.rect(surf, config.COL_WHITE, r, 1)
-                widgets.draw_text(surf, "clic → agrandir", (r.right - 6, r.bottom - 14),
+                widgets.draw_text(surf, _L("clic → agrandir", "click → enlarge"), (r.right - 6, r.bottom - 14),
                                   fonts.tiny(bold=True), config.COL_WHITE, align="right")
 
     def _draw_frontier(self, surf, rect, p, m):
-        inner = widgets.draw_panel(surf, rect, "Frontière efficiente (actions)", config.COL_UP)
+        inner = widgets.draw_panel(surf, rect, _L("Frontière efficiente (actions)", "Efficient frontier (equities)"), config.COL_UP)
         fr = analytics.equity_frontier(p, m)
         if not fr:
-            widgets.draw_text(surf, "≥ 2 actions longues requises.", (inner.x, inner.y),
+            widgets.draw_text(surf, _L("≥ 2 actions longues requises.", "≥ 2 long equities required."), (inner.x, inner.y),
                               fonts.tiny(), config.COL_TEXT_DIM)
             return
         vols, rets = fr["vols"], fr["rets"]
@@ -468,15 +485,15 @@ class AnalyticsApp(DesktopApp, PopupMixin):
             pygame.draw.aalines(surf, config.COL_CYAN, False, pts)
         cp = px(cvol, cret)
         pygame.draw.circle(surf, config.COL_AMBER, cp, 4)
-        widgets.draw_text(surf, "VOUS", (cp[0] + 6, cp[1] - 6), fonts.tiny(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, f"vol {cvol:.0f}%  ·  rdt att. {cret:.0f}%",
+        widgets.draw_text(surf, _L("VOUS", "YOU"), (cp[0] + 6, cp[1] - 6), fonts.tiny(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L(f"vol {cvol:.0f}%  ·  rdt att. {cret:.0f}%", f"vol {cvol:.0f}%  ·  exp. ret. {cret:.0f}%"),
                           (inner.x, inner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_corr(self, surf, rect, p, m, max_labels=8):
-        inner = widgets.draw_panel(surf, rect, "Corrélations (actions)", config.COL_DOWN)
+        inner = widgets.draw_panel(surf, rect, _L("Corrélations (actions)", "Correlations (equities)"), config.COL_DOWN)
         labels, corr = analytics.correlation(p, m)
         if len(labels) < 2:
-            widgets.draw_text(surf, "≥ 2 actions requises.", (inner.x, inner.y),
+            widgets.draw_text(surf, _L("≥ 2 actions requises.", "≥ 2 equities required."), (inner.x, inner.y),
                               fonts.tiny(), config.COL_TEXT_DIM)
             return
         labels = labels[:max_labels] if max_labels else labels

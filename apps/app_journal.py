@@ -16,15 +16,23 @@ l'icône dédiée du bureau ET un bouton « JOURNAL » dans Trading/Portefeuille
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import config, i18n
 from core import journal as J
 from ui import fonts, keynav, widgets
 
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
+
 ROW_H = 22
-SORT_FIELDS = [("day", "JOUR"), ("asset_class", "CLASSE"), ("side", "SENS"),
-                ("notional", "TAILLE"), ("realized", "P&L")]
+SORT_FIELDS = [("day", ("JOUR", "DAY")), ("asset_class", ("CLASSE", "CLASS")),
+               ("side", ("SENS", "SIDE")), ("notional", ("TAILLE", "SIZE")),
+               ("realized", ("P&L", "P&L"))]
 ASSET_CHIPS = [None, "Action", "ETF", "Obligation", "Commodity", "Crypto"]
 SIDE_CHIPS = [None, "achat", "vente", "short", "couverture"]
+_SIDE_EN = {"achat": "buy", "vente": "sell", "short": "short",
+            "couverture": "hedge"}
 
 
 class JournalApp(DesktopApp):
@@ -114,13 +122,13 @@ class JournalApp(DesktopApp):
         l'export du Tableur (apps/app_sheet.py)."""
         import os as _os
         if not self.player.trade_journal:
-            self.msg = "Journal vide : rien à exporter."
+            self.msg = _L("Journal vide : rien à exporter.", "Empty journal: nothing to export.")
             return
         path = _os.path.join(_os.path.expanduser("~"), "journal_trading.csv")
         if J.export_csv(self.player, path):
-            self.msg = f"Exporté vers « {path} »."
+            self.msg = _L(f"Exporté vers « {path} ».", f"Exported to '{path}'.")
         else:
-            self.msg = "Échec de l'export CSV (chemin inaccessible)."
+            self.msg = _L("Échec de l'export CSV (chemin inaccessible).", "CSV export failed (path inaccessible).")
 
     def _replicate(self, entry):
         """Ouvre Trading pré-filtré sur l'actif (achat de la quantité
@@ -243,9 +251,9 @@ class JournalApp(DesktopApp):
     def draw(self, surf, rect):
         surf.fill(config.COL_BG, rect)
         pad = 12
-        widgets.draw_text(surf, "JOURNAL DE TRADING", (rect.x + pad, rect.y + 8),
+        widgets.draw_text(surf, _L("JOURNAL DE TRADING", "TRADING JOURNAL"), (rect.x + pad, rect.y + 8),
                           fonts.head(bold=True), config.COL_AMBER)
-        sub = self.msg or "Filtrez, triez et reprenez vos trades passés. ✎ annote, ↻ réplique."
+        sub = self.msg or _L("Filtrez, triez et reprenez vos trades passés. ✎ annote, ↻ réplique.", "Filter, sort and revisit your past trades. ✎ annotate, ↻ replicate.")
         widgets.draw_text(surf, widgets.fit_text(sub, fonts.tiny(), rect.w - 2 * pad - 70),
                           (rect.x + pad, rect.y + 34), fonts.tiny(),
                           config.COL_WARN if self.msg else config.COL_TEXT_DIM)
@@ -266,7 +274,7 @@ class JournalApp(DesktopApp):
         stats = J.performance_stats(p, group_by="regime")
         disc = J.discipline_score(p)
         y_stat = rect.y + 56
-        widgets.draw_text(surf, "DISCIPLINE :", (rect.x + pad, y_stat), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("DISCIPLINE :", "DISCIPLINE:"), (rect.x + pad, y_stat), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         if disc is not None:
             widgets.draw_text(surf, f"{disc['score']:.0f}/100",
                               (rect.x + pad + 80, y_stat), fonts.small(bold=True), config.COL_AMBER)
@@ -275,7 +283,7 @@ class JournalApp(DesktopApp):
         wins = sum(g["wins"] for g in stats)
         win_rate = (wins / total_trades * 100) if total_trades else 0.0
         pnl_col = config.COL_UP if total_pnl >= 0 else config.COL_DOWN
-        stat_line = f"Trades clôturés : {total_trades} · Win rate : {win_rate:.0f}% · P&L total : {total_pnl:+,.0f} {cur}"
+        stat_line = _L(f"Trades clôturés : {total_trades} · Win rate : {win_rate:.0f}% · P&L total : {total_pnl:+,.0f} {cur}", f"Closed trades: {total_trades} · Win rate: {win_rate:.0f}% · Total P&L: {total_pnl:+,.0f} {cur}")
         widgets.draw_text(surf, widgets.fit_text(stat_line, fonts.tiny(bold=True), rect.w - 2 * pad - 180),
                           (rect.x + pad + 180, y_stat), fonts.tiny(bold=True), pnl_col)
 
@@ -284,7 +292,7 @@ class JournalApp(DesktopApp):
         fx = rect.x + pad
         self._asset_rects = {}
         for kind in ASSET_CHIPS:
-            label = "TOUTES" if kind is None else kind
+            label = _L("TOUTES", "ALL") if kind is None else i18n.asset_class_label(kind)
             w = max(46, fonts.tiny(bold=True).size(label)[0] + 10)
             r = pygame.Rect(fx, fy, w, 18)
             if r.right > rect.right - pad:
@@ -301,7 +309,7 @@ class JournalApp(DesktopApp):
         fx = rect.x + pad
         self._side_rects = {}
         for side in SIDE_CHIPS:
-            label = "TOUS" if side is None else side.upper()
+            label = _L("TOUS", "ALL") if side is None else (_SIDE_EN[side].upper() if i18n.get_lang() == "en" else side.upper())
             w = max(46, fonts.tiny(bold=True).size(label)[0] + 10)
             r = pygame.Rect(fx, fy2, w, 18)
             if r.right > rect.right - pad:
@@ -320,7 +328,7 @@ class JournalApp(DesktopApp):
         pygame.draw.rect(surf, config.COL_PANEL, sr, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, sr, 1, border_radius=4)
         cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        lbl = (self.search + cursor) if self.search else (cursor + "Rechercher…")
+        lbl = (self.search + cursor) if self.search else (cursor + _L("Rechercher…", "Search…"))
         widgets.draw_text(surf, widgets.fit_text(lbl, fonts.tiny(), sr.w - 14),
                           (sr.x + 6, sr.y + 4), fonts.tiny(),
                           config.COL_TEXT if self.search else config.COL_TEXT_DIM)
@@ -332,7 +340,8 @@ class JournalApp(DesktopApp):
 
         tx = sr.right + 14
         self._sort_rects = {}
-        for key, label in SORT_FIELDS:
+        for key, lblpair in SORT_FIELDS:
+            label = _L(*lblpair)
             active = self.sort_key == key
             arrow = (" ▲" if self.sort_dir > 0 else " ▼") if active else ""
             full = label + arrow
@@ -362,7 +371,7 @@ class JournalApp(DesktopApp):
             kelly_panel = pygame.Rect(panel.right + 10, ltop + half + 10,
                                       curve_w, panel.h - half - 10)
             self._draw_kelly(surf, kelly_panel, cur)
-        inner = widgets.draw_panel(surf, panel, "Trades", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Trades", "Trades"), config.COL_CYAN)
         self._rows = self._filtered_sorted()
         self.row_cursor = min(self.row_cursor, len(self._rows) - 1) if self._rows else 0
 
@@ -372,19 +381,19 @@ class JournalApp(DesktopApp):
                   "qte": 50, "prix": 62, "pnl": 74}
         cx = inner.x
         col_x = {}
-        for key, label in (("id", "ID"), ("day", "JOUR"), ("actif", "ACTIF"),
-                           ("classe", "CLASSE"), ("sens", "SENS"), ("qte", "QTÉ"),
-                           ("prix", "PRIX"), ("pnl", "P&L")):
+        for key, label in (("id", "ID"), ("day", _L("JOUR", "DAY")), ("actif", _L("ACTIF", "ASSET")),
+                           ("classe", _L("CLASSE", "CLASS")), ("sens", _L("SENS", "SIDE")), ("qte", _L("QTÉ", "QTY")),
+                           ("prix", _L("PRIX", "PRICE")), ("pnl", "P&L")):
             col_x[key] = cx
             widgets.draw_text(surf, label, (cx, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
             cx += cols_w[key]
         if show_regime:
             col_x["regime"] = cx
-            widgets.draw_text(surf, "RÉGIME", (cx, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, _L("RÉGIME", "REGIME"), (cx, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
             cx += 90
         if show_note:
             col_x["note"] = cx
-            widgets.draw_text(surf, "NOTE", (cx, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, _L("NOTE", "NOTE"), (cx, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
 
         list_area = pygame.Rect(inner.x - 6, inner.y + 20, inner.w + 12, inner.h - 24)
         self._list_rect = list_area
@@ -415,7 +424,7 @@ class JournalApp(DesktopApp):
         widgets.draw_text(surf, f"j{e['day']}", (col_x["day"], y), fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, widgets.fit_text(e['key'], fonts.tiny(bold=True), 58),
                           (col_x["actif"], y), fonts.tiny(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, widgets.fit_text(e['asset_class'], fonts.tiny(), 62),
+        widgets.draw_text(surf, widgets.fit_text(i18n.asset_class_label(e['asset_class']), fonts.tiny(), 62),
                           (col_x["classe"], y), fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, e['side'].upper()[:4], (col_x["sens"], y), fonts.tiny(),
                           config.COL_UP if e['side'] == 'achat' else config.COL_DOWN)
@@ -454,12 +463,12 @@ class JournalApp(DesktopApp):
         """Courbe du P&L réalisé CUMULÉ au fil des trades clôturés
         (core/journal.cumulative_realized_series) — la table seule ne donne
         aucune vue d'ensemble de la trajectoire."""
-        inner = widgets.draw_panel(surf, panel, "P&L cumulé", config.COL_PRESTIGE)
+        inner = widgets.draw_panel(surf, panel, _L("P&L cumulé", "Cumulative P&L"), config.COL_PRESTIGE)
         total = series[-1]
         col = config.COL_UP if total >= 0 else config.COL_DOWN
         widgets.draw_text(surf, f"{total:+,.0f} {cur}", (inner.x, inner.y),
                           fonts.small(bold=True), col)
-        widgets.draw_text(surf, f"{len(series)} trades clôturés", (inner.x, inner.y + 18),
+        widgets.draw_text(surf, _L(f"{len(series)} trades clôturés", f"{len(series)} closed trades"), (inner.x, inner.y + 18),
                           fonts.tiny(), config.COL_TEXT_DIM)
         chart = pygame.Rect(inner.x, inner.y + 40, inner.w, inner.h - 44)
         if chart.h < 30:
@@ -477,14 +486,16 @@ class JournalApp(DesktopApp):
         au-delà — sur-risquer un edge positif suffit à ruiner."""
         from core import kelly as K
         from core import portfolio as pf
-        inner = widgets.draw_panel(surf, panel, "Sizing (critère de Kelly)",
+        inner = widgets.draw_panel(surf, panel, _L("Sizing (critère de Kelly)", "Sizing (Kelly criterion)"),
                                    config.COL_AMBER)
         p = self.player
         nw = p.cash + sum(h["value"] for h in pf.holdings(p, self.market))
         reco = K.recommendation(p, nw)
         if reco is None:
-            widgets.draw_text(surf, "Aucun trade clôturé — Kelly a besoin de "
-                              "votre historique.", (inner.x, inner.y + 4),
+            widgets.draw_text(surf, _L("Aucun trade clôturé — Kelly a besoin de "
+                              "votre historique.",
+                              "No closed trade — Kelly needs "
+                              "your history."), (inner.x, inner.y + 4),
                               fonts.tiny(), config.COL_TEXT_DIM)
             return
         st = reco["stats"]
@@ -492,10 +503,12 @@ class JournalApp(DesktopApp):
                           f"({st['n']} trades)", (inner.x, inner.y),
                           fonts.tiny(), config.COL_TEXT_DIM)
         fcol = config.COL_UP if reco["f_star"] > 0 else config.COL_DOWN
-        widgets.draw_text(surf, f"Kelly f* = {reco['f_star'] * 100:.0f}% · "
+        widgets.draw_text(surf, _L(f"Kelly f* = {reco['f_star'] * 100:.0f}% · "
                           f"½-Kelly = {reco['f_half'] * 100:.0f}%",
+                          f"Kelly f* = {reco['f_star'] * 100:.0f}% · "
+                          f"½-Kelly = {reco['f_half'] * 100:.0f}%"),
                           (inner.x, inner.y + 16), fonts.small(bold=True), fcol)
-        widgets.draw_text(surf, f"Mise ½-Kelly ≈ {widgets.format_money(reco['stake_half'], cur)}",
+        widgets.draw_text(surf, _L(f"Mise ½-Kelly ≈ {widgets.format_money(reco['stake_half'], cur)}", f"½-Kelly stake ≈ {widgets.format_money(reco['stake_half'], cur)}"),
                           (inner.x, inner.y + 34), fonts.tiny(), config.COL_TEXT)
         # courbe g(f) : le sommet à f*, la chute au-delà
         chart = pygame.Rect(inner.x, inner.y + 54, inner.w,
@@ -544,7 +557,7 @@ class JournalApp(DesktopApp):
         pygame.draw.rect(surf, config.COL_BG, nr, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, nr, 1, border_radius=4)
         cursor = "_" if int(self._t * 2) % 2 == 0 else ""
-        widgets.draw_text(surf, (self._note_text or "Raison / commentaire…") + cursor,
+        widgets.draw_text(surf, (self._note_text or _L("Raison / commentaire…", "Reason / comment…")) + cursor,
                           (nr.x + 8, nr.y + 8), fonts.small(),
                           config.COL_TEXT if self._note_text else config.COL_TEXT_DIM)
         ok = pygame.Rect(box.x + 12, box.bottom - 38, 80, 28)
@@ -554,4 +567,4 @@ class JournalApp(DesktopApp):
         cancel = pygame.Rect(ok.right + 10, box.bottom - 38, 80, 28)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, cancel, border_radius=4)
         pygame.draw.rect(surf, config.COL_TEXT_DIM, cancel, 1, border_radius=4)
-        widgets.draw_text(surf, "Annuler", cancel.center, fonts.small(bold=True), config.COL_TEXT_DIM, align="center")
+        widgets.draw_text(surf, _L("Annuler", "Cancel"), cancel.center, fonts.small(bold=True), config.COL_TEXT_DIM, align="center")

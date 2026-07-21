@@ -14,11 +14,17 @@ avec les deux nouvelles lentilles de `core/football_field.py`.
 import pygame
 
 from apps.base import DesktopApp
-from core import config, crashlog, ma
+from core import config, crashlog, i18n, ma
 from core import football_field as FF
 from ui import fonts, widgets
 
-TIER_LABEL = {"small": "Petite", "mid": "Moyenne", "large": "Grande"}
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
+
+TIER_LABEL = {"small": ("Petite", "Small"), "mid": ("Moyenne", "Mid"),
+              "large": ("Grande", "Large")}
 
 
 class FootballFieldApp(DesktopApp):
@@ -94,7 +100,7 @@ class FootballFieldApp(DesktopApp):
         self._ensure_computed()
         surf.fill(config.COL_BG, rect)
         pad = 14
-        widgets.draw_text(surf, "FOOTBALL FIELD — valorisation multi-méthodes",
+        widgets.draw_text(surf, _L("FOOTBALL FIELD — valorisation multi-méthodes", "FOOTBALL FIELD — multi-method valuation"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         x, y = rect.x + pad, rect.y + 32
@@ -103,7 +109,7 @@ class FootballFieldApp(DesktopApp):
         cands = self._candidates_for(p)
         owned_set = set(ma.owned_tickers(p))
         if not cands:
-            widgets.draw_text(surf, "Aucune cible disponible pour le moment.",
+            widgets.draw_text(surf, _L("Aucune cible disponible pour le moment.", "No target available at the moment."),
                               (x, y + 20), fonts.small(), config.COL_TEXT_DIM)
             return
         for tk in cands[:14]:
@@ -124,7 +130,7 @@ class FootballFieldApp(DesktopApp):
         body = pygame.Rect(rect.x + pad, y + 28, rect.w - 2 * pad,
                            rect.bottom - pad - y - 28)
         if not self._field or not self._target:
-            widgets.draw_text(surf, "Sélectionnez une cible.", (body.x, body.y + 8),
+            widgets.draw_text(surf, _L("Sélectionnez une cible.", "Select a target."), (body.x, body.y + 8),
                               fonts.small(), config.COL_TEXT_DIM)
             return
         self._draw_field(surf, body)
@@ -137,15 +143,19 @@ class FootballFieldApp(DesktopApp):
             cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
         except Exception:
             crashlog.swallowed("apps.app_footballfield")
-        head = f"{t['name']} ({t['ticker']}) — {t['sector']} · {TIER_LABEL.get(t.get('tier'), '')}"
+        head = f"{t['name']} ({t['ticker']}) — {t['sector']} · {_L(*TIER_LABEL[t['tier']]) if t.get('tier') in TIER_LABEL else ''}"
         widgets.draw_text(surf, head, (body.x, body.y), fonts.small(bold=True), config.COL_TEXT)
-        widgets.draw_text(surf, f"EBITDA {widgets.format_money(f['ebitda'], cur)} · "
+        widgets.draw_text(surf, _L(f"EBITDA {widgets.format_money(f['ebitda'], cur)} · "
                           f"dette nette {widgets.format_money(f['net_debt'], cur)}",
+                          f"EBITDA {widgets.format_money(f['ebitda'], cur)} · "
+                          f"net debt {widgets.format_money(f['net_debt'], cur)}"),
                           (body.x, body.y + 18), fonts.tiny(), config.COL_TEXT_DIM)
 
         chart = pygame.Rect(body.x, body.y + 42, body.w, body.h - 80)
-        inner = widgets.draw_panel(surf, chart, "Fourchette de valorisation "
-                                   "(fonds propres) par méthode", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, chart, _L("Fourchette de valorisation "
+                                   "(fonds propres) par méthode",
+                                   "Valuation range "
+                                   "(equity) by method"), config.COL_CYAN)
         methods = f["methods"]
         all_vals = [v for m in methods for v in (m["equity_lo"], m["equity_hi"])]
         all_vals.append(f["ask_equity"])
@@ -173,23 +183,23 @@ class FootballFieldApp(DesktopApp):
         # repère du prix demandé (ask)
         ax = px(f["ask_equity"])
         pygame.draw.line(surf, config.COL_AMBER, (ax, inner.y + 4), (ax, yy), 2)
-        widgets.draw_text(surf, f"PRIX DEMANDÉ {widgets.format_money(f['ask_equity'], cur)}",
+        widgets.draw_text(surf, _L(f"PRIX DEMANDÉ {widgets.format_money(f['ask_equity'], cur)}", f"ASK PRICE {widgets.format_money(f['ask_equity'], cur)}"),
                           (min(ax + 6, inner.right - 220), inner.y + 4),
                           fonts.tiny(bold=True), config.COL_AMBER)
 
         foot_y = chart.bottom + 10
         is_owned = t["ticker"] in ma.owned_tickers(self.app.gs.player)
-        verdict = ("dans la fourchette" if any(
-            m["equity_lo"] <= f["ask_equity"] <= m["equity_hi"] for m in methods)
-            else "hors fourchette — cher" if f["ask_equity"] > max(
-                m["equity_hi"] for m in methods)
-            else "hors fourchette — décoté")
-        widgets.draw_text(surf, f"Verdict : le prix demandé est {verdict}.",
+        in_range = any(m["equity_lo"] <= f["ask_equity"] <= m["equity_hi"] for m in methods)
+        expensive = not in_range and f["ask_equity"] > max(m["equity_hi"] for m in methods)
+        verdict = (_L("dans la fourchette", "within range") if in_range
+            else _L("hors fourchette — cher", "out of range — expensive") if expensive
+            else _L("hors fourchette — décoté", "out of range — discounted"))
+        widgets.draw_text(surf, _L(f"Verdict : le prix demandé est {verdict}.", f"Verdict: the ask price is {verdict}."),
                           (body.x, foot_y), fonts.small(bold=True),
-                          config.COL_AMBER if "hors" in verdict else config.COL_UP)
+                          config.COL_UP if in_range else config.COL_AMBER)
         self._acquire_btn = pygame.Rect(body.right - 190, foot_y - 4, 190, 26)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._acquire_btn, border_radius=4)
         pygame.draw.rect(surf, config.COL_UP, self._acquire_btn, 1, border_radius=4)
-        widgets.draw_text(surf, "GÉRER →" if is_owned else "ACQUÉRIR →",
+        widgets.draw_text(surf, _L("GÉRER →", "MANAGE →") if is_owned else _L("ACQUÉRIR →", "ACQUIRE →"),
                           self._acquire_btn.center, fonts.small(bold=True),
                           config.COL_UP, align="center")

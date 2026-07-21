@@ -9,9 +9,14 @@ actuelle) avec achat du PANIER équipondéré en un clic.
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import config, i18n
 from core import themes as T
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
 
 BUDGET_CHOICES = [50_000, 100_000, 250_000, 500_000]
 
@@ -63,10 +68,12 @@ class ThemesApp(DesktopApp):
             p = self.app.gs.player
             res = T.buy_basket(p, market, self.selected, self.budget)
             if res["ok"]:
-                self._msg = f"{len(res['bought'])} lignes achetées " \
-                            f"({res['spent']:,.0f})."
+                self._msg = _L(f"{len(res['bought'])} lignes achetées "
+                            f"({res['spent']:,.0f}).",
+                            f"{len(res['bought'])} lines bought "
+                            f"({res['spent']:,.0f}).")
             else:
-                self._msg = "Achat impossible (budget/trésorerie insuffisants)."
+                self._msg = _L("Achat impossible (budget/trésorerie insuffisants).", "Purchase not possible (insufficient budget/cash).")
             self._cache_key = None
             return True
         return False
@@ -76,7 +83,7 @@ class ThemesApp(DesktopApp):
         self._ensure()
         surf.fill(config.COL_BG, rect)
         pad = 14
-        widgets.draw_text(surf, "THÉMATIQUES — investir par tendance",
+        widgets.draw_text(surf, _L("THÉMATIQUES — investir par tendance", "THEMES — invest by trend"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         col_w = int((rect.w - 3 * pad) * 0.46)
@@ -87,7 +94,7 @@ class ThemesApp(DesktopApp):
         self._draw_detail(surf, right)
 
     def _draw_ranking(self, surf, body):
-        inner = widgets.draw_panel(surf, body, "Rotation des thèmes (chaud → froid)",
+        inner = widgets.draw_panel(surf, body, _L("Rotation des thèmes (chaud → froid)", "Theme rotation (hot → cold)"),
                                    config.COL_CYAN)
         self._theme_rects = {}
         yy = inner.y
@@ -107,7 +114,7 @@ class ThemesApp(DesktopApp):
             col = config.COL_UP if rel >= 0 else config.COL_DOWN
             widgets.draw_text(surf, r["label"], (row.x + 8, row.y + 3),
                               fonts.small(bold=sel), config.COL_TEXT)
-            widgets.draw_text(surf, f"{rel * 100:+.1f}% vs marché",
+            widgets.draw_text(surf, _L(f"{rel * 100:+.1f}% vs marché", f"{rel * 100:+.1f}% vs market"),
                               (row.x + 8, row.y + 21), fonts.tiny(), col)
             # barre de force relative (centrée)
             bar_cx = row.right - 90
@@ -131,15 +138,17 @@ class ThemesApp(DesktopApp):
         y += 34
         s = T.theme_strength(market, self.selected)
         scol = config.COL_UP if s["relative"] >= 0 else config.COL_DOWN
-        widgets.draw_text(surf, f"Momentum panier : {s['basket_return'] * 100:+.1f}% "
+        widgets.draw_text(surf, _L(f"Momentum panier : {s['basket_return'] * 100:+.1f}% "
                           f"(marché {s['market_return'] * 100:+.1f}%)",
+                          f"Basket momentum: {s['basket_return'] * 100:+.1f}% "
+                          f"(market {s['market_return'] * 100:+.1f}%)"),
                           (inner.x, y), fonts.small(bold=True), scol)
         y += 24
         exposure = T.basket_exposure(p, market, self.selected)
-        widgets.draw_text(surf, f"Votre exposition au thème : {widgets.format_money(exposure, cur)}",
+        widgets.draw_text(surf, _L(f"Votre exposition au thème : {widgets.format_money(exposure, cur)}", f"Your exposure to the theme: {widgets.format_money(exposure, cur)}"),
                           (inner.x, y), fonts.tiny(), config.COL_TEXT)
         y += 22
-        widgets.draw_text(surf, "Constituants du panier :", (inner.x, y),
+        widgets.draw_text(surf, _L("Constituants du panier :", "Basket constituents:"), (inner.x, y),
                           fonts.tiny(bold=True), config.COL_TEXT_DIM)
         y += 18
         for tk in T.constituents(market, self.selected):
@@ -159,7 +168,7 @@ class ThemesApp(DesktopApp):
             y += 16
         # barre d'achat
         by = inner.bottom - 60
-        widgets.draw_text(surf, "Budget du panier :", (inner.x, by), fonts.tiny(bold=True),
+        widgets.draw_text(surf, _L("Budget du panier :", "Basket budget:"), (inner.x, by), fonts.tiny(bold=True),
                           config.COL_TEXT_DIM)
         x = inner.x + 120
         self._budget_rects = {}
@@ -179,7 +188,7 @@ class ThemesApp(DesktopApp):
         self._buy_btn = pygame.Rect(inner.x, by + 26, 180, 24)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._buy_btn, border_radius=4)
         pygame.draw.rect(surf, config.COL_UP, self._buy_btn, 1, border_radius=4)
-        widgets.draw_text(surf, "ACHETER LE PANIER", self._buy_btn.center,
+        widgets.draw_text(surf, _L("ACHETER LE PANIER", "BUY THE BASKET"), self._buy_btn.center,
                           fonts.small(bold=True), config.COL_UP, align="center")
         if self._msg:
             widgets.draw_text(surf, widgets.fit_text(self._msg, fonts.tiny(), inner.w - 200),

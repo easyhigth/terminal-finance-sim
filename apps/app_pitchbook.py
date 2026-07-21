@@ -12,10 +12,15 @@ banquier-conseil.
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import config, i18n
 from core import mandates as M
 from core import pitch_book as PB
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
 
 AMBITION_STEP = 0.1
 
@@ -67,12 +72,14 @@ class PitchBookApp(DesktopApp):
         surf.fill(config.COL_BG, rect)
         pad = 14
         p = self.app.gs.player
-        widgets.draw_text(surf, "PITCH BOOK — démarchage actif de mandats",
+        widgets.draw_text(surf, _L("PITCH BOOK — démarchage actif de mandats", "PITCH BOOK — active mandate prospecting"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         if p.grade_index < M.MIN_GRADE:
-            widgets.draw_text(surf, f"Réservé aux grades {config.GRADES[M.MIN_GRADE]} "
-                              "et au-delà.", (rect.x + pad, rect.y + 40),
+            widgets.draw_text(surf, _L(f"Réservé aux grades {config.GRADES[M.MIN_GRADE]} "
+                              "et au-delà.",
+                              f"Reserved for grades {config.GRADES[M.MIN_GRADE]} "
+                              "and above."), (rect.x + pad, rect.y + 40),
                               fonts.small(), config.COL_TEXT_DIM)
             return
 
@@ -83,7 +90,7 @@ class PitchBookApp(DesktopApp):
         self._draw_pitch_panel(surf, right, p)
 
     def _draw_profiles(self, surf, body, p):
-        inner = widgets.draw_panel(surf, body, "Profils clients", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, body, _L("Profils clients", "Client profiles"), config.COL_CYAN)
         self._chip_rects = {}
         y = inner.y
         for prof in M.CLIENT_PROFILES:
@@ -101,11 +108,11 @@ class PitchBookApp(DesktopApp):
             widgets.draw_text(surf, label, (row.x + 8, row.y + 6),
                               fonts.small(bold=True), col)
             if not allowed:
-                widgets.draw_text(surf, f"indisponible jusqu'au trimestre {until}",
+                widgets.draw_text(surf, _L(f"indisponible jusqu'au trimestre {until}", f"unavailable until quarter {until}"),
                                   (row.x + 8, row.y + 24), fonts.tiny(), config.COL_DOWN)
             else:
                 fit = PB.fit_score(p, key)
-                widgets.draw_text(surf, f"affinité {fit * 100:.0f}%",
+                widgets.draw_text(surf, _L(f"affinité {fit * 100:.0f}%", f"affinity {fit * 100:.0f}%"),
                                   (row.x + 8, row.y + 24), fonts.tiny(), config.COL_TEXT_DIM)
             desc = widgets.fit_text(M.profile_desc(key), fonts.tiny(), row.w - 16)
             widgets.draw_text(surf, desc, (row.x + 8, row.y + 40), fonts.tiny(),
@@ -115,17 +122,16 @@ class PitchBookApp(DesktopApp):
                 break
 
     def _draw_pitch_panel(self, surf, body, p):
-        inner = widgets.draw_panel(surf, body, "Préparer le pitch", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, body, _L("Préparer le pitch", "Prepare the pitch"), config.COL_AMBER)
         self._adj_rects = {}
         y = inner.y
-        widgets.draw_text(surf, f"Client : {M.profile_label(self.profile_key)}",
+        widgets.draw_text(surf, _L(f"Client : {M.profile_label(self.profile_key)}", f"Client: {M.profile_label(self.profile_key)}"),
                           (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
         y += 24
-        widgets.draw_text(surf, f"Ambition : {self.ambition:.1f}× "
-                          "(capital et objectif visés)", (inner.x, y),
+        _amb_lbl = _L(f"Ambition : {self.ambition:.1f}× (capital et objectif visés)", f"Ambition: {self.ambition:.1f}× (targeted capital and objective)")
+        widgets.draw_text(surf, _amb_lbl, (inner.x, y),
                           fonts.tiny(bold=True), config.COL_CYAN)
-        bx = inner.x + fonts.tiny(bold=True).size(
-            f"Ambition : {self.ambition:.1f}× (capital et objectif visés)")[0] + 8
+        bx = inner.x + fonts.tiny(bold=True).size(_amb_lbl)[0] + 8
         r1 = pygame.Rect(bx, y - 2, 18, 18)
         self._adj_rects["amb-"] = r1
         pygame.draw.rect(surf, config.COL_PANEL, r1, border_radius=3)
@@ -143,7 +149,7 @@ class PitchBookApp(DesktopApp):
         allowed, until = PB.can_pitch(p, self.profile_key)
         pcol = config.COL_UP if prob >= 0.5 else (
             config.COL_AMBER if prob >= 0.3 else config.COL_DOWN)
-        widgets.draw_text(surf, "Probabilité de succès estimée",
+        widgets.draw_text(surf, _L("Probabilité de succès estimée", "Estimated success probability"),
                           (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
         y += 20
         widgets.draw_text(surf, f"{prob * 100:.0f}%",
@@ -156,30 +162,32 @@ class PitchBookApp(DesktopApp):
                          self._pitch_btn, border_radius=4)
         pygame.draw.rect(surf, config.COL_UP if active else config.COL_BORDER,
                          self._pitch_btn, 1, border_radius=4)
-        widgets.draw_text(surf, "PITCHER", self._pitch_btn.center,
+        widgets.draw_text(surf, _L("PITCHER", "PITCH"), self._pitch_btn.center,
                           fonts.small(bold=True),
                           config.COL_UP if active else config.COL_TEXT_DIM, align="center")
         if not can_afford_slot:
-            widgets.draw_text(surf, "Trop de mandats/offres en cours.",
+            widgets.draw_text(surf, _L("Trop de mandats/offres en cours.", "Too many active mandates/offers."),
                               (self._pitch_btn.right + 10, y + 6), fonts.tiny(),
                               config.COL_DOWN)
         y += 40
-        widgets.draw_text(surf, "Journal des pitchs", (inner.x, y),
+        widgets.draw_text(surf, _L("Journal des pitchs", "Pitch log"), (inner.x, y),
                           fonts.small(bold=True), config.COL_TEXT)
         y += 20
         for res in self._log:
             if y > inner.bottom - 16:
                 break
             if not res.get("ok"):
-                txt = f"— {res.get('reason', 'échec')}"
+                txt = _L(f"— {res.get('reason', 'échec')}", f"— {res.get('reason', 'failure')}")
                 col = config.COL_TEXT_DIM
             elif res.get("won"):
                 offer = res.get("offer") or {}
-                txt = (f"GAGNÉ — {offer.get('client', '?')} "
+                txt = _L(f"GAGNÉ — {offer.get('client', '?')} "
+                       f"({offer.get('capital', 0):,.0f}, {offer.get('target_pct', 0):+.1f}%)",
+                       f"WON — {offer.get('client', '?')} "
                        f"({offer.get('capital', 0):,.0f}, {offer.get('target_pct', 0):+.1f}%)")
                 col = config.COL_UP
             else:
-                txt = f"PERDU — {res.get('reason', '')} ({res['probability'] * 100:.0f}% de chance)"
+                txt = _L(f"PERDU — {res.get('reason', '')} ({res['probability'] * 100:.0f}% de chance)", f"LOST — {res.get('reason', '')} ({res['probability'] * 100:.0f}% chance)")
                 col = config.COL_DOWN
             widgets.draw_text(surf, widgets.fit_text(txt, fonts.tiny(), inner.w),
                               (inner.x, y), fonts.tiny(), col)

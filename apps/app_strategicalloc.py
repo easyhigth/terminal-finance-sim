@@ -14,9 +14,13 @@ import math
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import config, i18n
 from core import strategic_allocation as SA
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
 
 BUCKET_COLOR = {
     "cash": (120, 130, 140), "equity": config.COL_UP, "bonds": config.COL_CYAN,
@@ -87,8 +91,8 @@ class StrategicAllocApp(DesktopApp):
         plan = SA.rebalance_plan(p, market, self._targets())
         results = SA.apply_plan(p, market, plan)
         ok = sum(1 for r in results if r.get("ok"))
-        self._msg = f"{ok}/{len(results)} ordre(s) exécuté(s)." if results else \
-            "Rien à rééquilibrer côté actions."
+        self._msg = _L(f"{ok}/{len(results)} ordre(s) exécuté(s).", f"{ok}/{len(results)} order(s) executed.") if results else \
+            _L("Rien à rééquilibrer côté actions.", "Nothing to rebalance on the equity side.")
         self._cache_key = None
 
     # ---------------------------------------------------------------- draw
@@ -96,7 +100,7 @@ class StrategicAllocApp(DesktopApp):
         self._ensure_computed()
         surf.fill(config.COL_BG, rect)
         pad = 14
-        widgets.draw_text(surf, "ALLOCATION STRATÉGIQUE — multi-actifs",
+        widgets.draw_text(surf, _L("ALLOCATION STRATÉGIQUE — multi-actifs", "STRATEGIC ALLOCATION — multi-asset"),
                           (rect.x + pad, rect.y + 8), fonts.head(bold=True),
                           config.COL_AMBER)
         col_w = (rect.w - 3 * pad) // 2
@@ -106,10 +110,10 @@ class StrategicAllocApp(DesktopApp):
         self._draw_targets(surf, right)
 
     def _draw_donut(self, surf, body):
-        inner = widgets.draw_panel(surf, body, "Répartition actuelle", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, body, _L("Répartition actuelle", "Current allocation"), config.COL_CYAN)
         alloc = self._alloc
         if not alloc or alloc["total"] <= 0:
-            widgets.draw_text(surf, "Patrimoine nul.", (inner.x, inner.y + 8),
+            widgets.draw_text(surf, _L("Patrimoine nul.", "Zero net worth."), (inner.x, inner.y + 8),
                               fonts.small(), config.COL_TEXT_DIM)
             return
         cx, cy, radius = inner.x + 110, inner.y + 120, 90
@@ -141,8 +145,10 @@ class StrategicAllocApp(DesktopApp):
             pct = alloc["pct"].get(b, 0.0) * 100
             dv = d.get(b, 0.0) * 100
             flag = " ⚠" if abs(d.get(b, 0.0)) > SA.DRIFT_BAND else ""
-            txt = (f"{SA.BUCKET_LABEL[b]} {pct:.0f}% "
-                   f"(cible {targets.get(b, 0) * 100:.0f}%, {dv:+.0f}pp){flag}")
+            txt = _L(f"{SA.BUCKET_LABEL[b]} {pct:.0f}% "
+                   f"(cible {targets.get(b, 0) * 100:.0f}%, {dv:+.0f}pp){flag}",
+                   f"{SA.BUCKET_LABEL[b]} {pct:.0f}% "
+                   f"(target {targets.get(b, 0) * 100:.0f}%, {dv:+.0f}pp){flag}")
             widgets.draw_text(surf, widgets.fit_text(txt, fonts.tiny(), inner.right - lx - 16),
                               (lx + 16, ly), fonts.tiny(bold=bool(flag)),
                               config.COL_AMBER if flag else config.COL_TEXT)
@@ -152,11 +158,11 @@ class StrategicAllocApp(DesktopApp):
                               fonts.tiny(), config.COL_UP)
 
     def _draw_targets(self, surf, body):
-        inner = widgets.draw_panel(surf, body, "Cible d'allocation", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, body, _L("Cible d'allocation", "Allocation target"), config.COL_AMBER)
         self._profile_rects = {}
         x, y = inner.x, inner.y
         for key in list(SA.PROFILES) + ["custom"]:
-            label = SA.PROFILES[key]["label"] if key != "custom" else "Personnalisé"
+            label = SA.PROFILES[key]["label"] if key != "custom" else _L("Personnalisé", "Custom")
             w = fonts.tiny(bold=True).size(label)[0] + 16
             if x + w > inner.right:
                 x = inner.x
@@ -175,7 +181,7 @@ class StrategicAllocApp(DesktopApp):
         self._adj_rects = {}
         targets = self._targets()
         for b in SA.BUCKETS:
-            widgets.draw_text(surf, f"{SA.BUCKET_LABEL[b]} : {targets.get(b, 0) * 100:.0f}%",
+            widgets.draw_text(surf, _L(f"{SA.BUCKET_LABEL[b]} : {targets.get(b, 0) * 100:.0f}%", f"{SA.BUCKET_LABEL[b]}: {targets.get(b, 0) * 100:.0f}%"),
                               (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
             if self.profile_key == "custom":
                 bx = inner.x + 200
@@ -194,26 +200,29 @@ class StrategicAllocApp(DesktopApp):
             y += 26
         tsum = sum(targets.values())
         if abs(tsum - 1.0) > 0.02:
-            widgets.draw_text(surf, f"Somme des cibles : {tsum * 100:.0f}% "
-                              "(idéalement 100%)", (inner.x, y), fonts.tiny(),
+            widgets.draw_text(surf, _L(f"Somme des cibles : {tsum * 100:.0f}% "
+                              "(idéalement 100%)",
+                              f"Sum of targets: {tsum * 100:.0f}% "
+                              "(ideally 100%)"), (inner.x, y), fonts.tiny(),
                               config.COL_DOWN)
             y += 18
         y += 8
         plan = self._plan or {"trades": [], "notes": []}
-        widgets.draw_text(surf, f"{len(plan['trades'])} ordre(s) action(s) prêt(s)",
+        widgets.draw_text(surf, _L(f"{len(plan['trades'])} ordre(s) action(s) prêt(s)", f"{len(plan['trades'])} equity order(s) ready"),
                           (inner.x, y), fonts.small(bold=True), config.COL_TEXT)
         y += 20
         for note in plan.get("notes", [])[:5]:
             widgets.draw_text(surf, widgets.fit_text(note, fonts.tiny(), inner.w),
                               (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
             y += 15
-        btn_w = fonts.small(bold=True).size("RÉÉQUILIBRER (actions)")[0] + 20
+        _rebal_lbl = _L("RÉÉQUILIBRER (actions)", "REBALANCE (equities)")
+        btn_w = fonts.small(bold=True).size(_rebal_lbl)[0] + 20
         self._rebal_btn = pygame.Rect(inner.x, inner.bottom - 32, btn_w, 26)
         active = bool(plan.get("trades"))
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if active else config.COL_PANEL,
                          self._rebal_btn, border_radius=4)
         pygame.draw.rect(surf, config.COL_UP if active else config.COL_BORDER,
                          self._rebal_btn, 1, border_radius=4)
-        widgets.draw_text(surf, "RÉÉQUILIBRER (actions)", self._rebal_btn.center,
+        widgets.draw_text(surf, _rebal_lbl, self._rebal_btn.center,
                           fonts.small(bold=True),
                           config.COL_UP if active else config.COL_TEXT_DIM, align="center")

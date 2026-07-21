@@ -79,7 +79,8 @@ class MenuScene(Scene):
     def _anim_label(self):
         if get_lang() == "en":
             return "ANIM: REDUCED" if anim_settings.reduce_motion() else "ANIM: NORMAL"
-        return "ANIM : RÉDUITE" if anim_settings.reduce_motion() else "ANIM : NORMALE"
+        return (_L("ANIM : RÉDUITE", "ANIM: REDUCED") if anim_settings.reduce_motion()
+                else _L("ANIM : NORMALE", "ANIM: NORMAL"))
 
     def _continue(self):
         gs = GameState.load(config.AUTOSAVE_SLOT)

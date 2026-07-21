@@ -8,14 +8,22 @@ commande TRADES/TJOURNAL du terminal ou depuis le hub PLUS.
 """
 import pygame
 
-from core import config
+from core import config, i18n
 from core import journal as J
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
 
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
+
+_SIDE_EN = {"achat": "buy", "vente": "sell", "short": "short", "couverture": "hedge"}
+
 ROW_H = 24
-SORT_FIELDS = [("day", "JOUR"), ("asset_class", "CLASSE"), ("side", "SENS"),
-                ("notional", "TAILLE"), ("realized", "P&L")]
+SORT_FIELDS = [("day", ("JOUR", "DAY")), ("asset_class", ("CLASSE", "CLASS")),
+               ("side", ("SENS", "SIDE")), ("notional", ("TAILLE", "SIZE")),
+               ("realized", ("P&L", "P&L"))]
 ASSET_CHIPS = [None, "Action", "ETF", "Obligation", "Commodity", "Crypto"]
 SIDE_CHIPS = [None, "achat", "vente", "short", "couverture"]
 
@@ -200,9 +208,9 @@ class TradeJournalScene(Scene):
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "JOURNAL DE TRADING", (40, 22),
+        widgets.draw_text(surf, _L("JOURNAL DE TRADING", "TRADING JOURNAL"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Filtrez, triez et reprenez vos trades passés. Cliquez ✎ pour annoter, ↻ pour répliquer.",
+        widgets.draw_text(surf, _L("Filtrez, triez et reprenez vos trades passés. Cliquez ✎ pour annoter, ↻ pour répliquer.", "Filter, sort and revisit your past trades. Click ✎ to annotate, ↻ to replicate."),
                           (42, 72), fonts.tiny(), config.COL_TEXT_DIM)
 
         p = self.player
@@ -215,7 +223,7 @@ class TradeJournalScene(Scene):
         stats = J.performance_stats(p, group_by="regime")
         disc = J.discipline_score(p)
         y_stat = top
-        widgets.draw_text(surf, "DISCIPLINE :", (x0, y_stat), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("DISCIPLINE :", "DISCIPLINE:"), (x0, y_stat), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         if disc is not None:
             widgets.draw_text(surf, f"{disc['score']:.0f}/100",
                               (x0 + 80, y_stat), fonts.small(bold=True), config.COL_AMBER)
@@ -224,7 +232,7 @@ class TradeJournalScene(Scene):
         wins = sum(g["wins"] for g in stats)
         win_rate = (wins / total_trades * 100) if total_trades else 0.0
         sx = x0 + 180
-        widgets.draw_text(surf, f"Trades clôturés : {total_trades}  ·  Win rate : {win_rate:.0f}%  ·  P&L total :",
+        widgets.draw_text(surf, _L(f"Trades clôturés : {total_trades}  ·  Win rate : {win_rate:.0f}%  ·  P&L total :", f"Closed trades: {total_trades}  ·  Win rate: {win_rate:.0f}%  ·  Total P&L:"),
                           (sx, y_stat), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         pnl_col = config.COL_UP if total_pnl >= 0 else config.COL_DOWN
         widgets.draw_text(surf, f"{total_pnl:+,.0f} {cur}",
@@ -234,10 +242,10 @@ class TradeJournalScene(Scene):
         fy = top + 26
         fx = x0
         self._asset_rects = {}
-        widgets.draw_text(surf, "CLASSE :", (fx, fy + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("CLASSE :", "CLASS:"), (fx, fy + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         fx += 60
         for kind in ASSET_CHIPS:
-            label = "TOUTES" if kind is None else kind
+            label = _L("TOUTES", "ALL") if kind is None else i18n.asset_class_label(kind)
             w = max(50, fonts.tiny(bold=True).size(label)[0] + 12)
             r = pygame.Rect(fx, fy, w, 20)
             self._asset_rects[kind] = r
@@ -250,10 +258,10 @@ class TradeJournalScene(Scene):
 
         fx = x0 + 500
         self._side_rects = {}
-        widgets.draw_text(surf, "SENS :", (fx, fy + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("SENS :", "SIDE:"), (fx, fy + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         fx += 50
         for side in SIDE_CHIPS:
-            label = "TOUS" if side is None else side.upper()
+            label = _L("TOUS", "ALL") if side is None else (_SIDE_EN[side].upper() if i18n.get_lang() == "en" else side.upper())
             w = max(50, fonts.tiny(bold=True).size(label)[0] + 12)
             r = pygame.Rect(fx, fy, w, 20)
             self._side_rects[side] = r
@@ -270,7 +278,7 @@ class TradeJournalScene(Scene):
         pygame.draw.rect(surf, config.COL_PANEL, sr, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, sr, 1, border_radius=4)
         cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        lbl = (self.search + cursor) if self.search else (cursor + "Rechercher (ticker, raison, commentaire…)")
+        lbl = (self.search + cursor) if self.search else (cursor + _L("Rechercher (ticker, raison, commentaire…)", "Search (ticker, reason, comment…)"))
         widgets.draw_text(surf, widgets.fit_text(lbl, fonts.small(), sr.w - 16),
                           (sr.x + 8, sr.y + 4), fonts.small(),
                           config.COL_TEXT if self.search else config.COL_TEXT_DIM)
@@ -283,9 +291,10 @@ class TradeJournalScene(Scene):
         # ---- tri ----
         tx = sr.right + 30
         self._sort_rects = {}
-        widgets.draw_text(surf, "TRIER :", (tx, sry + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("TRIER :", "SORT:"), (tx, sry + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         tx += 56
-        for key, label in SORT_FIELDS:
+        for key, lblpair in SORT_FIELDS:
+            label = _L(*lblpair)
             active = self.sort_key == key
             arrow = (" ▲" if self.sort_dir > 0 else " ▼") if active else ""
             full = label + arrow
@@ -302,22 +311,22 @@ class TradeJournalScene(Scene):
         ltop = sry + 34
         ph = config.footer_y() - 8 - ltop
         panel = pygame.Rect(x0, ltop, config.SCREEN_WIDTH - 80, ph)
-        inner = widgets.draw_panel(surf, panel, "Trades", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Trades", "Trades"), config.COL_CYAN)
         self._rows = self._filtered_sorted()
         self.row_cursor = min(self.row_cursor, len(self._rows) - 1) if self._rows else 0
 
         # en-têtes
         cols = [
             ("ID", inner.x, 50),
-            ("JOUR", inner.x + 50, 50),
-            ("ACTIF", inner.x + 100, 70),
-            ("CLASSE", inner.x + 170, 80),
-            ("SENS", inner.x + 250, 60),
-            ("QTÉ", inner.x + 310, 60),
-            ("PRIX", inner.x + 370, 80),
+            (_L("JOUR", "DAY"), inner.x + 50, 50),
+            (_L("ACTIF", "ASSET"), inner.x + 100, 70),
+            (_L("CLASSE", "CLASS"), inner.x + 170, 80),
+            (_L("SENS", "SIDE"), inner.x + 250, 60),
+            (_L("QTÉ", "QTY"), inner.x + 310, 60),
+            (_L("PRIX", "PRICE"), inner.x + 370, 80),
             ("P&L", inner.x + 450, 90),
-            ("RÉGIME", inner.x + 540, 100),
-            ("NOTE", inner.x + 640, inner.w - 640 - 120),
+            (_L("RÉGIME", "REGIME"), inner.x + 540, 100),
+            (_L("NOTE", "NOTE"), inner.x + 640, inner.w - 640 - 120),
         ]
         for label, cx, _ in cols:
             widgets.draw_text(surf, label, (cx, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
@@ -353,7 +362,7 @@ class TradeJournalScene(Scene):
         widgets.draw_text(surf, f"j{e['day']}", (inner.x + 50, y), fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, widgets.fit_text(e['key'], fonts.small(bold=True), 68),
                           (inner.x + 100, y), fonts.small(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, widgets.fit_text(e['asset_class'], fonts.tiny(), 78),
+        widgets.draw_text(surf, widgets.fit_text(i18n.asset_class_label(e['asset_class']), fonts.tiny(), 78),
                           (inner.x + 170, y + 2), fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, e['side'].upper(), (inner.x + 250, y), fonts.tiny(),
                           config.COL_UP if e['side'] == 'achat' else config.COL_DOWN)

@@ -81,10 +81,10 @@ def _saved_ago_label(gs):
         return ""
     age = time.time() - last_saved
     if age < 5:
-        return "· Sauvegardé à l'instant"
+        return _L("· Sauvegardé à l'instant", "· Saved just now")
     if age < 60:
-        return f"· Sauvegardé il y a {int(age)}s"
-    return f"· Sauvegardé il y a {int(age // 60)}min"
+        return _L(f"· Sauvegardé il y a {int(age)}s", f"· Saved {int(age)}s ago")
+    return _L(f"· Sauvegardé il y a {int(age // 60)}min", f"· Saved {int(age // 60)}min ago")
 
 
 class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, DesktopIconsMixin,

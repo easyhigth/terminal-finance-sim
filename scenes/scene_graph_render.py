@@ -10,8 +10,13 @@ chrome).
 import pygame
 
 from core import charts, config, indicators
+from core.i18n import get_lang
 from scenes.scene_graph_common import SERIES_COLS, x_label_positions
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 
 class GraphRenderMixin:
@@ -57,7 +62,9 @@ class GraphRenderMixin:
                                          y_fmt=y_fmt, color=color)
             widgets.draw_chart_extrema(surf, rect, series, lo, span, y_fmt=y_fmt)
 
-    def _empty(self, surf, rect, msg="Aucune donnée. Saisissez un ticker."):
+    def _empty(self, surf, rect, msg=None):
+        if msg is None:
+            msg = _L("Aucune donnée. Saisissez un ticker.", "No data. Enter a ticker.")
         widgets.draw_text(surf, msg, (rect.x, rect.y), fonts.small(), config.COL_TEXT_DIM)
 
     def _draw_event_markers(self, surf, rect, series, lo, span, pps=None):
@@ -117,7 +124,7 @@ class GraphRenderMixin:
             return self._empty(surf, rect)
         s = self._series(self.tickers[0])
         if len(s) < 2:
-            return self._empty(surf, rect, "Historique indisponible.")
+            return self._empty(surf, rect, _L("Historique indisponible.", "History unavailable."))
         ma20, ma50 = charts.sma(s, 20), charts.sma(s, 50)
         # indicateurs techniques optionnels (overlay, lecture seule) : élargissent
         # les bornes Y si besoin (bandes de Bollinger peuvent dépasser le prix).
@@ -135,7 +142,7 @@ class GraphRenderMixin:
                                        right_labels=True, pad_pct=0.015)
         self._x_labels(surf, rect, len(s))
         line_col = config.COL_CYAN
-        legend = [("Cours", line_col),
+        legend = [(_L("Cours", "Price"), line_col),
                   ("MM20", config.COL_WHITE), ("MM50", config.COL_TEXT_DIM)]
         if boll:
             lower, mid, upper = boll
@@ -210,7 +217,7 @@ class GraphRenderMixin:
             return self._empty(surf, rect)
         s, pps = self._series_for_ohlc(self.tickers[0])
         if len(s) < 2:
-            return self._empty(surf, rect, "Historique indisponible.")
+            return self._empty(surf, rect, _L("Historique indisponible.", "History unavailable."))
         lo, hi = min(s), max(s)
         y_fmt = self._ohlc_y_fmt(lo, hi)
         self._plot_axes(surf, rect, lo, hi, y_fmt,
@@ -276,7 +283,7 @@ class GraphRenderMixin:
             return self._empty(surf, rect)
         s, pps = self._series_for_ohlc(self.tickers[0])
         if len(s) < 2:
-            return self._empty(surf, rect, "Historique indisponible.")
+            return self._empty(surf, rect, _L("Historique indisponible.", "History unavailable."))
         n_bars = self._ohlc_n_buckets(s, default_intraday=30,
                                        default_step=min(70, len(s)))
         candles = widgets._aggregate_ohlc(s, n_bars)
@@ -301,7 +308,7 @@ class GraphRenderMixin:
             return self._empty(surf, rect)
         s = self._series(self.tickers[0])
         if len(s) < 2:
-            return self._empty(surf, rect, "Historique indisponible.")
+            return self._empty(surf, rect, _L("Historique indisponible.", "History unavailable."))
         pct = charts.normalize(s)
         lo, hi = min(pct), max(pct)
         lo, hi, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:+.0f}%")
@@ -316,7 +323,7 @@ class GraphRenderMixin:
         series = [(tk, charts.normalize(self._series(tk))) for tk in self.tickers]
         series = [(tk, s) for tk, s in series if len(s) >= 2]
         if not series:
-            return self._empty(surf, rect, "Ajoutez des tickers (Entrée).")
+            return self._empty(surf, rect, _L("Ajoutez des tickers (Entrée).", "Add tickers (Enter)."))
         allv = [v for _, s in series for v in s]
         lo, hi = min(allv), max(allv)
         lo, hi, span = self._plot_axes(surf, rect, lo, hi, lambda v: f"{v:+.0f}%")
@@ -331,11 +338,11 @@ class GraphRenderMixin:
 
     def _draw_spread(self, surf, rect):
         if len(self.tickers) < 2:
-            return self._empty(surf, rect, "Saisissez deux tickers (Entrée).")
+            return self._empty(surf, rect, _L("Saisissez deux tickers (Entrée).", "Enter two tickers (Enter)."))
         a, b = self._series(self.tickers[0]), self._series(self.tickers[1])
         sp = charts.spread(a, b, self.spread_mode)
         if len(sp) < 2:
-            return self._empty(surf, rect, "Historique indisponible.")
+            return self._empty(surf, rect, _L("Historique indisponible.", "History unavailable."))
         lo, hi = min(sp), max(sp)
         fmt = (lambda v: f"{v:.2f}") if self.spread_mode == "ratio" else (lambda v: f"{v:.0f}")
         lo, hi, span = self._plot_axes(surf, rect, lo, hi, fmt)
@@ -359,7 +366,7 @@ class GraphRenderMixin:
         self._x_labels(surf, rect, len(vol))
         self._polyline(surf, rect, vol, lo, span, config.COL_WARN, y_fmt=lambda v: f"{v:.1f}%",
                        cursor=self._cursor)
-        self._legend(surf, rect, [(f"Vol. annualisée (20 pas) = {vol[-1]:.1f}%", config.COL_WARN)])
+        self._legend(surf, rect, [(_L(f"Vol. annualisée (20 pas) = {vol[-1]:.1f}%", f"Annualized vol (20 steps) = {vol[-1]:.1f}%"), config.COL_WARN)])
 
     def _draw_beta(self, surf, rect):
         if not self.tickers:
@@ -376,7 +383,7 @@ class GraphRenderMixin:
         ry, rx = charts.simple_returns(s), charts.simple_returns(ridx)
         n = min(len(ry), len(rx))
         if n < 5:
-            return self._empty(surf, rect, "Historique insuffisant pour le bêta.")
+            return self._empty(surf, rect, _L("Historique insuffisant pour le bêta.", "Insufficient history for beta."))
         ry, rx = ry[-n:], rx[-n:]
         beta, alpha, r2 = charts.ols_beta(ry, rx)
         xr = max(abs(min(rx)), abs(max(rx))) or 0.01
@@ -410,7 +417,7 @@ class GraphRenderMixin:
             tickers = list(p.portfolio.keys()) or list(p.watchlist) or self.tickers
             tickers = tickers[:8]
         if len(tickers) < 2:
-            return self._empty(surf, rect, "Saisissez ≥ 2 tickers (Entrée).")
+            return self._empty(surf, rect, _L("Saisissez ≥ 2 tickers (Entrée).", "Enter ≥ 2 tickers (Enter)."))
         smap = {tk: self._series(tk) for tk in tickers}
         labels, corr = charts.correlation_matrix(smap)
         nlab = len(labels)

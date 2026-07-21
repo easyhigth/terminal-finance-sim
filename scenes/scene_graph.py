@@ -25,6 +25,7 @@ from core import commodities as CMD
 from core import config, intraday
 from core import crypto as CRY
 from core import etfs as ETF
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from scenes.scene_graph_common import (
     _INTRADAY_KINDS,
@@ -42,6 +43,10 @@ from scenes.scene_graph_common import (
 from scenes.scene_graph_render import GraphRenderMixin
 from ui import fonts, widgets
 from ui.popups import ChartPopup, PopupMixin
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 
 class GraphScene(GraphRenderMixin, Scene, PopupMixin):
@@ -252,7 +257,7 @@ class GraphScene(GraphRenderMixin, Scene, PopupMixin):
             if not tk and ETF.exists(q.upper()):   # un ticker d'ETF est aussi graphable
                 tk = q.upper()
         if not tk:
-            self.app.notify(f"Aucun résultat : {q}", "bad")
+            self.app.notify(_L(f"Aucun résultat : {q}", f"No result: {q}"), "bad")
             return
         if self.kind in _MULTI:
             if tk not in self.tickers:
@@ -283,14 +288,14 @@ class GraphScene(GraphRenderMixin, Scene, PopupMixin):
                 return None
             return {"type": "Action", "region": mt["region"], "sector": mt["sector"],
                     "values": [("Cours", f"{mt['price']:,.2f}"), ("Var.", f"{mt['change_pct']:+.2f}%"),
-                               ("Bêta", f"{mt['beta']:.2f}")]}
+                               (_L("Bêta", "Beta"), f"{mt['beta']:.2f}")]}
         if kind == "etf":
             q = ETF.quote(self.market, tk)
             if not q:
                 return None
             return {"type": "ETF", "region": None, "sector": q["category_label"],
                     "values": [("VL", f"{q['price']:,.2f}"), ("Var.", f"{q['change_pct']:+.2f}%"),
-                               ("Bêta monde", f"{q['beta']:+.2f}")]}
+                               (_L("Bêta monde", "World beta"), f"{q['beta']:+.2f}")]}
         if kind == "bond":
             q = BND.quote(self.market, tk)
             if not q:
@@ -405,13 +410,13 @@ class GraphScene(GraphRenderMixin, Scene, PopupMixin):
             self.back_btn.draw(surf)
             return
         code = next((c for c, _, k, _ in TYPES if k == self.kind), "GP")
-        label = next((l for c, l, k, _ in TYPES if k == self.kind), "")
+        label = next((_L(*l) for c, l, k, _ in TYPES if k == self.kind), "")
         widgets.draw_text(surf, f"GRAPHE — {code}  {label}", (40, 18),
                           fonts.title(bold=True), config.COL_AMBER)
         # sous-titre : actifs + période
         per = next((p for p, s in PERIODS if s == self.period), "5A")
         assets = "—" if self.kind in _NO_ASSET else " · ".join(self.tickers) or "—"
-        widgets.draw_text(surf, f"{assets}    ·    période {per}", (42, 62),
+        widgets.draw_text(surf, _L(f"{assets}    ·    période {per}", f"{assets}    ·    period {per}"), (42, 62),
                           fonts.small(), config.COL_TEXT_DIM)
 
         self._draw_info_bar(surf)
@@ -436,7 +441,7 @@ class GraphScene(GraphRenderMixin, Scene, PopupMixin):
             self._draw_rsi_panel(surf, rsi_canvas.inflate(-24, -16))
 
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("PAGE PRÉC/SUIV", "défiler"), ("ESC", "retour")])
+                              [(_L("PAGE PRÉC/SUIV", "PAGE UP/DOWN"), _L("défiler", "scroll")), ("ESC", _L("retour", "back"))])
         self.back_btn.draw(surf)
         if self.kind == "spread":
             self.mode_btn.draw(surf)
@@ -558,7 +563,7 @@ class GraphScene(GraphRenderMixin, Scene, PopupMixin):
         x = 40
         lbl_font = fonts.tiny()
         if self.tickers:
-            img = lbl_font.render("Sélection :", True, config.COL_TEXT_DIM)
+            img = lbl_font.render(_L("Sélection :", "Selection:"), True, config.COL_TEXT_DIM)
             surf.blit(img, (x, y + 5))
             x += img.get_width() + 8
             chip_zone_right = config.SCREEN_WIDTH - 200   # laisse de la place aux suggestions

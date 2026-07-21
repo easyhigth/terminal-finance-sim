@@ -211,4 +211,4 @@ class CompareScene(Scene):
         self.add_box.draw(surf)
         self.back_btn.draw(surf)
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.SCREEN_HEIGHT - 70),
-                             [("ENTRÉE", _L("ajouter", "add")), ("ESC", _L("retour", "back"))])
+                             [(_L("ENTRÉE", "ENTER"), _L("ajouter", "add")), ("ESC", _L("retour", "back"))])

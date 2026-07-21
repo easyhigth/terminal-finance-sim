@@ -10,18 +10,25 @@ import pygame
 
 from core import config
 from core import news as N
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
 _INBOX_KIND = {
-    "manager": ("MANAGER", config.COL_AMBER), "client": ("CLIENT", config.COL_CYAN),
-    "compliance": ("CONFORMITÉ", config.COL_DOWN), "desk": ("DESK", config.COL_TEXT),
-    "hr": ("RH", config.COL_UP), "country": ("PAYS", config.COL_PRESTIGE),
-    "research": ("VEILLE", config.COL_CYAN),
+    "manager": (("MANAGER", "MANAGER"), config.COL_AMBER), "client": (("CLIENT", "CLIENT"), config.COL_CYAN),
+    "compliance": (("CONFORMITÉ", "COMPLIANCE"), config.COL_DOWN), "desk": (("DESK", "DESK"), config.COL_TEXT),
+    "hr": (("RH", "HR"), config.COL_UP), "country": (("PAYS", "COUNTRY"), config.COL_PRESTIGE),
+    "research": (("VEILLE", "RESEARCH"), config.COL_CYAN),
 }
 _NEWS_KIND_COL = {"good": config.COL_UP, "bad": config.COL_DOWN, "info": config.COL_CYAN}
 ROW_H = 24
-_SOURCE_CHIPS = [(None, "TOUTES"), ("inbox", "MESSAGES"), ("news", "ACTUALITÉS")]
+_SOURCE_CHIPS = [(None, ("TOUTES", "ALL")), ("inbox", ("MESSAGES", "MESSAGES")),
+                 ("news", ("ACTUALITÉS", "NEWS"))]
 
 
 class NotificationsScene(Scene):
@@ -44,7 +51,8 @@ class NotificationsScene(Scene):
         out = []
         if self.source_filter in (None, "inbox"):
             for idx, m in enumerate(p.inbox):
-                tag, col = _INBOX_KIND.get(m["kind"], ("•", config.COL_TEXT))
+                tagpair, col = _INBOX_KIND.get(m["kind"], (("•", "•"), config.COL_TEXT))
+                tag = _L(*tagpair)
                 out.append({"src": "inbox", "ref": idx, "day": m["day"], "tag": tag,
                             "col": col, "text": f"{m['subject']} — {m['body']}",
                             "read": m.get("read", False)})
@@ -112,7 +120,7 @@ class NotificationsScene(Scene):
         unread = sum(1 for m in p.inbox if not m.get("read"))
         widgets.draw_text(surf, "CENTRE DE NOTIFICATIONS", (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, f"Messagerie + actualités en un seul flux · {unread} message(s) non lu(s).",
+        widgets.draw_text(surf, _L(f"Messagerie + actualités en un seul flux · {unread} message(s) non lu(s).", f"Mail + news in a single feed · {unread} unread message(s)."),
                           (42, 72), fonts.small(), config.COL_TEXT_DIM)
 
         x0 = 40
@@ -134,7 +142,8 @@ class NotificationsScene(Scene):
         chip_y = search_rect.bottom + 8
         self._chip_rects = {}
         cx = x0
-        for val, label in _SOURCE_CHIPS:
+        for val, labelpair in _SOURCE_CHIPS:
+            label = _L(*labelpair)
             w = fonts.tiny(bold=True).size(label)[0] + 16
             rect = pygame.Rect(cx, chip_y, w, 20)
             self._chip_rects[val] = rect
@@ -146,18 +155,19 @@ class NotificationsScene(Scene):
             cx += w + 6
 
         legend_y = chip_y + 26
-        msg_lbl = "MSG message :"
+        msg_lbl = _L("MSG message :", "MSG message:")
         widgets.draw_text(surf, msg_lbl, (x0, legend_y), fonts.tiny(), config.COL_TEXT_DIM)
         lx = x0 + fonts.tiny().size(msg_lbl)[0] + 8
-        for kind, (tag, col) in _INBOX_KIND.items():
+        for kind, (tagpair, col) in _INBOX_KIND.items():
+            tag = _L(*tagpair)
             w = fonts.tiny(bold=True).size(tag)[0]
             widgets.draw_text(surf, tag, (lx, legend_y), fonts.tiny(bold=True), col)
             lx += w + 10
-        news_lbl = "NEWS actu :"
+        news_lbl = _L("NEWS actu :", "NEWS:")
         widgets.draw_text(surf, news_lbl, (lx + 14, legend_y), fonts.tiny(), config.COL_TEXT_DIM)
         lx2 = lx + 14 + fonts.tiny().size(news_lbl)[0] + 8
-        for kind_lbl, col in (("bonne", config.COL_UP), ("mauvaise", config.COL_DOWN),
-                              ("neutre", config.COL_CYAN)):
+        for kind_lbl, col in ((_L("bonne", "good"), config.COL_UP), (_L("mauvaise", "bad"), config.COL_DOWN),
+                              (_L("neutre", "neutral"), config.COL_CYAN)):
             w = fonts.tiny(bold=True).size(kind_lbl)[0]
             widgets.draw_text(surf, kind_lbl, (lx2, legend_y), fonts.tiny(bold=True), col)
             lx2 += w + 10
@@ -165,7 +175,7 @@ class NotificationsScene(Scene):
         rows = self._rows()
         list_top = legend_y + 22
         panel = pygame.Rect(x0, list_top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - list_top)
-        inner = widgets.draw_panel(surf, panel, f"Flux ({len(rows)})", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L(f"Flux ({len(rows)})", f"Feed ({len(rows)})"), config.COL_CYAN)
         list_area = pygame.Rect(inner.x - 4, inner.y, inner.w + 8, inner.h)
         self._list_rect = list_area
         self.row_rects = []

@@ -17,12 +17,18 @@ import pygame
 
 from core import config
 from core.game_state import GameState, PlayerState
-from core.i18n import t
+from core.i18n import get_lang, t
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
 CASH_PRESETS = [250_000.0, 1_000_000.0, 10_000_000.0, 100_000_000.0]
 REGIME_CHOICES = ["Aléatoire", "Calme", "Expansion", "Volatil", "Récession"]
+_REGIME_EN = {"Aléatoire": "Random", "Calme": "Calm", "Expansion": "Expansion",
+              "Volatil": "Volatile", "Récession": "Recession"}
+
+
+def _regime_display(fr):
+    return _REGIME_EN.get(fr, fr) if get_lang() == "en" else fr
 CHIP_H = 28
 
 
@@ -150,8 +156,8 @@ class SandboxScene(Scene):
 
         self._regime_rects = {}
         y = self._draw_chip_row(surf, x0, y, t("sandbox.regime"),
-                                 REGIME_CHOICES, self.regime_idx, self._regime_rects,
-                                 key_fn=None)
+                                 [_regime_display(r) for r in REGIME_CHOICES],
+                                 self.regime_idx, self._regime_rects, key_fn=None)
 
         # toggle "tout débloquer"
         widgets.draw_text(surf, t("sandbox.unlock_label"), (x0, y), fonts.small(bold=True),

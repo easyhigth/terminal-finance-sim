@@ -29,19 +29,23 @@ def _asset_kind(tk):
         return "etf"
     return "stock"
 
-# (code, libellé court, kind, multi-actifs ?)
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
+# (code, libellé court [(fr, en)], kind, multi-actifs ?)
 TYPES = [
-    ("GP", "Ligne", "line", False),
-    ("GPC", "Chandel.", "candles", False),
-    ("GPO", "Barres", "bars", False),
-    ("GPCH", "Var %", "change", False),
-    ("COMP", "Comparer", "compare", True),
-    ("HS", "Spread", "spread", True),
-    ("HVOL", "Volatilité", "vol", False),
-    ("BETA", "Bêta", "beta", False),
-    ("CORR", "Corrél.", "corr", True),
-    ("GEG", "Macro", "macro", False),
-    ("GC", "Courbe", "curve", False),
+    ("GP", ("Ligne", "Line"), "line", False),
+    ("GPC", ("Chandel.", "Candles"), "candles", False),
+    ("GPO", ("Barres", "Bars"), "bars", False),
+    ("GPCH", ("Var %", "Chg %"), "change", False),
+    ("COMP", ("Comparer", "Compare"), "compare", True),
+    ("HS", ("Spread", "Spread"), "spread", True),
+    ("HVOL", ("Volatilité", "Volatility"), "vol", False),
+    ("BETA", ("Bêta", "Beta"), "beta", False),
+    ("CORR", ("Corrél.", "Corr."), "corr", True),
+    ("GEG", ("Macro", "Macro"), "macro", False),
+    ("GC", ("Courbe", "Curve"), "curve", False),
 ]
 _KIND_BY_CODE = {c: k for c, _, k, _ in TYPES}
 _MULTI = {k for _, _, k, multi in TYPES if multi}

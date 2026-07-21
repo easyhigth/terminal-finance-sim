@@ -12,8 +12,14 @@ import pygame
 
 from core import charts, config
 from core.career_history import format_timeline
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
 
 _KIND_COLORS = {
     "promo": config.COL_UP, "deal": config.COL_DEAL, "crisis": config.COL_DOWN,
@@ -21,13 +27,13 @@ _KIND_COLORS = {
 }
 
 _ATTRIB_LABELS = {
-    "salaire": ("Salaire", config.COL_CYAN),
-    "revenus": ("Revenus passifs", config.COL_UP),
-    "deals": ("Deals", config.COL_DEAL),
-    "mandats": ("Mandats", config.COL_AMBER),
-    "objectifs": ("Objectifs", config.COL_PRESTIGE),
-    "evenements": ("Événements", config.COL_WARN),
-    "marches": ("Marchés", config.COL_TEXT),
+    "salaire": (("Salaire", "Salary"), config.COL_CYAN),
+    "revenus": (("Revenus passifs", "Passive income"), config.COL_UP),
+    "deals": (("Deals", "Deals"), config.COL_DEAL),
+    "mandats": (("Mandats", "Mandates"), config.COL_AMBER),
+    "objectifs": (("Objectifs", "Objectives"), config.COL_PRESTIGE),
+    "evenements": (("Événements", "Events"), config.COL_WARN),
+    "marches": (("Marchés", "Markets"), config.COL_TEXT),
 }
 
 
@@ -96,7 +102,7 @@ class HistoryScene(Scene):
     def draw(self, surf):
         surf.fill(config.COL_BG)
         p = self.app.gs.player
-        widgets.draw_text(surf, "HISTORIQUE DE CARRIÈRE", (40, 22),
+        widgets.draw_text(surf, _L("HISTORIQUE DE CARRIÈRE", "CAREER HISTORY"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         sub = f"{p.name} · {p.grade} · jour {p.day} (T{p.quarter})"
         widgets.draw_text(surf, sub, (42, 72), fonts.small(), config.COL_TEXT_DIM)
@@ -131,7 +137,7 @@ class HistoryScene(Scene):
             widgets.draw_tooltip(surf, *self._crisis_tooltip)
 
     def _draw_networth_chart(self, surf, rect, p, cur):
-        inner = widgets.draw_panel(surf, rect, "Valeur nette — évolution", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, rect, _L("Valeur nette — évolution", "Net worth — evolution"), config.COL_CYAN)
         hist = p.cash_history or []
         if len(hist) < 2:
             widgets.draw_text(surf, "Historique trop court pour un graphique.",
@@ -178,7 +184,7 @@ class HistoryScene(Scene):
             pygame.draw.line(surf, col, (x, chart_rect.y), (x, chart_rect.bottom), 1)
             pygame.draw.circle(surf, col, (x, chart_rect.bottom), 3)
             if abs(mp[0] - x) <= 4 and chart_rect.y <= mp[1] <= chart_rect.bottom + 6:
-                self._crisis_tooltip = (f"{c['name']} (sévérité {c['severity']:.1f}x)", mp)
+                self._crisis_tooltip = (_L(f"{c['name']} (sévérité {c['severity']:.1f}x)", f"{c['name']} (severity {c['severity']:.1f}x)"), mp)
 
         best = max(p.best_cash, hist[i_max])
         label_y = inner.y + inner.h - 14
@@ -194,11 +200,11 @@ class HistoryScene(Scene):
         widgets.draw_text(surf, f"Drawdown max : -{max_dd:.1f}%",
                           (inner.x + 640, label_y), fonts.tiny(bold=True), config.COL_WARN)
         widgets.draw_text(
-            surf, f"({len(hist)} relevés récents)",
+            surf, _L(f"({len(hist)} relevés récents)", f"({len(hist)} recent readings)"),
             (inner.right, inner.y), fonts.tiny(), config.COL_TEXT_DIM, align="right")
 
     def _draw_perf_vs_index(self, surf, rect, p):
-        inner = widgets.draw_panel(surf, rect, "Performance vs indice régional", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, rect, _L("Performance vs indice régional", "Performance vs regional index"), config.COL_AMBER)
         hist = p.cash_history or []
         market = getattr(self.app, "market", None)
         idx_name = None
@@ -234,10 +240,10 @@ class HistoryScene(Scene):
         ])
 
     def _draw_attribution(self, surf, rect, p, cur):
-        inner = widgets.draw_panel(surf, rect, "Attribution du dernier trimestre", config.COL_PRESTIGE)
+        inner = widgets.draw_panel(surf, rect, _L("Attribution du dernier trimestre", "Last quarter attribution"), config.COL_PRESTIGE)
         attrib = getattr(p, "last_quarter_attribution", None) or {}
         if not attrib:
-            widgets.draw_text(surf, "Disponible après la clôture d'un trimestre.",
+            widgets.draw_text(surf, _L("Disponible après la clôture d'un trimestre.", "Available after a quarter closes."),
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
             return
         items = sorted(attrib.items(), key=lambda kv: -abs(kv[1]))
@@ -249,7 +255,8 @@ class HistoryScene(Scene):
             y = inner.y + i * line_h
             if y + line_h > inner.bottom:
                 break
-            label, col = _ATTRIB_LABELS.get(cat, (cat, config.COL_TEXT_DIM))
+            labelpair, col = _ATTRIB_LABELS.get(cat, ((cat, cat), config.COL_TEXT_DIM))
+            label = _L(*labelpair)
             widgets.draw_text(surf, label, (inner.x, y + 2), fonts.tiny(), config.COL_TEXT)
             frac = abs(delta) / max_abs
             w = max(2, int(bar_w * 0.5 * frac))
@@ -261,10 +268,10 @@ class HistoryScene(Scene):
                               (bar_x + bar_w, y + 2), fonts.tiny(), col, align="right")
 
     def _draw_timeline(self, surf, rect, p):
-        inner = widgets.draw_panel(surf, rect, "Timeline des évènements", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, rect, _L("Timeline des évènements", "Events timeline"), config.COL_AMBER)
         entries = format_timeline(p.journal, limit=len(p.journal))
         if not entries:
-            widgets.draw_text(surf, "Votre histoire s'écrira ici : promotions, deals, crises…",
+            widgets.draw_text(surf, _L("Votre histoire s'écrira ici : promotions, deals, crises…", "Your story will be written here: promotions, deals, crises…"),
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
             self._timeline_list_rect = None
             self._timeline_max_scroll = 0

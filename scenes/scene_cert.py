@@ -8,8 +8,13 @@ import pygame
 
 from core import certifications as C
 from core import config
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 
 class CertScene(Scene):
@@ -48,13 +53,13 @@ class CertScene(Scene):
         p = self.app.gs.player
         code, fee, tier = C.can_attempt(p, pid)
         if code == "done":
-            self.msg = f"{C.PROGRAMS[pid]['name']} déjà entièrement obtenu."
+            self.msg = _L(f"{C.PROGRAMS[pid]['name']} déjà entièrement obtenu.", f"{C.PROGRAMS[pid]['name']} already fully obtained.")
             return
         if code == "grade":
-            self.msg = f"{C.PROGRAMS[pid]['name']} : grade insuffisant (min. {config.GRADES[fee]})."
+            self.msg = _L(f"{C.PROGRAMS[pid]['name']} : grade insuffisant (min. {config.GRADES[fee]}).", f"{C.PROGRAMS[pid]['name']}: insufficient grade (min. {config.GRADES[fee]}).")
             return
         if code == "cash":
-            self.msg = f"Frais d'inscription {widgets.format_money(fee, self._cur())} : trésorerie insuffisante."
+            self.msg = _L(f"Frais d'inscription {widgets.format_money(fee, self._cur())} : trésorerie insuffisante.", f"Registration fee {widgets.format_money(fee, self._cur())}: insufficient cash.")
             return
         started = C.pay_and_start(p, pid)
         if started:
@@ -72,9 +77,11 @@ class CertScene(Scene):
         surf.fill(config.COL_BG)
         p = self.app.gs.player
         cur = self._cur()
-        widgets.draw_text(surf, "CERTIFICATIONS", (40, 22), fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Une certification liée à votre voie booste la réputation "
+        widgets.draw_text(surf, _L("CERTIFICATIONS", "CERTIFICATIONS"), (40, 22), fonts.title(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L("Une certification liée à votre voie booste la réputation "
                                 "et accélère l'accès aux hauts postes.",
+                                "A certification tied to your track boosts reputation "
+                                "and speeds access to senior roles."),
                           (42, 72), fonts.small(), config.COL_TEXT_DIM)
 
         self.btn_rects = {}
@@ -95,28 +102,33 @@ class CertScene(Scene):
             widgets.draw_text(surf, f"{prog['name']} — {prog['full']}", (rect.x+16, rect.y+12),
                               fonts.head(bold=True), config.COL_AMBER)
             if relevant:
-                widgets.draw_badge(surf, "VOIE " + p.track, (rect.x+16, rect.y+44),
+                widgets.draw_badge(surf, _L("VOIE ", "TRACK ") + p.track, (rect.x+16, rect.y+44),
                                    config.COL_PRESTIGE)
             widgets.draw_text(surf, C.desc_for(pid), (rect.x+16, rect.y+72),
                               fonts.small(), config.COL_TEXT)
             lvl = C.level(p, pid)
-            status_line = (f"Statut : {C.status_label(p, pid)}  ·  "
-                          f"niveaux {prog['levels']}  ·  voie {prog['track']}")
+            status_line = _L(f"Statut : {C.status_label(p, pid)}  ·  "
+                          f"niveaux {prog['levels']}  ·  voie {prog['track']}",
+                          f"Status: {C.status_label(p, pid)}  ·  "
+                          f"levels {prog['levels']}  ·  track {prog['track']}")
             if lvl < len(prog["fee"]):
                 remaining = sum(prog["fee"][lvl:])
-                status_line += (f"  ·  frais restants : {widgets.format_money(remaining, cur)} "
+                status_line += _L(f"  ·  frais restants : {widgets.format_money(remaining, cur)} "
                                 f"({prog['levels'] - lvl} niveau(x), débités un par un à "
-                                f"l'inscription)")
+                                f"l'inscription)",
+                                f"  ·  remaining fees: {widgets.format_money(remaining, cur)} "
+                                f"({prog['levels'] - lvl} level(s), charged one by one at "
+                                f"registration)")
             widgets.draw_text(surf, status_line,
                               (rect.x+16, rect.y+94), fonts.small(), config.COL_TEXT_DIM)
             # bouton d'inscription, ancré en bas-droite de la carte (largeur fixe)
             code, fee, _ = C.can_attempt(p, pid)
             if code == "done":
-                label, bcol = "OBTENU ✓", config.COL_UP
+                label, bcol = _L("OBTENU ✓", "OBTAINED ✓"), config.COL_UP
             elif code == "grade":
-                label, bcol = f"Grade min. {prog['min_grade']+1}*", config.COL_TEXT_DIM
+                label, bcol = _L(f"Grade min. {prog['min_grade']+1}*", f"Min. grade {prog['min_grade']+1}*"), config.COL_TEXT_DIM
             else:
-                label, bcol = f"PASSER NIV. {lvl+1} — {widgets.format_money(prog['fee'][lvl], cur)}", config.COL_UP
+                label, bcol = _L(f"PASSER NIV. {lvl+1} — {widgets.format_money(prog['fee'][lvl], cur)}", f"TAKE LVL. {lvl+1} — {widgets.format_money(prog['fee'][lvl], cur)}"), config.COL_UP
             footer_rect = pygame.Rect(rect.right - 260, rect.y, 244, rect.h)
             hover = pygame.Rect(rect.right - 260, rect.bottom - 16 - 36,
                                 244, 36).collidepoint(mp)

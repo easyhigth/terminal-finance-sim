@@ -18,33 +18,48 @@ def _L(fr, en):
 TRACK_INFO = {
     "Portfolio": {
         "color": config.COL_CYAN,
-        "desc": "Gestion de portefeuille : allocation d'actifs, frontière efficiente, "
+        "desc": ("Gestion de portefeuille : allocation d'actifs, frontière efficiente, "
                 "optimisation moyenne-variance, suivi du Sharpe et rebalancement.",
-        "concepts": "Markowitz, CAPM, Sharpe/Sortino, beta, rebalancing, tracking error.",
+                "Portfolio management: asset allocation, efficient frontier, "
+                "mean-variance optimization, Sharpe tracking and rebalancing."),
+        "concepts": ("Markowitz, CAPM, Sharpe/Sortino, beta, rebalancing, tracking error.",
+                     "Markowitz, CAPM, Sharpe/Sortino, beta, rebalancing, tracking error."),
     },
     "M&A": {
         "color": config.COL_UP,
-        "desc": "Fusions & acquisitions : valorisation, LBO, analyse relutif/dilutif, "
+        "desc": ("Fusions & acquisitions : valorisation, LBO, analyse relutif/dilutif, "
                 "structuration de deals et synergies.",
-        "concepts": "DCF, comparables, LBO, accretion/dilution, goodwill, due diligence.",
+                "Mergers & acquisitions: valuation, LBO, accretion/dilution analysis, "
+                "deal structuring and synergies."),
+        "concepts": ("DCF, comparables, LBO, accretion/dilution, goodwill, due diligence.",
+                     "DCF, comparables, LBO, accretion/dilution, goodwill, due diligence."),
     },
     "Risk": {
         "color": config.COL_DOWN,
-        "desc": "Gestion des risques : mesure et limitation de l'exposition, "
+        "desc": ("Gestion des risques : mesure et limitation de l'exposition, "
                 "VaR/CVaR, stress tests, couverture et conformité prudentielle.",
-        "concepts": "VaR, CVaR, stress testing, Bâle III, hedging, scénarios.",
+                "Risk management: measuring and limiting exposure, "
+                "VaR/CVaR, stress tests, hedging and prudential compliance."),
+        "concepts": ("VaR, CVaR, stress testing, Bâle III, hedging, scénarios.",
+                     "VaR, CVaR, stress testing, Basel III, hedging, scenarios."),
     },
     "Quant": {
         "color": config.COL_WARN,
-        "desc": "Quantitatif : pricing de dérivés, Greeks, modèles stochastiques, "
+        "desc": ("Quantitatif : pricing de dérivés, Greeks, modèles stochastiques, "
                 "backtesting de stratégies systématiques.",
-        "concepts": "Black-Scholes, Greeks, vol implicite, backtest, séries temporelles.",
+                "Quantitative: derivatives pricing, Greeks, stochastic models, "
+                "backtesting of systematic strategies."),
+        "concepts": ("Black-Scholes, Greeks, vol implicite, backtest, séries temporelles.",
+                     "Black-Scholes, Greeks, implied vol, backtest, time series."),
     },
     "Advisory": {
         "color": config.COL_EUROPE,
-        "desc": "Conseil : structuration de financements, relations clients, "
+        "desc": ("Conseil : structuration de financements, relations clients, "
                 "négociation et exécution d'opérations stratégiques.",
-        "concepts": "Structuration, pitch, négociation, financement, conformité.",
+                "Advisory: financing structuring, client relations, "
+                "negotiation and execution of strategic transactions."),
+        "concepts": ("Structuration, pitch, négociation, financement, conformité.",
+                     "Structuring, pitch, negotiation, financing, compliance."),
     },
 }
 
@@ -170,7 +185,7 @@ class TrackScene(Scene):
                               fonts.head(bold=True), accent)
             ty += fonts.head().get_height() + 8
 
-            desc_h = widgets.draw_text_wrapped(surf, info["desc"], (x + pad, ty),
+            desc_h = widgets.draw_text_wrapped(surf, _L(*info["desc"]), (x + pad, ty),
                                                fonts.small(), config.COL_TEXT, text_w, line_gap=3)
             ty += desc_h + 10
 
@@ -181,10 +196,10 @@ class TrackScene(Scene):
                                                fonts.tiny(), config.COL_WHITE, text_w, line_gap=2)
             ty += perk_h + 10
 
-            widgets.draw_text(surf, "CONCEPTS CLÉS :", (x + pad, ty),
+            widgets.draw_text(surf, _L("CONCEPTS CLÉS :", "KEY CONCEPTS:"), (x + pad, ty),
                               fonts.tiny(bold=True), config.COL_TEXT_DIM)
             ty += fonts.tiny(bold=True).get_height() + 4
-            widgets.draw_text_wrapped(surf, info["concepts"], (x + pad, ty),
+            widgets.draw_text_wrapped(surf, _L(*info["concepts"]), (x + pad, ty),
                                       fonts.tiny(), config.COL_NEUTRAL, text_w, line_gap=2)
 
             if locked:

@@ -15,11 +15,16 @@ from ui import fonts, widgets
 
 CARD_KEYS = ["exam", "cert"]
 _REQ_HINTS = {
-    "Réputation": "Augmentez votre réputation via les missions, les deals et les certifications "
+    "Réputation": ("Augmentez votre réputation via les missions, les deals et les certifications "
                   "(CFA/FRM/CQF réduisent aussi le seuil requis).",
-    "Missions (ce grade)": "Terminez des missions (MISSIONS) — chaque mission complétée à ce grade compte.",
-    "Deals conclus (ce grade)": "Concluez des deals via DEALS pour valider ce critère.",
-    "Ancienneté (trimestres)": "Patientez : ce critère se remplit automatiquement avec le temps passé à ce grade.",
+                  "Raise your reputation via missions, deals and certifications "
+                  "(CFA/FRM/CQF also lower the required threshold)."),
+    "Missions (ce grade)": ("Terminez des missions (MISSIONS) — chaque mission complétée à ce grade compte.",
+                            "Complete missions (MISSIONS) — each mission finished at this grade counts."),
+    "Deals conclus (ce grade)": ("Concluez des deals via DEALS pour valider ce critère.",
+                                 "Close deals via DEALS to validate this criterion."),
+    "Ancienneté (trimestres)": ("Patientez : ce critère se remplit automatiquement avec le temps passé à ce grade.",
+                                "Wait: this criterion fills automatically with time spent at this grade."),
 }
 
 
@@ -70,11 +75,11 @@ class ExamCertScene(Scene):
             self.app.scenes.go("evaluation")
             return
         if not p.can_promote():
-            self.msg = "Vous êtes au grade maximal : aucune promotion possible."
+            self.msg = _L("Vous êtes au grade maximal : aucune promotion possible.", "You are at the maximum grade: no promotion possible.")
             return
         if not career_mod.promotion_ready(p):
             miss = ", ".join(career_mod.missing_criteria(p))
-            self.msg = f"Critères de promotion non remplis : {miss}."
+            self.msg = _L(f"Critères de promotion non remplis : {miss}.", f"Promotion criteria not met: {miss}.")
             return
         self.app.scenes.go("evaluation")
 
@@ -84,9 +89,11 @@ class ExamCertScene(Scene):
     def draw(self, surf):
         surf.fill(config.COL_BG)
         p = self.app.gs.player
-        widgets.draw_text(surf, "EXAMEN / CERTIFICATION", (40, 22), fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Passez l'examen pour évoluer en grade, ou une certification "
+        widgets.draw_text(surf, _L("EXAMEN / CERTIFICATION", "EXAM / CERTIFICATION"), (40, 22), fonts.title(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L("Passez l'examen pour évoluer en grade, ou une certification "
                                 "pour booster votre carrière.",
+                                "Take the exam to move up a grade, or a certification "
+                                "to boost your career."),
                           (42, 72), fonts.small(), config.COL_TEXT_DIM)
 
         self._card_rects = {}
@@ -114,18 +121,18 @@ class ExamCertScene(Scene):
         pygame.draw.rect(surf, config.COL_CYAN if focused else accent, rect, 3 if focused else 2,
                          border_radius=6)
         self._card_rects["exam"] = rect
-        widgets.draw_text(surf, "EXAMEN DE PROMOTION", (rect.x + 20, rect.y + 18),
+        widgets.draw_text(surf, _L("EXAMEN DE PROMOTION", "PROMOTION EXAM"), (rect.x + 20, rect.y + 18),
                           fonts.head(bold=True), config.COL_AMBER)
         if paused:
             idx = p.eval_state.get("idx", 0)
             total = len(p.eval_state.get("items", []))
-            widgets.draw_text(surf, f"|| Examen en pause — question {idx + 1}/{total}. Reprenez ci-dessous.",
+            widgets.draw_text(surf, _L(f"|| Examen en pause — question {idx + 1}/{total}. Reprenez ci-dessous.", f"|| Exam paused — question {idx + 1}/{total}. Resume below."),
                               (rect.x + 20, rect.y + 54), fonts.small(bold=True), config.COL_CYAN)
         else:
-            widgets.draw_text(surf, "Réussir l'examen vous fait passer au grade suivant.",
+            widgets.draw_text(surf, _L("Réussir l'examen vous fait passer au grade suivant.", "Passing the exam moves you to the next grade."),
                               (rect.x + 20, rect.y + 54), fonts.small(), config.COL_TEXT)
         if not p.can_promote():
-            widgets.draw_text(surf, "Grade maximal atteint.", (rect.x + 20, rect.y + 84),
+            widgets.draw_text(surf, _L("Grade maximal atteint.", "Maximum grade reached."), (rect.x + 20, rect.y + 84),
                               fonts.small(bold=True), config.COL_UP)
         else:
             y = rect.y + 84
@@ -135,11 +142,11 @@ class ExamCertScene(Scene):
                 widgets.draw_text(surf, f"{mark} {r['label']}", (rect.x + 20, y), fonts.small(), col)
                 widgets.draw_text(surf, f"{int(r['current'])}/{int(r['target'])}",
                                   (rect.right - 20, y), fonts.small(bold=True), col, align="right")
-                hint = _REQ_HINTS.get(r["label"])
-                if hint and pygame.Rect(rect.x + 20, y, rect.w - 40, 20).collidepoint(mp):
-                    widgets.draw_tooltip(surf, hint, mp)
+                hintpair = _REQ_HINTS.get(r["label"])
+                if hintpair and pygame.Rect(rect.x + 20, y, rect.w - 40, 20).collidepoint(mp):
+                    widgets.draw_tooltip(surf, _L(*hintpair), mp)
                 y += 26
-        label = "REPRENDRE L'EXAMEN" if paused else ("PASSER L'EXAMEN" if ready else "VOIR LA ROADMAP (CAREER)")
+        label = _L("REPRENDRE L'EXAMEN", "RESUME THE EXAM") if paused else (_L("PASSER L'EXAMEN", "TAKE THE EXAM") if ready else _L("VOIR LA ROADMAP (CAREER)", "VIEW ROADMAP (CAREER)"))
         widgets.draw_card_footer(surf, rect, label, accent, hover=hover)
 
     def _draw_cert_card(self, surf, rect, p, mp, focused):
@@ -150,7 +157,7 @@ class ExamCertScene(Scene):
         self._card_rects["cert"] = rect
         widgets.draw_text(surf, "CERTIFICATIONS", (rect.x + 20, rect.y + 18),
                           fonts.head(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "CFA / FRM / CQF — boostent réputation et promotions.",
+        widgets.draw_text(surf, _L("CFA / FRM / CQF — boostent réputation et promotions.", "CFA / FRM / CQF — boost reputation and promotions."),
                           (rect.x + 20, rect.y + 54), fonts.small(), config.COL_TEXT)
         widgets.draw_text(surf, f"Voie actuelle : {p.track}", (rect.x + 20, rect.y + 84),
                           fonts.small(), config.COL_TEXT_DIM)

@@ -7,9 +7,14 @@ formule, exemple chiffré, à retenir). Lire une leçon la marque comme apprise
 import pygame
 
 from core import config
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from data import lessons as L
 from ui import fonts, keynav, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 _TOPIC_COL = {
     "Valorisation": config.COL_AMBER, "Risque": config.COL_DOWN,
@@ -39,18 +44,18 @@ class AcademyScene(Scene):
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button(
-            (260, config.SCREEN_HEIGHT - 50, 180, 42), "TUTORIELS", config.COL_CYAN)
+            (260, config.SCREEN_HEIGHT - 50, 180, 42), _L("TUTORIELS", "TUTORIALS"), config.COL_CYAN)
 
     def _mark_read(self, lesson_id):
         p = self.app.gs.player
         if lesson_id not in p.learned:
             p.learned.append(lesson_id)
             p.adjust_reputation(1, reason="Leçon apprise (Académie)")
-            self.app.notify("Leçon apprise (+1 réputation)", "good")
+            self.app.notify(_L("Leçon apprise (+1 réputation)", "Lesson learned (+1 reputation)"), "good")
             if len(p.learned) >= len(L.LESSONS):
                 from core import badges
                 for b in badges.check_new(p, self.app.market):
-                    self.app.notify(f"✶ Badge : {badges.badge_name(b)}", "prestige")
+                    self.app.notify(_L(f"✶ Badge : {badges.badge_name(b)}", f"✶ Badge: {badges.badge_name(b)}"), "prestige")
 
     def _scroll_to_cursor(self):
         """Ajuste le scroll pour garder la leçon sélectionnée au clavier visible."""

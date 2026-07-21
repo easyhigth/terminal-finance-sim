@@ -5,28 +5,51 @@ Explique le but du jeu et son fonctionnement avant d'entrer dans le terminal.
 import pygame
 
 from core import config
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
-GOAL = ("De stagiaire à Partner : gravissez 12 grades en bâtissant votre "
-        "réputation et votre fortune, dans une simulation de marché vivante.")
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
+GOAL = (("De stagiaire à Partner : gravissez 12 grades en bâtissant votre "
+         "réputation et votre fortune, dans une simulation de marché vivante."),
+        ("From intern to Partner: climb 12 grades by building your reputation "
+         "and fortune, in a living market simulation."))
 
 HOW = [
-    ("|| ▶ ▶▶ ▶▶▶", "Le temps avance en direct, à la vitesse choisie. Le marché "
+    ("|| ▶ ▶▶ ▶▶▶", ("Le temps avance en direct, à la vitesse choisie. Le marché "
                 "(320 sociétés fictives, interconnectées) évolue, des actus et "
-                "des crises surgissent."),
-    ("MISSION", "Accomplis le travail de ton grade (analyse, décisions...) "
-                "pour gagner de la réputation."),
-    ("EVAL", "Quand réputation + critères (missions, deals, ancienneté) sont "
-             "réunis, passe l'examen pour être promu."),
-    ("BUY / SELL", "Investis dans de vraies sociétés du roster : ta VALEUR NETTE "
-                   "monte et descend avec le marché. RESEARCH pour une reco."),
-    ("DEALS / MANDATS", "Traite des opportunités à délai et gère des mandats "
-                        "clients (objectif de rendement + limite de risque)."),
-    ("DÉCISIONS", "Des dilemmes éthiques/réglementaires : couper les coins paie… "
-                  "mais fait monter le scrutin réglementaire (risque d'enquête)."),
-    ("RIVAUX & CRISES", "Des concurrents te disputent les deals ; des crises "
-                        "(krach, choc de taux...) frappent ton portefeuille."),
+                "des crises surgissent.",
+                "Time advances live, at the chosen speed. The market "
+                "(320 fictional, interconnected companies) evolves, news and "
+                "crises break out.")),
+    ("MISSION", ("Accomplis le travail de ton grade (analyse, décisions...) "
+                "pour gagner de la réputation.",
+                "Do the work of your grade (analysis, decisions...) "
+                "to earn reputation.")),
+    ("EVAL", ("Quand réputation + critères (missions, deals, ancienneté) sont "
+             "réunis, passe l'examen pour être promu.",
+             "When reputation + criteria (missions, deals, seniority) are "
+             "met, take the exam to be promoted.")),
+    ("BUY / SELL", ("Investis dans de vraies sociétés du roster : ta VALEUR NETTE "
+                   "monte et descend avec le marché. RESEARCH pour une reco.",
+                   "Invest in real roster companies: your NET WORTH "
+                   "rises and falls with the market. RESEARCH for a reco.")),
+    ("DEALS / MANDATS", ("Traite des opportunités à délai et gère des mandats "
+                        "clients (objectif de rendement + limite de risque).",
+                        "Handle time-limited opportunities and manage client "
+                        "mandates (return objective + risk limit).")),
+    (("DÉCISIONS", "DECISIONS"), ("Des dilemmes éthiques/réglementaires : couper les coins paie… "
+                  "mais fait monter le scrutin réglementaire (risque d'enquête).",
+                  "Ethical/regulatory dilemmas: cutting corners pays… "
+                  "but raises regulatory scrutiny (investigation risk).")),
+    (("RIVAUX & CRISES", "RIVALS & CRISES"), ("Des concurrents te disputent les deals ; des crises "
+                        "(krach, choc de taux...) frappent ton portefeuille.",
+                        "Competitors fight you for deals; crises "
+                        "(crash, rate shock...) hit your portfolio.")),
 ]
 
 
@@ -34,7 +57,7 @@ class IntroScene(Scene):
     def on_enter(self, **kwargs):
         self.start_btn = widgets.Button(
             (config.SCREEN_WIDTH // 2 - 150, config.SCREEN_HEIGHT - 64, 300, 48),
-            "COMMENCER LA CARRIÈRE", config.COL_UP)
+            _L("COMMENCER LA CARRIÈRE", "START THE CAREER"), config.COL_UP)
 
     def handle_event(self, event):
         if self.start_btn.handle(event):
@@ -49,29 +72,33 @@ class IntroScene(Scene):
         surf.fill(config.COL_BG)
         p = self.app.gs.player
         cx = config.SCREEN_WIDTH // 2
-        widgets.draw_text(surf, "BIENVENUE AU TERMINAL", (cx, 30),
+        widgets.draw_text(surf, _L("BIENVENUE AU TERMINAL", "WELCOME TO THE TERMINAL"), (cx, 30),
                           fonts.title(bold=True), config.COL_AMBER, align="center")
         info = config.CONTINENTS.get(p.continent, {})
-        sub = f"{p.continent} · {info.get('regulator','')} · devise {info.get('currency','$')}"
+        sub = _L(f"{p.continent} · {info.get('regulator','')} · devise {info.get('currency','$')}",
+                 f"{p.continent} · {info.get('regulator','')} · currency {info.get('currency','$')}")
         widgets.draw_text(surf, sub, (cx, 78), fonts.small(), config.COL_TEXT_DIM, align="center")
 
         # but du jeu
         goal = pygame.Rect(cx - 460, 110, 920, 78)
-        gi = widgets.draw_panel(surf, goal, "Votre objectif", config.COL_CYAN)
-        widgets.draw_text_wrapped(surf, GOAL, (gi.x, gi.y), fonts.body(),
+        gi = widgets.draw_panel(surf, goal, _L("Votre objectif", "Your goal"), config.COL_CYAN)
+        widgets.draw_text_wrapped(surf, _L(*GOAL), (gi.x, gi.y), fonts.body(),
                                   config.COL_TEXT, gi.w, line_gap=6)
 
         # comment ça marche
         how = pygame.Rect(cx - 460, 200, 920, config.footer_y() - 210)
-        hi = widgets.draw_panel(surf, how, "Comment ça fonctionne", config.COL_AMBER)
+        hi = widgets.draw_panel(surf, how, _L("Comment ça fonctionne", "How it works"), config.COL_AMBER)
         y = hi.y
         for cmd, desc in HOW:
-            widgets.draw_text(surf, cmd, (hi.x, y), fonts.body(bold=True), config.COL_AMBER)
-            h = widgets.draw_text_wrapped(surf, desc, (hi.x + 200, y), fonts.small(),
+            cmd_lbl = cmd if isinstance(cmd, str) else _L(*cmd)
+            widgets.draw_text(surf, cmd_lbl, (hi.x, y), fonts.body(bold=True), config.COL_AMBER)
+            h = widgets.draw_text_wrapped(surf, _L(*desc), (hi.x + 200, y), fonts.small(),
                                           config.COL_TEXT, hi.w - 200, line_gap=3)
             y += max(28, h + 10)
-        widgets.draw_text(surf, "Astuce : tout se pilote au clavier (ou via le rail à "
+        widgets.draw_text(surf, _L("Astuce : tout se pilote au clavier (ou via le rail à "
                                 "gauche). Tape COMMANDS pour la liste, clique la carte pour zoomer.",
+                                "Tip: everything is keyboard-driven (or via the left "
+                                "rail). Type COMMANDS for the list, click the map to zoom."),
                           (hi.x, hi.bottom - 18), fonts.tiny(), config.COL_TEXT_DIM)
 
         self.start_btn.draw(surf)

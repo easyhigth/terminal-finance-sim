@@ -135,15 +135,21 @@ class RunSetupScene(Scene):
 
     def _confirm_code_prompt(self):
         from core import hall_of_fame as hof
+        from core.i18n import get_lang
+        en = get_lang() == "en"
         ok, result = hof.import_friend_code(self.code_buf)
         self.code_prompt = False
         if ok:
-            self.app.notify(f"Score de {result['name']} ajouté au classement du défi.", "good")
+            self.app.notify(
+                (f"{result['name']}'s score added to the challenge ranking." if en
+                 else f"Score de {result['name']} ajouté au classement du défi."), "good")
             self._refresh_daily_ranking()
         elif result == "duplicate":
-            self.app.notify("Ce code a déjà été importé.", "warn")
+            self.app.notify("This code was already imported." if en
+                            else "Ce code a déjà été importé.", "warn")
         else:
-            self.app.notify("Code invalide — vérifiez le copier-coller.", "bad")
+            self.app.notify("Invalid code — check the copy-paste." if en
+                            else "Code invalide — vérifiez le copier-coller.", "bad")
 
     def handle_event(self, event):
         if self.code_prompt:
@@ -336,11 +342,14 @@ class RunSetupScene(Scene):
         """Méta d'un scénario de départ. Le capital affiché intègre le
         multiplicateur du preset de difficulté SÉLECTIONNÉ — le joueur voit
         le chiffre avec lequel il démarrera vraiment (cf. difficulty.apply)."""
+        from core.i18n import get_lang
+        en = get_lang() == "en"
         p = diff_mod.PRESETS[self.diff_idx]
         cash = s["cash"] * p["cash_mult"]
         note = f" ({diff_mod.label(p)})" if p["cash_mult"] != 1.0 else ""
+        rep_lbl = "reputation" if en else "réputation"
         return (f"Capital {widgets.format_money(cash, '$')}{note} · "
-                f"grade {config.GRADES[s['grade_index']]} · réputation {s['reputation']}.  "
+                f"grade {config.GRADES[s['grade_index']]} · {rep_lbl} {s['reputation']}.  "
                 + s["desc"])
 
     def _draw_choice_list(self, surf, panel_rect, title, accent, items, selected_idx,

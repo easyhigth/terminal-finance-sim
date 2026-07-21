@@ -19,6 +19,10 @@ from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
 # ordre d'affichage des régions
 _REGION_ORDER = ["USA", "Am.Nord", "Europe", "Am.Sud", "Afrique", "Asia", "Océanie"]
 
@@ -41,7 +45,7 @@ class GovernmentsScene(Scene):
         self.back_btn = widgets.Button(
             config.back_button_rect(200), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.bonds_btn = widgets.Button(
-            (260, config.SCREEN_HEIGHT - 50, 200, 42), "MARCHÉ OBLIGATAIRE", config.COL_CYAN)
+            (260, config.SCREEN_HEIGHT - 50, 200, 42), _L("MARCHÉ OBLIGATAIRE", "BOND MARKET"), config.COL_CYAN)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -86,10 +90,12 @@ class GovernmentsScene(Scene):
     def draw(self, surf):
         lang = get_lang()
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "GOUVERNEMENTS & RISQUE SOUVERAIN", (40, 22),
+        widgets.draw_text(surf, _L("GOUVERNEMENTS & RISQUE SOUVERAIN", "GOVERNMENTS & SOVEREIGN RISK"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Note, dette/PIB et stabilité pilotent le rendement exigé "
+        widgets.draw_text(surf, _L("Note, dette/PIB et stabilité pilotent le rendement exigé "
                                 "des obligations · les événements politiques font bouger les spreads.",
+                                "Rating, debt/GDP and stability drive the required bond yield "
+                                "· political events move the spreads."),
                           (42, 72), fonts.small(), config.COL_TEXT_DIM)
         ph = config.footer_y() - 8 - 100
         self._draw_list(surf, pygame.Rect(40, 100, 320, ph), lang)
@@ -100,7 +106,7 @@ class GovernmentsScene(Scene):
         self.bonds_btn.draw(surf)
 
     def _draw_list(self, surf, panel, lang):
-        inner = widgets.draw_panel(surf, panel, "Pays", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Pays", "Countries"), config.COL_CYAN)
         self._list_rect = inner
         self.row_rects = {}
         self._code_order = []
@@ -138,7 +144,7 @@ class GovernmentsScene(Scene):
         self.list_scroll = min(self.list_scroll, self._list_max)
 
     def _draw_detail(self, surf, panel, lang):
-        inner = widgets.draw_panel(surf, panel, "Fiche pays", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, panel, _L("Fiche pays", "Country sheet"), config.COL_AMBER)
         self._detail_rect = panel
         g = G.get(self.sel)
         if not g:
@@ -160,26 +166,27 @@ class GovernmentsScene(Scene):
 
         # tuiles : rating, dette/PIB, stabilité
         tile_w = (inner.w - 2 * 12) // 3
-        widgets.draw_tile(surf, (x, y, tile_w, 46), "Note souveraine", g["rating"],
+        widgets.draw_tile(surf, (x, y, tile_w, 46), _L("Note souveraine", "Sovereign rating"), g["rating"],
                           widgets.rating_color(g["rating"]), widgets.rating_color(g["rating"]))
-        widgets.draw_tile(surf, (x + tile_w + 12, y, tile_w, 46), "Dette / PIB",
+        widgets.draw_tile(surf, (x + tile_w + 12, y, tile_w, 46), _L("Dette / PIB", "Debt / GDP"),
                           f"{g['debt_gdp']}%", config.COL_AMBER,
                           config.COL_DOWN if g["debt_gdp"] >= 100 else config.COL_TEXT)
         stab = g["stability"]
         scol = (config.COL_UP if stab >= 0.7 else config.COL_WARN if stab >= 0.52 else config.COL_DOWN)
-        widgets.draw_tile(surf, (x + 2 * (tile_w + 12), y, tile_w, 46), "Stabilité",
+        widgets.draw_tile(surf, (x + 2 * (tile_w + 12), y, tile_w, 46), _L("Stabilité", "Stability"),
                           G.stability_label(stab), scol, scol)
         y += 54
         # jauge de stabilité
         widgets.draw_progress(surf, (x, y, inner.w, 8), stab, scol)
         y += 18
         prime = G.country_premium(g) * 100
-        widgets.draw_text(surf, f"Prime de risque pays ≈ +{prime:.2f}% sur le rendement souverain.",
+        widgets.draw_text(surf, _L(f"Prime de risque pays ≈ +{prime:.2f}% sur le rendement souverain.",
+                          f"Country risk premium ≈ +{prime:.2f}% on the sovereign yield."),
                           (x, y), fonts.tiny(), config.COL_TEXT_DIM)
         y += 24
 
         # historique 5 ans
-        widgets.draw_text(surf, "HISTORIQUE (≈5 ANS)", (x, y), fonts.tiny(bold=True), config.COL_CYAN)
+        widgets.draw_text(surf, _L("HISTORIQUE (≈5 ANS)", "HISTORY (≈5 YEARS)"), (x, y), fonts.tiny(bold=True), config.COL_CYAN)
         pygame.draw.line(surf, config.COL_BORDER, (x, y + 17), (inner.right, y + 17), 1)
         y += 24
         kindcol = {"good": config.COL_UP, "bad": config.COL_DOWN, "info": config.COL_TEXT_DIM}
@@ -192,17 +199,17 @@ class GovernmentsScene(Scene):
 
         # obligations du pays
         y += 6
-        widgets.draw_text(surf, "OBLIGATIONS SOUVERAINES", (x, y), fonts.tiny(bold=True), config.COL_CYAN)
+        widgets.draw_text(surf, _L("OBLIGATIONS SOUVERAINES", "SOVEREIGN BONDS"), (x, y), fonts.tiny(bold=True), config.COL_CYAN)
         pygame.draw.line(surf, config.COL_BORDER, (x, y + 17), (inner.right, y + 17), 1)
         y += 22
-        cols = [("OBLIGATION", x), ("RATING", x + 220), ("COUPON", x + 300),
-                ("MAT.", x + 380), ("YTM", x + 450), ("PRIX", x + 540), ("DUR.", x + 640)]
+        cols = [(_L("OBLIGATION", "BOND"), x), ("RATING", x + 220), ("COUPON", x + 300),
+                ("MAT.", x + 380), ("YTM", x + 450), (_L("PRIX", "PRICE"), x + 540), (_L("DUR.", "DUR.") , x + 640)]
         for label, cx in cols:
             widgets.draw_text(surf, label, (cx, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         y += 20
         govbonds = [q for q in B.sovereign_quotes(market) if q["gov"] == g["code"]]
         if not govbonds:
-            widgets.draw_text(surf, "Aucune obligation cotée pour ce pays.", (x, y),
+            widgets.draw_text(surf, _L("Aucune obligation cotée pour ce pays.", "No listed bonds for this country."), (x, y),
                               fonts.small(), config.COL_TEXT_DIM)
             y += 22
         for q in sorted(govbonds, key=lambda b: b["years"]):
@@ -223,8 +230,10 @@ class GovernmentsScene(Scene):
             sign = "+" if bump > 0 else ""
             bcol = config.COL_DOWN if bump > 0 else config.COL_UP
             y += 4
-            widgets.draw_text(surf, f"» Tension politique régionale : spread {sign}{bump*10000:.0f} bps "
+            widgets.draw_text(surf, _L(f"» Tension politique régionale : spread {sign}{bump*10000:.0f} bps "
                               "(les prix obligataires de la zone réagissent).",
+                              f"» Regional political tension: spread {sign}{bump*10000:.0f} bps "
+                              "(the region's bond prices react)."),
                               (x, y), fonts.tiny(bold=True), bcol)
             y += 20
 

@@ -10,9 +10,14 @@ import os
 import pygame
 
 from core import config
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from data import tutorials as T
 from ui import fonts, keynav, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 _IMG_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "tutorials")
@@ -97,15 +102,15 @@ class TutorialsScene(Scene):
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "TUTORIELS — COMMENT FAIRE", (40, 22),
+        widgets.draw_text(surf, _L("TUTORIELS — COMMENT FAIRE", "TUTORIALS — HOW TO"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Guides illustrés des actions clés du terminal.",
+        widgets.draw_text(surf, _L("Guides illustrés des actions clés du terminal.", "Illustrated guides to the terminal's key actions."),
                           (42, 72), fonts.small(), config.COL_TEXT_DIM)
 
         ph = config.footer_y() - 8 - 100
         # liste à gauche
         listp = pygame.Rect(40, 100, 320, ph)
-        linner = widgets.draw_panel(surf, listp, "Guides", config.COL_CYAN)
+        linner = widgets.draw_panel(surf, listp, _L("Guides", "Guides"), config.COL_CYAN)
         self._list_rect = linner
         self._rows = {}
         self.cursor = min(self.cursor, len(T.TUTORIALS) - 1) if T.TUTORIALS else 0
@@ -138,7 +143,7 @@ class TutorialsScene(Scene):
 
         # contenu à droite (panneau scrollable)
         readp = pygame.Rect(380, 100, config.SCREEN_WIDTH - 420, ph)
-        rinner = widgets.draw_panel(surf, readp, "Tutoriel", config.COL_AMBER)
+        rinner = widgets.draw_panel(surf, readp, _L("Tutoriel", "Tutorial"), config.COL_AMBER)
         self._content_rect = readp
         tut = T.get(self.sel)
         if not tut:
@@ -182,7 +187,7 @@ class TutorialsScene(Scene):
         box = pygame.Rect(rinner.x, cy, rinner.w, box_h)
         pygame.draw.rect(surf, config.COL_PANEL, box, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, (box.x, box.y, 3, box.h))
-        widgets.draw_text(surf, "À COMPRENDRE", (box.x + 12, box.y + 8),
+        widgets.draw_text(surf, _L("À COMPRENDRE", "TO UNDERSTAND"), (box.x + 12, box.y + 8),
                           fonts.tiny(bold=True), config.COL_CYAN)
         concept_h = widgets.draw_text_wrapped(surf, tut["concept"], (box.x + 12, box.y + 26),
                                   fonts.small(), config.COL_TEXT, box.w - 24)
@@ -205,7 +210,7 @@ class TutorialsScene(Scene):
         self.back_btn.draw(surf)
 
     def _draw_steps(self, surf, t, x, y, w, clip_rect=None):
-        widgets.draw_text(surf, "ÉTAPES", (x, y), fonts.tiny(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L("ÉTAPES", "STEPS"), (x, y), fonts.tiny(bold=True), config.COL_AMBER)
         y += 20
         for i, step in enumerate(t["steps"], 1):
             widgets.draw_text(surf, f"{i}.", (x, y), fonts.small(bold=True), config.COL_AMBER)

@@ -10,8 +10,14 @@ import pygame
 
 from core import config
 from core import rivals as R
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
 
 _MOOD_COL = {"up": config.COL_UP, "down": config.COL_DOWN, "flat": config.COL_TEXT_DIM}
 _TRACK_COL = {
@@ -25,12 +31,12 @@ def _relative_date(player, entry):
     le « T2 j14 » brut, dur à situer sans faire le calcul soi-même."""
     delta = player.day - entry.get("day", player.day)
     if delta <= 0:
-        return "aujourd'hui"
+        return _L("aujourd'hui", "today")
     if delta == 1:
-        return "hier"
+        return _L("hier", "yesterday")
     if delta < 14:
-        return f"il y a {delta} j"
-    return f"il y a {delta // 7} sem."
+        return _L(f"il y a {delta} j", f"{delta}d ago")
+    return _L(f"il y a {delta // 7} sem.", f"{delta // 7}w ago")
 
 
 class RivalsScene(Scene):
@@ -58,13 +64,13 @@ class RivalsScene(Scene):
         nem = R.nemesis(p, self.market)
         pscore = R.player_score(p, self.market)
 
-        widgets.draw_text(surf, "RIVAUX", (40, 22), fonts.title(bold=True), config.COL_AMBER)
-        sub = f"Rang {rank} / {total}"
+        widgets.draw_text(surf, _L("RIVAUX", "RIVALS"), (40, 22), fonts.title(bold=True), config.COL_AMBER)
+        sub = _L(f"Rang {rank} / {total}", f"Rank {rank} / {total}")
         if nem:
             gap = nem["score"] - pscore
-            sub += f"   ·   némésis : {nem['name']} (+{widgets.format_money(gap, cur)} devant)"
+            sub += _L(f"   ·   némésis : {nem['name']} (+{widgets.format_money(gap, cur)} devant)", f"   ·   nemesis: {nem['name']} (+{widgets.format_money(gap, cur)} ahead)")
         else:
-            sub += "   ·   vous dominez le classement"
+            sub += _L("   ·   vous dominez le classement", "   ·   you dominate the leaderboard")
         widgets.draw_text(surf, sub, (42, 72), fonts.small(), config.COL_TEXT_DIM)
 
         # cartes : une par acteur, triées par score (déjà fait par leaderboard)
@@ -98,10 +104,10 @@ class RivalsScene(Scene):
         col_left = pygame.Rect(rect.x, rect.y, int(rect.w * 0.62), rect.h)
         col_right = pygame.Rect(col_left.right + 10, rect.y, rect.right - col_left.right - 10, rect.h)
 
-        inner = widgets.draw_panel(surf, col_left, "Journal d'activité des rivaux", config.COL_DOWN)
+        inner = widgets.draw_panel(surf, col_left, _L("Journal d'activité des rivaux", "Rival activity log"), config.COL_DOWN)
         log_events = R.recent_activity(player, limit=max(1, inner.h // 16))
         if not log_events:
-            widgets.draw_text(surf, "Aucune activité rivale récente. Patientez, le temps avance en direct.",
+            widgets.draw_text(surf, _L("Aucune activité rivale récente. Patientez, le temps avance en direct.", "No recent rival activity. Wait, time advances live."),
                               (inner.x, inner.y + 2), fonts.tiny(), config.COL_TEXT_DIM)
         else:
             y = inner.y
@@ -114,13 +120,15 @@ class RivalsScene(Scene):
                                   (inner.x, y), fonts.tiny(), ecol)
                 y += row_h
 
-        inner2 = widgets.draw_panel(surf, col_right, "Coups récents", config.COL_AMBER)
+        inner2 = widgets.draw_panel(surf, col_right, _L("Coups récents", "Recent moves"), config.COL_AMBER)
         max_recent = max(1, inner2.h // 16)
         recent = list(reversed(getattr(player, "rival_events", None) or []))[:max_recent]
         if not recent:
-            widgets.draw_text_wrapped(surf, "Rien à signaler pour l'instant. Les rivaux agissent "
-                                      "au fil du temps (qui avance en direct) : sniping de deals, "
+            widgets.draw_text_wrapped(surf, _L("Rien à signaler pour l'instant. Les rivaux agissent ", "Nothing to report yet. Rivals act ") +
+                                      _L("au fil du temps (qui avance en direct) : sniping de deals, "
                                       "débauchage de mandats, percées en cours.",
+                                      "over time (which advances live): deal sniping, "
+                                      "mandate poaching, breakthroughs under way."),
                               (inner2.x, inner2.y + 2), fonts.tiny(), config.COL_TEXT_DIM, inner2.w)
             return
         y = inner2.y
@@ -166,9 +174,9 @@ class RivalsScene(Scene):
             widgets.draw_badge(surf, rdata.get("track", "?"), (rect.x + 70, rect.y + 54), tcol)
             style = rdata.get("style", "")
             if style:
-                style_label = {"aggressive": "Agressif", "conservative": "Prudent",
+                style_label = {"aggressive": _L("Agressif", "Aggressive"), "conservative": _L("Prudent", "Conservative"),
                                "momentum": "Momentum", "value": "Value",
-                               "balanced": "Équilibré"}.get(style, "")
+                               "balanced": _L("Équilibré", "Balanced")}.get(style, "")
                 widgets.draw_text(surf, style_label, (rect.x + 160, rect.y + 54),
                                   fonts.tiny(), config.COL_TEXT_DIM)
             mood = _MOOD_COL.get(rdata.get("mood", "flat"), config.COL_TEXT_DIM)
@@ -197,5 +205,5 @@ class RivalsScene(Scene):
             widgets.draw_text(surf, f"{sign}{widgets.format_money(delta, cur)} vs vous",
                               (rect.right - 16, rect.y + 40), fonts.tiny(), dcol, align="right")
             if is_nem:
-                widgets.draw_text(surf, "NÉMÉSIS", (rect.right - 16, rect.y + 62),
+                widgets.draw_text(surf, _L("NÉMÉSIS", "NEMESIS"), (rect.right - 16, rect.y + 62),
                                   fonts.tiny(bold=True), config.COL_DOWN, align="right")

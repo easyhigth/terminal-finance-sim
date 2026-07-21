@@ -299,10 +299,12 @@ def country_premium(gov):
 
 
 def stability_label(stability):
+    from core.i18n import get_lang
+    en = get_lang() == "en"
     if stability >= 0.82:
-        return "Très stable"
+        return "Very stable" if en else "Très stable"
     if stability >= 0.68:
         return "Stable"
     if stability >= 0.52:
         return "Fragile"
-    return "Instable"
+    return "Unstable" if en else "Instable"

@@ -12,15 +12,20 @@ import pygame
 
 from core import config, unlocks
 from core import etfs as E
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
 from ui.popups import PopupMixin
 
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
 LOT = 10
 ROW_H = 26
-SORT_FIELDS = [("name", "NOM"), ("price", "NAV"), ("change_pct", "VAR %"),
-               ("change_1y", "1 AN"), ("yield", "RDT"), ("expense", "FRAIS"),
-               ("risk", "RISQUE")]
+SORT_FIELDS = [("name", ("NOM", "NAME")), ("price", ("NAV", "NAV")), ("change_pct", ("VAR %", "CHG %")),
+               ("change_1y", ("1 AN", "1Y")), ("yield", ("RDT", "YLD")), ("expense", ("FRAIS", "FEES")),
+               ("risk", ("RISQUE", "RISK"))]
 
 
 class ETFScene(Scene, PopupMixin):
@@ -49,7 +54,7 @@ class ETFScene(Scene, PopupMixin):
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.explore_btn = widgets.Button((220, config.SCREEN_HEIGHT - 50, 160, 42),
-                                          "EXPLORER", config.COL_CYAN)
+                                          _L("EXPLORER", "EXPLORE"), config.COL_CYAN)
 
     def _can_trade(self):
         return unlocks.unlocked(self.app.gs.player, "trade")
@@ -163,16 +168,16 @@ class ETFScene(Scene, PopupMixin):
             for eid, rect in self.buy_rects.items():
                 if rect.collidepoint(event.pos):
                     r = E.buy(p, m, eid, LOT)
-                    self.msg = (f"Acheté {LOT} × {eid} @ {r['price']:.2f}"
-                                if r["ok"] else f"Achat refusé ({r['reason']}).")
+                    self.msg = (_L(f"Acheté {LOT} × {eid} @ {r['price']:.2f}", f"Bought {LOT} × {eid} @ {r['price']:.2f}")
+                                if r["ok"] else _L(f"Achat refusé ({r['reason']}).", f"Buy rejected ({r['reason']})."))
                     if r["ok"] and not p.hardcore:
                         self.app.gs.save(config.AUTOSAVE_SLOT)
                     return
             for eid, rect in self.sell_rects.items():
                 if rect.collidepoint(event.pos):
                     r = E.sell(p, m, eid, LOT)
-                    self.msg = (f"Vendu {min(LOT, r['qty']):.0f} × {eid} (P&L {r['realized']:+.0f})"
-                                if r["ok"] else "Aucune position.")
+                    self.msg = (_L(f"Vendu {min(LOT, r['qty']):.0f} × {eid} (P&L {r['realized']:+.0f})", f"Sold {min(LOT, r['qty']):.0f} × {eid} (P&L {r['realized']:+.0f})")
+                                if r["ok"] else _L("Aucune position.", "No position."))
                     if r["ok"] and not p.hardcore:
                         self.app.gs.save(config.AUTOSAVE_SLOT)
                     return
@@ -190,8 +195,10 @@ class ETFScene(Scene, PopupMixin):
         p = self.app.gs.player
         cur = config.CONTINENTS[p.continent]["currency"]
         widgets.draw_text(surf, "ETF", (40, 22), fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Fonds indiciels : un panier dont la NAV émerge de son exposition — "
-                                "réagit aux mêmes facteurs (monde/secteur/région/taux). "
+        widgets.draw_text(surf, _L("Fonds indiciels : un panier dont la NAV émerge de son exposition — "
+                                "réagit aux mêmes facteurs (monde/secteur/région/taux). ",
+                                "Index funds: a basket whose NAV emerges from its exposure — "
+                                "reacts to the same factors (world/sector/region/rates). ")
                                 + (self.msg if self.msg else ""),
                           (42, 72), fonts.small(), config.COL_TEXT_DIM)
         mp = pygame.mouse.get_pos()
@@ -204,7 +211,7 @@ class ETFScene(Scene, PopupMixin):
         pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, search_rect, 1, border_radius=4)
         cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        label = (self.search + cursor) if self.search else (cursor + "Tapez pour rechercher (nom, ticker, exposition)…")
+        label = (self.search + cursor) if self.search else (cursor + _L("Tapez pour rechercher (nom, ticker, exposition)…", "Type to search (name, ticker, exposure)…"))
         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
                           (search_rect.x + 8, search_rect.y + 4), fonts.small(),
                           config.COL_TEXT if self.search else config.COL_TEXT_DIM)
@@ -215,20 +222,20 @@ class ETFScene(Scene, PopupMixin):
                               config.COL_TEXT_DIM, align="center")
 
         # chips catégorie
-        cat_chips = [(None, "TOUTES")] + [(k, lbl) for k, lbl in E.CATEGORIES]
+        cat_chips = [(None, _L("TOUTES", "ALL"))] + [(k, lbl) for k, lbl in E.CATEGORIES]
         self._cat_rects, ybot = self._draw_chip_row(surf, x0 + 290, top, config.SCREEN_WIDTH - 40,
                                                      cat_chips, self.cat_filter, config.COL_PRESTIGE)
         y = max(ybot, top + 28)
 
         # tri
         self._sort_rects = {}
-        widgets.draw_text(surf, "TRIER :", (x0, y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("TRIER :", "SORT:"), (x0, y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         sx0 = x0 + 56
         sx = sx0
         for key, lbl in SORT_FIELDS:
             active = (self.sort_key == key)
             arrow = (" ▲" if self.sort_dir > 0 else " ▼") if active else ""
-            full = lbl + arrow
+            full = _L(*lbl) + arrow
             w = fonts.tiny(bold=True).size(full)[0] + 16
             rect = pygame.Rect(sx, y, w, 20)
             self._sort_rects[key] = rect
@@ -248,9 +255,9 @@ class ETFScene(Scene, PopupMixin):
                      "expo": inner.x + 410, "risk": inner.x + 645, "nav": inner.x + 705,
                      "var": inner.x + 775, "y1": inner.x + 845, "yld": inner.x + 910,
                      "exp": inner.x + 970, "you": inner.x + 1030, "act": inner.x + 1075}
-        heads = [("NOM", "name"), ("TICK", "tk"), ("CAT.", "cat"), ("EXPOSITION", "expo"),
-                 ("RISQ", "risk"), ("NAV", "nav"), ("VAR%", "var"), ("1AN", "y1"),
-                 ("RDT", "yld"), ("FRAIS", "exp"), ("VOUS", "you")]
+        heads = [(_L("NOM", "NAME"), "name"), ("TICK", "tk"), ("CAT.", "cat"), (_L("EXPOSITION", "EXPOSURE"), "expo"),
+                 (_L("RISQ", "RISK"), "risk"), ("NAV", "nav"), (_L("VAR%", "CHG%"), "var"), (_L("1AN", "1Y"), "y1"),
+                 (_L("RDT", "YLD"), "yld"), (_L("FRAIS", "FEES"), "exp"), (_L("VOUS", "YOU"), "you")]
         for lbl, key in heads:
             widgets.draw_text(surf, lbl, (self.cols[key], inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         if self._can_trade():
@@ -281,12 +288,12 @@ class ETFScene(Scene, PopupMixin):
             pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 6, bar_h), border_radius=3)
 
         hv = E.holdings_value(p, m)
-        widgets.draw_text(surf, f"Valeur ETF détenue : {widgets.format_money(hv, cur)}"
-                          + ("" if self._can_trade() else "   ⊘ trading débloqué au grade Associate"),
+        widgets.draw_text(surf, _L(f"Valeur ETF détenue : {widgets.format_money(hv, cur)}", f"ETF holdings value: {widgets.format_money(hv, cur)}")
+                          + ("" if self._can_trade() else _L("   ⊘ trading débloqué au grade Associate", "   ⊘ trading unlocked at Associate grade")),
                           (inner.x, inner.bottom - 18), fonts.small(bold=True),
                           config.COL_UP if hv else config.COL_TEXT_DIM)
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("↑↓", "actifs"), ("ENTRÉE", "ouvrir")])
+                              [("↑↓", _L("actifs", "assets")), (_L("ENTRÉE", "ENTER"), _L("ouvrir", "open"))])
         self.back_btn.draw(surf)
         self.explore_btn.draw(surf)
         self.popups_draw(surf)

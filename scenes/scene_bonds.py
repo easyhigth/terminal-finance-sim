@@ -12,14 +12,19 @@ import pygame
 
 from core import bonds as B
 from core import config, unlocks
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
 from ui.popups import PopupMixin
 
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
 LOT = 10   # taille d'un paquet d'achat/vente
 ROW_H = 28
-SORT_FIELDS = [("name", "NOM"), ("price", "COURS"), ("value", "VALEUR"),
-               ("ytm", "RENDEMENT"), ("mod_duration", "DURATION")]
+SORT_FIELDS = [("name", ("NOM", "NAME")), ("price", ("COURS", "PRICE")), ("value", ("VALEUR", "VALUE")),
+               ("ytm", ("RENDEMENT", "YIELD")), ("mod_duration", ("DURATION", "DURATION"))]
 
 
 class BondsScene(Scene, PopupMixin):
@@ -37,7 +42,7 @@ class BondsScene(Scene, PopupMixin):
         self._row_list = []
         self._row_offsets = {}
         self.search_box = widgets.SearchBox((40, 100, 280, 24),
-                                             "Tapez pour rechercher (nom, émetteur)…")
+                                             _L("Tapez pour rechercher (nom, émetteur)…", "Type to search (name, issuer)…"))
         self.sort_key = "ytm"
         self.sort_dir = -1
         self._sort_rects = {}
@@ -47,7 +52,7 @@ class BondsScene(Scene, PopupMixin):
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.gov_btn = widgets.Button((220, config.SCREEN_HEIGHT - 50, 160, 42),
-                                      "PAYS / GOV", config.COL_CYAN)
+                                      _L("PAYS / GOV", "COUNTRIES / GOV"), config.COL_CYAN)
 
     def _can_trade(self):
         return unlocks.unlocked(self.app.gs.player, "trade")
@@ -141,15 +146,15 @@ class BondsScene(Scene, PopupMixin):
             for bid, rect in self.buy_rects.items():
                 if rect.collidepoint(event.pos):
                     r = B.buy_bond(p, m, bid, LOT)
-                    self.msg = (f"Acheté {LOT} × {bid} @ {r['price']:.2f}"
-                                if r["ok"] else f"Achat refusé ({r['reason']}).")
+                    self.msg = (_L(f"Acheté {LOT} × {bid} @ {r['price']:.2f}", f"Bought {LOT} × {bid} @ {r['price']:.2f}")
+                                if r["ok"] else _L(f"Achat refusé ({r['reason']}).", f"Buy rejected ({r['reason']})."))
                     if r["ok"] and not p.hardcore:
                         self.app.gs.save(config.AUTOSAVE_SLOT)
             for bid, rect in self.sell_rects.items():
                 if rect.collidepoint(event.pos):
                     r = B.sell_bond(p, m, bid, LOT)
-                    self.msg = (f"Vendu {min(LOT, r['qty']):.0f} × {bid} (P&L {r['realized']:+.0f})"
-                                if r["ok"] else "Aucune position.")
+                    self.msg = (_L(f"Vendu {min(LOT, r['qty']):.0f} × {bid} (P&L {r['realized']:+.0f})", f"Sold {min(LOT, r['qty']):.0f} × {bid} (P&L {r['realized']:+.0f})")
+                                if r["ok"] else _L("Aucune position.", "No position."))
                     if r["ok"] and not p.hardcore:
                         self.app.gs.save(config.AUTOSAVE_SLOT)
 
@@ -164,11 +169,13 @@ class BondsScene(Scene, PopupMixin):
         m = self.app.market
         p = self.app.gs.player
         cur = config.CONTINENTS[p.continent]["currency"]
-        widgets.draw_text(surf, "MARCHÉ OBLIGATAIRE", (40, 22),
+        widgets.draw_text(surf, _L("MARCHÉ OBLIGATAIRE", "BOND MARKET"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         lvl = B.base_yield_level(m) * 100
-        widgets.draw_text(surf, f"Niveau de courbe ≈ {lvl:.2f}% (taux directeur) · prix ↑ quand les "
-                                "taux ↓ (duration) · souverains (GOV) & corporate. "
+        widgets.draw_text(surf, _L(f"Niveau de courbe ≈ {lvl:.2f}% (taux directeur) · prix ↑ quand les "
+                                "taux ↓ (duration) · souverains (GOV) & corporate. ",
+                                f"Curve level ≈ {lvl:.2f}% (policy rate) · price ↑ when "
+                                "rates ↓ (duration) · sovereign (GOV) & corporate. ")
                                 + (self.msg if self.msg else ""),
                           (42, 74), fonts.small(), config.COL_TEXT_DIM)
 
@@ -176,12 +183,12 @@ class BondsScene(Scene, PopupMixin):
         self.search_box.draw(surf)
         sort_y = self.search_box.rect.bottom + 8
         self._sort_rects = {}
-        widgets.draw_text(surf, "TRIER :", (40, sort_y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("TRIER :", "SORT:"), (40, sort_y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         sx = 40 + 56
         for key, lbl in SORT_FIELDS:
             active = (self.sort_key == key)
             arrow = (" ▲" if self.sort_dir > 0 else " ▼") if active else ""
-            full = lbl + arrow
+            full = _L(*lbl) + arrow
             w = fonts.tiny(bold=True).size(full)[0] + 16
             rect = pygame.Rect(sx, sort_y, w, 20)
             self._sort_rects[key] = rect
@@ -193,9 +200,9 @@ class BondsScene(Scene, PopupMixin):
 
         self._kind_rects = {}
         kx = sx + 20
-        widgets.draw_text(surf, "TYPE :", (kx, sort_y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("TYPE :", "TYPE:"), (kx, sort_y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         kx += 48
-        for val, lbl in (("Souverain", "SOUVERAINS"), ("Corporate", "CORPORATE")):
+        for val, lbl in (("Souverain", _L("SOUVERAINS", "SOVEREIGN")), ("Corporate", _L("CORPORATE", "CORPORATE"))):
             active = (self.kind_filter == val)
             w = fonts.tiny(bold=True).size(lbl)[0] + 16
             rect = pygame.Rect(kx, sort_y, w, 20)
@@ -209,16 +216,16 @@ class BondsScene(Scene, PopupMixin):
         top = sort_y + 28
         ph = config.footer_y() - 8 - top
         panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, ph)
-        inner = widgets.draw_panel(surf, panel, "Obligations", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Obligations", "Bonds"), config.COL_CYAN)
 
         # colonnes (x relatifs à inner.x)
         self.cols = {"name": inner.x, "type": inner.x + 270, "issuer": inner.x + 350,
                      "rating": inner.x + 560, "coupon": inner.x + 620,
                      "mat": inner.x + 690, "ytm": inner.x + 745, "price": inner.x + 820,
                      "dur": inner.x + 900, "you": inner.x + 960, "act": inner.x + 1010}
-        heads = [("OBLIGATION", "name"), ("TYPE", "type"), ("ÉMETTEUR / PAYS", "issuer"),
+        heads = [(_L("OBLIGATION", "BOND"), "name"), ("TYPE", "type"), (_L("ÉMETTEUR / PAYS", "ISSUER / COUNTRY"), "issuer"),
                  ("RATING", "rating"), ("CPN", "coupon"), ("MAT", "mat"), ("YTM", "ytm"),
-                 ("PRIX", "price"), ("DUR", "dur"), ("VOUS", "you")]
+                 (_L("PRIX", "PRICE"), "price"), ("DUR", "dur"), (_L("VOUS", "YOU"), "you")]
         for label, key in heads:
             widgets.draw_text(surf, label, (self.cols[key], inner.y), fonts.tiny(bold=True),
                               config.COL_TEXT_DIM)
@@ -262,9 +269,9 @@ class BondsScene(Scene, PopupMixin):
         cursor_id = self._row_list[self.row_cursor] if self._row_list else None
         y = list_top - self.scroll
         if sov:
-            y = self._draw_group(surf, "SOUVERAINS", sov, y, p, m, list_area, mp, cursor_id)
+            y = self._draw_group(surf, _L("SOUVERAINS", "SOVEREIGN"), sov, y, p, m, list_area, mp, cursor_id)
         if corp:
-            y = self._draw_group(surf, "CORPORATE", corp, y, p, m, list_area, mp, cursor_id)
+            y = self._draw_group(surf, _L("CORPORATE", "CORPORATE"), corp, y, p, m, list_area, mp, cursor_id)
         surf.set_clip(prev_clip)
 
         content_h = (y + self.scroll) - list_top
@@ -274,12 +281,12 @@ class BondsScene(Scene, PopupMixin):
 
         # synthèse position obligataire
         hv = B.holdings_value(p, m)
-        widgets.draw_text(surf, f"Valeur obligataire détenue : {widgets.format_money(hv, cur)}"
-                          + ("" if self._can_trade() else "   ⊘ trading débloqué au grade Associate"),
+        widgets.draw_text(surf, _L(f"Valeur obligataire détenue : {widgets.format_money(hv, cur)}", f"Bond holdings value: {widgets.format_money(hv, cur)}")
+                          + ("" if self._can_trade() else _L("   ⊘ trading débloqué au grade Associate", "   ⊘ trading unlocked at Associate grade")),
                           (inner.x, inner.bottom - 20), fonts.small(bold=True),
                           config.COL_UP if hv else config.COL_TEXT_DIM)
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("↑↓", "obligations"), ("ENTRÉE", "ouvrir")])
+                              [("↑↓", _L("obligations", "bonds")), (_L("ENTRÉE", "ENTER"), _L("ouvrir", "open"))])
         self.back_btn.draw(surf)
         self.gov_btn.draw(surf)
         self.popups_draw(surf)
@@ -304,7 +311,7 @@ class BondsScene(Scene, PopupMixin):
                 widgets.draw_text(surf, widgets.fit_text(q["name"], fonts.small(bold=True), 260),
                                   (cols["name"], y), fonts.small(bold=True), config.COL_TEXT)
                 tcol = config.COL_CYAN if q["kind"] == "Souverain" else config.COL_PRESTIGE
-                widgets.draw_text(surf, "Souv." if q["kind"] == "Souverain" else "Corp.",
+                widgets.draw_text(surf, (_L("Souv.", "Sov.") if q["kind"] == "Souverain" else "Corp."),
                                   (cols["type"], y), fonts.tiny(bold=True), tcol)
                 issuer = widgets.fit_text(q["issuer"], fonts.tiny(), 200)
                 if issuer != q["issuer"]:
@@ -326,8 +333,10 @@ class BondsScene(Scene, PopupMixin):
                         fs = B.fill_price(m, q["id"], LOT, "sell")
                         if fb and fs and q["price"]:
                             spread_pct = (fb - fs) / q["price"] * 100
-                            self._tooltip = (f"Achat ~{fb:.2f} / Vente ~{fs:.2f} "
-                                              f"(spread {spread_pct:.2f}% pour {LOT} unités)", mp)
+                            self._tooltip = (_L(f"Achat ~{fb:.2f} / Vente ~{fs:.2f} "
+                                              f"(spread {spread_pct:.2f}% pour {LOT} unités)",
+                                              f"Buy ~{fb:.2f} / Sell ~{fs:.2f} "
+                                              f"(spread {spread_pct:.2f}% for {LOT} units)"), mp)
                 widgets.draw_text(surf, f"{q['mod_duration']:.1f}", (cols["dur"], y), fonts.small(), config.COL_TEXT_DIM)
                 pos = p.bonds.get(q["id"])
                 held = pos["qty"] if pos else 0

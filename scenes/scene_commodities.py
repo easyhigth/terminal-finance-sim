@@ -11,20 +11,38 @@ import pygame
 
 from core import commodities as C
 from core import config, unlocks
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
 from ui.popups import PopupMixin
 
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
 LOT = 5
 ROW_H = 26
-SORT_FIELDS = [("name", "NOM"), ("spot", "COURS"), ("value", "VALEUR"),
-               ("roll_yield", "ROLL"), ("vol", "VOL")]
+SORT_FIELDS = [("name", ("NOM", "NAME")), ("spot", ("COURS", "PRICE")), ("value", ("VALEUR", "VALUE")),
+               ("roll_yield", ("ROLL", "ROLL")), ("vol", ("VOL", "VOL"))]
 
 CATEGORY_ORDER = [
     "Métaux précieux", "Énergie", "Métaux industriels", "Minéraux stratégiques",
     "Céréales & oléagineux", "Softs & tropicaux", "Bétail & laitier",
     "Matériaux & construction", "Exotiques & environnement",
 ]
+
+# Libellés d'affichage EN (les clés FR restent les clés de données q["category"]).
+_CATEGORY_EN = {
+    "Métaux précieux": "Precious metals", "Énergie": "Energy",
+    "Métaux industriels": "Industrial metals", "Minéraux stratégiques": "Strategic minerals",
+    "Céréales & oléagineux": "Grains & oilseeds", "Softs & tropicaux": "Softs & tropicals",
+    "Bétail & laitier": "Livestock & dairy", "Matériaux & construction": "Materials & construction",
+    "Exotiques & environnement": "Exotics & environment",
+}
+
+
+def _cat_label(cat):
+    return _CATEGORY_EN.get(cat, cat) if get_lang() == "en" else cat
 
 
 class CommoditiesScene(Scene, PopupMixin):
@@ -46,7 +64,7 @@ class CommoditiesScene(Scene, PopupMixin):
         self.sort_dir = 1
         self._sort_rects = {}
         self._flash = widgets.TickFlash()
-        self.search_box = widgets.SearchBox((40, 94, 260, 24), "Tapez pour rechercher…")
+        self.search_box = widgets.SearchBox((40, 94, 260, 24), _L("Tapez pour rechercher…", "Type to search…"))
         self.back_btn = widgets.Button(config.back_button_rect(160),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
@@ -140,15 +158,15 @@ class CommoditiesScene(Scene, PopupMixin):
             for cid, rect in self.buy_rects.items():
                 if rect.collidepoint(event.pos):
                     r = C.buy(p, m, cid, LOT)
-                    self.msg = (f"Acheté {LOT} {cid}" if r["ok"]
-                                else f"Achat refusé ({r['reason']}).")
+                    self.msg = (_L(f"Acheté {LOT} {cid}", f"Bought {LOT} {cid}") if r["ok"]
+                                else _L(f"Achat refusé ({r['reason']}).", f"Buy rejected ({r['reason']})."))
                     if r["ok"] and not p.hardcore:
                         self.app.gs.save(config.AUTOSAVE_SLOT)
             for cid, rect in self.sell_rects.items():
                 if rect.collidepoint(event.pos):
                     r = C.sell(p, m, cid, LOT)
-                    self.msg = (f"Vendu {cid} (P&L {r['realized']:+.0f})" if r["ok"]
-                                else "Aucune position.")
+                    self.msg = (_L(f"Vendu {cid} (P&L {r['realized']:+.0f})", f"Sold {cid} (P&L {r['realized']:+.0f})") if r["ok"]
+                                else _L("Aucune position.", "No position."))
                     if r["ok"] and not p.hardcore:
                         self.app.gs.save(config.AUTOSAVE_SLOT)
 
@@ -160,10 +178,12 @@ class CommoditiesScene(Scene, PopupMixin):
         surf.fill(config.COL_BG)
         m, p = self.app.market, self.app.gs.player
         cur = config.CONTINENTS[p.continent]["currency"]
-        widgets.draw_text(surf, "MATIÈRES PREMIÈRES — FUTURES", (40, 22),
+        widgets.draw_text(surf, _L("MATIÈRES PREMIÈRES — FUTURES", "COMMODITIES — FUTURES"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Contango = futures > spot (roll négatif) · "
-                                "backwardation = futures < spot (roll positif). " + self.msg,
+        widgets.draw_text(surf, _L("Contango = futures > spot (roll négatif) · "
+                                "backwardation = futures < spot (roll positif). ",
+                                "Contango = futures > spot (negative roll) · "
+                                "backwardation = futures < spot (positive roll). ") + self.msg,
                           (42, 64), fonts.small(), config.COL_TEXT_DIM)
 
         # ---- recherche ----
@@ -178,11 +198,12 @@ class CommoditiesScene(Scene, PopupMixin):
         sel = self.cat_filter is None
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, all_rect, border_radius=3)
         pygame.draw.rect(surf, config.COL_CYAN if sel else config.COL_BORDER, all_rect, 1, border_radius=3)
-        widgets.draw_text(surf, "TOUTES", all_rect.center, fonts.tiny(bold=sel),
+        widgets.draw_text(surf, _L("TOUTES", "ALL"), all_rect.center, fonts.tiny(bold=sel),
                           config.COL_CYAN if sel else config.COL_TEXT_DIM, align="center")
         cx += 78
         for cat in CATEGORY_ORDER:
-            w = max(70, fonts.tiny(bold=True).size(cat)[0] + 16)
+            clabel = _cat_label(cat)
+            w = max(70, fonts.tiny(bold=True).size(clabel)[0] + 16)
             rect = pygame.Rect(cx, cy, w, 20)
             if rect.right > config.SCREEN_WIDTH - 40:
                 cx = 42
@@ -192,18 +213,18 @@ class CommoditiesScene(Scene, PopupMixin):
             sel = (self.cat_filter == cat)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect, border_radius=3)
             pygame.draw.rect(surf, config.COL_AMBER if sel else config.COL_BORDER, rect, 1, border_radius=3)
-            widgets.draw_text(surf, cat, rect.center, fonts.tiny(bold=sel),
+            widgets.draw_text(surf, clabel, rect.center, fonts.tiny(bold=sel),
                               config.COL_AMBER if sel else config.COL_TEXT_DIM, align="center")
             cx += w + 8
 
         sort_y = cy + 30
         self._sort_rects = {}
-        widgets.draw_text(surf, "TRIER :", (40, sort_y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("TRIER :", "SORT:"), (40, sort_y + 3), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         sx = 40 + 56
         for key, lbl in SORT_FIELDS:
             active = (self.sort_key == key)
             arrow = (" ▲" if self.sort_dir > 0 else " ▼") if active else ""
-            full = lbl + arrow
+            full = _L(*lbl) + arrow
             w = fonts.tiny(bold=True).size(full)[0] + 16
             rect = pygame.Rect(sx, sort_y, w, 20)
             self._sort_rects[key] = rect
@@ -216,10 +237,10 @@ class CommoditiesScene(Scene, PopupMixin):
         panel_top = sort_y + 28
         ph = config.footer_y() - 8 - panel_top
         panel = pygame.Rect(40, panel_top, config.SCREEN_WIDTH - 80, ph)
-        inner = widgets.draw_panel(surf, panel, "Contrats", config.COL_CYAN)
-        cols = [("COMMODITY", inner.x), ("SPOT", inner.x + 280), ("FUTURE 1M", inner.x + 380),
-                ("STRUCTURE", inner.x + 500), ("ROLL/AN", inner.x + 660),
-                ("VOL", inner.x + 740), ("VOUS", inner.x + 800)]
+        inner = widgets.draw_panel(surf, panel, _L("Contrats", "Contracts"), config.COL_CYAN)
+        cols = [("COMMODITY", inner.x), ("SPOT", inner.x + 280), (_L("FUTURE 1M", "1M FUTURE"), inner.x + 380),
+                ("STRUCTURE", inner.x + 500), (_L("ROLL/AN", "ROLL/YR"), inner.x + 660),
+                ("VOL", inner.x + 740), (_L("VOUS", "YOU"), inner.x + 800)]
         for label, x in cols:
             widgets.draw_text(surf, label, (x, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
 
@@ -255,7 +276,7 @@ class CommoditiesScene(Scene, PopupMixin):
                            key=sort_value, reverse=(self.sort_dir < 0))
             if not q_cat:
                 continue
-            y = self._draw_group(surf, cat, q_cat, y, p, list_area, cols, cur, mp, cursor_id)
+            y = self._draw_group(surf, _cat_label(cat), q_cat, y, p, list_area, cols, cur, mp, cursor_id)
         surf.set_clip(prev_clip)
 
         content_h = (y + self.scroll) - list_top
@@ -270,12 +291,12 @@ class CommoditiesScene(Scene, PopupMixin):
             pygame.draw.rect(surf, config.COL_AMBER_DIM, (track.x, bar_y, 6, bar_h), border_radius=3)
 
         hv = C.holdings_value(p, m)
-        widgets.draw_text(surf, f"Valeur commodities détenue : {widgets.format_money(hv, cur)}"
-                          + ("" if self._can_trade() else "   ⊘ trading débloqué au grade Associate"),
+        widgets.draw_text(surf, _L(f"Valeur commodities détenue : {widgets.format_money(hv, cur)}", f"Commodity holdings value: {widgets.format_money(hv, cur)}")
+                          + ("" if self._can_trade() else _L("   ⊘ trading débloqué au grade Associate", "   ⊘ trading unlocked at Associate grade")),
                           (inner.x, inner.bottom - 22), fonts.small(bold=True),
                           config.COL_UP if hv else config.COL_TEXT_DIM)
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("↑↓", "contrats"), ("ENTRÉE", "ouvrir")])
+                              [("↑↓", _L("contrats", "contracts")), (_L("ENTRÉE", "ENTER"), _L("ouvrir", "open"))])
         self.back_btn.draw(surf)
         self.popups_draw(surf)
         if self._tooltip:

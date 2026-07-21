@@ -8,6 +8,7 @@ import pygame
 
 from core import config, unlocks
 from core import crypto as K
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
 from ui.popups import PopupMixin
@@ -15,11 +16,15 @@ from ui.popups import PopupMixin
 LOT = 1
 
 
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
 class CryptoScene(Scene, PopupMixin):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
         self.msg = ""
-        self.search_box = widgets.SearchBox((40, 100, 280, 24), "Rechercher un actif…")
+        self.search_box = widgets.SearchBox((40, 100, 280, 24), _L("Rechercher un actif…", "Search an asset…"))
         self.buy_rects, self.sell_rects = {}, {}
         self.name_rects = {}
         self.row_cursor = 0
@@ -30,7 +35,7 @@ class CryptoScene(Scene, PopupMixin):
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
                                         config.back_button_rect(160)[1], 150, 42),
-                                       "TUTO", config.COL_CYAN)
+                                       _L("TUTO", "GUIDE"), config.COL_CYAN)
 
     def _can_trade(self):
         return unlocks.unlocked(self.app.gs.player, "trade")
@@ -80,14 +85,15 @@ class CryptoScene(Scene, PopupMixin):
             for cid, rect in self.buy_rects.items():
                 if rect.collidepoint(event.pos):
                     r = K.buy(p, m, cid, LOT)
-                    self.msg = f"Acheté {LOT} {cid}" if r["ok"] else f"Refusé ({r['reason']})."
+                    self.msg = (_L(f"Acheté {LOT} {cid}", f"Bought {LOT} {cid}") if r["ok"]
+                                else _L(f"Refusé ({r['reason']}).", f"Rejected ({r['reason']})."))
                     if r["ok"] and not p.hardcore:
                         self.app.gs.save(config.AUTOSAVE_SLOT)
             for cid, rect in self.sell_rects.items():
                 if rect.collidepoint(event.pos):
                     r = K.sell(p, m, cid, LOT)
-                    self.msg = (f"Vendu {cid} (P&L {r['realized']:+.0f})" if r["ok"]
-                                else "Aucune position.")
+                    self.msg = (_L(f"Vendu {cid} (P&L {r['realized']:+.0f})", f"Sold {cid} (P&L {r['realized']:+.0f})") if r["ok"]
+                                else _L("Aucune position.", "No position."))
                     if r["ok"] and not p.hardcore:
                         self.app.gs.save(config.AUTOSAVE_SLOT)
 
@@ -100,16 +106,20 @@ class CryptoScene(Scene, PopupMixin):
         surf.fill(config.COL_BG)
         m, p = self.app.market, self.app.gs.player
         cur = config.CONTINENTS[p.continent]["currency"]
-        widgets.draw_text(surf, "CRYPTO-ACTIFS", (40, 22), fonts.title(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L("CRYPTO-ACTIFS", "CRYPTO-ASSETS"), (40, 22), fonts.title(bold=True), config.COL_AMBER)
         depegs = K.active_depegs(m)
         if depegs:
             names = ", ".join(K.name(d) for d in depegs)
-            warn = (f"⚠ DEPEG en cours sur {names} — risque de CONTAGION sur les "
-                    "crypto-actifs corrélés. " + self.msg)
+            warn = (_L(f"⚠ DEPEG en cours sur {names} — risque de CONTAGION sur les "
+                    "crypto-actifs corrélés. ",
+                    f"⚠ DEPEG under way on {names} — CONTAGION risk on correlated "
+                    "crypto-assets. ") + self.msg)
             wcol = config.COL_DOWN
         else:
-            warn = ("Classe très volatile, sans flux. Le stablecoin vise 1.0 mais "
-                    "peut DÉCROCHER (depeg). " + self.msg)
+            warn = (_L("Classe très volatile, sans flux. Le stablecoin vise 1.0 mais "
+                    "peut DÉCROCHER (depeg). ",
+                    "Highly volatile, no yield. The stablecoin targets 1.0 but "
+                    "can BREAK ITS PEG (depeg). ") + self.msg)
             wcol = config.COL_TEXT_DIM
         widgets.draw_text(surf, warn, (42, 74), fonts.small(), wcol)
 
@@ -118,9 +128,9 @@ class CryptoScene(Scene, PopupMixin):
         top = self.search_box.rect.bottom + 8
         ph = config.footer_y() - 8 - top
         panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, ph)
-        inner = widgets.draw_panel(surf, panel, "Marché crypto", config.COL_CYAN)
-        cols = [("ACTIF", inner.x), ("SPOT", inner.x + 300), ("VOL/AN", inner.x + 470),
-                ("TYPE", inner.x + 580), ("VOUS", inner.x + 760)]
+        inner = widgets.draw_panel(surf, panel, _L("Marché crypto", "Crypto market"), config.COL_CYAN)
+        cols = [(_L("ACTIF", "ASSET"), inner.x), ("SPOT", inner.x + 300), (_L("VOL/AN", "VOL/YR"), inner.x + 470),
+                ("TYPE", inner.x + 580), (_L("VOUS", "YOU"), inner.x + 760)]
         for label, x in cols:
             widgets.draw_text(surf, label, (x, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         self.buy_rects, self.sell_rects = {}, {}
@@ -157,7 +167,7 @@ class CryptoScene(Scene, PopupMixin):
                 label = "Stablecoin" + (" ⚠ DEPEG" if depeg else "")
                 lcol = config.COL_DOWN if depeg else config.COL_CYAN
             elif risk > 0.02:
-                label = f"Crypto ⚡ contagion {risk*100:.0f}%"
+                label = _L(f"Crypto ⚡ contagion {risk*100:.0f}%", f"Crypto ⚡ contagion {risk*100:.0f}%")
                 lcol = config.COL_DOWN if risk > 0.15 else config.COL_WARN
             else:
                 label, lcol = "Crypto", config.COL_TEXT_DIM
@@ -174,12 +184,12 @@ class CryptoScene(Scene, PopupMixin):
                     widgets.draw_text(surf, sym, (rect.x + 6, y), fonts.tiny(bold=True), c2)
             y += 32
         hv = K.holdings_value(p, m)
-        widgets.draw_text(surf, f"Valeur crypto détenue : {widgets.format_money(hv, cur)}"
-                          + ("" if self._can_trade() else "   ⊘ trading débloqué au grade Associate"),
+        widgets.draw_text(surf, _L(f"Valeur crypto détenue : {widgets.format_money(hv, cur)}", f"Crypto holdings value: {widgets.format_money(hv, cur)}")
+                          + ("" if self._can_trade() else _L("   ⊘ trading débloqué au grade Associate", "   ⊘ trading unlocked at Associate grade")),
                           (inner.x, inner.bottom - 22), fonts.small(bold=True),
                           config.COL_UP if hv else config.COL_TEXT_DIM)
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("↑↓", "actifs"), ("ENTRÉE", "ouvrir")])
+                              [("↑↓", _L("actifs", "assets")), (_L("ENTRÉE", "ENTER"), _L("ouvrir", "open"))])
         self.back_btn.draw(surf)
         self.tuto_btn.draw(surf)
         self.popups_draw(surf)

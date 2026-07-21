@@ -15,9 +15,14 @@ enregistrée (fallback/tests) ; l'ouverture EN FENÊTRE est redirigée ici
 import pygame
 
 from apps.base import DesktopApp
-from core import config, unlocks
+from core import config, i18n, unlocks
 from core import deals as D
 from ui import fonts, keynav, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
 
 ROW_H = 92
 KINDS = ["M&A", "Portfolio", "Risk", "Quant", "Advisory", "General"]
@@ -148,7 +153,7 @@ class DealsApp(DesktopApp):
         btn_w, btn_h, gap = 110, 24, 6
         x = rect.right - 12 - 2 * btn_w - gap
         self._mode_rects = {}
-        for mode, label in (("active", "EN COURS"), ("history", "HISTORIQUE")):
+        for mode, label in (("active", _L("EN COURS", "ACTIVE")), ("history", _L("HISTORIQUE", "HISTORY"))):
             r = pygame.Rect(x, rect.y + 10, btn_w, btn_h)
             active = self.view_mode == mode
             accent = config.COL_AMBER if active else config.COL_TEXT_DIM
@@ -160,19 +165,19 @@ class DealsApp(DesktopApp):
 
     def draw(self, surf, rect):
         surf.fill(config.COL_BG, rect)
-        widgets.draw_text(surf, "DEALS — OPPORTUNITÉS EN COURS", (rect.x + 16, rect.y + 10),
+        widgets.draw_text(surf, _L("DEALS — OPPORTUNITÉS EN COURS", "DEALS — ACTIVE OPPORTUNITIES"), (rect.x + 16, rect.y + 10),
                           fonts.head(bold=True), config.COL_AMBER)
         p = self.app.gs.player
         if not self._can():
             g = unlocks.effective_required_grade(p, "deals")
-            widgets.draw_text(surf, f"⊘ Deals débloqués au grade {config.GRADES[g]}.",
+            widgets.draw_text(surf, _L(f"⊘ Deals débloqués au grade {config.GRADES[g]}.", f"⊘ Deals unlocked at grade {config.GRADES[g]}."),
                               (rect.x + 16, rect.y + 40), fonts.small(), config.COL_TEXT_DIM)
             return
         self._draw_mode_toggle(surf, rect)
         if self.view_mode == "history":
             self._draw_history(surf, rect, p)
             return
-        widgets.draw_text(surf, "Chaque deal expire au bout d'un nombre de jours ; cliquez une ligne pour le lancer.",
+        widgets.draw_text(surf, _L("Chaque deal expire au bout d'un nombre de jours ; cliquez une ligne pour le lancer.", "Each deal expires after a number of days; click a row to launch it."),
                           (rect.x + 16, rect.y + 34), fonts.tiny(), config.COL_TEXT_DIM)
 
         top = rect.y + 56
@@ -180,7 +185,7 @@ class DealsApp(DesktopApp):
         pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, search_rect, 1, border_radius=4)
         cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        label = (self.search + cursor) if self.search else (cursor + "Rechercher…")
+        label = (self.search + cursor) if self.search else (cursor + _L("Rechercher…", "Search…"))
         col = config.COL_TEXT if self.search else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(label, fonts.tiny(), search_rect.w - 26),
                           (search_rect.x + 6, search_rect.y + 4), fonts.tiny(), col)
@@ -218,7 +223,7 @@ class DealsApp(DesktopApp):
 
         panel_top = cy + 30
         panel = pygame.Rect(rect.x + 16, panel_top, rect.w - 32, rect.bottom - 12 - panel_top)
-        inner = widgets.draw_panel(surf, panel, f"Deals ({len(deals)} / {len(p.deals)})", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L(f"Deals ({len(deals)} / {len(p.deals)})", f"Deals ({len(deals)} / {len(p.deals)})"), config.COL_CYAN)
         list_top = inner.y
         list_area = pygame.Rect(inner.x - 6, list_top, inner.w + 12, inner.bottom - list_top - 4)
         self._list_rect = list_area
@@ -226,11 +231,11 @@ class DealsApp(DesktopApp):
         cur = config.CONTINENTS.get(p.continent, {}).get("currency", "$")
 
         if not p.deals:
-            widgets.draw_text(surf, "Aucun deal en cours. Patientez, le temps avance en direct.",
+            widgets.draw_text(surf, _L("Aucun deal en cours. Patientez, le temps avance en direct.", "No active deal. Wait, time advances live."),
                               (inner.x, list_top + 4), fonts.tiny(), config.COL_TEXT_DIM)
             return
         if not deals:
-            widgets.draw_text(surf, "Aucun deal ne correspond à ce filtre.",
+            widgets.draw_text(surf, _L("Aucun deal ne correspond à ce filtre.", "No deal matches this filter."),
                               (inner.x, list_top + 4), fonts.tiny(), config.COL_TEXT_DIM)
 
         wide = inner.w >= 620
@@ -275,41 +280,43 @@ class DealsApp(DesktopApp):
 
         py = row.y + 50 if not wide else row.y + 8
         pcol = config.COL_UP if prob >= 0.6 else config.COL_WARN if prob >= 0.35 else config.COL_DOWN
-        calib = ("Facile" if prob >= 0.6 else "Modéré" if prob >= 0.35
-                 else "Difficile" if prob >= 0.15 else "Très difficile")
-        widgets.draw_text(surf, f"Probabilité {int(prob*100)}% — {calib}", (px, py), fonts.tiny(), pcol)
+        calib = (_L("Facile", "Easy") if prob >= 0.6 else _L("Modéré", "Moderate") if prob >= 0.35
+                 else _L("Difficile", "Hard") if prob >= 0.15 else _L("Très difficile", "Very hard"))
+        widgets.draw_text(surf, _L(f"Probabilité {int(prob*100)}% — {calib}", f"Probability {int(prob*100)}% — {calib}"), (px, py), fonts.tiny(), pcol)
         widgets.draw_progress(surf, pygame.Rect(px, py + 16, 140, 10), prob, accent=pcol)
 
         gy = py + 30 if not wide else row.y + 46
-        widgets.draw_text(surf, f"Gain {widgets.format_money(d['reward_cash'], cur)} (+{d['reward_rep']} rép.)",
+        widgets.draw_text(surf, _L(f"Gain {widgets.format_money(d['reward_cash'], cur)} (+{d['reward_rep']} rép.)", f"Gain {widgets.format_money(d['reward_cash'], cur)} (+{d['reward_rep']} rep.)"),
                           (px, gy), fonts.tiny(), config.COL_UP)
 
         ux = row.right - 150 if wide else px
         uy = row.y + 8 if wide else gy + 16
-        widgets.draw_text(surf, f"{d['days_left']} j restants", (ux, uy), fonts.tiny(), config.COL_TEXT)
+        widgets.draw_text(surf, _L(f"{d['days_left']} j restants", f"{d['days_left']} days left"), (ux, uy), fonts.tiny(), config.COL_TEXT)
         urgent = d["days_left"] <= 7
         ucol = config.COL_DOWN if urgent else config.COL_WARN if d["days_left"] <= 14 else config.COL_UP
         widgets.draw_progress(surf, pygame.Rect(ux, uy + 16, 130, 8), min(1.0, d["days_left"] / 26), accent=ucol)
         hover_rect = pygame.Rect(ux, uy, 130, 30)
         if hover_rect.collidepoint(mp):
-            self._tooltip = ("Passé ce délai, l'offre est retirée — un rival peut la "
-                              "rafler avant vous.", mp)
+            self._tooltip = (_L("Passé ce délai, l'offre est retirée — un rival peut la "
+                              "rafler avant vous.",
+                              "After this deadline the offer is withdrawn — a rival can "
+                              "grab it before you."), mp)
         if urgent:
-            widgets.draw_badge(surf, "URGENT", (ux, uy + 28), accent=config.COL_DOWN)
+            widgets.draw_badge(surf, _L("URGENT", "URGENT"), (ux, uy + 28), accent=config.COL_DOWN)
 
     # --------------------------------------------------------- historique
     def _draw_history(self, surf, rect, p):
-        widgets.draw_text(surf, "Replay des derniers deals résolus (succès, échecs, expirations).",
+        widgets.draw_text(surf, _L("Replay des derniers deals résolus (succès, échecs, expirations).", "Replay of the latest resolved deals (successes, failures, expirations)."),
                           (rect.x + 16, rect.y + 34), fonts.tiny(), config.COL_TEXT_DIM)
         top = rect.y + 56
         panel = pygame.Rect(rect.x + 16, top, rect.w - 32, rect.bottom - 12 - top)
         history = list(reversed(p.deals_history))
-        inner = widgets.draw_panel(surf, panel, f"Historique ({len(history)})", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L(f"Historique ({len(history)})", f"History ({len(history)})"), config.COL_CYAN)
         list_area = pygame.Rect(inner.x - 6, inner.y, inner.w + 12, inner.h)
         self._hist_list_rect = list_area
         cur = config.CONTINENTS.get(p.continent, {}).get("currency", "$")
         if not history:
-            widgets.draw_text(surf, "Aucun deal résolu pour l'instant.",
+            widgets.draw_text(surf, _L("Aucun deal résolu pour l'instant.", "No deal resolved yet."),
                               (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
             self._max_scroll_hist = 0
             return
@@ -324,8 +331,8 @@ class DealsApp(DesktopApp):
             if visible:
                 col = {"success": config.COL_UP, "partial": config.COL_UP,
                        "fail": config.COL_DOWN, "expired": config.COL_WARN}.get(h["outcome"], config.COL_TEXT_DIM)
-                label = {"success": "RÉUSSI", "partial": "PARTIEL",
-                         "fail": "ÉCHEC", "expired": "EXPIRÉ"}.get(h["outcome"], h["outcome"].upper())
+                label = {"success": _L("RÉUSSI", "SUCCESS"), "partial": _L("PARTIEL", "PARTIAL"),
+                         "fail": _L("ÉCHEC", "FAIL"), "expired": _L("EXPIRÉ", "EXPIRED")}.get(h["outcome"], h["outcome"].upper())
                 widgets.draw_text(surf, f"J{h['day']}", (inner.x, y + 6), fonts.tiny(), config.COL_TEXT_DIM)
                 title_w = 260 if not wide else 360
                 widgets.draw_text(surf, widgets.fit_text(h["title"], fonts.tiny(), title_w),
@@ -337,7 +344,7 @@ class DealsApp(DesktopApp):
                 widgets.draw_text(surf, f"{sign}{widgets.format_money(h['cash_delta'], cur)}",
                                   (inner.right - 180, y + 6), fonts.tiny(), col)
                 rsign = "+" if h["rep_delta"] >= 0 else ""
-                widgets.draw_text(surf, f"{rsign}{h['rep_delta']} rép.",
+                widgets.draw_text(surf, _L(f"{rsign}{h['rep_delta']} rép.", f"{rsign}{h['rep_delta']} rep."),
                                   (inner.right - 70, y + 6), fonts.tiny(), col)
             y += row_h
         surf.set_clip(prev_clip)

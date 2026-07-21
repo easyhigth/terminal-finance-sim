@@ -12,15 +12,20 @@ redirigée ici (cf. DesktopScene._open_scene_window).
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import config, i18n
 from core import dilemmas as D
 from ui import fonts, widgets
 
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
+
 _CAT = {
-    "ethique": ("ÉTHIQUE", config.COL_DOWN),
-    "reglementaire": ("RÉGLEMENTAIRE", config.COL_WARN),
-    "strategie": ("STRATÉGIE", config.COL_CYAN),
-    "signature": ("DÉCISION SIGNATURE", config.COL_AMBER),
+    "ethique": (("ÉTHIQUE", "ETHICS"), config.COL_DOWN),
+    "reglementaire": (("RÉGLEMENTAIRE", "REGULATORY"), config.COL_WARN),
+    "strategie": (("STRATÉGIE", "STRATEGY"), config.COL_CYAN),
+    "signature": (("DÉCISION SIGNATURE", "SIGNATURE DECISION"), config.COL_AMBER),
 }
 
 
@@ -94,12 +99,13 @@ class DilemmaApp(DesktopApp):
     def draw(self, surf, rect):
         surf.fill(config.COL_BG, rect)
         if self.dilemma is None:
-            widgets.draw_text(surf, "Aucune décision en attente.", (rect.x + 20, rect.y + 20),
+            widgets.draw_text(surf, _L("Aucune décision en attente.", "No pending decision."), (rect.x + 20, rect.y + 20),
                               fonts.head(bold=True), config.COL_TEXT_DIM)
             return
         d = self.dilemma
-        label, col = _CAT.get(d["category"], ("DÉCISION", config.COL_AMBER))
-        widgets.draw_text(surf, "DÉCISION", (rect.x + 20, rect.y + 12), fonts.head(bold=True), config.COL_AMBER)
+        labelpair, col = _CAT.get(d["category"], (("DÉCISION", "DECISION"), config.COL_AMBER))
+        label = _L(*labelpair)
+        widgets.draw_text(surf, _L("DÉCISION", "DECISION"), (rect.x + 20, rect.y + 12), fonts.head(bold=True), config.COL_AMBER)
         widgets.draw_badge(surf, label, (rect.right - 20, rect.y + 18), col, align="right")
 
         panel = pygame.Rect(rect.x + 20, rect.y + 50, rect.w - 40, 140)
@@ -116,7 +122,7 @@ class DilemmaApp(DesktopApp):
 
     def _draw_options(self, surf, rect, d, cur, top):
         self.option_rects = {}
-        widgets.draw_text(surf, "Votre décision :", (rect.x + 20, top), fonts.small(bold=True),
+        widgets.draw_text(surf, _L("Votre décision :", "Your decision:"), (rect.x + 20, top), fonts.small(bold=True),
                           config.COL_TEXT_DIM)
         y = top + 26
         mp = pygame.mouse.get_pos()
@@ -146,11 +152,11 @@ class DilemmaApp(DesktopApp):
             parts.append(("cash " + ("+" if o["cash"] >= 0 else "") + widgets.format_money(o["cash"], cur),
                           config.COL_UP if o["cash"] >= 0 else config.COL_DOWN))
         if o.get("rep"):
-            parts.append((f"réputation {o['rep']:+d}", config.COL_UP if o["rep"] >= 0 else config.COL_DOWN))
+            parts.append((_L(f"réputation {o['rep']:+d}", f"reputation {o['rep']:+d}"), config.COL_UP if o["rep"] >= 0 else config.COL_DOWN))
         if o.get("heat"):
-            parts.append((f"scrutin {o['heat']:+d}", config.COL_DOWN if o["heat"] > 0 else config.COL_UP))
+            parts.append((_L(f"scrutin {o['heat']:+d}", f"scrutiny {o['heat']:+d}"), config.COL_DOWN if o["heat"] > 0 else config.COL_UP))
         if not parts:
-            parts.append(("aucun effet immédiat", config.COL_TEXT_DIM))
+            parts.append((_L("aucun effet immédiat", "no immediate effect"), config.COL_TEXT_DIM))
         return parts
 
     def _objective_impact_lines(self, p):
@@ -171,7 +177,7 @@ class DilemmaApp(DesktopApp):
         impact = self._objective_impact_lines(p)
         panel_h = min(rect.bottom - top - 60, 320)
         panel = pygame.Rect(rect.x + 20, top, rect.w - 40, panel_h)
-        inner = widgets.draw_panel(surf, panel, "Conséquence", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Conséquence", "Consequence"), config.COL_CYAN)
         widgets.draw_text(surf, o["label"], (inner.x, inner.y), fonts.body(bold=True), config.COL_WHITE)
         widgets.draw_text_wrapped(surf, o["outcome"], (inner.x, inner.y + 30),
                                   fonts.small(), config.COL_TEXT, inner.w, line_gap=4)
@@ -190,7 +196,7 @@ class DilemmaApp(DesktopApp):
                 y += 16
             y += 4
         if others and y < inner.bottom - 20:
-            widgets.draw_text(surf, "Vous avez écarté :", (inner.x, y), fonts.small(bold=True),
+            widgets.draw_text(surf, _L("Vous avez écarté :", "You passed on:"), (inner.x, y), fonts.small(bold=True),
                               config.COL_TEXT_DIM)
             y += 18
             for opt in others:
@@ -204,11 +210,11 @@ class DilemmaApp(DesktopApp):
                     r = widgets.draw_text(surf, text, (x, y), fonts.tiny(), c)
                     x = r.right + 12
                 y += 17
-        widgets.draw_text(surf, f"Scrutin réglementaire actuel : {p.heat}/100",
+        widgets.draw_text(surf, _L(f"Scrutin réglementaire actuel : {p.heat}/100", f"Current regulatory scrutiny: {p.heat}/100"),
                           (rect.x + 20, panel.bottom + 8), fonts.small(),
                           config.COL_DOWN if p.heat >= 55 else config.COL_TEXT_DIM)
         self._continue_rect = pygame.Rect(rect.centerx - 110, rect.bottom - 46, 220, 36)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._continue_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_UP, self._continue_rect, 2, border_radius=4)
-        widgets.draw_text(surf, "CONTINUER", self._continue_rect.center, fonts.small(bold=True),
+        widgets.draw_text(surf, _L("CONTINUER", "CONTINUE"), self._continue_rect.center, fonts.small(bold=True),
                           config.COL_UP, align="center")

@@ -15,9 +15,14 @@ déplaçable de ui/calculator.py (coordonnées absolues, compatibles fenêtre).
 import pygame
 
 from apps.base import DesktopApp
-from core import config
+from core import config, i18n
 from core import missions as M
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if i18n.get_lang() == "en" else fr
+
 
 CHART_COLORS = {"A": config.COL_CYAN, "B": config.COL_AMBER}
 
@@ -189,7 +194,7 @@ class MissionApp(DesktopApp):
         self._calc_rect = pygame.Rect(rect.right - 120, rect.y + 10, 104, 22)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._calc_rect, border_radius=3)
         pygame.draw.rect(surf, config.COL_CYAN, self._calc_rect, 1, border_radius=3)
-        widgets.draw_text(surf, "CALCULATRICE", self._calc_rect.center,
+        widgets.draw_text(surf, _L("CALCULATRICE", "CALCULATOR"), self._calc_rect.center,
                           fonts.tiny(bold=True), config.COL_CYAN, align="center")
 
         if self.state == "intro":
@@ -211,16 +216,16 @@ class MissionApp(DesktopApp):
     def _draw_intro(self, surf, rect):
         panel = pygame.Rect(rect.x + 20, rect.y + 62, rect.w - 40,
                             rect.h - 62 - 56)
-        inner = widgets.draw_panel(surf, panel, "Brief", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Brief", "Brief"), config.COL_CYAN)
         widgets.draw_text_wrapped(surf, self.mission["brief"], (inner.x, inner.y),
                                   fonts.small(), config.COL_TEXT, inner.w, line_gap=5)
         lines = [
-            f"{len(self.mission['items'])} questions.",
-            "Texte à trous : tapez votre réponse chiffrée puis Entrée.",
-            "QCM / décisions : cliquez la bonne réponse.",
+            _L(f"{len(self.mission['items'])} questions.", f"{len(self.mission['items'])} questions."),
+            _L("Texte à trous : tapez votre réponse chiffrée puis Entrée.", "Fill-in: type your numeric answer then Enter."),
+            _L("QCM / décisions : cliquez la bonne réponse.", "MCQ / decisions: click the right answer."),
             "",
-            f"Récompense (au prorata du score) : jusqu'à +{self.mission['reward_rep']} réputation",
-            "et un honoraire de conseil.",
+            _L(f"Récompense (au prorata du score) : jusqu'à +{self.mission['reward_rep']} réputation", f"Reward (pro rata of score): up to +{self.mission['reward_rep']} reputation"),
+            _L("et un honoraire de conseil.", "and an advisory fee."),
         ]
         y = inner.y + 66
         for ln in lines:
@@ -231,17 +236,17 @@ class MissionApp(DesktopApp):
         p = self.app.gs.player
         thr = M.reputation_threshold(p.grade_index)
         if y <= inner.bottom - 40:
-            widgets.draw_text(surf, f"Seuil de réputation pour l'examen (EVAL) : {p.reputation}/{thr}",
+            widgets.draw_text(surf, _L(f"Seuil de réputation pour l'examen (EVAL) : {p.reputation}/{thr}", f"Reputation threshold for the exam (EVAL): {p.reputation}/{thr}"),
                               (inner.x, y), fonts.tiny(), config.COL_TEXT)
             widgets.draw_progress(surf, pygame.Rect(inner.x, y + 18, min(260, inner.w), 8),
                                   min(1.0, p.reputation / thr) if thr else 1.0,
                                   config.COL_UP if p.reputation >= thr else config.COL_AMBER)
-        self._draw_continue(surf, rect, "COMMENCER")
+        self._draw_continue(surf, rect, _L("COMMENCER", "START"))
 
     def _draw_item(self, surf, rect):
         item = self._item()
         total = len(self.mission["items"])
-        widgets.draw_text(surf, f"Question {self.idx + 1} / {total}",
+        widgets.draw_text(surf, _L(f"Question {self.idx + 1} / {total}", f"Question {self.idx + 1} / {total}"),
                           (rect.x + 20, rect.y + 58), fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_progress(surf, (rect.x + 20, rect.y + 74, rect.w - 40, 5),
                               self.idx / total, config.COL_AMBER)
@@ -255,7 +260,7 @@ class MissionApp(DesktopApp):
                                           rect.w // 2 - 30, min(260, rect.h - 200)))
 
         ppanel = pygame.Rect(rect.x + 20, rect.y + 88, prompt_w, 120)
-        pinner = widgets.draw_panel(surf, ppanel, "Énoncé", config.COL_AMBER)
+        pinner = widgets.draw_panel(surf, ppanel, _L("Énoncé", "Prompt"), config.COL_AMBER)
         widgets.draw_text_wrapped(surf, item["prompt"], (pinner.x, pinner.y),
                                   fonts.small(), config.COL_WHITE, pinner.w, line_gap=5)
 
@@ -268,7 +273,7 @@ class MissionApp(DesktopApp):
             self._draw_feedback(surf, rect, item)
 
     def _draw_charts(self, surf, item, chart_rect):
-        inner = widgets.draw_panel(surf, chart_rect, "Cours", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, chart_rect, _L("Cours", "Price"), config.COL_CYAN)
         which = item.get("chart", "")
         names = ["A", "B"] if which == "AB" else [which]
         for name in names:
@@ -280,7 +285,7 @@ class MissionApp(DesktopApp):
                                     show_pct=True)
         lx = inner.x
         for name in names:
-            widgets.draw_text(surf, f"■ Titre {name}", (lx, inner.bottom - 16),
+            widgets.draw_text(surf, _L(f"■ Titre {name}", f"■ Stock {name}"), (lx, inner.bottom - 16),
                               fonts.tiny(bold=True), CHART_COLORS.get(name, config.COL_CYAN))
             lx += 100
 
@@ -323,33 +328,33 @@ class MissionApp(DesktopApp):
         pygame.draw.rect(surf, border, box, 2 if active else 1)
         cursor = "_" if (active and int(self.t * 2) % 2 == 0) else ""
         shown = (self.input or "") + cursor
-        widgets.draw_text(surf, shown or "tapez un nombre…", (box.x + 10, box.y + 12),
+        widgets.draw_text(surf, shown or _L("tapez un nombre…", "type a number…"), (box.x + 10, box.y + 12),
                           fonts.body(bold=True),
                           config.COL_WHITE if self.input else config.COL_TEXT_DIM)
         if item.get("unit"):
             widgets.draw_text(surf, item["unit"], (box.right + 10, box.y + 12),
                               fonts.body(), config.COL_TEXT_DIM)
-        widgets.draw_text(surf, "Entrée pour valider.", (box.x, box.bottom + 6),
+        widgets.draw_text(surf, _L("Entrée pour valider.", "Enter to submit."), (box.x, box.bottom + 6),
                           fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_feedback(self, surf, rect, item):
         ok = (self.chosen == item["answer"]) if item["kind"] == "mcq" else bool(self.input_ok)
         accent = config.COL_UP if ok else config.COL_DOWN
-        verdict = "Correct" if ok else "Incorrect"
+        verdict = _L("Correct", "Correct") if ok else _L("Incorrect", "Incorrect")
         y = rect.y + 220 + (len(item["choices"]) * 52 if item["kind"] == "mcq" else 80)
         y = min(y, rect.bottom - 170)
         widgets.draw_text(surf, verdict, (rect.x + 20, y), fonts.body(bold=True), accent)
         if item["kind"] == "fill" and not ok:
-            widgets.draw_text(surf, f"Réponse attendue ≈ {item['answer']:.2f} {item['unit']}",
+            widgets.draw_text(surf, _L(f"Réponse attendue ≈ {item['answer']:.2f} {item['unit']}", f"Expected answer ≈ {item['answer']:.2f} {item['unit']}"),
                               (rect.x + 140, y + 2), fonts.tiny(), config.COL_TEXT_DIM)
         exp = pygame.Rect(rect.x + 20, y + 26, rect.w - 40,
                           max(60, rect.bottom - (y + 26) - 52))
-        einner = widgets.draw_panel(surf, exp, "Explication", config.COL_CYAN)
+        einner = widgets.draw_panel(surf, exp, _L("Explication", "Explanation"), config.COL_CYAN)
         widgets.draw_text_wrapped(surf, item["expl"], (einner.x, einner.y),
                                   fonts.tiny(), config.COL_TEXT, einner.w)
         self._draw_continue(surf, rect,
-                            "SUIVANT" if self.idx < len(self.mission["items"]) - 1
-                            else "VOIR RÉSULTAT")
+                            _L("SUIVANT", "NEXT") if self.idx < len(self.mission["items"]) - 1
+                            else _L("VOIR RÉSULTAT", "SEE RESULT"))
 
     def _objective_impact_lines(self, p):
         from core import career
@@ -368,31 +373,33 @@ class MissionApp(DesktopApp):
         accent = config.COL_UP if ratio >= 0.5 else config.COL_WARN
         panel = pygame.Rect(rect.x + max(20, rect.w // 6), rect.y + 70,
                             rect.w - 2 * max(20, rect.w // 6), rect.h - 70 - 60)
-        inner = widgets.draw_panel(surf, panel, "Mission terminée", accent)
+        inner = widgets.draw_panel(surf, panel, _L("Mission terminée", "Mission complete"), accent)
         cx = panel.centerx
-        widgets.draw_text(surf, f"Score : {self.score} / {total}", (cx, inner.y + 6),
+        widgets.draw_text(surf, _L(f"Score : {self.score} / {total}", f"Score: {self.score} / {total}"), (cx, inner.y + 6),
                           fonts.head(bold=True), accent, align="center")
         p = self.app.gs.player
         cur = config.CONTINENTS[p.continent]["currency"]
         msg = [
-            f"Réputation : +{self.rep_gain}  (désormais {p.reputation}/100)",
-            f"Honoraire  : +{widgets.format_money(self.cash_gain, cur)}",
+            _L(f"Réputation : +{self.rep_gain}  (désormais {p.reputation}/100)", f"Reputation: +{self.rep_gain}  (now {p.reputation}/100)"),
+            _L(f"Honoraire  : +{widgets.format_money(self.cash_gain, cur)}", f"Fee       : +{widgets.format_money(self.cash_gain, cur)}"),
         ]
         if self.score < total:
             best_rep, best_cash = M.compute_rewards(self.mission, total, total)
             miss_rep, miss_cash = best_rep - self.rep_gain, best_cash - self.cash_gain
             if miss_rep > 0 or miss_cash > 0:
-                msg.append(f"Avec un score parfait : +{miss_rep} réputation et "
-                           f"+{widgets.format_money(miss_cash, cur)} de plus.")
+                msg.append(_L(f"Avec un score parfait : +{miss_rep} réputation et "
+                           f"+{widgets.format_money(miss_cash, cur)} de plus.",
+                           f"With a perfect score: +{miss_rep} reputation and "
+                           f"+{widgets.format_money(miss_cash, cur)} more."))
         msg.append("")
         msg.extend(self._objective_impact_lines(p))
         thr = M.reputation_threshold(p.grade_index)
         if p.reputation >= thr and p.can_promote():
-            msg.append(f"Réputation ≥ {thr} : vous pouvez tenter l'examen (EVAL).")
+            msg.append(_L(f"Réputation ≥ {thr} : vous pouvez tenter l'examen (EVAL).", f"Reputation ≥ {thr}: you can attempt the exam (EVAL)."))
         elif p.can_promote():
-            msg.append(f"Encore {thr - p.reputation} de réputation avant l'examen (EVAL).")
+            msg.append(_L(f"Encore {thr - p.reputation} de réputation avant l'examen (EVAL).", f"{thr - p.reputation} more reputation before the exam (EVAL)."))
         else:
-            msg.append("Grade maximal atteint.")
+            msg.append(_L("Grade maximal atteint.", "Maximum grade reached."))
         y = inner.y + 44
         for m in msg:
             if y > inner.bottom - 20:
@@ -400,4 +407,4 @@ class MissionApp(DesktopApp):
             widgets.draw_text(surf, widgets.fit_text(m, fonts.small(), inner.w),
                               (cx, y), fonts.small(), config.COL_TEXT, align="center")
             y += 26
-        self._draw_continue(surf, rect, "TERMINER")
+        self._draw_continue(surf, rect, _L("TERMINER", "FINISH"))

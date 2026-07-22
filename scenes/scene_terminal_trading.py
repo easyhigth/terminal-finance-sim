@@ -133,16 +133,16 @@ class TerminalTradingMixin:
         if not res["ok"]:
             if res["reason"] == "sector_excluded":
                 firm = firms_mod.get(self.app.gs.player.firm)
-                fname = firm["name"] if firm else "votre firme"
+                fname = firm["name"] if firm else _L("votre firme", "your firm")
                 reason = _L(
                     f"secteur {res.get('sector', '?')} exclu par l'ADN « {fname} » "
                     "(contrainte ESG/mandat de la firme, pas de contournement possible)",
                     f"{res.get('sector', '?')} sector excluded by « {fname} »'s DNA "
                     "(firm ESG/mandate constraint, no workaround)")
             else:
-                reason = {"ticker": "ticker inconnu", "qty": "quantité invalide",
-                          "isshort": f"position courte ouverte sur {tk} — utilisez COVER",
-                          "leverage": f"levier max atteint ({res.get('max_leverage',0):.1f}x) — tapez MARGIN pour le détail"
+                reason = {"ticker": _L("ticker inconnu", "unknown ticker"), "qty": _L("quantité invalide", "invalid quantity"),
+                          "isshort": _L(f"position courte ouverte sur {tk} — utilisez COVER", f"open short position on {tk} — use COVER"),
+                          "leverage": _L(f"levier max atteint ({res.get('max_leverage',0):.1f}x) — tapez MARGIN pour le détail", f"max leverage reached ({res.get('max_leverage',0):.1f}x) — type MARGIN for details")
                           }.get(res["reason"], res["reason"])
             self._log(_L(f"  Achat refusé : {reason}.", f"  Buy rejected: {reason}."))
             return
@@ -258,9 +258,9 @@ class TerminalTradingMixin:
             return
         res = pf_mod.short(self.app.gs.player, self.market, tk, qty)
         if not res["ok"]:
-            reason = {"ticker": "ticker inconnu", "qty": "quantité invalide",
-                      "islong": f"position longue ouverte sur {tk} — vendez-la d'abord",
-                      "leverage": f"levier max atteint ({res.get('max_leverage',0):.1f}x) — tapez MARGIN pour le détail"
+            reason = {"ticker": _L("ticker inconnu", "unknown ticker"), "qty": _L("quantité invalide", "invalid quantity"),
+                      "islong": _L(f"position longue ouverte sur {tk} — vendez-la d'abord", f"open long position on {tk} — sell it first"),
+                      "leverage": _L(f"levier max atteint ({res.get('max_leverage',0):.1f}x) — tapez MARGIN pour le détail", f"max leverage reached ({res.get('max_leverage',0):.1f}x) — type MARGIN for details")
                       }.get(res["reason"], res["reason"])
             self._log(_L(f"  Short refusé : {reason}.", f"  Short rejected: {reason}."))
             return
@@ -427,11 +427,11 @@ class TerminalTradingMixin:
                          e["side"], e["key"], f"{e['notional']:,.0f}", res, e["regime"],
                          (e["reason"] or "—")[:16]))
         if not rows:
-            rows = [("—", "—", "—", "—", "—", "—", "—", "—", "aucune entrée")]
+            rows = [("—", "—", "—", "—", "—", "—", "—", "—", _L("aucune entrée", "no entry"))]
         self._open_window(_L("JOURNAL DE TRADING", "TRADING JOURNAL"),
-                          [("Id", 30), ("Jour", 45), ("Classe", 70), ("Sens", 60),
-                           ("Actif", 60), ("Taille", 80), ("P&L", 60), ("Régime", 70),
-                           ("Raison", 120)], rows)
+                          [("Id", 30), (_L("Jour", "Day"), 45), (_L("Classe", "Class"), 70), (_L("Sens", "Side"), 60),
+                           (_L("Actif", "Asset"), 60), (_L("Taille", "Size"), 80), ("P&L", 60), (_L("Régime", "Regime"), 70),
+                           (_L("Raison", "Reason"), 120)], rows)
 
     def _cmd_note(self, args):
         """NOTE <id> <commentaire...> : annote une entrée existante du journal."""

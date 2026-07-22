@@ -94,7 +94,7 @@ MORE_SHORTCUTS = {
 # (cf. ui/keynav.nearest_in_direction), Tab suit cet ordre fixe.
 ZONE_ORDER = ["console", "indices", "health", "topco", "career", "feed"]
 
-SAMPLE_NEWS = {
+_SAMPLE_NEWS_FR = {
     "Europe": ["BCE : statu quo, marché partagé sur le calendrier des baisses.",
                "MiFID II : reporting renforcé pour les buy-side.",
                "Spread OAT-Bund stable après adjudication."],
@@ -105,6 +105,21 @@ SAMPLE_NEWS = {
              "BoJ surveille la devise ; intervention possible.",
              "Flux transfrontaliers sous contrôle renforcé."],
 }
+_SAMPLE_NEWS_EN = {
+    "Europe": ["ECB: status quo, market split on the timing of cuts.",
+               "MiFID II: enhanced reporting for the buy-side.",
+               "OAT-Bund spread stable after auction."],
+    "USA": ["Fed: tone judged cautious by analysts.",
+            "Earnings season: tech surprises to the upside.",
+            "SEC: heightened scrutiny on short-selling."],
+    "Asia": ["HKMA defends the HKD peg.",
+             "BoJ watches the currency; intervention possible.",
+             "Cross-border flows under tighter control."],
+}
+
+
+def _sample_news():
+    return _SAMPLE_NEWS_EN if get_lang() == "en" else _SAMPLE_NEWS_FR
 
 
 class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMixin,
@@ -120,7 +135,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         p0 = self.app.gs.player
         fresh = (p0.day == 1 and not p0.cash_history)
         if not hasattr(self, "cmd_history") or fresh:
-            self.cmd_history = ["> Bienvenue. Tapez HELP, ou COMMANDS pour tout voir."]
+            self.cmd_history = [_L("> Bienvenue. Tapez HELP, ou COMMANDS pour tout voir.", "> Welcome. Type HELP, or COMMANDS to see everything.")]
         self.console_expanded = getattr(self, "console_expanded", False)
         self.console_scroll = 0    # 0 = bas (dernier message) ; >0 = remonte
         self._console_rect_cache = None
@@ -139,7 +154,7 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         # scénario « krach de départ » : on injecte un choc une seule fois
         if p.flags.get("start_crisis") and not p.flags.get("start_crisis_done"):
             from core.market import Crisis
-            self.market.add_crisis(Crisis("Krach de départ", steps=6,
+            self.market.add_crisis(Crisis(_L("Krach de départ", "Opening crash"), steps=6,
                                           world=-0.05, vol_mult=2.2))
             p.flags["start_crisis_done"] = True
         career_mod.ensure_objectives(p)   # objectifs du trimestre courant
@@ -148,7 +163,8 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
         self.worldmap = WorldMap()
         # restaure les marqueurs persistants des news du jour courant (reprise de save)
         self.worldmap.set_day_markers(news_mod.for_day(p, p.day))
-        self.news = list(SAMPLE_NEWS.get(p.continent, SAMPLE_NEWS["USA"]))
+        _sn = _sample_news()
+        self.news = list(_sn.get(p.continent, _sn["USA"]))
         self.recent_events = []
         if not hasattr(self, "datawins"):
             self.datawins = []        # fenêtres de données déplaçables (overlay)
@@ -508,9 +524,9 @@ class TerminalScene(TerminalMarketMixin, TerminalTradingMixin, TerminalCareerMix
             prev = self._pnl_sign.get(tk)
             if prev is not None and sign != 0 and prev != sign and prev != 0:
                 if sign > 0:
-                    self.app.notify(f"{tk} : position repassée en gain latent ({pnl:+,.0f})", "good")
+                    self.app.notify(_L(f"{tk} : position repassée en gain latent ({pnl:+,.0f})", f"{tk}: position back to unrealized gain ({pnl:+,.0f})"), "good")
                 else:
-                    self.app.notify(f"{tk} : position repassée en perte latente ({pnl:+,.0f})", "warn")
+                    self.app.notify(_L(f"{tk} : position repassée en perte latente ({pnl:+,.0f})", f"{tk}: position back to unrealized loss ({pnl:+,.0f})"), "warn")
             self._pnl_sign[tk] = sign
         for tk in list(self._pnl_sign):
             if tk not in self.app.gs.player.portfolio:

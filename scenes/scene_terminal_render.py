@@ -327,7 +327,7 @@ class TerminalRenderMixin:
                                  mouse_pos=pygame.mouse.get_pos(),
                                  y_fmt=lambda v: widgets.format_money(v, cur), show_pct=True,
                                  show_extrema=False)
-        widgets.draw_text(surf, f"Réputation {p.reputation}/100", (inner.x, inner.y + 126),
+        widgets.draw_text(surf, _L(f"Réputation {p.reputation}/100", f"Reputation {p.reputation}/100"), (inner.x, inner.y + 126),
                           fonts.small(), config.COL_TEXT_DIM)
         rep_col = config.COL_UP if p.reputation >= 50 else (config.COL_DOWN if p.reputation < 25 else config.COL_WARN)
         widgets.draw_progress(surf, (inner.x, inner.y + 146, inner.w, 9), p.reputation / 100.0, rep_col)
@@ -508,11 +508,11 @@ class TerminalRenderMixin:
             wrapped_h = fonts.small().get_height()
         y += max(44, wrapped_h + 10)
         # 2) promotion
-        widgets.draw_text(surf, "PROMOTION", (inner.x, y), fonts.tiny(bold=True), config.COL_CYAN)
+        widgets.draw_text(surf, _L("PROMOTION", "PROMOTION"), (inner.x, y), fonts.tiny(bold=True), config.COL_CYAN)
         y += 18
         if p.can_promote():
             if career_mod.promotion_ready(p):
-                widgets.draw_text(surf, "Prêt — tapez EVAL", (inner.x, y),
+                widgets.draw_text(surf, _L("Prêt — tapez EVAL", "Ready — type EVAL"), (inner.x, y),
                                   fonts.small(bold=True), config.COL_UP)
                 y += 22
             else:
@@ -542,29 +542,29 @@ class TerminalRenderMixin:
         widgets.draw_text(surf, f"Marge faillite {widgets.format_money(marge, cur)}",
                           (inner.x, y), fonts.tiny(), risk_col)
         scrut_col = config.COL_DOWN if p.heat >= 55 else (config.COL_WARN if p.heat >= 30 else config.COL_TEXT_DIM)
-        widgets.draw_text(surf, f"Scrutin réglementaire {p.heat}/100", (inner.x, y + 16),
+        widgets.draw_text(surf, _L(f"Scrutin réglementaire {p.heat}/100", f"Regulatory scrutiny {p.heat}/100"), (inner.x, y + 16),
                           fonts.tiny(), scrut_col)
         y += 40
         # 4) opportunité (deal le plus urgent)
-        widgets.draw_text(surf, "OPPORTUNITÉ", (inner.x, y), fonts.tiny(bold=True), config.COL_CYAN)
+        widgets.draw_text(surf, _L("OPPORTUNITÉ", "OPPORTUNITY"), (inner.x, y), fonts.tiny(bold=True), config.COL_CYAN)
         y += 18
         if p.deals:
             d = min(p.deals, key=lambda d: d["days_left"])
             acc = config.COL_DEAL_URGENT if d["days_left"] <= config.DAYS_PER_STEP * 2 else config.COL_DEAL
             widgets.draw_text(surf, f"#{d['id']} {d['title'][:22]}", (inner.x, y),
                               fonts.tiny(bold=True), config.COL_TEXT)
-            widgets.draw_text(surf, f"échéance {d['days_left']}j · DEAL {d['id']}",
+            widgets.draw_text(surf, _L(f"échéance {d['days_left']}j · DEAL {d['id']}", f"deadline {d['days_left']}d · DEAL {d['id']}"),
                               (inner.x, y + 16), fonts.tiny(), acc)
         else:
-            widgets.draw_text(surf, "Aucun deal — patientez, le temps avance.", (inner.x, y),
+            widgets.draw_text(surf, _L("Aucun deal — patientez, le temps avance.", "No deal — wait, time advances."), (inner.x, y),
                               fonts.tiny(), config.COL_TEXT_DIM)
         y += 36
         # prochain déblocage
         nxt = unlocks_mod.next_unlock(p)
         if nxt:
-            widgets.draw_text(surf, "PROCHAIN DÉBLOCAGE", (inner.x, y),
+            widgets.draw_text(surf, _L("PROCHAIN DÉBLOCAGE", "NEXT UNLOCK"), (inner.x, y),
                               fonts.tiny(bold=True), config.COL_CYAN)
-            widgets.draw_text_wrapped(surf, f"{nxt[0]} — grade {config.GRADES[nxt[1]]}",
+            widgets.draw_text_wrapped(surf, _L(f"{nxt[0]} — grade {config.GRADES[nxt[1]]}", f"{nxt[0]} — {config.GRADES[nxt[1]]} grade"),
                                       (inner.x, y + 16), fonts.tiny(), config.COL_PRESTIGE, inner.w)
         y += 36
         surf.set_clip(prev_clip)
@@ -617,7 +617,7 @@ class TerminalRenderMixin:
                               (rect.x + 90, head_y), fonts.tiny(), config.COL_WARN)
         # boutons à droite : [▲][▼][AGRANDIR/RÉDUIRE]
         bx = rect.right - 10
-        exp_label = "RÉDUIRE" if self.console_expanded else "AGRANDIR"
+        exp_label = _L("RÉDUIRE", "SHRINK") if self.console_expanded else _L("AGRANDIR", "EXPAND")
         ew = fonts.tiny(bold=True).size(exp_label)[0] + 16
         exp_rect = pygame.Rect(bx - ew, head_y - 2, ew, 16); bx = exp_rect.x - 6
         for key, rr, lab in (("expand", exp_rect, exp_label),):

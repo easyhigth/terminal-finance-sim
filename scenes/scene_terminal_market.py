@@ -152,44 +152,44 @@ class TerminalMarketMixin:
             if not val or not ref:
                 return ("—", config.COL_TEXT_DIM)
             if val < ref * 0.9:
-                return ("décoté", config.COL_UP)
+                return (_L("décoté", "cheap"), config.COL_UP)
             if val > ref * 1.1:
-                return ("cher", config.COL_DOWN)
-            return ("en ligne", config.COL_TEXT)
+                return (_L("cher", "expensive"), config.COL_DOWN)
+            return (_L("en ligne", "in line"), config.COL_TEXT)
         rows = []
         for label, key in [("P/E", "pe"), ("EV/EBITDA", "ev_ebitda"), ("P/S", "ps")]:
             v, r = mt[key], med[key]
             txt, col = verdict(v, r)
             rows.append((label, fmt(v), fmt(r), (txt, col)))
-        self._open_window(f"RV {mt['ticker']} — secteur {mt['sector']} ({med['n']} pairs)",
-                          [("Multiple", 90), (mt["ticker"], 70), ("Médiane", 70),
+        self._open_window(_L(f"RV {mt['ticker']} — secteur {mt['sector']} ({med['n']} pairs)", f"RV {mt['ticker']} — {mt['sector']} sector ({med['n']} peers)"),
+                          [("Multiple", 90), (mt["ticker"], 70), (_L("Médiane", "Median"), 70),
                            ("Verdict", 80)], rows)
 
     def _cmd_eco(self):
         """ECO — indicateurs macro et leur tendance."""
         m = self.market.macro
         notes = {
-            "rate": "coût de l'argent ; ↑ pèse sur actions/immo",
-            "inflation": "hausse des prix ; guide la banque centrale",
-            "growth": "PIB ; ↑ soutient les bénéfices",
-            "unemployment": "↑ = ralentissement",
-            "confidence": "moral des marchés",
+            "rate": _L("coût de l'argent ; ↑ pèse sur actions/immo", "cost of money; ↑ weighs on stocks/real estate"),
+            "inflation": _L("hausse des prix ; guide la banque centrale", "rising prices; guides the central bank"),
+            "growth": _L("PIB ; ↑ soutient les bénéfices", "GDP; ↑ supports earnings"),
+            "unemployment": _L("↑ = ralentissement", "↑ = slowdown"),
+            "confidence": _L("moral des marchés", "market sentiment"),
         }
         rows = []
         reg_good = self.market.regime in ("Expansion", "Calme")
-        rows.append(("Régime de marché",
-                     f"{self.market.regime_label()} (depuis {self.market.regime_age()} sem.)",
+        rows.append((_L("Régime de marché", "Market regime"),
+                     _L(f"{self.market.regime_label()} (depuis {self.market.regime_age()} sem.)", f"{self.market.regime_label()} (for {self.market.regime_age()} wk)"),
                      ("", config.COL_UP if reg_good else config.COL_DOWN),
-                     "toile de fond : module dérive & volatilité"))
+                     _L("toile de fond : module dérive & volatilité", "backdrop: shapes drift & volatility")))
         for key in ["rate", "inflation", "growth", "unemployment", "confidence"]:
             d = m[key]
             ch = self.market.macro_change(key)
             ccol = config.COL_UP if ch >= 0 else config.COL_DOWN
             rows.append((d["label"], f"{d['v']:.2f}{d['unit']}",
                          (f"{'+' if ch>=0 else ''}{ch:.2f}", ccol), notes[key]))
-        self._open_window("ECO — macro-économie",
-                          [("Indicateur", 120), ("Niveau", 70), ("1 an", 60),
-                           ("Lecture", 200)], rows)
+        self._open_window(_L("ECO — macro-économie", "ECO — macroeconomics"),
+                          [(_L("Indicateur", "Indicator"), 120), (_L("Niveau", "Level"), 70), (_L("1 an", "1 yr"), 60),
+                           (_L("Lecture", "Reading"), 200)], rows)
 
     def _cmd_define(self, terms):
         """DEFINE — définition d'un terme du glossaire."""
@@ -283,8 +283,8 @@ class TerminalMarketMixin:
         rows = [((c["ticker"], config.COL_AMBER), c["name"][:18], c["region"],
                  widgets.format_money(self.market.price_of(c["ticker"]) * c["shares"] * 1e6, cur))
                 for c in members[:18]]
-        self._open_window(f"SECTEUR — {key}", [("Tk", 60), ("Nom", 150),
-                                               ("Région", 70), ("Capi", 80)], rows)
+        self._open_window(_L(f"SECTEUR — {key}", f"SECTOR — {key}"), [("Tk", 60), (_L("Nom", "Name"), 150),
+                                               (_L("Région", "Region"), 70), (_L("Capi", "Mkt cap"), 80)], rows)
 
     def _cmd_region(self, name):
         region = self._match_region(name)
@@ -331,10 +331,10 @@ class TerminalMarketMixin:
                      f"{q['price']:.2f}", f"{q['change_1y']:+.1f}%", f"{q['expense']*100:.2f}%")
                     for q in quotes]
             if not rows:
-                rows = [("—", "aucun fonds", "—", "—", "—", "—")]
+                rows = [("—", _L("aucun fonds", "no fund"), "—", "—", "—", "—")]
             self._open_window(_L(f"SCREEN ETF ({len(quotes)})", f"SCREEN ETF ({len(quotes)})"),
-                              [("Tk", 55), ("Nom", 150), ("Catégorie", 110),
-                               ("NAV", 60), ("1AN", 60), ("Frais", 55)], rows)
+                              [("Tk", 55), (_L("Nom", "Name"), 150), (_L("Catégorie", "Category"), 110),
+                               ("NAV", 60), (_L("1AN", "1Y"), 60), (_L("Frais", "Fees"), 55)], rows)
             return
         kwargs = self._parse_screen_args(args)
         if not kwargs:
@@ -364,9 +364,9 @@ class TerminalMarketMixin:
                      ", ".join(f"{k}={v}" for k, v in s["criteria"].items())[:40])
                     for s in screens]
             if not rows:
-                rows = [("—", "—", "aucun critère sauvegardé", "—")]
-            self._open_window("CRITÈRES SAUVEGARDÉS", [("Id", 30), ("Type", 50),
-                              ("Label", 110), ("Critères", 180)], rows)
+                rows = [("—", "—", _L("aucun critère sauvegardé", "no saved criterion"), "—")]
+            self._open_window(_L("CRITÈRES SAUVEGARDÉS", "SAVED CRITERIA"), [("Id", 30), ("Type", 50),
+                              ("Label", 110), (_L("Critères", "Criteria"), 180)], rows)
             return
         if sub == "REMOVE":
             if len(args) < 2 or not args[1].isdigit():
@@ -428,9 +428,9 @@ class TerminalMarketMixin:
                     rows.append(((c["ticker"], config.COL_AMBER), s["label"], c["name"][:18],
                                  f"{c['pe']:.1f}" if c["pe"] is not None else "n.m."))
         if not rows:
-            rows = [("—", "—", "aucune correspondance", "—")]
+            rows = [("—", "—", _L("aucune correspondance", "no match"), "—")]
         self._open_window(_L("IDÉES D'INVESTISSEMENT", "INVESTMENT IDEAS"),
-                          [("Tk", 60), ("Critère", 90), ("Nom", 130), ("P/E ou NAV", 70)], rows)
+                          [("Tk", 60), (_L("Critère", "Criterion"), 90), (_L("Nom", "Name"), 130), (_L("P/E ou NAV", "P/E or NAV"), 70)], rows)
 
     def _cmd_benchmark(self):
         p = self.app.gs.player
@@ -448,14 +448,14 @@ class TerminalMarketMixin:
         p = self.app.gs.player
         days_in_q = (p.day - 1) % config.DAYS_PER_QUARTER
         to_end = config.DAYS_PER_QUARTER - days_in_q
-        rows = [("Fin de trimestre", f"~{to_end}j", f"T{p.quarter}")]
+        rows = [(_L("Fin de trimestre", "Quarter end"), _L(f"~{to_end}j", f"~{to_end}d"), f"{_L('T','Q')}{p.quarter}")]
         for d in sorted(p.deals, key=lambda d: d["days_left"]):
             urgent = d["days_left"] <= config.DAYS_PER_STEP * 2
             rows.append(((f"#{d['id']} {d['title'][:20]}",
                           config.COL_DOWN if urgent else config.COL_TEXT),
                          f"{d['days_left']}j", d["kind"]))
-        self._open_window(f"CALENDRIER — Jour {p.day}",
-                          [("Échéance", 200), ("Délai", 60), ("Type", 80)], rows)
+        self._open_window(_L(f"CALENDRIER — Jour {p.day}", f"CALENDAR — Day {p.day}"),
+                          [(_L("Échéance", "Deadline"), 200), (_L("Délai", "Lead"), 60), ("Type", 80)], rows)
 
     # ------------------------------------------------------------- recherche
     def _cmd_research(self, ticker):

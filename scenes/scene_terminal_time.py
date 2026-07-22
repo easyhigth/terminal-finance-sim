@@ -118,9 +118,11 @@ class TerminalTimeMixin:
             if ev["type"] == "snipe":
                 inbox_mod.on_deal_sniped(p, ev["deal"], ev["rival"])
             elif ev["type"] == "poach":
-                inbox_mod.push(p, "client", f"Mandat — {ev['client']}", "Mandat perdu",
-                               f"{ev['rival']} a décroché le mandat de {ev['client']} "
-                               "pendant que vous hésitiez. Soyez plus décidé.")
+                inbox_mod.push(p, "client", _L(f"Mandat — {ev['client']}", f"Mandate — {ev['client']}"), _L("Mandat perdu", "Mandate lost"),
+                               _L(f"{ev['rival']} a décroché le mandat de {ev['client']} "
+                               "pendant que vous hésitiez. Soyez plus décidé.",
+                               f"{ev['rival']} won {ev['client']}'s mandate "
+                               "while you hesitated. Be more decisive."))
         # Trading actif des rivaux (positions visibles)
         rivals_mod.step_trading(p, m, random)
         # Messages inbox de provocation des rivaux
@@ -415,15 +417,19 @@ class TerminalTimeMixin:
                               f"  ✓ MANDATE won: {mm['client']} (+{res['growth']:.1f}%) "
                               f"→ +{widgets.format_money(mm['reward_cash'], cur)}, rep +{mm['reward_rep']}."))
                     self.app.notify(_L(f"Mandat réussi : {mm['client']}", f"Mandate won: {mm['client']}"), "good")
-                    inbox_mod.push(p, "client", mm["client"], "Mandat rempli avec succès",
-                                   f"Performance de {res['growth']:.1f}% conforme à nos attentes. "
-                                   "Commission versée. Au plaisir de retravailler ensemble.")
+                    inbox_mod.push(p, "client", mm["client"], _L("Mandat rempli avec succès", "Mandate successfully fulfilled"),
+                                   _L(f"Performance de {res['growth']:.1f}% conforme à nos attentes. "
+                                   "Commission versée. Au plaisir de retravailler ensemble.",
+                                   f"Performance of {res['growth']:.1f}% in line with our expectations. "
+                                   "Fee paid. Looking forward to working together again."))
                 else:
                     self._log(_L(f"  ✗ MANDAT échoué : {mm['client']} (rép -{mm['penalty_rep']}).", f"  ✗ MANDATE failed: {mm['client']} (rep -{mm['penalty_rep']})."))
                     self.app.notify(_L(f"Mandat échoué : {mm['client']}", f"Mandate failed: {mm['client']}"), "bad")
-                    inbox_mod.push(p, "client", mm["client"], "Mandat non rempli",
-                                   "Les objectifs n'ont pas été atteints. Nous confions "
-                                   "désormais notre capital ailleurs.")
+                    inbox_mod.push(p, "client", mm["client"], _L("Mandat non rempli", "Mandate not fulfilled"),
+                                   _L("Les objectifs n'ont pas été atteints. Nous confions "
+                                   "désormais notre capital ailleurs.",
+                                   "The objectives were not met. We are now entrusting "
+                                   "our capital elsewhere."))
         # nouvelle offre de mandat éventuelle
         offer = mandates_mod.maybe_offer(p, random, m)
         if offer:
@@ -443,10 +449,13 @@ class TerminalTimeMixin:
                           f"(type MANDATES to view)."))
                 self.app.notify(_L(f"Offre de mandat : {offer['client']}", f"Mandate offer: {offer['client']}"), "info",
                                 action="mandates")
-            inbox_mod.push(p, "client", offer["client"], "Proposition de mandat",
-                           f"Nous souhaitons vous confier {widgets.format_money(offer['capital'], cur)} : "
+            inbox_mod.push(p, "client", offer["client"], _L("Proposition de mandat", "Mandate proposal"),
+                           _L(f"Nous souhaitons vous confier {widgets.format_money(offer['capital'], cur)} : "
                            f"objectif +{offer['target_pct']:.0f}% en {offer['horizon']} trimestres, "
-                           f"bêta ≤ {offer['max_beta']:.2f}. Tapez MANDATES puis MANDATE ACCEPT {offer['id']}.")
+                           f"bêta ≤ {offer['max_beta']:.2f}. Tapez MANDATES puis MANDATE ACCEPT {offer['id']}.",
+                           f"We'd like to entrust you with {widgets.format_money(offer['capital'], cur)}: "
+                           f"target +{offer['target_pct']:.0f}% over {offer['horizon']} quarters, "
+                           f"beta ≤ {offer['max_beta']:.2f}. Type MANDATES then MANDATE ACCEPT {offer['id']}."))
         # nouvelle offre d'IPO éventuelle
         ipo_offer = ipo_mod.maybe_offer(p, random, m)
         if ipo_offer:
@@ -537,7 +546,7 @@ class TerminalTimeMixin:
         rep_sign = "+" if rep_delta >= 0 else ""
         bits = [f"{cash_sign}{widgets.format_money(cash_delta, cur)}"]
         if rep_delta:
-            bits.append(f"{rep_sign}{rep_delta} rép.")
+            bits.append(_L(f"{rep_sign}{rep_delta} rép.", f"{rep_sign}{rep_delta} rep."))
         if new_events > 0:
             bits.append(_L(f"{new_events} évènement(s)", f"{new_events} event(s)"))
         # détail « pourquoi ma réputation a bougé » : une ligne par cause, pour que
@@ -547,7 +556,7 @@ class TerminalTimeMixin:
         if rep_log:
             for reason, delta in rep_log:
                 sign = "+" if delta >= 0 else ""
-                self._log(f"    {sign}{delta} rép. — {reason}")
+                self._log(_L(f"    {sign}{delta} rép. — {reason}", f"    {sign}{delta} rep. — {reason}"))
                 if abs(delta) >= 3:    # variation individuelle notable -> toast dédié
                     self.app.notify(
                         _L(f"Réputation {sign}{delta} — {reason}", f"Reputation {sign}{delta} — {reason}"),

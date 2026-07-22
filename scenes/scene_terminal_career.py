@@ -244,7 +244,7 @@ class TerminalCareerMixin:
                           f"+{res['target_pct']:.0f}% en {res['horizon']}T, bêta ≤ {res['max_beta']:.2f}.",
                           f"  ✓ Mandate #{mid} accepted: {res['client']}{profile_txt} — target "
                           f"+{res['target_pct']:.0f}% in {res['horizon']}Q, beta ≤ {res['max_beta']:.2f}."))
-                career_mod.log(p, "deal", f"Mandat accepté : {res['client']}")
+                career_mod.log(p, "deal", _L(f"Mandat accepté : {res['client']}", f"Mandate accepted: {res['client']}"))
             else:
                 self._log(_L(f"  Offre #{mid} introuvable.", f"  Offer #{mid} not found."))
         elif op in ("DECLINE", "REFUSER"):
@@ -344,8 +344,8 @@ class TerminalCareerMixin:
         (toast renforcé + journal) : ce sont les ambitions de carrière, pas de
         simples jalons."""
         for g in legacy_mod.check_new(self.app.gs.player, self.market):
-            self.app.notify(f"✶ OBJECTIF DE LÉGENDE : {g['name']}", "prestige")
-            career_mod.log(self.app.gs.player, "info", f"Objectif de légende atteint : {g['name']}")
+            self.app.notify(_L(f"✶ OBJECTIF DE LÉGENDE : {g['name']}", f"✶ LEGEND OBJECTIVE: {g['name']}"), "prestige")
+            career_mod.log(self.app.gs.player, "info", _L(f"Objectif de légende atteint : {g['name']}", f"Legend objective reached: {g['name']}"))
 
     def _cmd_pitch(self):
         """PITCH : démarche un client pour décrocher un mandat (selon réputation)."""

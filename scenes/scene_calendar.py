@@ -231,13 +231,13 @@ class CalendarScene(Scene):
                 selected = self.selected_event == e["id"]
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD if selected else config.COL_PANEL, row, border_radius=4)
                 pygame.draw.rect(surf, config.COL_CYAN, row, 2 if selected else 1, border_radius=4)
-                widgets.draw_text(surf, f"#{e['id']} {e['event_type']}",
+                widgets.draw_text(surf, f"#{e['id']} {MACRO.event_type_label(e['event_type'])}",
                                   (row.x + 12, row.y + 6), fonts.small(bold=True), config.COL_AMBER)
                 probs = e["probabilities"]
                 prob_str = "  ".join(f"{o}: {probs[o]*100:.0f}%" for o in MACRO.OUTCOMES)
-                widgets.draw_text(surf, _L(f"Consensus : {e['consensus']}  ·  {prob_str}  ·  "
+                widgets.draw_text(surf, _L(f"Consensus : {MACRO.consensus_label(e['consensus'])}  ·  {prob_str}  ·  "
                                         f"Résolution dans {max(0, e['resolve_step'] - market.step_count)} pas",
-                                        f"Consensus: {e['consensus']}  ·  {prob_str}  ·  "
+                                        f"Consensus: {MACRO.consensus_label(e['consensus'])}  ·  {prob_str}  ·  "
                                         f"Resolves in {max(0, e['resolve_step'] - market.step_count)} steps"),
                                   (row.x + 12, row.y + 26), fonts.tiny(), config.COL_TEXT)
                 n_bets = len(MACRO.pending_bets_for(p, e["id"]))
@@ -260,7 +260,7 @@ class CalendarScene(Scene):
         rows = []
         for b in p.macro_bets:
             ev = MACRO.find_event(p, b["event_id"])
-            label = ev["event_type"] if ev else _L(f"Évènement #{b['event_id']}", f"Event #{b['event_id']}")
+            label = MACRO.event_type_label(ev["event_type"]) if ev else _L(f"Évènement #{b['event_id']}", f"Event #{b['event_id']}")
             rows.append(("pending", _L(f"{label} — pari « {_outcome_label(b['outcome'])} » : "
                                      f"{widgets.format_money(b['stake'], cur)} (x{b['multiplier']:.2f})",
                                      f"{label} — bet \"{_outcome_label(b['outcome'])}\": "
@@ -269,10 +269,10 @@ class CalendarScene(Scene):
             for br in h["bets_resolved"]:
                 status = _L("GAGNÉ", "WON") if br["won"] else _L("PERDU", "LOST")
                 rows.append(("won" if br["won"] else "lost",
-                             _L(f"{h['event']['event_type']} — issue réelle « {_outcome_label(h['actual_outcome'])} » · "
+                             _L(f"{MACRO.event_type_label(h['event']['event_type'])} — issue réelle « {_outcome_label(h['actual_outcome'])} » · "
                              f"pari « {_outcome_label(br['outcome'])} » : {status} "
                              f"({widgets.format_money(br['payout'], cur)})",
-                             f"{h['event']['event_type']} — actual outcome \"{_outcome_label(h['actual_outcome'])}\" · "
+                             f"{MACRO.event_type_label(h['event']['event_type'])} — actual outcome \"{_outcome_label(h['actual_outcome'])}\" · "
                              f"bet \"{_outcome_label(br['outcome'])}\": {status} "
                              f"({widgets.format_money(br['payout'], cur)})")))
 

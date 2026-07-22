@@ -57,6 +57,40 @@ _CONSENSUS_LABELS = {
                                       "sous-souscription (demande faible)"],
 }
 
+# --- couche EN (affichage). Les valeurs FR restent les clés de logique et sont
+# ce qui est sérialisé dans les saves ; on ne localise qu'à l'AFFICHAGE via
+# event_type_label()/consensus_label(). ---
+_EVENT_TYPE_EN = {
+    "Décision de taux (banque centrale)": "Rate decision (central bank)",
+    "Inflation (CPI)": "Inflation (CPI)",
+    "Emploi (NFP)": "Employment (NFP)",
+    "Croissance (PIB)": "Growth (GDP)",
+    "Indice PMI (manufacturier/services)": "PMI index (manufacturing/services)",
+    "Émission de dette souveraine": "Sovereign debt issuance",
+}
+_CONSENSUS_EN = {
+    "statu quo": "hold", "hausse de 25pb": "25bp hike", "baisse de 25pb": "25bp cut",
+    "en ligne": "in line", "léger dépassement": "slight beat", "léger ralentissement": "slight slowdown",
+    "créations supérieures aux attentes": "hiring above expectations",
+    "créations inférieures aux attentes": "hiring below expectations",
+    "accélération": "acceleration", "ralentissement": "slowdown",
+    "expansion confirmée": "expansion confirmed", "contraction": "contraction",
+    "demande conforme": "demand in line", "sur-souscription (forte demande)": "oversubscribed (strong demand)",
+    "sous-souscription (demande faible)": "undersubscribed (weak demand)",
+}
+
+
+def event_type_label(event_type):
+    """Libellé localisé d'un type d'évènement macro (clé FR conservée)."""
+    from core.i18n import get_lang
+    return _EVENT_TYPE_EN.get(event_type, event_type) if get_lang() == "en" else event_type
+
+
+def consensus_label(consensus):
+    """Libellé localisé du consensus (clé FR conservée)."""
+    from core.i18n import get_lang
+    return _CONSENSUS_EN.get(consensus, consensus) if get_lang() == "en" else consensus
+
 
 def _consensus(event_type, rng):
     labels = _CONSENSUS_LABELS.get(event_type, ["en ligne"])

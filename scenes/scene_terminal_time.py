@@ -214,14 +214,14 @@ class TerminalTimeMixin:
             ev = res["event"]
             won_bets = [b for b in res["bets_resolved"] if b["won"]]
             total_payout = sum(b["payout"] for b in res["bets_resolved"])
-            self._log(_L(f"  ■ Évènement macro résolu : {ev['event_type']} → issue {res['actual_outcome']} "
+            self._log(_L(f"  ■ Évènement macro résolu : {macrocal_mod.event_type_label(ev['event_type'])} → issue {res['actual_outcome']} "
                       f"({len(won_bets)}/{len(res['bets_resolved'])} pari(s) gagné(s), "
                       f"{widgets.format_money(total_payout, cur)}).",
-                      f"  ■ Macro event resolved: {ev['event_type']} → outcome {res['actual_outcome']} "
+                      f"  ■ Macro event resolved: {macrocal_mod.event_type_label(ev['event_type'])} → outcome {res['actual_outcome']} "
                       f"({len(won_bets)}/{len(res['bets_resolved'])} bet(s) won, "
                       f"{widgets.format_money(total_payout, cur)})."))
             if res["bets_resolved"]:
-                self.app.notify(_L(f"Évènement résolu : {ev['event_type']}", f"Event resolved: {ev['event_type']}"),
+                self.app.notify(_L(f"Évènement résolu : {macrocal_mod.event_type_label(ev['event_type'])}", f"Event resolved: {macrocal_mod.event_type_label(ev['event_type'])}"),
                                  "good" if won_bets else "bad")
         for exe in (summary.get("conditional_orders_executed") or []):
             order, res = exe["order"], exe["result"]
@@ -470,11 +470,11 @@ class TerminalTimeMixin:
         # nouvel évènement macro éventuel
         macro_event = macrocal_mod.maybe_schedule(p, random, m)
         if macro_event:
-            self._log(_L(f"  ✶ AGENDA MACRO : {macro_event['event_type']} dans "
+            self._log(_L(f"  ✶ AGENDA MACRO : {macrocal_mod.event_type_label(macro_event['event_type'])} dans "
                       f"{macro_event['resolve_step'] - m.step_count} pas (AGENDA pour voir).",
-                      f"  ✶ MACRO CALENDAR: {macro_event['event_type']} in "
+                      f"  ✶ MACRO CALENDAR: {macrocal_mod.event_type_label(macro_event['event_type'])} in "
                       f"{macro_event['resolve_step'] - m.step_count} steps (type AGENDA to view)."))
-            self.app.notify(_L(f"Agenda macro : {macro_event['event_type']}", f"Macro calendar: {macro_event['event_type']}"), "info",
+            self.app.notify(_L(f"Agenda macro : {macrocal_mod.event_type_label(macro_event['event_type'])}", f"Macro calendar: {macrocal_mod.event_type_label(macro_event['event_type'])}"), "info",
                             action="calendar")
         # revue de performance éventuelle (déclenchée par advance_step)
         if summary.get("review_offer"):

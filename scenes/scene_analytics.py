@@ -12,7 +12,8 @@ livre de positions).
 """
 import pygame
 
-from core import analytics, config
+from core import analytics, config, i18n
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.popups import PopupMixin
@@ -27,6 +28,17 @@ _CLASS_COL = {"Actions": config.COL_AMBER, "Obligations": config.COL_CYAN,
 _alert_color = widgets.alert_color
 
 
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
+_LIQ_EN = {"Liquide": "Liquid", "Peu liquide": "Low liquidity", "Illiquide": "Illiquid"}
+
+
+def _liq_label(k):
+    return _LIQ_EN.get(k, k) if get_lang() == "en" else k
+
+
 class AnalyticsScene(Scene, PopupMixin):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
@@ -35,9 +47,9 @@ class AnalyticsScene(Scene, PopupMixin):
         self.back_btn = widgets.Button(
             config.back_button_rect(180), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.book_btn = widgets.Button(
-            (240, config.SCREEN_HEIGHT - 50, 170, 42), "PORTEFEUILLE", config.COL_AMBER)
+            (240, config.SCREEN_HEIGHT - 50, 170, 42), _L("PORTEFEUILLE", "PORTFOLIO"), config.COL_AMBER)
         self.stress_btn = widgets.Button(
-            (420, config.SCREEN_HEIGHT - 50, 170, 42), "⚠ STRESS TEST", config.COL_DOWN)
+            (420, config.SCREEN_HEIGHT - 50, 170, 42), _L("⚠ STRESS TEST", "⚠ STRESS TEST"), config.COL_DOWN)
         self.shop_btn = widgets.Button(
             (600, config.SCREEN_HEIGHT - 50, 160, 42), "SHOP", config.COL_AMBER)
         self._holding_rects = {}    # label -> Rect (clic → fiche flottante, toutes classes)
@@ -128,7 +140,7 @@ class AnalyticsScene(Scene, PopupMixin):
                 return
             if self._corr_rect and self._corr_rect.collidepoint(event.pos):
                 p, m = self.app.gs.player, self.market
-                self.open_custom_chart("CORRÉLATIONS — actions",
+                self.open_custom_chart(_L("CORRÉLATIONS — actions", "CORRELATIONS — equities"),
                                        lambda surf, rect: self._draw_corr(surf, rect, p, m, max_labels=None),
                                        accent=config.COL_DOWN, size=(560, 420))
                 return
@@ -148,15 +160,19 @@ class AnalyticsScene(Scene, PopupMixin):
         cur = config.CONTINENTS.get(p.continent, {}).get("currency", "$")
         s = analytics.summary(p, m)
 
-        widgets.draw_text(surf, "ANALYSE DU PORTEFEUILLE", (40, 20),
+        widgets.draw_text(surf, _L("ANALYSE DU PORTEFEUILLE", "PORTFOLIO ANALYSIS"), (40, 20),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, f"{s['n_positions']} positions · "
+        widgets.draw_text(surf, _L(f"{s['n_positions']} positions · "
                           f"{config.GRADES[p.grade_index]} · valeur nette en {cur}",
+                          f"{s['n_positions']} positions · "
+                          f"{config.GRADES[p.grade_index]} · net worth in {cur}"),
                           (42, 64), fonts.small(), config.COL_TEXT_DIM)
 
         if s["n_positions"] == 0:
-            widgets.draw_text(surf, "Portefeuille vide. Achetez des actifs (BUY, BUYBOND, "
+            widgets.draw_text(surf, _L("Portefeuille vide. Achetez des actifs (BUY, BUYBOND, "
                               "BUYCMDTY…) pour voir l'analyse détaillée.",
+                              "Empty portfolio. Buy assets (BUY, BUYBOND, "
+                              "BUYCMDTY…) to see the detailed analysis."),
                               (40, 120), fonts.body(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             self.shop_btn.draw(surf)
@@ -180,7 +196,7 @@ class AnalyticsScene(Scene, PopupMixin):
         self._draw_allocations(surf, pygame.Rect(x2, top, mw, h), s, cur)
         self._draw_risk_charts(surf, pygame.Rect(x3, top, rw, h), p, m, s)
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("souris", "cliquer une position")])
+                              [(_L("souris", "mouse"), _L("cliquer une position", "click a position"))])
         self.back_btn.draw(surf)
         self.book_btn.draw(surf)
         self.stress_btn.draw(surf)
@@ -201,27 +217,27 @@ class AnalyticsScene(Scene, PopupMixin):
         fm = lambda v: widgets.format_money(v, cur)
         lev = "∞" if s["leverage"] == float("inf") else f"{s['leverage']:.2f}x"
         tiles = [
-            ("Valeur nette", fm(s["net_worth"]), config.COL_WHITE),
-            ("Trésorerie", fm(s["cash"]), config.COL_TEXT),
-            ("P&L latent", fm(s["unrealized_pnl"]),
+            (_L("Valeur nette", "Net worth"), fm(s["net_worth"]), config.COL_WHITE),
+            (_L("Trésorerie", "Cash"), fm(s["cash"]), config.COL_TEXT),
+            (_L("P&L latent", "Unrealized P&L"), fm(s["unrealized_pnl"]),
              config.COL_UP if s["unrealized_pnl"] >= 0 else config.COL_DOWN),
-            ("P&L réalisé", fm(s["realized_pnl"]),
+            (_L("P&L réalisé", "Realized P&L"), fm(s["realized_pnl"]),
              config.COL_UP if s["realized_pnl"] >= 0 else config.COL_DOWN),
-            ("Bêta", f"{s['beta']:.2f}", config.COL_CYAN),
-            ("Levier", lev, config.COL_WARN if s["leverage"] > 1.5 else config.COL_TEXT),
-            ("Vol. annu.", f"{s['volatility']:.1f}%", config.COL_WARN),
+            (_L("Bêta", "Beta"), f"{s['beta']:.2f}", config.COL_CYAN),
+            (_L("Levier", "Leverage"), lev, config.COL_WARN if s["leverage"] > 1.5 else config.COL_TEXT),
+            (_L("Vol. annu.", "Ann. vol."), f"{s['volatility']:.1f}%", config.COL_WARN),
             ("Max DD", f"{s['max_drawdown']:.1f}%",
              _alert_color(s["max_drawdown"], "max_drawdown")),
-            ("Concentration", f"top {s['top_weight']:.0f}%",
+            (_L("Concentration", "Concentration"), f"top {s['top_weight']:.0f}%",
              _alert_color(s["top_weight"], "top_weight")),
-            ("Exposition nette", fm(s["net_exposure"]),
+            (_L("Exposition nette", "Net exposure"), fm(s["net_exposure"]),
              config.COL_UP if s["net_exposure"] >= 0 else config.COL_DOWN),
         ]
         self._draw_tile_row(surf, 92, tiles)
 
     def _draw_risk_tiles(self, surf, s):
         tiles = [
-            ("Rdt annualisé", f"{s['annualized_return']:+.1f}%",
+            (_L("Rdt annualisé", "Ann. return"), f"{s['annualized_return']:+.1f}%",
              config.COL_UP if s["annualized_return"] >= 0 else config.COL_DOWN),
             ("Sharpe", f"{s['sharpe']:.2f}",
              config.COL_UP if s["sharpe"] >= 0 else config.COL_DOWN),
@@ -234,17 +250,17 @@ class AnalyticsScene(Scene, PopupMixin):
             ("VaR 95%", f"{s['var95']:.1f}%", config.COL_DOWN),
             ("CVaR 95%", f"{s['cvar95']:.1f}%", config.COL_DOWN),
             ("Tracking error", f"{s['tracking_error']:.1f}%", config.COL_TEXT),
-            ("Récup.", "—" if s["recovery_time"] is None else f"{s['recovery_time']} pas",
+            (_L("Récup.", "Recov."), "—" if s["recovery_time"] is None else _L(f"{s['recovery_time']} pas", f"{s['recovery_time']} steps"),
              config.COL_WARN if s["recovery_time"] is None else config.COL_TEXT),
-            ("Lignes effectives", f"{s['effective_positions']:.1f}", config.COL_TEXT),
+            (_L("Lignes effectives", "Effective lines"), f"{s['effective_positions']:.1f}", config.COL_TEXT),
         ]
         self._draw_tile_row(surf, 148, tiles)
 
     def _draw_holdings(self, surf, rect, s, cur):
-        inner = widgets.draw_panel(surf, rect, "Positions détaillées", config.COL_CYAN)
-        cols = [("Cl.", inner.x, "left"), ("Actif", inner.x + 46, "left"),
-                ("Qté", inner.x + 300, "right"), ("Cours", inner.x + 390, "right"),
-                ("Valeur", inner.x + 490, "right"), ("Poids", inner.right, "right")]
+        inner = widgets.draw_panel(surf, rect, _L("Positions détaillées", "Detailed positions"), config.COL_CYAN)
+        cols = [(_L("Cl.", "Cl."), inner.x, "left"), (_L("Actif", "Asset"), inner.x + 46, "left"),
+                (_L("Qté", "Qty"), inner.x + 300, "right"), (_L("Cours", "Price"), inner.x + 390, "right"),
+                (_L("Valeur", "Value"), inner.x + 490, "right"), (_L("Poids", "Weight"), inner.right, "right")]
         for label, cx, al in cols:
             widgets.draw_text(surf, label, (cx, inner.y), fonts.tiny(bold=True),
                               config.COL_TEXT_DIM, align=al)
@@ -306,7 +322,7 @@ class AnalyticsScene(Scene, PopupMixin):
                                   fonts.tiny(), config.COL_TEXT_DIM, align="right")
                 liq_col = {"Liquide": config.COL_UP, "Peu liquide": config.COL_WARN,
                            "Illiquide": config.COL_DOWN}.get(h["liquidity"], config.COL_TEXT_DIM)
-                widgets.draw_text(surf, h["liquidity"], (inner.x + 490, y + 13),
+                widgets.draw_text(surf, _liq_label(h["liquidity"]), (inner.x + 490, y + 13),
                                   fonts.tiny(), liq_col, align="right")
                 sign = "+" if live_pnl_pct >= 0 else ""
                 widgets.draw_text(surf, f"{sign}{live_pnl_pct:.1f}%", (inner.right, y + 13),
@@ -318,45 +334,45 @@ class AnalyticsScene(Scene, PopupMixin):
         self.scroll_holdings = max(0, min(self._holdings_max_scroll, self.scroll_holdings))
         self.scroll_holdings = widgets.draw_scrollbar(surf, rect, list_area, self.scroll_holdings,
                                self._holdings_max_scroll, content_h)
-        widgets.draw_text(surf, "clic/clic droit actif → fiche d'analyse · clic cours/valeur/P&L (actions) → graphe",
+        widgets.draw_text(surf, _L("clic/clic droit actif → fiche d'analyse · clic cours/valeur/P&L (actions) → graphe", "click/right-click asset → analysis sheet · click price/value/P&L (equities) → chart"),
                           (inner.x, inner.bottom - 12), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_allocations(self, surf, rect, s, cur):
-        inner = widgets.draw_panel(surf, rect, "Répartition & diversification", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, rect, _L("Répartition & diversification", "Allocation & diversification"), config.COL_AMBER)
         self._alloc_list_rect = inner
         prev_clip = surf.get_clip()
         surf.set_clip(inner)
         y0 = inner.y - self.scroll_alloc
         y = y0
-        y = self._alloc_block(surf, inner, y, "Par classe d'actifs", s["by_class"],
-                              lambda k: _CLASS_COL.get(k, config.COL_TEXT))
+        y = self._alloc_block(surf, inner, y, _L("Par classe d'actifs", "By asset class"), s["by_class"],
+                              lambda k: _CLASS_COL.get(k, config.COL_TEXT), labelfn=i18n.asset_class_label)
         y += 6
-        y = self._alloc_block(surf, inner, y, "Par secteur", s["by_sector"],
+        y = self._alloc_block(surf, inner, y, _L("Par secteur", "By sector"), s["by_sector"],
                               lambda k: config.COL_CYAN)
         y += 6
-        y = self._alloc_block(surf, inner, y, "Par région", s["by_region"],
+        y = self._alloc_block(surf, inner, y, _L("Par région", "By region"), s["by_region"],
                               lambda k: config.COL_PRESTIGE)
         y += 6
         liq_col = {"Liquide": config.COL_UP, "Peu liquide": config.COL_WARN,
                    "Illiquide": config.COL_DOWN}
-        y = self._alloc_block(surf, inner, y, "Par liquidité", s["by_liquidity"],
-                              lambda k: liq_col.get(k, config.COL_TEXT))
+        y = self._alloc_block(surf, inner, y, _L("Par liquidité", "By liquidity"), s["by_liquidity"],
+                              lambda k: liq_col.get(k, config.COL_TEXT), labelfn=_liq_label)
         # diversification
         y += 4
         pygame.draw.line(surf, config.COL_BORDER, (inner.x, y), (inner.right, y), 1)
         y += 6
-        widgets.draw_text(surf, f"Lignes effectives (1/HHI) : {s['effective_positions']:.1f}",
+        widgets.draw_text(surf, _L(f"Lignes effectives (1/HHI) : {s['effective_positions']:.1f}", f"Effective lines (1/HHI): {s['effective_positions']:.1f}"),
                           (inner.x, y), fonts.tiny(), config.COL_TEXT)
         y += 15
         red, amber = widgets.ALERT_THRESHOLDS["top_weight"]
-        conc = "forte" if s["top_weight"] > red else "modérée" if s["top_weight"] > amber else "saine"
+        conc = _L("forte", "high") if s["top_weight"] > red else _L("modérée", "moderate") if s["top_weight"] > amber else _L("saine", "healthy")
         ccol = _alert_color(s["top_weight"], "top_weight")
-        widgets.draw_text(surf, f"Concentration : {conc} (top {s['top_weight']:.0f}%)",
+        widgets.draw_text(surf, _L(f"Concentration : {conc} (top {s['top_weight']:.0f}%)", f"Concentration: {conc} (top {s['top_weight']:.0f}%)"),
                           (inner.x, y), fonts.tiny(bold=True), ccol)
         y += 18
         top_risk = sorted(s["rows"], key=lambda r: -r["risk_contribution_pct"])[:3]
         if top_risk:
-            widgets.draw_text(surf, "Top contributeurs au risque",
+            widgets.draw_text(surf, _L("Top contributeurs au risque", "Top risk contributors"),
                               (inner.x, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
             y += 16
             for r in top_risk:
@@ -371,14 +387,15 @@ class AnalyticsScene(Scene, PopupMixin):
         self.scroll_alloc = max(0, min(self._alloc_max_scroll, self.scroll_alloc))
         self.scroll_alloc = widgets.draw_scrollbar(surf, rect, inner, self.scroll_alloc, self._alloc_max_scroll, content_h)
 
-    def _alloc_block(self, surf, inner, y, title, data, colfn):
+    def _alloc_block(self, surf, inner, y, title, data, colfn, labelfn=None):
         widgets.draw_text(surf, title, (inner.x, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         y += 16
         total = sum(data.values()) or 1.0
         items = sorted(data.items(), key=lambda kv: -kv[1])
         for k, v in items:
             frac = v / total
-            widgets.draw_text(surf, widgets.fit_text(str(k), fonts.tiny(), 110),
+            disp = labelfn(k) if labelfn else str(k)
+            widgets.draw_text(surf, widgets.fit_text(disp, fonts.tiny(), 110),
                               (inner.x, y), fonts.tiny(), config.COL_TEXT)
             widgets.draw_progress(surf, (inner.x + 116, y + 2, inner.w - 116 - 42, 9),
                                   frac, colfn(k))
@@ -397,14 +414,14 @@ class AnalyticsScene(Scene, PopupMixin):
         for r in (self._frontier_rect, self._corr_rect):
             if r.collidepoint(mp):
                 pygame.draw.rect(surf, config.COL_WHITE, r, 1)
-                widgets.draw_text(surf, "clic → agrandir", (r.right - 6, r.bottom - 14),
+                widgets.draw_text(surf, _L("clic → agrandir", "click → enlarge"), (r.right - 6, r.bottom - 14),
                                   fonts.tiny(bold=True), config.COL_WHITE, align="right")
 
     def _draw_frontier(self, surf, rect, p, m):
-        inner = widgets.draw_panel(surf, rect, "Frontière efficiente (actions)", config.COL_UP)
+        inner = widgets.draw_panel(surf, rect, _L("Frontière efficiente (actions)", "Efficient frontier (equities)"), config.COL_UP)
         fr = analytics.equity_frontier(p, m)
         if not fr:
-            widgets.draw_text(surf, "≥ 2 actions longues requises.", (inner.x, inner.y),
+            widgets.draw_text(surf, _L("≥ 2 actions longues requises.", "≥ 2 long equities required."), (inner.x, inner.y),
                               fonts.tiny(), config.COL_TEXT_DIM)
             return
         vols, rets = fr["vols"], fr["rets"]
@@ -427,15 +444,15 @@ class AnalyticsScene(Scene, PopupMixin):
         # position courante
         cp = px(cvol, cret)
         pygame.draw.circle(surf, config.COL_AMBER, cp, 4)
-        widgets.draw_text(surf, "VOUS", (cp[0] + 6, cp[1] - 6), fonts.tiny(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, f"vol {cvol:.0f}%  ·  rdt att. {cret:.0f}%",
+        widgets.draw_text(surf, _L("VOUS", "YOU"), (cp[0] + 6, cp[1] - 6), fonts.tiny(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L(f"vol {cvol:.0f}%  ·  rdt att. {cret:.0f}%", f"vol {cvol:.0f}%  ·  exp. ret {cret:.0f}%"),
                           (inner.x, inner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_corr(self, surf, rect, p, m, max_labels=8):
-        inner = widgets.draw_panel(surf, rect, "Corrélations (actions)", config.COL_DOWN)
+        inner = widgets.draw_panel(surf, rect, _L("Corrélations (actions)", "Correlations (equities)"), config.COL_DOWN)
         labels, corr = analytics.correlation(p, m)
         if len(labels) < 2:
-            widgets.draw_text(surf, "≥ 2 actions requises.", (inner.x, inner.y),
+            widgets.draw_text(surf, _L("≥ 2 actions requises.", "≥ 2 equities required."), (inner.x, inner.y),
                               fonts.tiny(), config.COL_TEXT_DIM)
             return
         labels = labels[:max_labels] if max_labels else labels

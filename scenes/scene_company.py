@@ -109,9 +109,9 @@ class CompanyScene(Scene):
         self.back_btn = widgets.Button(config.back_button_rect(180),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.buy_btn = widgets.Button(
-            (config.SCREEN_WIDTH - 320, config.SCREEN_HEIGHT - 70, 130, 46), "ACHAT", config.COL_UP)
+            (config.SCREEN_WIDTH - 320, config.SCREEN_HEIGHT - 70, 130, 46), _L("ACHAT", "BUY"), config.COL_UP)
         self.sell_btn = widgets.Button(
-            (config.SCREEN_WIDTH - 180, config.SCREEN_HEIGHT - 70, 140, 46), "VENTE", config.COL_DOWN)
+            (config.SCREEN_WIDTH - 180, config.SCREEN_HEIGHT - 70, 140, 46), _L("VENTE", "SELL"), config.COL_DOWN)
         self.fa_btn = widgets.Button((230, config.SCREEN_HEIGHT - 70, 200, 46),
                                      _L("PLEIN ÉCRAN (FA)", "FULLSCREEN (FA)"), config.COL_CYAN)
         self.graph_btn = widgets.Button((230, config.SCREEN_HEIGHT - 70, 200, 46),
@@ -283,7 +283,7 @@ class CompanyScene(Scene):
             self._draw_valuation_tab(surf, content, mt)
 
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.SCREEN_HEIGHT - 56),
-                              [("ESC", "retour")])
+                              [("ESC", _L("retour", "back"))])
         self.back_btn.draw(surf)
         self.buy_btn.draw(surf)
         self.sell_btn.draw(surf)
@@ -351,7 +351,7 @@ class CompanyScene(Scene):
             widgets.draw_text(surf, f"{c['price']:,.2f} {cur}", (rect.right - 8, rect.y + 4),
                               fonts.small(), config.COL_TEXT, align="right")
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.SCREEN_HEIGHT - 56),
-                              [("↑↓", _L("naviguer", "navigate")), ("ENTRÉE", _L("ouvrir", "open")), ("ESC", _L("retour", "back"))])
+                              [("↑↓", _L("naviguer", "navigate")), (_L("ENTRÉE", "ENTER"), _L("ouvrir", "open")), ("ESC", _L("retour", "back"))])
 
     def _draw_tabs(self, surf, y):
         self._tab_rects = {}
@@ -417,7 +417,7 @@ class CompanyScene(Scene):
                     title = ev.get("title", "")
                     desc = ev.get("desc", "")
                     ago = mkt.step_count - ev["step"]
-                    ago_str = f"il y a {ago} pas" if ago > 0 else "ce pas"
+                    ago_str = _L(f"il y a {ago} pas", f"{ago} steps ago") if ago > 0 else _L("ce pas", "this step")
                     ecol = _KIND_COL.get(ev.get("kind", "info"), config.COL_CYAN)
                     line = f"{icon}  {title} — {ago_str}"
                     widgets.draw_text(surf, line, (rect.x, y), fonts.tiny(bold=True), ecol)
@@ -432,33 +432,33 @@ class CompanyScene(Scene):
         ph_top = y + 8
         ph = rect.bottom - ph_top
         panel = pygame.Rect(rect.x, ph_top, 560, ph)
-        inner = widgets.draw_panel(surf, panel, "Fondamentaux & valorisation", accent)
+        inner = widgets.draw_panel(surf, panel, _L("Fondamentaux & valorisation", "Fundamentals & valuation"), accent)
         # 3e élément optionnel : terme du glossaire (data/glossary_data.py) à
         # ouvrir en un clic sur le libellé — cf. ui/glossary_hint.py. None
         # quand il n'y a pas d'entrée de glossaire pertinente (le libellé
         # reste alors un simple texte, non cliquable).
         col_valo = [
-            ("Capitalisation", widgets.format_money(mt["mktcap"] * 1e6, cur), None),
-            ("Chiffre d'affaires", widgets.format_money(mt["revenue"] * 1e6, cur), None),
+            (_L("Capitalisation", "Market cap"), widgets.format_money(mt["mktcap"] * 1e6, cur), None),
+            (_L("Chiffre d'affaires", "Revenue"), widgets.format_money(mt["revenue"] * 1e6, cur), None),
             ("EBITDA", widgets.format_money(mt["ebitda"] * 1e6, cur), "EBITDA"),
-            ("Résultat net", widgets.format_money(mt["net_income"] * 1e6, cur), None),
-            ("BPA (EPS)", _fmt(mt["eps"], " " + cur, 2), None),
+            (_L("Résultat net", "Net income"), widgets.format_money(mt["net_income"] * 1e6, cur), None),
+            (_L("BPA (EPS)", "EPS"), _fmt(mt["eps"], " " + cur, 2), None),
             ("P/E", _fmt(mt["pe"], "x", 1), "P/E"),
             ("EV", widgets.format_money(mt["ev"] * 1e6, cur), "EV"),
             ("EV / EBITDA", _fmt(mt["ev_ebitda"], "x", 1), "EV/EBITDA"),
             ("P / Sales", _fmt(mt["ps"], "x", 1), "P/S"),
         ]
         col_risk = [
-            ("Marge nette", _fmt(mt["net_margin"] * 100, "%", 1), None),
-            ("Marge EBITDA", _fmt(mt["ebitda_margin"] * 100, "%", 1), None),
+            (_L("Marge nette", "Net margin"), _fmt(mt["net_margin"] * 100, "%", 1), None),
+            (_L("Marge EBITDA", "EBITDA margin"), _fmt(mt["ebitda_margin"] * 100, "%", 1), None),
             ("FCF yield", _fmt(mt["fcf_yield"], "%", 1), "FCF"),
-            ("Dette nette", widgets.format_money(mt["net_debt"] * 1e6, cur), None),
-            ("Dette / EBITDA", _fmt(mt["nd_ebitda"], "x", 1), None),
-            ("Notation crédit", mt["credit_rating"], None),
-            ("Rendement div.", _fmt(mt["div_yield"] * 100, "%", 2), None),
+            (_L("Dette nette", "Net debt"), widgets.format_money(mt["net_debt"] * 1e6, cur), None),
+            (_L("Dette / EBITDA", "Debt / EBITDA"), _fmt(mt["nd_ebitda"], "x", 1), None),
+            (_L("Notation crédit", "Credit rating"), mt["credit_rating"], None),
+            (_L("Rendement div.", "Div. yield"), _fmt(mt["div_yield"] * 100, "%", 2), None),
             ("Payout", _fmt(mt["payout"], "%", 0), None),
-            ("Bêta", _fmt(mt["beta"], "", 2), "Beta"),
-            ("Actions (M)", _fmt(mt["shares"], "", 1), None),
+            (_L("Bêta", "Beta"), _fmt(mt["beta"], "", 2), "Beta"),
+            (_L("Actions (M)", "Shares (M)"), _fmt(mt["shares"], "", 1), None),
         ]
         cw = inner.w // 2
         for ci, col in enumerate((col_valo, col_risk)):
@@ -482,7 +482,7 @@ class CompanyScene(Scene):
                                  n_candles=32, sma_windows=(10, 30))
             widgets.draw_text(surf, "MA10", (cinner.x, cinner.y), fonts.tiny(), config.COL_AMBER)
             widgets.draw_text(surf, "MA30", (cinner.x + 52, cinner.y), fonts.tiny(), config.COL_TEXT_DIM)
-            widgets.draw_text(surf, f"haut {max(hist):,.2f}  bas {min(hist):,.2f}",
+            widgets.draw_text(surf, _L(f"haut {max(hist):,.2f}  bas {min(hist):,.2f}", f"high {max(hist):,.2f}  low {min(hist):,.2f}"),
                               (cinner.right, cinner.y), fonts.tiny(), config.COL_TEXT_DIM, align="right")
         else:
             widgets.draw_text_wrapped(
@@ -606,12 +606,12 @@ class CompanyScene(Scene):
 
         top = py + ph + 8
         panel_rect = pygame.Rect(rect.x, top, rect.w, rect.bottom - top)
-        header = widgets.draw_panel(surf, panel_rect, "Graphique", self.accent)
+        header = widgets.draw_panel(surf, panel_rect, _L("Graphique", "Chart"), self.accent)
         m = self.app.market
         hist = stock_series(m, self.app.sim_clock, self.app.gs.player.day, self.ticker,
                             self.chart_period) if m else []
         if not hist or len(hist) < 2:
-            widgets.draw_text(surf, "Historique en cours de constitution.",
+            widgets.draw_text(surf, _L("Historique en cours de constitution.", "History still building."),
                               (header.x, header.y), fonts.small(), config.COL_TEXT_DIM)
             return
         # bande de badges (prix, volatilité, ouverture du marché) sous l'en-tête
@@ -640,7 +640,7 @@ class CompanyScene(Scene):
                 rets = [abs(recent[k] / recent[k - 1] - 1) for k in range(1, len(recent))]
                 avg_ret = sum(rets) / len(rets)
                 if avg_ret > 0.0009 * vol_mult * 1.6:
-                    widgets.draw_text(surf, "! forte variation", (badge_x, badge_y),
+                    widgets.draw_text(surf, _L("! forte variation", "! large move"), (badge_x, badge_y),
                                       fonts.tiny(bold=True), config.COL_DOWN)
         if self.chart_kind == "candles":
             widgets.draw_candles(surf, inner, hist, n_candles=32, sma_windows=(10, 30))
@@ -668,7 +668,7 @@ class CompanyScene(Scene):
         elif self.chart_kind == "vol":
             vol = [v for v in charts.rolling_vol(hist, 20) if v is not None]
             if len(vol) < 2:
-                widgets.draw_text(surf, "Historique insuffisant.", (inner.x, inner.y),
+                widgets.draw_text(surf, _L("Historique insuffisant.", "Not enough history."), (inner.x, inner.y),
                                   fonts.small(), config.COL_TEXT_DIM)
             else:
                 widgets.draw_series(surf, inner, vol, config.COL_WARN,
@@ -838,7 +838,7 @@ class CompanyScene(Scene):
                 widgets.draw_text(surf, tag, (inner.x + 8, ry), fonts.small(bold=True), col)
                 widgets.draw_text(surf, widgets.fit_text(cat, fonts.tiny(), 90),
                                   (inner.x + 26, ry + 1), fonts.tiny(), config.COL_PRESTIGE)
-                widgets.draw_text(surf, e["region"] or "Monde", (inner.x + 122, ry + 1),
+                widgets.draw_text(surf, e["region"] or _L("Monde", "World"), (inner.x + 122, ry + 1),
                                   fonts.tiny(), config.COL_TEXT_DIM)
                 widgets.draw_text(surf, widgets.fit_text(e["text"], fonts.small(), inner.w - 200),
                                   (inner.x + 202, ry), fonts.small(), config.COL_TEXT)
@@ -856,7 +856,7 @@ class CompanyScene(Scene):
         left = pygame.Rect(rect.x, rect.y, half, rect.h)
         inner = widgets.draw_panel(surf, left, _L("Multiples vs médiane secteur", "Multiples vs sector median"), self.accent)
         med = self.sector_med
-        widgets.draw_text(surf, f"Secteur {mt['sector']} ({med['n'] if med else 0} pairs comparables)",
+        widgets.draw_text(surf, _L(f"Secteur {mt['sector']} ({med['n'] if med else 0} pairs comparables)", f"Sector {mt['sector']} ({med['n'] if med else 0} comparable peers)"),
                           (inner.x, inner.y), fonts.small(bold=True), config.COL_TEXT_DIM)
         y = inner.y + 30
 
@@ -869,8 +869,8 @@ class CompanyScene(Scene):
             if val < ref * 0.9:
                 return (_L("décoté", "cheap"), config.COL_UP)
             if val > ref * 1.1:
-                return ("cher", config.COL_DOWN)
-            return ("en ligne", config.COL_TEXT)
+                return (_L("cher", "expensive"), config.COL_DOWN)
+            return (_L("en ligne", "in line"), config.COL_TEXT)
 
         for label, key, term in [("P/E", "pe", "P/E"), ("EV/EBITDA", "ev_ebitda", "EV/EBITDA"),
                                  ("P/S", "ps", "P/S")]:
@@ -899,14 +899,14 @@ class CompanyScene(Scene):
         right = pygame.Rect(rect.x + half + 20, rect.y, rect.w - half - 20, rect.h)
         rinner = widgets.draw_panel(surf, right, _L("Profil rentabilité / risque", "Profitability / risk profile"), self.accent)
         rows = [
-            ("Marge nette", _fmt(mt["net_margin"] * 100, "%", 1), None),
-            ("Marge EBITDA", _fmt(mt["ebitda_margin"] * 100, "%", 1), None),
+            (_L("Marge nette", "Net margin"), _fmt(mt["net_margin"] * 100, "%", 1), None),
+            (_L("Marge EBITDA", "EBITDA margin"), _fmt(mt["ebitda_margin"] * 100, "%", 1), None),
             ("FCF yield", _fmt(mt["fcf_yield"], "%", 1), "FCF"),
-            ("Dette / EBITDA", _fmt(mt["nd_ebitda"], "x", 1), None),
-            ("Notation crédit", mt["credit_rating"], None),
-            ("Rendement dividende", _fmt(mt["div_yield"] * 100, "%", 2), None),
+            (_L("Dette / EBITDA", "Debt / EBITDA"), _fmt(mt["nd_ebitda"], "x", 1), None),
+            (_L("Notation crédit", "Credit rating"), mt["credit_rating"], None),
+            (_L("Rendement dividende", "Dividend yield"), _fmt(mt["div_yield"] * 100, "%", 2), None),
             ("Payout", _fmt(mt["payout"], "%", 0), None),
-            ("Bêta", _fmt(mt["beta"], "", 2), "Beta"),
+            (_L("Bêta", "Beta"), _fmt(mt["beta"], "", 2), "Beta"),
         ]
         yy = rinner.y
         for label, val, term in rows:

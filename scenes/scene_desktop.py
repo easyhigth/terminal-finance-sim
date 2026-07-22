@@ -38,6 +38,7 @@ import time
 
 import pygame
 
+from apps.base import app_title as _app_title
 from apps.scene_host import SceneHostApp
 from core import config, desktop_onboarding, desktop_tutorial
 from core import difficulty as difficulty_mod
@@ -1076,6 +1077,6 @@ class DesktopScene(DesktopWidgetsMixin, DesktopMenusMixin, DesktopIconsMixin,
             desktop_icons.draw(surf, (r.x + 12, r.centery), kind, size=16,
                                alpha=150 if w.minimized else 255)
             if r.w > 48:   # trop étroit : icône seule, pas de texte tronqué illisible
-                widgets.draw_text(surf, widgets.fit_text(w.app_obj.title, fonts.tiny(), r.w - 26),
+                widgets.draw_text(surf, widgets.fit_text(_app_title(w.app_obj), fonts.tiny(), r.w - 26),
                                   (r.x + 22, r.y + 5), fonts.tiny(bold=True), col)
             x += entry_w + 6

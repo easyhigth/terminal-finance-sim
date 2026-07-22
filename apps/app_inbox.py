@@ -13,7 +13,7 @@ import pygame
 
 from apps.base import DesktopApp
 from core import config, i18n
-from scenes.scene_inbox import _KIND, FILTER_CHIPS
+from scenes.scene_inbox import _KIND, FILTER_CHIPS, _kind_label
 
 
 def _L(fr, en):
@@ -71,7 +71,7 @@ class InboxApp(DesktopApp):
             order = [i for i in order if msgs[i]["kind"] == self.kind_filter]
         if q:
             order = [i for i in order
-                     if q in f"{_KIND.get(msgs[i]['kind'], ('', None))[0]} {msgs[i].get('sender', '')} "
+                     if q in f"{_kind_label(msgs[i]['kind'])} {msgs[i].get('sender', '')} "
                              f"{msgs[i].get('subject', '')} {msgs[i].get('body', '')}".lower()]
         return order
 
@@ -174,16 +174,17 @@ class InboxApp(DesktopApp):
         self._kind_rects = {}
         cx = search_rect.right + 10
         chip_y = search_rect.y + 2
-        chips_w = sum(fonts.tiny(bold=True).size(lbl)[0] + 20 for _k, lbl in FILTER_CHIPS)
+        chips_w = sum(fonts.tiny(bold=True).size(_L(*lbl))[0] + 20 for _k, lbl in FILTER_CHIPS)
         if cx + chips_w > rect.right - pad:
             cx = rect.x + pad
             chip_y = search_rect.bottom + 6
-        for kind, label in FILTER_CHIPS:
+        for kind, label_pair in FILTER_CHIPS:
+            label = _L(*label_pair)
             w = fonts.tiny(bold=True).size(label)[0] + 14
             r = pygame.Rect(cx, chip_y, w, 20)
             self._kind_rects[kind] = r
             sel = (kind == self.kind_filter)
-            _, kcol = _KIND.get(kind, ("", config.COL_AMBER)) if kind else ("", config.COL_AMBER)
+            _, kcol = _KIND.get(kind, (("", ""), config.COL_AMBER)) if kind else (("", ""), config.COL_AMBER)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_BG, r, border_radius=3)
             pygame.draw.rect(surf, kcol if sel else config.COL_BORDER, r, 1, border_radius=3)
             widgets.draw_text(surf, label, r.center, fonts.tiny(bold=sel),
@@ -226,7 +227,8 @@ class InboxApp(DesktopApp):
                         pygame.draw.rect(surf, config.COL_PANEL_HEAD, row)
                         pygame.draw.rect(surf, config.COL_AMBER, (row.x, row.y, 3, row.h))
                     keynav.draw_focus_ring(surf, row, pos == self.cursor)
-                    tag, tcol = _KIND.get(m["kind"], ("•", config.COL_TEXT))
+                    _kp, tcol = _KIND.get(m["kind"], (("•", "•"), config.COL_TEXT))
+                    tag = _L(*_kp)
                     bold = not m.get("read")
                     widgets.draw_text(surf, tag, (row.x + 6, y + 3), fonts.tiny(bold=True), tcol)
                     widgets.draw_text(surf, f"J{m['day']}", (row.right - 8, y + 3),
@@ -249,7 +251,8 @@ class InboxApp(DesktopApp):
         rx, ry = read_area.x + 12, read_area.y + 10
         if self.sel is not None and 0 <= self.sel < len(msgs):
             m = msgs[self.sel]
-            tag, tcol = _KIND.get(m["kind"], ("•", config.COL_TEXT))
+            _kp, tcol = _KIND.get(m["kind"], (("•", "•"), config.COL_TEXT))
+            tag = _L(*_kp)
             widgets.draw_badge(surf, tag, (rx, ry), tcol)
             widgets.draw_text(surf, f"Jour {m['day']}", (read_area.right - 12, ry),
                               fonts.tiny(), config.COL_TEXT_DIM, align="right")

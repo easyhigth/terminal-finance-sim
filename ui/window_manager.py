@@ -117,7 +117,8 @@ class Window:
         icon_col = config.COL_AMBER if focused else config.COL_TEXT_DIM
         desktop_icons.draw(surf, (tr.x + 15, tr.centery), icon_kind, size=18,
                            alpha=255 if focused else 190)
-        widgets.draw_text(surf, self.app_obj.title, (tr.x + 32, tr.y + 5),
+        from apps.base import app_title
+        widgets.draw_text(surf, app_title(self.app_obj), (tr.x + 32, tr.y + 5),
                           fonts.small(bold=True), icon_col)
         if self.pinned:
             # petite épingle VECTORIELLE (tête + pointe) juste avant les boutons

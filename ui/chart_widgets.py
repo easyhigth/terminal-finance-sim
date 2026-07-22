@@ -7,6 +7,7 @@ Tout est dessiné à la main avec pygame.draw pour garder l'esthétique Bloomber
 import pygame
 
 from core import config
+from core.i18n import get_lang
 from ui import fonts
 
 
@@ -40,6 +41,10 @@ class Sparkline:
 # ---------------------------------------------------------------------------
 _GRADIENT_MASK_CACHE = {}   # hauteur (px) -> Surface 1×h SRCALPHA (dégradé vertical)
 
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 def _gradient_mask(height):
     """Masque de dégradé vertical 1px de large (plein en haut, nul en bas),
@@ -346,7 +351,7 @@ def draw_chart_crosshair(surf, rect, series, lo, span, mouse_pos, x_fmt=None, y_
         v0 = next((x for x in series if x is not None), None)
         if v0:
             pct = (v - v0) / v0 * 100
-            label = f"{label}  ({'+' if pct >= 0 else ''}{pct:.1f}% depuis le début)"
+            label = _L(f"{label}  ({'+' if pct >= 0 else ''}{pct:.1f}% depuis le début)", f"{label}  ({'+' if pct >= 0 else ''}{pct:.1f}% since start)")
     if x_fmt:
         label = f"{x_fmt(i)}   {label}"
     font = fonts.tiny(bold=True)
@@ -534,7 +539,7 @@ class ChartCursor:
         last = next((v for v in reversed(series) if v is not None), None)
         diff = (last - self.pin) / self.pin * 100 if (last is not None and self.pin) else 0.0
         pin_label = y_fmt(self.pin) if y_fmt else f"{self.pin:,.2f}"
-        label = f"Réf. {pin_label}  ({'+' if diff >= 0 else ''}{diff:.1f}% vs actuel)"
+        label = _L(f"Réf. {pin_label}  ({'+' if diff >= 0 else ''}{diff:.1f}% vs actuel)", f"Ref. {pin_label}  ({'+' if diff >= 0 else ''}{diff:.1f}% vs current)")
         font = fonts.tiny(bold=True)
         ly = py - font.get_height() - 4 if py - font.get_height() - 4 > rect.top else py + 4
         draw_text(surf, label, (rect.x + 4, ly), font, config.COL_WARN)

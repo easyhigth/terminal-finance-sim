@@ -16,6 +16,7 @@ import math
 import pygame
 
 from core import config
+from core.i18n import get_lang
 from data.worldmap_geo import WORLD as CONTINENTS  # côtes détaillées (normalisées)
 from ui import fonts, widgets
 
@@ -67,6 +68,10 @@ def _build_land_dots(nx=120, ny=64):
 
 LAND_DOTS = _build_land_dots()
 
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 class WorldMap:
     def __init__(self):
@@ -295,7 +300,7 @@ class WorldMap:
         pygame.draw.rect(surf, OCEAN, rect)
         pygame.draw.rect(surf, accent, rect, 1)
         # en-tête + bouton retour monde
-        widgets.draw_text(surf, f"RÉGION — {region}", (rect.x + 12, rect.y + 8),
+        widgets.draw_text(surf, _L(f"RÉGION — {region}", f"REGION — {region}"), (rect.x + 12, rect.y + 8),
                           fonts.head(bold=True), accent)
         self._unzoom_rect = pygame.Rect(rect.right - 120, rect.y + 8, 108, 22)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._unzoom_rect, border_radius=3)
@@ -316,7 +321,7 @@ class WorldMap:
         pygame.draw.line(surf, config.COL_BORDER, (rect.x + 12, y + 2),
                          (rect.right - 12, y + 2), 1)
         y += 10
-        widgets.draw_text(surf, "Sociétés (clic → fiche)", (rect.x + 14, y),
+        widgets.draw_text(surf, _L("Sociétés (clic → fiche)", "Companies (click → sheet)"), (rect.x + 14, y),
                           fonts.tiny(bold=True), config.COL_TEXT_DIM)
         y += 18
         # liste des sociétés en 3 colonnes — on ne dessine QUE ce qui tient
@@ -348,5 +353,5 @@ class WorldMap:
                               config.COL_TEXT if not hover else config.COL_WHITE)
         rest = len(all_comps) - len(comps)
         if rest > 0:
-            widgets.draw_text(surf, f"+{rest} autres sociétés dans la région",
+            widgets.draw_text(surf, _L(f"+{rest} autres sociétés dans la région", f"+{rest} more companies in the region"),
                               (rect.x + 14, rect.bottom - 16), fonts.tiny(), config.COL_TEXT_DIM)

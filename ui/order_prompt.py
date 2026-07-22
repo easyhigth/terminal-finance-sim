@@ -18,7 +18,12 @@ import pygame
 
 from core import conditional_orders as CO
 from core import config
+from core.i18n import get_lang
 from ui import fonts, style, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 COND_ROW_H = 20
 COND_LIST_MAX_H = 88
@@ -58,15 +63,15 @@ class ConditionalOrderMixin:
             r = CO.place(self.app.gs.player, self.market, tk, self._order_kind, val)
         if r["ok"]:
             labels = {"stop": "Stop-loss", "target": "Take-profit", "trailing": "Trailing stop"}
-            label = labels.get(self._order_kind, "Ordre")
+            label = labels.get(self._order_kind, _L("Ordre", "Order"))
             if self._order_kind == "trailing":
-                self.msg = f"{label} posé sur {tk} à {val:.1f}%."
+                self.msg = _L(f"{label} posé sur {tk} à {val:.1f}%.", f"{label} placed on {tk} at {val:.1f}%.")
             else:
-                self.msg = f"{label} posé sur {tk} à {val:,.2f}."
+                self.msg = _L(f"{label} posé sur {tk} à {val:,.2f}.", f"{label} placed on {tk} at {val:,.2f}.")
             self._order_prompt = None
             self._order_focus = False
         else:
-            self.msg = f"Ordre refusé ({r['reason']})."
+            self.msg = _L(f"Ordre refusé ({r['reason']}).", f"Order rejected ({r['reason']}).")
 
     def _cancel_conditional(self, order_id):
         CO.cancel(self.app.gs.player, order_id)
@@ -206,9 +211,9 @@ class ConditionalOrderMixin:
         widgets.draw_text(surf, senses[self._order_kind], (box.x + 12, box.y + 76),
                           fonts.tiny(), config.COL_TEXT)
         if self._order_kind == "trailing":
-            hint = "Distance (% du cours) :"
+            hint = _L("Distance (% du cours) :", "Distance (% of price):")
         else:
-            hint = "Seuil de déclenchement :"
+            hint = _L("Seuil de déclenchement :", "Trigger threshold:")
         widgets.draw_text(surf, hint, (box.x + 12, box.y + 94),
                           fonts.tiny(), config.COL_TEXT_DIM)
         self._order_price_rect = pygame.Rect(box.x + 12, box.y + 110, box.w - 24, 26)

@@ -9,7 +9,12 @@ examens de chaque niveau. N'est instancié par scene_terminal.py que si
 import pygame
 
 from core import config
+from core.i18n import get_lang
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 TITLE_H = 22
 PADX = 10
@@ -36,14 +41,14 @@ class CheatPanel:
         if key.startswith("cash:"):
             amt = float(key.split(":")[1])
             p.cash += amt
-            self.msg = f"Trésorerie +{amt:,.0f}".replace(",", " ")
+            self.msg = _L(f"Trésorerie +{amt:,.0f}", f"Cash +{amt:,.0f}").replace(",", " ")
         elif key.startswith("rep:"):
             amt = int(key.split(":")[1])
             p.reputation = max(0, min(100, p.reputation + amt))
-            self.msg = f"Réputation → {p.reputation}/100"
+            self.msg = _L(f"Réputation → {p.reputation}/100", f"Reputation → {p.reputation}/100")
         elif key.startswith("repset:"):
             p.reputation = int(key.split(":")[1])
-            self.msg = f"Réputation → {p.reputation}/100"
+            self.msg = _L(f"Réputation → {p.reputation}/100", f"Reputation → {p.reputation}/100")
         elif key.startswith("grade:"):
             if key == "grade:-1":
                 gi = max(0, p.grade_index - 1)
@@ -132,14 +137,14 @@ class CheatPanel:
         y = self._row(surf, y, [("cash:1000", "+1K"), ("cash:10000", "+10K"),
                                  ("cash:100000", "+100K"), ("cash:1000000", "+1M")], mp)
 
-        widgets.draw_text(surf, "RÉPUTATION", (self.rect.x + PADX, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("RÉPUTATION", "REPUTATION"), (self.rect.x + PADX, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         y += 18
         y = self._row(surf, y, [("rep:10", "+10"), ("rep:25", "+25"),
                                  ("repset:100", "MAX"), ("repset:0", "0")], mp)
 
         widgets.draw_text(surf, f"GRADE — {p.grade}", (self.rect.x + PADX, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         y += 18
-        y = self._row(surf, y, [("grade:-1", "◂ PRÉCÉDENT"), ("grade:+1", "SUIVANT ▸"),
+        y = self._row(surf, y, [("grade:-1", _L("◂ PRÉCÉDENT", "◂ PREVIOUS")), ("grade:+1", _L("SUIVANT ▸", "NEXT ▸")),
                                  ("grade:max", "MAX")], mp)
 
         widgets.draw_text(surf, "EXAMEN", (self.rect.x + PADX, y), fonts.tiny(bold=True), config.COL_TEXT_DIM)

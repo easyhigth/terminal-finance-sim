@@ -14,6 +14,7 @@ jeu), donc les clics sont gérés par PageManager avant la translation souris.
 import pygame
 
 from core import config
+from core.i18n import get_lang
 from core.sim_clock import SPEEDS
 from ui import fonts, style, widgets
 
@@ -23,6 +24,10 @@ GEAR_W = 28
 CHEAT_W = 44
 PAD_RIGHT = 8
 
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 def cluster_width(cheats=False):
     """Largeur totale réservée à droite de la bande d'onglets (boutons + gear).
@@ -172,7 +177,7 @@ def draw(surf, app):
     _draw_gear(surf, g, config.COL_AMBER if ghover else config.COL_TEXT_DIM)
     # état de pause auto : petit liseré ambre déjà via le fond ; tooltip au survol
     if ghover:
-        widgets.draw_tooltip(surf, "Réglages (affichage, son, langue, raccourcis)",
+        widgets.draw_tooltip(surf, _L("Réglages (affichage, son, langue, raccourcis)", "Settings (display, sound, language, shortcuts)"),
                              (g.left - 6, g.bottom + 2))
     elif pr.collidepoint((mx, my)):
         label = "Reprendre (Espace)" if paused else "Pause (Espace)"

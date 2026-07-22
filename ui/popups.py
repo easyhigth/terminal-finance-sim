@@ -31,8 +31,13 @@ from core import commodities as commodities_mod
 from core import config
 from core import crypto as crypto_mod
 from core import etfs as etfs_mod
+from core.i18n import get_lang
 from ui import fonts, widgets
 from ui.datawindow import DataWindow
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 _KIND_TABS = [("Ligne", "line"), ("Chandel.", "candles"), ("Var %", "change"), ("Vol.", "vol")]
 
@@ -147,19 +152,23 @@ def _draw_series_plot(surf, rect, s, kind):
         widgets.draw_series(surf, inner, pct, col, mouse_pos=mp, y_fmt=lambda v: f"{v:+.1f}%",
                             extrema_label=False)
         _x_labels(surf, rect, len(pct))
-        return (f"variation cumulée {pct[-1]:+.1f}%  ·  "
-                f"haut {max(pct):+.1f}% · bas {min(pct):+.1f}%")
+        return _L(f"variation cumulée {pct[-1]:+.1f}%  ·  "
+                f"haut {max(pct):+.1f}% · bas {min(pct):+.1f}%",
+                f"cumulative change {pct[-1]:+.1f}%  ·  "
+                f"high {max(pct):+.1f}% · low {min(pct):+.1f}%")
     if kind == "vol":
         vol = [v for v in _charts.rolling_vol(s, 20) if v is not None]
         if len(vol) < 2:
-            widgets.draw_text(surf, "Historique insuffisant.", (inner.x, inner.y),
+            widgets.draw_text(surf, _L("Historique insuffisant.", "Not enough history."), (inner.x, inner.y),
                               fonts.tiny(), config.COL_TEXT_DIM)
             return None
         widgets.draw_series(surf, inner, vol, config.COL_WARN, baseline=False,
                             mouse_pos=mp, y_fmt=lambda v: f"{v:.1f}%", extrema_label=False)
         _x_labels(surf, rect, len(vol))
-        return (f"vol. annualisée (20 pas) {vol[-1]:.1f}%  ·  "
-                f"haut {max(vol):.1f}% · bas {min(vol):.1f}%")
+        return _L(f"vol. annualisée (20 pas) {vol[-1]:.1f}%  ·  "
+                f"haut {max(vol):.1f}% · bas {min(vol):.1f}%",
+                f"annualized vol (20 steps) {vol[-1]:.1f}%  ·  "
+                f"high {max(vol):.1f}% · low {min(vol):.1f}%")
     # ligne (défaut)
     col = config.COL_UP if s[-1] >= s[0] else config.COL_DOWN
     widgets.draw_series(surf, inner, s, col, mouse_pos=mp, y_fmt=lambda v: f"{v:,.2f}", show_pct=True,
@@ -230,7 +239,7 @@ class CompanyPopup(DataWindow):
             return
         mt = self.market.metrics(self.ticker) if self.market else None
         if not mt:
-            widgets.draw_text(surf, f"Société introuvable : {self.ticker}",
+            widgets.draw_text(surf, _L(f"Société introuvable : {self.ticker}", f"Company not found: {self.ticker}"),
                               (content.x, content.y), fonts.small(), config.COL_DOWN)
             return
         cur = config.CONTINENTS.get(mt["region"], {}).get("currency", "$")
@@ -254,7 +263,7 @@ class CompanyPopup(DataWindow):
         y += 28
         # fondamentaux compacts (2 colonnes x 3 lignes)
         col_a = [("P/E", f"{mt['pe']:.1f}x" if mt["pe"] else "n.m."),
-                 ("Bêta", f"{mt['beta']:.2f}"),
+                 (_L("Bêta", "Beta"), f"{mt['beta']:.2f}"),
                  ("Div.", f"{mt['div_yield']*100:.1f}%")]
         col_b = [("Capi", widgets.format_money(mt["mktcap"] * 1e6, cur)),
                  ("Marge nette", f"{mt['net_margin']*100:.1f}%"),
@@ -290,7 +299,7 @@ class CompanyPopup(DataWindow):
                           align="center")
         self._detail_rect = pygame.Rect(self._expand_rect.x - 8 - 150, content.bottom - 18, 150, 18)
         hov2 = self._detail_rect.collidepoint(mp)
-        widgets.draw_text(surf, "ANALYSE COMPLÈTE →", (self._detail_rect.centerx, self._detail_rect.y + 2),
+        widgets.draw_text(surf, _L("ANALYSE COMPLÈTE →", "FULL ANALYSIS →"), (self._detail_rect.centerx, self._detail_rect.y + 2),
                           fonts.tiny(bold=True), self.accent if hov2 else config.COL_TEXT_DIM,
                           align="center")
 
@@ -327,7 +336,7 @@ class ChartPopup(DataWindow):
             self.render_fn(surf, content)
             return
         if not self.ticker:
-            widgets.draw_text(surf, "Aucun actif sélectionné.", (content.x, content.y),
+            widgets.draw_text(surf, _L("Aucun actif sélectionné.", "No asset selected."), (content.x, content.y),
                               fonts.small(), config.COL_TEXT_DIM)
             return
         tabs_rect = pygame.Rect(content.x, content.y, content.w, 22)
@@ -406,8 +415,8 @@ class CommodityPopup(DataWindow):
         self._sector_rect = widgets.draw_badge(surf, q["category"], (content.x + 100, y), self.accent)
         self._type_rect = widgets.draw_badge(surf, "Commodity", (content.x + 230, y), config.COL_TEXT_DIM)
         y += 28
-        col_a = [("Future 1M", f"{q['front']:,.2f}"), ("Roll yield", f"{q['roll_yield']*100:+.1f}%")]
-        col_b = [("Vol. annualisée", f"{q['vol']*100:.0f}%"), ("Pente courbe", f"{q['slope']*100:+.1f}%/an")]
+        col_a = [(_L("Future 1M", "1M future"), f"{q['front']:,.2f}"), ("Roll yield", f"{q['roll_yield']*100:+.1f}%")]
+        col_b = [(_L("Vol. annualisée", "Annualized vol"), f"{q['vol']*100:.0f}%"), (_L("Pente courbe", "Curve slope"), f"{q['slope']*100:+.1f}%/an")]
         cw = content.w // 2
         for ci, col in enumerate((col_a, col_b)):
             fx = content.x + ci * cw
@@ -491,10 +500,10 @@ class CryptoPopup(DataWindow):
         self._type_rect = widgets.draw_badge(surf, "Crypto", (content.x + 110, y), config.COL_TEXT_DIM)
         risk = crypto_mod.contagion_risk(self.market, self.cid) if self.market else 0.0
         if risk > 0.01:
-            widgets.draw_badge(surf, f"Contagion {risk*100:.0f}%", (content.x + 210, y), config.COL_DOWN)
+            widgets.draw_badge(surf, _L(f"Contagion {risk*100:.0f}%", f"Contagion {risk*100:.0f}%"), (content.x + 210, y), config.COL_DOWN)
         y += 28
-        col_a = [("Vol. annualisée", f"{q['vol']*100:.0f}%")]
-        col_b = [("Rendement", f"{q['yield']*100:.1f}%")] if q["cbdc"] else [("Type", status)]
+        col_a = [(_L("Vol. annualisée", "Annualized vol"), f"{q['vol']*100:.0f}%")]
+        col_b = [(_L("Rendement", "Yield"), f"{q['yield']*100:.1f}%")] if q["cbdc"] else [("Type", status)]
         cw = content.w // 2
         for ci, col in enumerate((col_a, col_b)):
             fx = content.x + ci * cw
@@ -590,7 +599,7 @@ class BondPopup(DataWindow):
         self._type_rect = widgets.draw_badge(surf, "Obligation", (content.x + 200, y), config.COL_TEXT_DIM)
         y += 28
         col_a = [("YTM", f"{q['ytm']*100:.2f}%"), ("Coupon", f"{q['coupon']*100:.1f}%")]
-        col_b = [("Duration mod.", f"{q['mod_duration']:.2f}"), ("Maturité", f"{q['years']} ans")]
+        col_b = [(_L("Duration mod.", "Mod. duration"), f"{q['mod_duration']:.2f}"), (_L("Maturité", "Maturity"), _L(f"{q['years']} ans", f"{q['years']}y"))]
         cw = content.w // 2
         for ci, col in enumerate((col_a, col_b)):
             fx = content.x + ci * cw
@@ -615,7 +624,7 @@ class BondPopup(DataWindow):
                               fonts.tiny(), config.COL_TEXT_DIM)
 
 
-_RISK_LABEL = {1: "Très faible", 2: "Faible", 3: "Modéré", 4: "Élevé", 5: "Très élevé"}
+_RISK_LABEL = {1: ("Très faible", "Very low"), 2: ("Faible", "Low"), 3: ("Modéré", "Moderate"), 4: ("Élevé", "High"), 5: ("Très élevé", "Very high")}
 
 
 class ETFPopup(DataWindow):
@@ -684,13 +693,13 @@ class ETFPopup(DataWindow):
         self._sector_rect = widgets.draw_badge(surf, q["category_label"], (content.x, y), self.accent)
         self._type_rect = widgets.draw_badge(surf, "ETF", (content.x + 130, y), config.COL_TEXT_DIM)
         if q["leveraged"]:
-            widgets.draw_badge(surf, "RISQUE ÉLEVÉ", (content.x + 180, y), config.COL_DOWN)
+            widgets.draw_badge(surf, _L("RISQUE ÉLEVÉ", "HIGH RISK"), (content.x + 180, y), config.COL_DOWN)
         y += 26
-        widgets.draw_text(surf, "Exposition : " + widgets.fit_text(q["exposure"], fonts.tiny(), content.w - 80),
+        widgets.draw_text(surf, _L("Exposition : ", "Exposure: ") + widgets.fit_text(q["exposure"], fonts.tiny(), content.w - 80),
                           (content.x, y), fonts.tiny(), config.COL_TEXT_DIM)
         y += 18
-        col_a = [("Var. 1 an", f"{q['change_1y']:+.1f}%"), ("Rendement", f"{q['yield']*100:.1f}%")]
-        col_b = [("Frais", f"{q['expense']*100:.2f}%"), ("Bêta monde", f"{q['beta']:+.2f}")]
+        col_a = [(_L("Var. 1 an", "1Y chg"), f"{q['change_1y']:+.1f}%"), (_L("Rendement", "Yield"), f"{q['yield']*100:.1f}%")]
+        col_b = [(_L("Frais", "Fees"), f"{q['expense']*100:.2f}%"), (_L("Bêta monde", "World beta"), f"{q['beta']:+.2f}")]
         cw = content.w // 2
         for ci, col in enumerate((col_a, col_b)):
             fx = content.x + ci * cw
@@ -701,7 +710,7 @@ class ETFPopup(DataWindow):
                                   config.COL_WHITE, align="right")
                 fy += 15
         y += 15 * 2 + 6
-        widgets.draw_text(surf, f"Risque : {_RISK_LABEL.get(q['risk'], '?')}", (content.x, y),
+        widgets.draw_text(surf, _L("Risque : ", "Risk: ") + (_L(*_RISK_LABEL[q['risk']]) if q['risk'] in _RISK_LABEL else '?'), (content.x, y),
                           fonts.tiny(), config.COL_WARN if q["risk"] >= 4 else config.COL_TEXT_DIM)
         y += 18
         tabs_rect = pygame.Rect(content.x, y, content.w, 20)
@@ -746,7 +755,7 @@ class StructuredPopup(DataWindow):
         t = structured_mod.template_quote(self.template_id, self.market) \
             if self.template_id in structured_mod._BY_ID else None
         if not t:
-            widgets.draw_text(surf, f"Produit introuvable : {self.template_id}",
+            widgets.draw_text(surf, _L(f"Produit introuvable : {self.template_id}", f"Product not found: {self.template_id}"),
                               (content.x, content.y), fonts.small(), config.COL_DOWN)
             return
         y = content.y
@@ -754,9 +763,9 @@ class StructuredPopup(DataWindow):
                           (content.x, y), fonts.body(bold=True), config.COL_AMBER)
         y += 24
         widgets.draw_badge(surf, t["family"], (content.x, y), self.accent)
-        self._type_rect = widgets.draw_badge(surf, "Structuré", (content.x + 110, y), config.COL_TEXT_DIM)
+        self._type_rect = widgets.draw_badge(surf, _L("Structuré", "Structured"), (content.x + 110, y), config.COL_TEXT_DIM)
         y += 28
-        widgets.draw_text(surf, f"Maturité : {t['years']} ans", (content.x, y), fonts.tiny(), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L(f"Maturité : {t['years']} ans", f"Maturity: {t['years']}y"), (content.x, y), fonts.tiny(), config.COL_TEXT_DIM)
         y += 24
         widgets.draw_text_wrapped(surf, t["desc"], (content.x, y), fonts.small(),
                                   config.COL_TEXT, content.w, line_gap=3)
@@ -791,7 +800,7 @@ class CreditPopup(DataWindow):
             return
         q = sec_mod.tranche_quote(self.tranche_id, self.market) if self.tranche_id in sec_mod._BY_ID else None
         if not q:
-            widgets.draw_text(surf, f"Tranche introuvable : {self.tranche_id}",
+            widgets.draw_text(surf, _L(f"Tranche introuvable : {self.tranche_id}", f"Tranche not found: {self.tranche_id}"),
                               (content.x, content.y), fonts.small(), config.COL_DOWN)
             return
         y = content.y
@@ -799,10 +808,10 @@ class CreditPopup(DataWindow):
         widgets.draw_text(surf, q["rating"], (content.right, y),
                           fonts.body(bold=True), self.accent, align="right")
         y += 24
-        self._type_rect = widgets.draw_badge(surf, "Crédit", (content.x, y), config.COL_TEXT_DIM)
+        self._type_rect = widgets.draw_badge(surf, _L("Crédit", "Credit"), (content.x, y), config.COL_TEXT_DIM)
         y += 28
-        col_a = [("Attache", f"{q['attach']*100:.0f}%"), ("Détache", f"{q['detach']*100:.0f}%")]
-        col_b = [("Coupon", f"{q['coupon']*100:.1f}%"), ("Perte att.", f"{q['exp_loss']*100:.1f}%")]
+        col_a = [(_L("Attache", "Attach"), f"{q['attach']*100:.0f}%"), (_L("Détache", "Detach"), f"{q['detach']*100:.0f}%")]
+        col_b = [("Coupon", f"{q['coupon']*100:.1f}%"), (_L("Perte att.", "Exp. loss"), f"{q['exp_loss']*100:.1f}%")]
         cw = content.w // 2
         for ci, col in enumerate((col_a, col_b)):
             fx = content.x + ci * cw
@@ -829,7 +838,7 @@ class QuickAccessWindow(DataWindow):
         self.open_company = open_company
         self._zones = []
         size = (380, 56 + self.CAP * self.ROW_H + 30)
-        super().__init__("ACCÈS RAPIDE — favoris", [], [], pos=pos, accent=accent,
+        super().__init__(_L("ACCÈS RAPIDE — favoris", "QUICK ACCESS — favorites"), [], [], pos=pos, accent=accent,
                          size=size, resizable=False, min_size=(320, 140))
 
     def _handle_body(self, pos):
@@ -855,8 +864,10 @@ class QuickAccessWindow(DataWindow):
             return
         self._zones = []
         wl = self.player.watchlist
-        widgets.draw_text(surf, f"{len(wl)}/{self.CAP} favoris — clic ticker → fiche · "
+        widgets.draw_text(surf, _L(f"{len(wl)}/{self.CAP} favoris — clic ticker → fiche · "
                                 "▲▼ réordonner · ✕ retirer",
+                                f"{len(wl)}/{self.CAP} favorites — click ticker → sheet · "
+                                "▲▼ reorder · ✕ remove"),
                           (content.x, content.y), fonts.tiny(), config.COL_TEXT_DIM)
         y = content.y + 20
         if not wl:

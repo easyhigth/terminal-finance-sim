@@ -13,8 +13,30 @@ import pygame
 from core import config, risklimits, unlocks
 from core import finmath as fm
 from core import risk as risk_mod
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
+# Libellés d'affichage EN des scénarios (les clés FR restent les clés de lookup
+# dans STRESS_SCENARIOS et risk_mod.STRESS).
+_SCENARIO_EN = {
+    "Crise actions (-)": "Equity crisis (-)", "Choc de taux (+)": "Rate shock (+)",
+    "Choc de vol": "Vol shock", "Stagflation": "Stagflation",
+    "Krach actions": "Equity crash", "Choc de taux +200bps": "Rate shock +200bps",
+    "Choc de volatilité": "Volatility shock", "Récession": "Recession",
+    "Choc d'inflation": "Inflation shock", "Crise Europe": "Europe crisis",
+    "Choc énergie": "Energy shock", "Crise de crédit": "Credit crisis",
+    "Crise de liquidité": "Liquidity crisis",
+}
+
+
+def _scenario_label(name):
+    return _SCENARIO_EN.get(name, name) if get_lang() == "en" else name
 
 
 def _draw_wrapped_tooltip(surf, text, pos, max_width=320):
@@ -76,9 +98,9 @@ class RiskScene(Scene):
         self.back_btn = widgets.Button(
             (40, config.SCREEN_HEIGHT-66, 160, 44), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.mode_btn = widgets.Button(
-            (210, config.SCREEN_HEIGHT-66, 240, 44), "MODE : —", config.COL_CYAN)
+            (210, config.SCREEN_HEIGHT-66, 240, 44), _L("MODE : —", "MODE: —"), config.COL_CYAN)
         self.tuto_btn = widgets.Button(
-            (460, config.SCREEN_HEIGHT-66, 150, 44), "TUTO", config.COL_WARN)
+            (460, config.SCREEN_HEIGHT-66, 150, 44), _L("TUTO", "GUIDE"), config.COL_WARN)
         self._exp_btns = {}
         self._scenario_btns = {}
         self._conf_btns = {}
@@ -183,22 +205,24 @@ class RiskScene(Scene):
     def update(self, dt):
         mp = pygame.mouse.get_pos()
         self.back_btn.update(mp)
-        self.mode_btn.label = "MODE : RÉEL" if self.real else "MODE : DÉMO"
+        self.mode_btn.label = _L("MODE : RÉEL", "MODE: REAL") if self.real else _L("MODE : DÉMO", "MODE: DEMO")
         self.mode_btn.update(mp)
         self.tuto_btn.update(mp)
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "MODULE RISK — VALUE AT RISK & STRESS TESTS",
+        widgets.draw_text(surf, _L("MODULE RISK — VALUE AT RISK & STRESS TESTS", "RISK MODULE — VALUE AT RISK & STRESS TESTS"),
                           (40, 24), fonts.title(bold=True), config.COL_AMBER)
-        sub = ("Portefeuille RÉEL · modèle à facteurs du marché · horizon 1 pas"
+        sub = (_L("Portefeuille RÉEL · modèle à facteurs du marché · horizon 1 pas",
+                  "REAL portfolio · market factor model · 1-step horizon")
                if self.real else
-               "DÉMO · Monte-Carlo corrélé (Cholesky) · horizon 1 jour · "
-               "notionnel {:.0f} M$".format(self.exposure.sum()))
+               _L("DÉMO · Monte-Carlo corrélé (Cholesky) · horizon 1 jour · "
+                  "notionnel {:.0f} M$", "DEMO · correlated Monte-Carlo (Cholesky) · 1-day horizon · "
+                  "notional {:.0f} M$").format(self.exposure.sum()))
         widgets.draw_text(surf, sub, (42, 76), fonts.small(), config.COL_TEXT_DIM)
         if not self._can():
             g = unlocks.effective_required_grade(self.app.gs.player, "risk")
-            widgets.draw_text(surf, f"⊘ Module Risk débloqué au grade {config.GRADES[g]}.",
+            widgets.draw_text(surf, _L(f"⊘ Module Risk débloqué au grade {config.GRADES[g]}.", f"⊘ Risk module unlocked at {config.GRADES[g]} grade."),
                               (42, 110), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             return
@@ -210,7 +234,7 @@ class RiskScene(Scene):
         self._draw_stress(surf)
         self._draw_limits(surf)
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("souris", "ajuster les expositions")])
+                              [(_L("souris", "mouse"), _L("ajuster les expositions", "adjust the exposures"))])
         self.back_btn.draw(surf)
         self.mode_btn.draw(surf)
         self.tuto_btn.draw(surf)
@@ -219,7 +243,7 @@ class RiskScene(Scene):
         panel = pygame.Rect(40, 110, 360, 280)
         self._exp_btns = {}
         if self.real:
-            inner = widgets.draw_panel(surf, panel, "Exposition du book réel (M$)", config.COL_CYAN)
+            inner = widgets.draw_panel(surf, panel, _L("Exposition du book réel (M$)", "Real book exposure (M$)"), config.COL_CYAN)
             y = inner.y
             for name, val in self.real_exposures.items():
                 widgets.draw_text(surf, name, (inner.x, y), fonts.small(), config.COL_TEXT)
@@ -227,13 +251,13 @@ class RiskScene(Scene):
                                   (inner.right, y), fonts.small(bold=True),
                                   config.COL_WHITE, align="right")
                 y += 34
-            widgets.draw_text(surf, f"Max drawdown valeur nette : {self.max_dd*100:.1f}%",
+            widgets.draw_text(surf, _L(f"Max drawdown valeur nette : {self.max_dd*100:.1f}%", f"Net worth max drawdown: {self.max_dd*100:.1f}%"),
                               (inner.x, inner.bottom - 40), fonts.small(bold=True),
                               widgets.alert_color(self.max_dd * 100, "max_drawdown"))
-            widgets.draw_text(surf, "Bascule en MODE DÉMO pour ajuster des expositions.",
+            widgets.draw_text(surf, _L("Bascule en MODE DÉMO pour ajuster des expositions.", "Switch to DEMO MODE to adjust exposures."),
                               (inner.x, inner.bottom - 18), fonts.tiny(), config.COL_TEXT_DIM)
             return
-        inner = widgets.draw_panel(surf, panel, "Exposition par facteur (M$)", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Exposition par facteur (M$)", "Exposure by factor (M$)"), config.COL_CYAN)
         y = inner.y
         for i, name in enumerate(FACTORS):
             widgets.draw_text(surf, name, (inner.x, y), fonts.small(), config.COL_TEXT)
@@ -255,7 +279,7 @@ class RiskScene(Scene):
 
     def _draw_histogram(self, surf):
         panel = pygame.Rect(416, 110, 560, 280)
-        inner = widgets.draw_panel(surf, panel, "Distribution des P&L simulés (M$)", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, panel, _L("Distribution des P&L simulés (M$)", "Simulated P&L distribution (M$)"), config.COL_AMBER)
         counts, edges = np.histogram(self.total_pnl, bins=50)
         cmax = counts.max() if counts.max() > 0 else 1
         x0, y0 = inner.x, inner.bottom-20
@@ -276,15 +300,15 @@ class RiskScene(Scene):
             pygame.draw.line(surf, config.COL_WHITE, (vx, y0-h), (vx, y0), 1)
             widgets.draw_text(surf, f"VaR {int(self.confidence*100)}%",
                               (vx+4, y0-h), fonts.tiny(), config.COL_WHITE)
-        widgets.draw_text(surf, "← pertes      gains →", (x0, y0+4),
+        widgets.draw_text(surf, _L("← pertes      gains →", "← losses      gains →"), (x0, y0+4),
                           fonts.tiny(), config.COL_TEXT_DIM)
 
     def _draw_metrics(self, surf):
         panel = pygame.Rect(40, 400, 360, config.footer_y() - 408)
-        inner = widgets.draw_panel(surf, panel, "Métriques de risque", config.COL_DOWN)
+        inner = widgets.draw_panel(surf, panel, _L("Métriques de risque", "Risk metrics"), config.COL_DOWN)
         # sélecteur de confiance
         self._conf_btns = {}
-        widgets.draw_text(surf, "Niveau de confiance :", (inner.x, inner.y),
+        widgets.draw_text(surf, _L("Niveau de confiance :", "Confidence level:"), (inner.x, inner.y),
                           fonts.small(), config.COL_TEXT_DIM)
         cx = inner.x
         for conf in (0.90, 0.95, 0.99):
@@ -299,24 +323,34 @@ class RiskScene(Scene):
             cx += 80
 
         rows = [
-            ("VaR historique", f"-{self.var:.2f} M$", config.COL_DOWN,
-             f"Perte maximale attendue sur 1 jour avec {int(self.confidence*100)}% de confiance, "
+            (_L("VaR historique", "Historical VaR"), f"-{self.var:.2f} M$", config.COL_DOWN,
+             _L(f"Perte maximale attendue sur 1 jour avec {int(self.confidence*100)}% de confiance, "
              "estimée à partir de l'historique réel des P&L du portefeuille (sans hypothèse de "
-             "distribution)."),
-            ("VaR paramétrique", f"-{self.param_var:.2f} M$", config.COL_WARN,
-             "Même perte maximale à 1 jour, mais calculée avec une hypothèse de distribution "
+             "distribution).",
+             f"Maximum loss expected over 1 day with {int(self.confidence*100)}% confidence, "
+             "estimated from the portfolio's real P&L history (no distribution assumption).")),
+            (_L("VaR paramétrique", "Parametric VaR"), f"-{self.param_var:.2f} M$", config.COL_WARN,
+             _L("Même perte maximale à 1 jour, mais calculée avec une hypothèse de distribution "
              "normale des rendements (formule fermée, plus rapide mais moins fidèle aux queues "
-             "épaisses du marché réel)."),
-            ("CVaR (Expected Shortfall)", f"-{self.cvar:.2f} M$", config.COL_DOWN,
-             "Perte MOYENNE dans les pires scénarios au-delà de la VaR — répond à « si je dépasse "
-             "la VaR, combien je perds en moyenne ? ». Toujours ≥ la VaR en valeur absolue."),
-            ("Volatilité du P&L (1j)", f"{self.port_sigma:.2f} M$", config.COL_TEXT,
-             "Écart-type quotidien du P&L du portefeuille : mesure la dispersion des résultats, "
-             "sans distinguer gains et pertes."),
-            (f"VaR annualisée (~√{52 if self.real else 252})",
+             "épaisses du marché réel).",
+             "Same 1-day maximum loss, but computed assuming a normal distribution of returns "
+             "(closed-form, faster but less faithful to the fat tails of the real market).")),
+            (_L("CVaR (Expected Shortfall)", "CVaR (Expected Shortfall)"), f"-{self.cvar:.2f} M$", config.COL_DOWN,
+             _L("Perte MOYENNE dans les pires scénarios au-delà de la VaR — répond à « si je dépasse "
+             "la VaR, combien je perds en moyenne ? ». Toujours ≥ la VaR en valeur absolue.",
+             "AVERAGE loss in the worst scenarios beyond the VaR — answers \"if I exceed the VaR, "
+             "how much do I lose on average?\". Always ≥ the VaR in absolute value.")),
+            (_L("Volatilité du P&L (1j)", "P&L volatility (1d)"), f"{self.port_sigma:.2f} M$", config.COL_TEXT,
+             _L("Écart-type quotidien du P&L du portefeuille : mesure la dispersion des résultats, "
+             "sans distinguer gains et pertes.",
+             "Daily standard deviation of the portfolio P&L: measures the dispersion of outcomes, "
+             "without distinguishing gains from losses.")),
+            (_L(f"VaR annualisée (~√{52 if self.real else 252})", f"Annualized VaR (~√{52 if self.real else 252})"),
              f"-{self.var*np.sqrt(52 if self.real else 252):.1f} M$", config.COL_NEUTRAL,
-             "Extrapolation de la VaR quotidienne sur 1 an (règle de la racine du temps), à "
-             "interpréter avec prudence : suppose des pertes i.i.d. sans corrélation entre jours."),
+             _L("Extrapolation de la VaR quotidienne sur 1 an (règle de la racine du temps), à "
+             "interpréter avec prudence : suppose des pertes i.i.d. sans corrélation entre jours.",
+             "Extrapolation of the daily VaR over 1 year (square-root-of-time rule), to be "
+             "interpreted with caution: assumes i.i.d. losses with no correlation between days.")),
         ]
         mp = pygame.mouse.get_pos()
         y = inner.y+58
@@ -330,7 +364,7 @@ class RiskScene(Scene):
 
     def _draw_stress(self, surf):
         panel = pygame.Rect(416, 400, 560, config.footer_y() - 408)
-        inner = widgets.draw_panel(surf, panel, "Stress Tests — scénarios", config.COL_WARN)
+        inner = widgets.draw_panel(surf, panel, _L("Stress Tests — scénarios", "Stress Tests — scenarios"), config.COL_WARN)
         self._scenario_btns = {}
         names = list(risk_mod.STRESS) if self.real else list(STRESS_SCENARIOS)
         # grille de boutons (plusieurs lignes) pour ne jamais déborder du panneau
@@ -346,7 +380,7 @@ class RiskScene(Scene):
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect)
             pygame.draw.rect(surf, config.COL_WARN if sel else config.COL_BORDER, rect, 1)
             font = fonts.tiny(bold=sel)
-            img = font.render(widgets.fit_text(name, font, bw - 8), True,
+            img = font.render(widgets.fit_text(_scenario_label(name), font, bw - 8), True,
                               config.COL_WARN if sel else config.COL_TEXT)
             surf.blit(img, img.get_rect(center=rect.center))
         n_rows = (len(names) + cols - 1) // cols
@@ -357,10 +391,10 @@ class RiskScene(Scene):
             if self.scenario and self.stress_real is not None:
                 s = self.stress_real
                 y = body_top
-                widgets.draw_text(surf, f"Scénario : {self.scenario} (sur votre book)",
+                widgets.draw_text(surf, _L(f"Scénario : {_scenario_label(self.scenario)} (sur votre book)", f"Scenario: {_scenario_label(self.scenario)} (on your book)"),
                                   (inner.x, y), fonts.small(bold=True), config.COL_WARN)
                 y += 30
-                for lab, key in [("Impact actions", "equity"), ("Impact obligations", "bond")]:
+                for lab, key in [(_L("Impact actions", "Equity impact"), "equity"), (_L("Impact obligations", "Bond impact"), "bond")]:
                     v = s[key]
                     widgets.draw_text(surf, lab, (inner.x, y), fonts.small(), config.COL_TEXT_DIM)
                     widgets.draw_text(surf, f"{'+' if v>=0 else ''}{v:.2f} M$",
@@ -368,18 +402,18 @@ class RiskScene(Scene):
                                       config.COL_UP if v >= 0 else config.COL_DOWN)
                     y += 26
                 tcol = config.COL_UP if s["total"] >= 0 else config.COL_DOWN
-                widgets.draw_text(surf, "PERTE/GAIN TOTAL", (inner.x, y+6),
+                widgets.draw_text(surf, _L("PERTE/GAIN TOTAL", "TOTAL LOSS/GAIN"), (inner.x, y+6),
                                   fonts.body(bold=True), config.COL_WHITE)
                 widgets.draw_text(surf, f"{'+' if s['total']>=0 else ''}{s['total']:.2f} M$",
                                   (inner.x+200, y+6), fonts.head(bold=True), tcol)
             else:
-                widgets.draw_text(surf, "Sélectionnez un scénario pour stresser votre book réel.",
+                widgets.draw_text(surf, _L("Sélectionnez un scénario pour stresser votre book réel.", "Select a scenario to stress your real book."),
                                   (inner.x, body_top), fonts.small(), config.COL_TEXT_DIM)
             return
 
         if self.scenario and self.scenario_pnl is not None:
             y = body_top
-            widgets.draw_text(surf, f"Scénario : {self.scenario}", (inner.x, y),
+            widgets.draw_text(surf, _L(f"Scénario : {_scenario_label(self.scenario)}", f"Scenario: {_scenario_label(self.scenario)}"), (inner.x, y),
                               fonts.small(bold=True), config.COL_WARN)
             y += 28
             total = 0.0
@@ -392,19 +426,19 @@ class RiskScene(Scene):
                                   (inner.x+180, y), fonts.small(bold=True), col)
                 y += 24
             tcol = config.COL_UP if total >= 0 else config.COL_DOWN
-            widgets.draw_text(surf, "IMPACT TOTAL", (inner.x, y+4),
+            widgets.draw_text(surf, _L("IMPACT TOTAL", "TOTAL IMPACT"), (inner.x, y+4),
                               fonts.body(bold=True), config.COL_WHITE)
             widgets.draw_text(surf, f"{'+' if total>=0 else ''}{total:.2f} M$",
                               (inner.x+180, y+4), fonts.head(bold=True), tcol)
         else:
-            widgets.draw_text(surf, "Sélectionnez un scénario pour voir l'impact.",
+            widgets.draw_text(surf, _L("Sélectionnez un scénario pour voir l'impact.", "Select a scenario to see the impact."),
                               (inner.x, body_top), fonts.small(), config.COL_TEXT_DIM)
 
     def _draw_sensitivity(self, surf):
         panel = pygame.Rect(992, 110, 248, 280)
-        inner = widgets.draw_panel(surf, panel, "Sensibilité facteurs", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Sensibilité facteurs", "Factor sensitivity"), config.COL_CYAN)
         if not self.real:
-            widgets.draw_text(surf, "Disponible en mode portefeuille réel.",
+            widgets.draw_text(surf, _L("Disponible en mode portefeuille réel.", "Available in real portfolio mode."),
                               (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
             return
         sens = risk_mod.sensitivity(self.app.gs.player, self.app.market)
@@ -418,18 +452,18 @@ class RiskScene(Scene):
 
     def _draw_limits(self, surf):
         panel = pygame.Rect(992, 400, 248, config.footer_y() - 408)
-        inner = widgets.draw_panel(surf, panel, "Limites & reverse stress", config.COL_PRESTIGE)
+        inner = widgets.draw_panel(surf, panel, _L("Limites & reverse stress", "Limits & reverse stress"), config.COL_PRESTIGE)
         self._reverse_btns = {}
         self._profile_btns = {}
         if not self.real:
-            widgets.draw_text(surf, "Disponible en mode portefeuille réel.",
+            widgets.draw_text(surf, _L("Disponible en mode portefeuille réel.", "Available in real portfolio mode."),
                               (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
             return
         p = self.app.gs.player
         active = getattr(p, "risk_limit_profile", "default")
         y = inner.y
         bx = inner.x
-        for name, label in (("strict", "STRICT"), ("default", "DÉFAUT"), ("souple", "SOUPLE")):
+        for name, label in (("strict", _L("STRICT", "STRICT")), ("default", _L("DÉFAUT", "DEFAULT")), ("souple", _L("SOUPLE", "LOOSE"))):
             w = 76
             rect = pygame.Rect(bx, y, w, 22)
             self._profile_btns[name] = rect
@@ -442,13 +476,13 @@ class RiskScene(Scene):
         y += 30
         streak = p.flags.get("risk_breach_streak", 0)
         if streak >= 3:
-            widgets.draw_text(surf, f"⚠ Réputation impactée (dépassement depuis {streak} tours)",
+            widgets.draw_text(surf, _L(f"⚠ Réputation impactée (dépassement depuis {streak} tours)", f"⚠ Reputation impacted (breach for {streak} steps)"),
                               (inner.x, y), fonts.tiny(), config.COL_DOWN)
             y += 16
 
         res = risklimits.check_limits(p, self.app.market)
         if res["ok"]:
-            widgets.draw_badge(surf, "AUCUN DÉPASSEMENT", (inner.x, y), accent=config.COL_UP)
+            widgets.draw_badge(surf, _L("AUCUN DÉPASSEMENT", "NO BREACH"), (inner.x, y), accent=config.COL_UP)
             y += 28
         else:
             breaches = res["breaches"]
@@ -457,12 +491,12 @@ class RiskScene(Scene):
                                   (inner.x, y), fonts.tiny(), config.COL_DOWN)
                 y += 16
             if len(breaches) > 3:
-                widgets.draw_text(surf, f"+{len(breaches) - 3} autre(s) dépassement(s)",
+                widgets.draw_text(surf, _L(f"+{len(breaches) - 3} autre(s) dépassement(s)", f"+{len(breaches) - 3} more breach(es)"),
                                   (inner.x, y), fonts.tiny(), config.COL_DOWN)
                 y += 16
             y += 10
 
-        widgets.draw_text(surf, "Reverse stress (perte cible) :",
+        widgets.draw_text(surf, _L("Reverse stress (perte cible) :", "Reverse stress (target loss):"),
                           (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
         y += 18
         bx = inner.x
@@ -478,15 +512,15 @@ class RiskScene(Scene):
             bx += 76
         y += 32
         if self._reverse_target is not None:
-            scen = self.scenario or "Krach actions"
+            scen = self.scenario or "Krach actions"  # clé de lookup (FR)
             rs = risk_mod.reverse_stress(self.app.gs.player, self.app.market,
                                          target_loss_pct=self._reverse_target, scenario=scen)
             if rs["ok"]:
-                widgets.draw_text(surf, f"Scénario « {scen} »", (inner.x, y),
+                widgets.draw_text(surf, _L(f"Scénario « {_scenario_label(scen)} »", f"Scenario \"{_scenario_label(scen)}\""), (inner.x, y),
                                   fonts.tiny(), config.COL_TEXT)
                 y += 16
-                widgets.draw_text(surf, f"à x{rs['scale']:.2f} pour -{self._reverse_target:.0f}%",
+                widgets.draw_text(surf, _L(f"à x{rs['scale']:.2f} pour -{self._reverse_target:.0f}%", f"at x{rs['scale']:.2f} for -{self._reverse_target:.0f}%"),
                                   (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)
             else:
-                widgets.draw_text(surf, "Pas d'exposition pour ce scénario.",
+                widgets.draw_text(surf, _L("Pas d'exposition pour ce scénario.", "No exposure for this scenario."),
                                   (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM)

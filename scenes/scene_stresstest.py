@@ -10,12 +10,18 @@ import pygame
 
 from core import config
 from core import stresstest as ST
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
 _CHOICES = [
-    ("accept", "Prendre acte (aucun coût)"),
-    ("hedge_now", "Renforcer la couverture immédiatement"),
+    ("accept", ("Prendre acte (aucun coût)", "Acknowledge (no cost)")),
+    ("hedge_now", ("Renforcer la couverture immédiatement", "Reinforce the hedge immediately")),
 ]
 
 
@@ -30,7 +36,7 @@ class StressTestScene(Scene):
         self.focus = 0
         self.continue_btn = widgets.Button(
             (config.SCREEN_WIDTH // 2 - 130, config.SCREEN_HEIGHT - 78, 260, 48),
-            "CONTINUER", config.COL_UP)
+            _L("CONTINUER", "CONTINUE"), config.COL_UP)
         self.back_btn = widgets.Button(config.back_button_rect(),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
@@ -87,33 +93,38 @@ class StressTestScene(Scene):
     def draw(self, surf):
         surf.fill(config.COL_BG)
         if self.test is None:
-            widgets.draw_text(surf, "Aucun stress test réglementaire en attente.",
+            widgets.draw_text(surf, _L("Aucun stress test réglementaire en attente.", "No pending regulatory stress test."),
                               (40, 40), fonts.head(bold=True), config.COL_TEXT_DIM)
-            widgets.draw_text(surf, "ESC pour revenir.", (40, 90), fonts.small(),
+            widgets.draw_text(surf, _L("ESC pour revenir.", "ESC to return."), (40, 90), fonts.small(),
                               config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             return
-        widgets.draw_text(surf, "STRESS TEST RÉGLEMENTAIRE", (40, 22),
+        widgets.draw_text(surf, _L("STRESS TEST RÉGLEMENTAIRE", "REGULATORY STRESS TEST"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_badge(surf, "SEMESTRIEL", (config.SCREEN_WIDTH - 40, 30),
+        widgets.draw_badge(surf, _L("SEMESTRIEL", "SEMI-ANNUAL"), (config.SCREEN_WIDTH - 40, 30),
                            config.COL_CYAN, align="right")
 
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
         panel = pygame.Rect(120, 100, config.SCREEN_WIDTH - 240, 150)
-        inner = widgets.draw_panel(surf, panel, "Scénario imposé par le superviseur", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Scénario imposé par le superviseur", "Scenario imposed by the supervisor"), config.COL_CYAN)
         t = self.test
-        verdict = "RÉUSSI" if t["passed"] else "ÉCHOUÉ"
+        verdict = _L("RÉUSSI", "PASSED") if t["passed"] else _L("ÉCHOUÉ", "FAILED")
         vcol = config.COL_UP if t["passed"] else config.COL_DOWN
-        lines = (
+        lines = _L(
             f"Scénario : {t['scenario']}\n"
             f"Impact total simulé : {widgets.format_money(t['impact_total']*1e6, cur)} "
             f"({t['loss_ratio']*100:.1f}% de la valeur nette)\n"
             f"Seuil de tolérance : {t['fail_ratio']*100:.0f}% de la valeur nette\n"
-            f"Valeur nette : {widgets.format_money(t['net_worth'], cur)}"
+            f"Valeur nette : {widgets.format_money(t['net_worth'], cur)}",
+            f"Scenario: {t['scenario']}\n"
+            f"Simulated total impact: {widgets.format_money(t['impact_total']*1e6, cur)} "
+            f"({t['loss_ratio']*100:.1f}% of net worth)\n"
+            f"Tolerance threshold: {t['fail_ratio']*100:.0f}% of net worth\n"
+            f"Net worth: {widgets.format_money(t['net_worth'], cur)}"
         )
         widgets.draw_text_wrapped(surf, lines, (inner.x, inner.y), fonts.body(),
                                   config.COL_TEXT, inner.w, line_gap=6)
-        widgets.draw_text(surf, f"VERDICT : {verdict}", (inner.x, inner.bottom - 28),
+        widgets.draw_text(surf, _L(f"VERDICT : {verdict}", f"VERDICT: {verdict}"), (inner.x, inner.bottom - 28),
                           fonts.body(bold=True), vcol)
 
         if self.state == "decide":
@@ -123,11 +134,12 @@ class StressTestScene(Scene):
 
     def _draw_options(self, surf, cur):
         self.option_rects = {}
-        widgets.draw_text(surf, "Votre réponse :", (120, 270), fonts.small(bold=True),
+        widgets.draw_text(surf, _L("Votre réponse :", "Your response:"), (120, 270), fonts.small(bold=True),
                           config.COL_TEXT_DIM)
         y = 300
         mp = pygame.mouse.get_pos()
-        for i, (_, label) in enumerate(_CHOICES):
+        for i, (_, label_pair) in enumerate(_CHOICES):
+            label = _L(*label_pair)
             rect = pygame.Rect(120, y, config.SCREEN_WIDTH - 240, 60)
             self.option_rects[i] = rect
             hover = rect.collidepoint(mp)
@@ -143,17 +155,17 @@ class StressTestScene(Scene):
     def _draw_outcome(self, surf, cur):
         r = self.result
         panel = pygame.Rect(120, 280, config.SCREEN_WIDTH - 240, 200)
-        inner = widgets.draw_panel(surf, panel, "Issue du contrôle réglementaire", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Issue du contrôle réglementaire", "Outcome of the regulatory review"), config.COL_CYAN)
         widgets.draw_text_wrapped(surf, r.get("message", ""), (inner.x, inner.y),
                                   fonts.body(), config.COL_TEXT, inner.w, line_gap=6)
         eff = []
         cash_delta = r.get("cash_delta", 0.0)
         if cash_delta:
-            eff.append((f"trésorerie {widgets.format_money(cash_delta, cur)}",
+            eff.append((_L(f"trésorerie {widgets.format_money(cash_delta, cur)}", f"cash {widgets.format_money(cash_delta, cur)}"),
                         config.COL_UP if cash_delta >= 0 else config.COL_DOWN))
         rep_delta = r.get("rep_delta", 0)
         if rep_delta:
-            eff.append((f"réputation {rep_delta:+d}",
+            eff.append((_L(f"réputation {rep_delta:+d}", f"reputation {rep_delta:+d}"),
                         config.COL_UP if rep_delta >= 0 else config.COL_DOWN))
         x = inner.x
         for text, c in eff:

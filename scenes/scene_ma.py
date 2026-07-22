@@ -11,11 +11,19 @@ import pygame
 from core import config, unlocks
 from core import finmath as fm
 from core import ma as M
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
 ROW_H = 24
-TABS = ["CIBLES", "PORTEFEUILLE", "OUTILS"]
+TABS = ["CIBLES", "PORTEFEUILLE", "OUTILS"]  # clés d'état (FR)
+_TAB_LABELS = {"CIBLES": ("CIBLES", "TARGETS"), "PORTEFEUILLE": ("PORTEFEUILLE", "PORTFOLIO"),
+               "OUTILS": ("OUTILS", "TOOLS")}
 
 
 class MAScene(Scene):
@@ -99,19 +107,21 @@ class MAScene(Scene):
     # ------------------------------------------------------------- draw
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "M&A — ACQUISITIONS, PORTEFEUILLE & OUTILS", (40, 22),
+        widgets.draw_text(surf, _L("M&A — ACQUISITIONS, PORTEFEUILLE & OUTILS", "M&A — ACQUISITIONS, PORTFOLIO & TOOLS"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         if not self._can_ma():
             p = self.app.gs.player
             g = unlocks.effective_required_grade(p, "ma")
-            widgets.draw_text(surf, f"⊘ M&A débloqué au grade {config.GRADES[g]}.",
+            widgets.draw_text(surf, _L(f"⊘ M&A débloqué au grade {config.GRADES[g]}.", f"⊘ M&A unlocked at {config.GRADES[g]} grade."),
                               (42, 72), fonts.small(), config.COL_TEXT_DIM)
             note = unlocks.track_lock_note(p, "ma")
             if note:
                 widgets.draw_text(surf, note.strip(), (42, 92), fonts.small(), config.COL_TEXT_DIM)
         else:
-            widgets.draw_text(surf, "Cibles privées non cotées : analyse complète, financement "
+            widgets.draw_text(surf, _L("Cibles privées non cotées : analyse complète, financement "
                                     "cash + dette (LBO), pilotage et sortie.",
+                                    "Private unlisted targets: full analysis, cash + debt (LBO) "
+                                    "financing, steering and exit."),
                               (42, 72), fonts.small(), config.COL_TEXT_DIM)
 
         # ---- onglets ----
@@ -119,13 +129,13 @@ class MAScene(Scene):
         tx = 40
         ty = 96
         for name in TABS:
-            w = fonts.small(bold=True).size(name)[0] + 28
+            w = fonts.small(bold=True).size(_L(*_TAB_LABELS[name]))[0] + 28
             rect = pygame.Rect(tx, ty, w, 28)
             self._tab_rects[name] = rect
             sel = (name == self.tab)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect, border_radius=4)
             pygame.draw.rect(surf, config.COL_CYAN if sel else config.COL_BORDER, rect, 1, border_radius=4)
-            widgets.draw_text(surf, name, rect.center, fonts.small(bold=sel),
+            widgets.draw_text(surf, _L(*_TAB_LABELS[name]), rect.center, fonts.small(bold=sel),
                               config.COL_CYAN if sel else config.COL_TEXT_DIM, align="center")
             tx += w + 8
 
@@ -145,7 +155,7 @@ class MAScene(Scene):
         pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, search_rect, 1, border_radius=4)
         cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        label = (self.search + cursor) if self.search else (cursor + "Tapez pour rechercher…")
+        label = (self.search + cursor) if self.search else (cursor + _L("Tapez pour rechercher…", "Type to search…"))
         col = config.COL_TEXT if self.search else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
                           (search_rect.x + 8, search_rect.y + 4), fonts.small(), col)
@@ -184,10 +194,10 @@ class MAScene(Scene):
 
         panel_top = cy + 34
         panel = pygame.Rect(40, panel_top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - panel_top)
-        inner = widgets.draw_panel(surf, panel, f"Cibles disponibles ({len(targets)})", config.COL_CYAN)
-        cols = [("SOCIÉTÉ", inner.x), ("SECTEUR", inner.x + 230), ("RÉGION", inner.x + 340),
-                ("CA", inner.x + 430), ("EBITDA%", inner.x + 540), ("EV ESTIMÉE", inner.x + 630),
-                ("MGMT", inner.x + 760), ("MORAL", inner.x + 830)]
+        inner = widgets.draw_panel(surf, panel, _L(f"Cibles disponibles ({len(targets)})", f"Available targets ({len(targets)})"), config.COL_CYAN)
+        cols = [(_L("SOCIÉTÉ", "COMPANY"), inner.x), (_L("SECTEUR", "SECTOR"), inner.x + 230), (_L("RÉGION", "REGION"), inner.x + 340),
+                (_L("CA", "REV"), inner.x + 430), ("EBITDA%", inner.x + 540), (_L("EV ESTIMÉE", "EST. EV"), inner.x + 630),
+                ("MGMT", inner.x + 760), (_L("MORAL", "MORALE"), inner.x + 830)]
         for label, x in cols:
             widgets.draw_text(surf, label, (x, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
         list_top = inner.y + 22
@@ -234,23 +244,23 @@ class MAScene(Scene):
         owned = list((getattr(p, "ma_owned", None) or {}).values())
         panel_h = (config.footer_y() - 8 - top - 200)
         panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, max(140, panel_h))
-        inner = widgets.draw_panel(surf, panel, f"Sociétés détenues ({len(owned)})", config.COL_UP)
+        inner = widgets.draw_panel(surf, panel, _L(f"Sociétés détenues ({len(owned)})", f"Owned companies ({len(owned)})"), config.COL_UP)
         # bandeau de synergies de roll-up (détenir >=2 cibles d'un secteur)
         syns = M.roll_up_summary(p)
         if syns:
             parts = [f"{s['sector']} ×{s['count']} (+{s['growth_bonus']*100:.1f}%)" for s in syns]
-            txt = "Synergies roll-up : " + " · ".join(parts)
+            txt = _L("Synergies roll-up : ", "Roll-up synergies: ") + " · ".join(parts)
             widgets.draw_text(surf, widgets.fit_text(txt, fonts.tiny(bold=True), panel.w - 300),
                               (panel.right - 12, panel.y + 7), fonts.tiny(bold=True),
                               config.COL_CYAN, align="right")
         self._row_rects = {}
         if not owned:
-            widgets.draw_text(surf, "Aucune société détenue pour le moment — onglet CIBLES pour acquérir.",
+            widgets.draw_text(surf, _L("Aucune société détenue pour le moment — onglet CIBLES pour acquérir.", "No owned company yet — TARGETS tab to acquire."),
                               (inner.x, inner.y + 4), fonts.small(), config.COL_TEXT_DIM)
         else:
-            cols = [("SOCIÉTÉ", inner.x), ("CA", inner.x + 220), ("EBITDA%", inner.x + 320),
-                    ("DETTE RESTANTE", inner.x + 420), ("MGMT", inner.x + 580),
-                    ("MORAL", inner.x + 650), ("EFFIC.", inner.x + 720), ("CASH BUF.", inner.x + 800)]
+            cols = [(_L("SOCIÉTÉ", "COMPANY"), inner.x), (_L("CA", "REV"), inner.x + 220), ("EBITDA%", inner.x + 320),
+                    (_L("DETTE RESTANTE", "DEBT LEFT"), inner.x + 420), ("MGMT", inner.x + 580),
+                    (_L("MORAL", "MORALE"), inner.x + 650), (_L("EFFIC.", "EFFIC."), inner.x + 720), (_L("CASH BUF.", "CASH BUF."), inner.x + 800)]
             for label, x in cols:
                 widgets.draw_text(surf, label, (x, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
             y = inner.y + 22
@@ -271,9 +281,9 @@ class MAScene(Scene):
         hist = list(reversed((getattr(p, "ma_history", None) or [])))
         hist_top = panel.bottom + 10
         hist_panel = pygame.Rect(40, hist_top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - hist_top)
-        hinner = widgets.draw_panel(surf, hist_panel, f"Historique M&A ({len(hist)})", config.COL_AMBER)
+        hinner = widgets.draw_panel(surf, hist_panel, _L(f"Historique M&A ({len(hist)})", f"M&A history ({len(hist)})"), config.COL_AMBER)
         if not hist:
-            widgets.draw_text(surf, "Aucune cession ni défaut pour l'instant.",
+            widgets.draw_text(surf, _L("Aucune cession ni défaut pour l'instant.", "No divestment or default yet."),
                               (hinner.x, hinner.y + 4), fonts.small(), config.COL_TEXT_DIM)
             self._hist_list_rect = None
             self._hist_max_scroll = 0
@@ -347,16 +357,18 @@ class MAScene(Scene):
 
     def _draw_lbo(self, surf, top):
         panel = pygame.Rect(40, top, 600, config.footer_y() - 8 - top)
-        inner = widgets.draw_panel(surf, panel, "Leveraged Buyout (LBO) — générique", config.COL_UP)
+        inner = widgets.draw_panel(surf, panel, _L("Leveraged Buyout (LBO) — générique", "Leveraged Buyout (LBO) — generic"), config.COL_UP)
         x, y = inner.x, inner.y
-        widgets.draw_text(surf, f"EV d'entrée : {self.entry_ev:.0f} M  |  EBITDA : {self.entry_ebitda:.0f} M  |  "
+        widgets.draw_text(surf, _L(f"EV d'entrée : {self.entry_ev:.0f} M  |  EBITDA : {self.entry_ebitda:.0f} M  |  "
                                 f"Multiple entrée : {self.entry_ev/self.entry_ebitda:.1f}x",
+                                f"Entry EV: {self.entry_ev:.0f} M  |  EBITDA: {self.entry_ebitda:.0f} M  |  "
+                                f"Entry multiple: {self.entry_ev/self.entry_ebitda:.1f}x"),
                           (x, y), fonts.small(), config.COL_TEXT_DIM)
         y += 36
-        self._slider(surf, x, y, "Levier (dette / EV)", self.debt_pct, "debt_pct", 0.05, "{:.0%}"); y += 38
-        self._slider(surf, x, y, "Multiple de sortie", self.exit_multiple, "exit_multiple", 0.5, "{:.1f}x"); y += 38
-        self._slider(surf, x, y, "Horizon (années)", self.years, "years", 1, "{:.0f}"); y += 38
-        self._slider(surf, x, y, "Croissance EBITDA (CAGR)", self.ebitda_cagr, "ebitda_cagr", 0.01, "{:.0%}"); y += 50
+        self._slider(surf, x, y, _L("Levier (dette / EV)", "Leverage (debt / EV)"), self.debt_pct, "debt_pct", 0.05, "{:.0%}"); y += 38
+        self._slider(surf, x, y, _L("Multiple de sortie", "Exit multiple"), self.exit_multiple, "exit_multiple", 0.5, "{:.1f}x"); y += 38
+        self._slider(surf, x, y, _L("Horizon (années)", "Horizon (years)"), self.years, "years", 1, "{:.0f}"); y += 38
+        self._slider(surf, x, y, _L("Croissance EBITDA (CAGR)", "EBITDA growth (CAGR)"), self.ebitda_cagr, "ebitda_cagr", 0.01, "{:.0%}"); y += 50
 
         moic, irr_v, exit_eq = fm.lbo_returns(self.entry_ev, self.entry_ebitda, self.debt_pct,
                                               self.exit_multiple, int(self.years), self.ebitda_cagr)
@@ -367,13 +379,13 @@ class MAScene(Scene):
         equity_in = self.entry_ev * (1 - self.debt_pct)
         exit_ebitda = self.entry_ebitda * ((1 + self.ebitda_cagr) ** int(self.years))
         rows = [
-            ("Equity investi (entrée)", f"{equity_in:.0f} M", config.COL_TEXT),
-            ("EBITDA de sortie", f"{exit_ebitda:.0f} M", config.COL_TEXT),
-            ("EV de sortie", f"{exit_ebitda*self.exit_multiple:.0f} M", config.COL_TEXT),
-            ("Equity de sortie", f"{exit_eq:.0f} M", config.COL_WHITE),
+            (_L("Equity investi (entrée)", "Equity invested (entry)"), f"{equity_in:.0f} M", config.COL_TEXT),
+            (_L("EBITDA de sortie", "Exit EBITDA"), f"{exit_ebitda:.0f} M", config.COL_TEXT),
+            (_L("EV de sortie", "Exit EV"), f"{exit_ebitda*self.exit_multiple:.0f} M", config.COL_TEXT),
+            (_L("Equity de sortie", "Exit equity"), f"{exit_eq:.0f} M", config.COL_WHITE),
             ("", "", config.COL_TEXT),
-            ("MOIC (multiple)", f"{moic:.2f}x", config.COL_UP if moic >= 2 else config.COL_WARN),
-            ("IRR (fonds propres)", f"{irr_v*100:.1f}%",
+            (_L("MOIC (multiple)", "MOIC (multiple)"), f"{moic:.2f}x", config.COL_UP if moic >= 2 else config.COL_WARN),
+            (_L("IRR (fonds propres)", "IRR (equity)"), f"{irr_v*100:.1f}%",
              config.COL_UP if irr_v >= 0.20 else config.COL_WARN if irr_v >= 0.10 else config.COL_DOWN),
         ]
         for label, val, col in rows:
@@ -384,18 +396,18 @@ class MAScene(Scene):
 
     def _draw_accretion(self, surf, top):
         panel = pygame.Rect(660, top, config.SCREEN_WIDTH - 700, config.footer_y() - 8 - top)
-        inner = widgets.draw_panel(surf, panel, "Accretion / Dilution (paiement en actions)", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Accretion / Dilution (paiement en actions)", "Accretion / Dilution (stock payment)"), config.COL_CYAN)
         x, y = inner.x, inner.y
-        widgets.draw_text(surf, "Acquéreur", (x, y), fonts.small(bold=True), config.COL_AMBER); y += 26
-        widgets.draw_text(surf, f"BPA actuel : {self.acq_eps:.2f}   Actions : {self.acq_shares:.0f} M",
+        widgets.draw_text(surf, _L("Acquéreur", "Acquirer"), (x, y), fonts.small(bold=True), config.COL_AMBER); y += 26
+        widgets.draw_text(surf, _L(f"BPA actuel : {self.acq_eps:.2f}   Actions : {self.acq_shares:.0f} M", f"Current EPS: {self.acq_eps:.2f}   Shares: {self.acq_shares:.0f} M"),
                           (x, y), fonts.small(), config.COL_TEXT); y += 26
-        widgets.draw_text(surf, f"Résultat net : {self.acq_eps*self.acq_shares:.0f} M",
+        widgets.draw_text(surf, _L(f"Résultat net : {self.acq_eps*self.acq_shares:.0f} M", f"Net income: {self.acq_eps*self.acq_shares:.0f} M"),
                           (x, y), fonts.small(), config.COL_TEXT_DIM); y += 40
-        widgets.draw_text(surf, "Cible & financement", (x, y), fonts.small(bold=True), config.COL_AMBER); y += 28
-        widgets.draw_text(surf, f"Résultat net cible : {self.target_ni:.0f} M",
+        widgets.draw_text(surf, _L("Cible & financement", "Target & financing"), (x, y), fonts.small(bold=True), config.COL_AMBER); y += 28
+        widgets.draw_text(surf, _L(f"Résultat net cible : {self.target_ni:.0f} M", f"Target net income: {self.target_ni:.0f} M"),
                           (x, y), fonts.small(), config.COL_TEXT); y += 34
-        self._slider(surf, x, y, "Actions émises (M)", self.new_shares, "new_shares", 5.0, "{:.0f}"); y += 38
-        self._slider(surf, x, y, "Synergies (M)", self.synergies, "synergies", 10.0, "{:.0f}"); y += 50
+        self._slider(surf, x, y, _L("Actions émises (M)", "Shares issued (M)"), self.new_shares, "new_shares", 5.0, "{:.0f}"); y += 38
+        self._slider(surf, x, y, _L("Synergies (M)", "Synergies (M)"), self.synergies, "synergies", 10.0, "{:.0f}"); y += 50
 
         pf_eps, delta = fm.accretion_dilution(self.acq_eps, self.acq_shares * 1e6, self.target_ni * 1e6,
                                               self.new_shares * 1e6, self.synergies * 1e6)
@@ -406,14 +418,16 @@ class MAScene(Scene):
         pygame.draw.rect(surf, bg, res)
         pygame.draw.rect(surf, border, res, 1)
         ry = y + 16
-        widgets.draw_text(surf, "BPA pro-forma", (res.x + 14, ry), fonts.small(), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("BPA pro-forma", "Pro-forma EPS"), (res.x + 14, ry), fonts.small(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, f"{pf_eps:.3f}", (res.x + 260, ry), fonts.body(bold=True), config.COL_WHITE); ry += 36
-        widgets.draw_text(surf, "Variation du BPA", (res.x + 14, ry), fonts.small(), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("Variation du BPA", "EPS change"), (res.x + 14, ry), fonts.small(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, f"{'+' if delta>=0 else ''}{delta:.2f}%",
                           (res.x + 260, ry), fonts.head(bold=True), border); ry += 44
-        verdict = "RELUTIF (accretive) ✓" if accretive else "DILUTIF (dilutive) ✗"
+        verdict = _L("RELUTIF (accretive) ✓", "ACCRETIVE ✓") if accretive else _L("DILUTIF (dilutive) ✗", "DILUTIVE ✗")
         widgets.draw_text(surf, verdict, (res.x + 14, ry), fonts.body(bold=True), border); ry += 34
-        note = ("Le BPA combiné dépasse celui de l'acquéreur : crée de la valeur par action."
+        note = (_L("Le BPA combiné dépasse celui de l'acquéreur : crée de la valeur par action.",
+                   "The combined EPS exceeds the acquirer's: creates value per share.")
                 if accretive else
-                "Le BPA combiné baisse : à justifier par des synergies futures ou stratégie.")
+                _L("Le BPA combiné baisse : à justifier par des synergies futures ou stratégie.",
+                   "The combined EPS drops: to be justified by future synergies or strategy."))
         widgets.draw_text_wrapped(surf, note, (res.x + 14, ry), fonts.small(), config.COL_TEXT, res.w - 28)

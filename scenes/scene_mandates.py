@@ -19,26 +19,46 @@ def _L(fr, en):
 
 ROW_H = 26
 
-_JARGON = {
-    "bêta": "Bêta : sensibilité du portefeuille aux mouvements du marché. β=1 suit le "
-            "marché ; au-delà, risque (et gain potentiel) amplifiés.",
-    "tracking error": "Tracking error : écart de performance entre votre portefeuille et "
-                       "l'indice de référence du mandat. Plus il est faible, plus vous "
-                       "« collez » au benchmark.",
-    "duration": "Duration : sensibilité du portefeuille obligataire aux taux d'intérêt (en "
-                "années). Plus elle est élevée, plus la valeur varie si les taux bougent.",
-    "drawdown": "Drawdown : perte maximale subie depuis un sommet de valeur liquidative sur "
-                "la période. Mesure le risque de baisse vécu par le client.",
-    "liquidité": "Liquidité : part du portefeuille immédiatement cessible (cash + actifs très "
-                 "liquides), exigée par le client pour faire face à des retraits.",
-    "rendement cible": "Rendement cible : performance minimale promise au client sur "
-                       "l'horizon du mandat.",
-}
+# (déclencheurs FR+EN, (définition fr, en))
+_JARGON = [
+    (("bêta", "beta"),
+     ("Bêta : sensibilité du portefeuille aux mouvements du marché. β=1 suit le "
+      "marché ; au-delà, risque (et gain potentiel) amplifiés.",
+      "Beta: sensitivity of the portfolio to market moves. β=1 tracks the "
+      "market; above that, amplified risk (and potential gain).")),
+    (("tracking error",),
+     ("Tracking error : écart de performance entre votre portefeuille et "
+      "l'indice de référence du mandat. Plus il est faible, plus vous "
+      "« collez » au benchmark.",
+      "Tracking error: performance gap between your portfolio and the "
+      "mandate's benchmark index. The lower it is, the more you "
+      "\"hug\" the benchmark.")),
+    (("duration",),
+     ("Duration : sensibilité du portefeuille obligataire aux taux d'intérêt (en "
+      "années). Plus elle est élevée, plus la valeur varie si les taux bougent.",
+      "Duration: sensitivity of the bond portfolio to interest rates (in "
+      "years). The higher it is, the more value swings when rates move.")),
+    (("drawdown",),
+     ("Drawdown : perte maximale subie depuis un sommet de valeur liquidative sur "
+      "la période. Mesure le risque de baisse vécu par le client.",
+      "Drawdown: maximum loss suffered from a NAV peak over the period. "
+      "Measures the downside risk experienced by the client.")),
+    (("liquidité", "liquidity"),
+     ("Liquidité : part du portefeuille immédiatement cessible (cash + actifs très "
+      "liquides), exigée par le client pour faire face à des retraits.",
+      "Liquidity: share of the portfolio immediately sellable (cash + highly "
+      "liquid assets), required by the client to cover withdrawals.")),
+    (("rendement cible", "target return", "target yield"),
+     ("Rendement cible : performance minimale promise au client sur "
+      "l'horizon du mandat.",
+      "Target return: minimum performance promised to the client over "
+      "the mandate horizon.")),
+]
 
 
 def _jargon_lines(*texts):
     lo = " ".join(t or "" for t in texts).lower()
-    return [v for k, v in _JARGON.items() if k in lo]
+    return [_L(*d) for triggers, d in _JARGON if any(t in lo for t in triggers)]
 
 
 def _draw_jargon_hint(surf, pos, mp, *texts):
@@ -80,17 +100,17 @@ def _extra_constraints_text(m):
     propres à son type (item 17). Vide si aucune contrainte additionnelle."""
     parts = []
     if m.get("target_yield") is not None:
-        parts.append(f"Rendement cible {m['target_yield']:.1f}%")
+        parts.append(_L(f"Rendement cible {m['target_yield']:.1f}%", f"Target return {m['target_yield']:.1f}%"))
     if m.get("min_liquidity") is not None:
-        parts.append(f"Liquidité min {m['min_liquidity']:.1f}%")
+        parts.append(_L(f"Liquidité min {m['min_liquidity']:.1f}%", f"Min liquidity {m['min_liquidity']:.1f}%"))
     if m.get("max_drawdown") is not None:
-        parts.append(f"Drawdown max {m['max_drawdown']:.1f}%")
+        parts.append(_L(f"Drawdown max {m['max_drawdown']:.1f}%", f"Max drawdown {m['max_drawdown']:.1f}%"))
     if m.get("max_tracking_error") is not None:
-        parts.append(f"Tracking error max {m['max_tracking_error']:.1f}%")
+        parts.append(_L(f"Tracking error max {m['max_tracking_error']:.1f}%", f"Max tracking error {m['max_tracking_error']:.1f}%"))
     if m.get("max_duration") is not None:
-        parts.append(f"Duration max {m['max_duration']:.1f}")
+        parts.append(_L(f"Duration max {m['max_duration']:.1f}", f"Max duration {m['max_duration']:.1f}"))
     if m.get("excluded_sectors"):
-        parts.append("Exclut : " + ", ".join(m["excluded_sectors"]))
+        parts.append(_L("Exclut : ", "Excludes: ") + ", ".join(m["excluded_sectors"]))
     return "  ·  ".join(parts)
 
 
@@ -101,19 +121,19 @@ def _extra_status(m, values):
     additionnelle n'est définie sur ce mandat."""
     if m.get("max_drawdown") is not None and values.get("drawdown") is not None:
         v = values["drawdown"]
-        return f"Drawdown {v:.1f}% / max {m['max_drawdown']:.1f}%", v <= m["max_drawdown"]
+        return _L(f"Drawdown {v:.1f}% / max {m['max_drawdown']:.1f}%", f"Drawdown {v:.1f}% / max {m['max_drawdown']:.1f}%"), v <= m["max_drawdown"]
     if m.get("max_tracking_error") is not None and values.get("tracking_error") is not None:
         v = values["tracking_error"]
-        return f"Tracking error {v:.1f}% / max {m['max_tracking_error']:.1f}%", v <= m["max_tracking_error"]
+        return _L(f"Tracking error {v:.1f}% / max {m['max_tracking_error']:.1f}%", f"Tracking error {v:.1f}% / max {m['max_tracking_error']:.1f}%"), v <= m["max_tracking_error"]
     if m.get("max_duration") is not None and values.get("duration") is not None:
         v = values["duration"]
-        return f"Duration {v:.1f} / max {m['max_duration']:.1f}", v <= m["max_duration"]
+        return _L(f"Duration {v:.1f} / max {m['max_duration']:.1f}", f"Duration {v:.1f} / max {m['max_duration']:.1f}"), v <= m["max_duration"]
     if m.get("target_yield") is not None and values.get("yield") is not None:
         v = values["yield"]
-        return f"Rendement {v:.1f}% / cible {m['target_yield']:.1f}%", v >= m["target_yield"]
+        return _L(f"Rendement {v:.1f}% / cible {m['target_yield']:.1f}%", f"Return {v:.1f}% / target {m['target_yield']:.1f}%"), v >= m["target_yield"]
     if m.get("min_liquidity") is not None and values.get("liquidity") is not None:
         v = values["liquidity"]
-        return f"Liquidité {v:.1f}% / min {m['min_liquidity']:.1f}%", v >= m["min_liquidity"]
+        return _L(f"Liquidité {v:.1f}% / min {m['min_liquidity']:.1f}%", f"Liquidity {v:.1f}% / min {m['min_liquidity']:.1f}%"), v >= m["min_liquidity"]
     return None, True
 
 
@@ -182,9 +202,9 @@ class MandatesScene(Scene):
                 oid = offers[self.offer_cursor]["id"]
                 res = MD.accept(p, oid, self.app.ensure_market())
                 if res == "full":
-                    self.app.notify("Trop de mandats actifs en parallèle.", "warn")
+                    self.app.notify(_L("Trop de mandats actifs en parallèle.", "Too many active mandates in parallel."), "warn")
                 elif res:
-                    self.app.notify(f"Mandat de {res['client']} accepté.", "info")
+                    self.app.notify(_L(f"Mandat de {res['client']} accepté.", f"{res['client']} mandate accepted."), "info")
             return
         if event.type == pygame.KEYDOWN and event.key == pygame.K_d:
             p = self.app.gs.player
@@ -203,9 +223,9 @@ class MandatesScene(Scene):
                 if rect.collidepoint(event.pos):
                     res = MD.accept(p, oid, self.app.ensure_market())
                     if res == "full":
-                        self.app.notify("Trop de mandats actifs en parallèle.", "warn")
+                        self.app.notify(_L("Trop de mandats actifs en parallèle.", "Too many active mandates in parallel."), "warn")
                     elif res:
-                        self.app.notify(f"Mandat de {res['client']} accepté.", "info")
+                        self.app.notify(_L(f"Mandat de {res['client']} accepté.", f"{res['client']} mandate accepted."), "info")
                     return
             for oid, rect in self._decline_rects.items():
                 if rect.collidepoint(event.pos):
@@ -220,11 +240,11 @@ class MandatesScene(Scene):
     # ------------------------------------------------------------- draw
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "MANDATS CLIENTS", (40, 22), fonts.title(bold=True), config.COL_PRESTIGE)
+        widgets.draw_text(surf, _L("MANDATS CLIENTS", "CLIENT MANDATES"), (40, 22), fonts.title(bold=True), config.COL_PRESTIGE)
         p = self.app.gs.player
         if not self._can():
             g = unlocks.effective_required_grade(p, "mandates")
-            widgets.draw_text(surf, f"⊘ Mandats débloqués au grade {config.GRADES[g]}.",
+            widgets.draw_text(surf, _L(f"⊘ Mandats débloqués au grade {config.GRADES[g]}.", f"⊘ Mandates unlocked at {config.GRADES[g]} grade."),
                               (42, 64), fonts.small(), config.COL_TEXT_DIM)
             note = unlocks.track_lock_note(p, "mandates")
             if note:
@@ -234,7 +254,7 @@ class MandatesScene(Scene):
             return
         # y=64 (pas 56) : à 56, le sous-titre était barré par le bas du grand
         # titre (même interligne que les autres écrans : titre 22 → sous-titre 64)
-        widgets.draw_text(surf, "Gérez l'argent de clients sous objectif de rendement et limite de risque (bêta).",
+        widgets.draw_text(surf, _L("Gérez l'argent de clients sous objectif de rendement et limite de risque (bêta).", "Manage client money under a return objective and a risk limit (beta)."),
                           (42, 64), fonts.small(), config.COL_TEXT_DIM)
 
         market = self.app.ensure_market()
@@ -251,10 +271,10 @@ class MandatesScene(Scene):
         off_h = 50 + len(offers) * 78 if offers else 50
         off_h = min(off_h, 245)
         off_panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, off_h)
-        inner = widgets.draw_panel(surf, off_panel, f"Offres en attente ({len(offers)})", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, off_panel, _L(f"Offres en attente ({len(offers)})", f"Pending offers ({len(offers)})"), config.COL_CYAN)
         self.offer_cursor = min(self.offer_cursor, len(offers) - 1) if offers else 0
         if not offers:
-            widgets.draw_text(surf, "Aucune offre en attente. Patientez, le temps avance en direct.",
+            widgets.draw_text(surf, _L("Aucune offre en attente. Patientez, le temps avance en direct.", "No pending offer. Wait, time advances live."),
                               (inner.x, inner.y + 4), fonts.small(), config.COL_TEXT_DIM)
         else:
             y = inner.y
@@ -272,9 +292,12 @@ class MandatesScene(Scene):
                     widgets.draw_badge(surf, MD.type_label(o["type"]), (r.right + 10, row.y + 4),
                                        accent=config.COL_CYAN)
                 beta_ok = current_beta <= o["max_beta"]
-                widgets.draw_text(surf, f"Capital : {widgets.format_money(o['capital'], cur)}  ·  "
+                widgets.draw_text(surf, _L(f"Capital : {widgets.format_money(o['capital'], cur)}  ·  "
                                         f"Horizon : {o['horizon']}T  ·  Objectif : {o['target_pct']:.1f}%  ·  "
                                         f"β max {o['max_beta']:.2f} (votre β actuel : {current_beta:.2f})",
+                                        f"Capital: {widgets.format_money(o['capital'], cur)}  ·  "
+                                        f"Horizon: {o['horizon']}Q  ·  Target: {o['target_pct']:.1f}%  ·  "
+                                        f"β max {o['max_beta']:.2f} (your current β: {current_beta:.2f})"),
                                   (row.x + 12, row.y + 26), fonts.tiny(),
                                   config.COL_TEXT if beta_ok else config.COL_WARN)
                 extra = _extra_constraints_text(o)
@@ -285,17 +308,19 @@ class MandatesScene(Scene):
                     et = widgets.draw_text(surf, extra, (row.x + 12, row.y + 42),
                                            fonts.tiny(), config.COL_TEXT_DIM)
                     _draw_jargon_hint(surf, (et.right + 6, row.y + 42), mp, "bêta", extra)
-                widgets.draw_text(surf, f"Commission si réussite : {widgets.format_money(o['reward_cash'], cur)}  "
+                widgets.draw_text(surf, _L(f"Commission si réussite : {widgets.format_money(o['reward_cash'], cur)}  "
                                         f"(+{o['reward_rep']} rép.)  ·  échec : -{o['penalty_rep']} rép.",
+                                        f"Fee on success: {widgets.format_money(o['reward_cash'], cur)}  "
+                                        f"(+{o['reward_rep']} rep.)  ·  failure: -{o['penalty_rep']} rep."),
                                   (row.x + 12, row.y + 56), fonts.tiny(), config.COL_TEXT_DIM)
                 acc = pygame.Rect(row.right - 196, row.y + 21, 90, 30)
                 dec = pygame.Rect(row.right - 100, row.y + 21, 90, 30)
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, acc, border_radius=4)
                 pygame.draw.rect(surf, config.COL_UP, acc, 1, border_radius=4)
-                widgets.draw_text(surf, "ACCEPTER", acc.center, fonts.tiny(bold=True), config.COL_UP, align="center")
+                widgets.draw_text(surf, _L("ACCEPTER", "ACCEPT"), acc.center, fonts.tiny(bold=True), config.COL_UP, align="center")
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, dec, border_radius=4)
                 pygame.draw.rect(surf, config.COL_DOWN, dec, 1, border_radius=4)
-                widgets.draw_text(surf, "REFUSER", dec.center, fonts.tiny(bold=True), config.COL_DOWN, align="center")
+                widgets.draw_text(surf, _L("REFUSER", "DECLINE"), dec.center, fonts.tiny(bold=True), config.COL_DOWN, align="center")
                 self._accept_rects[o["id"]] = acc
                 self._decline_rects[o["id"]] = dec
                 y += 78
@@ -303,12 +328,12 @@ class MandatesScene(Scene):
         # ---- mandats actifs ----
         act_top = off_panel.bottom + 10
         act_panel = pygame.Rect(40, act_top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - act_top)
-        ainner = widgets.draw_panel(surf, act_panel, f"Mandats actifs ({len(p.mandates)})", config.COL_PRESTIGE)
+        ainner = widgets.draw_panel(surf, act_panel, _L(f"Mandats actifs ({len(p.mandates)})", f"Active mandates ({len(p.mandates)})"), config.COL_PRESTIGE)
         list_top = ainner.y
         list_area = pygame.Rect(ainner.x - 6, list_top, ainner.w + 12, ainner.bottom - list_top - 4)
         self._list_rect = list_area
         if not p.mandates:
-            widgets.draw_text(surf, "Aucun mandat actif. Acceptez une offre ci-dessus.",
+            widgets.draw_text(surf, _L("Aucun mandat actif. Acceptez une offre ci-dessus.", "No active mandate. Accept an offer above."),
                               (ainner.x, list_top + 4), fonts.small(), config.COL_TEXT_DIM)
             if offers:
                 hints = [("↑↓", _L("offre", "offer")), (_L("ENTRÉE", "ENTER"), _L("accepter", "accept")), ("D", _L("refuser", "decline"))]
@@ -338,12 +363,12 @@ class MandatesScene(Scene):
                     widgets.draw_badge(surf, MD.type_label(m["type"]), (r.right + 10, row.y + 6),
                                        accent=config.COL_CYAN)
                 qleft = max(0, m["deadline_q"] - p.quarter)
-                widgets.draw_text(surf, f"Échéance T{m['deadline_q']} ({qleft} trim. restants)",
+                widgets.draw_text(surf, _L(f"Échéance T{m['deadline_q']} ({qleft} trim. restants)", f"Deadline Q{m['deadline_q']} ({qleft} qtrs left)"),
                                   (row.right - 12, row.y + 8), fonts.tiny(), config.COL_TEXT_DIM, align="right")
 
                 # jauge croissance vs objectif
                 gy = row.y + 34
-                widgets.draw_text(surf, f"Croissance {growth:+.1f}% / objectif {m['target_pct']:.1f}%",
+                widgets.draw_text(surf, _L(f"Croissance {growth:+.1f}% / objectif {m['target_pct']:.1f}%", f"Growth {growth:+.1f}% / target {m['target_pct']:.1f}%"),
                                   (row.x + 12, gy), fonts.tiny(), config.COL_TEXT)
                 gauge = pygame.Rect(row.x + 320, gy, 220, 14)
                 gcol = config.COL_UP if growth >= m["target_pct"] else config.COL_WARN
@@ -352,7 +377,7 @@ class MandatesScene(Scene):
 
                 # jauge bêta vs limite
                 by = row.y + 56
-                widgets.draw_text(surf, f"Bêta {beta:.2f} / limite {m['max_beta']:.2f}",
+                widgets.draw_text(surf, _L(f"Bêta {beta:.2f} / limite {m['max_beta']:.2f}", f"Beta {beta:.2f} / limit {m['max_beta']:.2f}"),
                                   (row.x + 12, by), fonts.tiny(), config.COL_TEXT)
                 bgauge = pygame.Rect(row.x + 320, by, 220, 14)
                 bcol = config.COL_DOWN if beta > m["max_beta"] else config.COL_UP
@@ -368,7 +393,7 @@ class MandatesScene(Scene):
                                     mouse_pos=pygame.mouse.get_pos(),
                                     y_fmt=lambda v: widgets.format_money(v, cur),
                                     show_pct=True, show_extrema=False)
-                widgets.draw_text(surf, "Net worth (tendance)", (spark.x, spark.y - 14),
+                widgets.draw_text(surf, _L("Net worth (tendance)", "Net worth (trend)"), (spark.x, spark.y - 14),
                                   fonts.tiny(), config.COL_TEXT_DIM)
 
                 extra_text, extra_ok = _extra_status(m, check["values"])
@@ -378,7 +403,7 @@ class MandatesScene(Scene):
                     _draw_jargon_hint(surf, (et2.right + 6, row.y + 78), mp, "bêta", extra_text)
 
                 feas = check["ok"]
-                widgets.draw_badge(surf, "EN BONNE VOIE" if feas else "EN RISQUE",
+                widgets.draw_badge(surf, _L("EN BONNE VOIE", "ON TRACK") if feas else _L("EN RISQUE", "AT RISK"),
                                    (row.x + 12, row.bottom - 22),
                                    accent=config.COL_UP if feas else config.COL_WARN)
             y += ROW
@@ -410,37 +435,41 @@ class MandatesScene(Scene):
         rect = pygame.Rect((config.SCREEN_WIDTH - w) // 2, (config.SCREEN_HEIGHT - h) // 2, w, h)
         accent = config.COL_UP if res["ok"] else config.COL_DOWN
         if res["ok"]:
-            title = "MANDAT RÉUSSI"
+            title = _L("MANDAT RÉUSSI", "MANDATE SUCCEEDED")
         elif res.get("early_terminated"):
-            title = "MANDAT RÉSILIÉ"
+            title = _L("MANDAT RÉSILIÉ", "MANDATE TERMINATED")
         else:
-            title = "MANDAT ÉCHOUÉ"
+            title = _L("MANDAT ÉCHOUÉ", "MANDATE FAILED")
         inner = widgets.draw_panel(surf, rect, title, accent)
 
         widgets.draw_text(surf, res["client"], (inner.x, inner.y), fonts.body(bold=True), config.COL_AMBER)
         y = inner.y + 30
-        widgets.draw_text(surf, f"Rendement obtenu : {res['growth']:+.1f}%   ·   "
+        widgets.draw_text(surf, _L(f"Rendement obtenu : {res['growth']:+.1f}%   ·   "
                                 f"objectif : +{res['target_pct']:.1f}%",
+                                f"Return achieved: {res['growth']:+.1f}%   ·   "
+                                f"target: +{res['target_pct']:.1f}%"),
                           (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 24
-        widgets.draw_text(surf, f"Bêta atteint : {res['beta']:.2f}   ·   limite autorisée : {res['max_beta']:.2f}",
+        widgets.draw_text(surf, _L(f"Bêta atteint : {res['beta']:.2f}   ·   limite autorisée : {res['max_beta']:.2f}", f"Beta reached: {res['beta']:.2f}   ·   allowed limit: {res['max_beta']:.2f}"),
                           (inner.x, y), fonts.small(), config.COL_TEXT)
         y += 34
-        widgets.draw_text(surf, "Diagnostic :", (inner.x, y), fonts.small(bold=True), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("Diagnostic :", "Diagnosis:"), (inner.x, y), fonts.small(bold=True), config.COL_TEXT_DIM)
         y += 22
         widgets.draw_text_wrapped(surf, res["reason"], (inner.x, y), fonts.small(),
                                   accent, inner.w)
         y += 46
         if res["ok"]:
-            widgets.draw_text(surf, f"Commission perçue : +{res['reward_cash']:,.0f}   ·   "
+            widgets.draw_text(surf, _L(f"Commission perçue : +{res['reward_cash']:,.0f}   ·   "
                                     f"réputation +{res['reward_rep']}",
+                                    f"Fee received: +{res['reward_cash']:,.0f}   ·   "
+                                    f"reputation +{res['reward_rep']}"),
                               (inner.x, y), fonts.small(), config.COL_UP)
         else:
-            widgets.draw_text(surf, f"Réputation -{res['penalty_rep']} (client perdu).",
+            widgets.draw_text(surf, _L(f"Réputation -{res['penalty_rep']} (client perdu).", f"Reputation -{res['penalty_rep']} (client lost)."),
                               (inner.x, y), fonts.small(), config.COL_DOWN)
 
         close = pygame.Rect(rect.right - 110, rect.bottom - 40, 90, 28)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, close, border_radius=4)
         pygame.draw.rect(surf, accent, close, 1, border_radius=4)
-        widgets.draw_text(surf, "FERMER", close.center, fonts.tiny(bold=True), accent, align="center")
+        widgets.draw_text(surf, _L("FERMER", "CLOSE"), close.center, fonts.tiny(bold=True), accent, align="center")
         self._postmortem_close_rect = close

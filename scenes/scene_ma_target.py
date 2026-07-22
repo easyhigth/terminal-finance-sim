@@ -10,10 +10,17 @@ import pygame
 
 from core import config, unlocks
 from core import ma as M
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
-TABS = ["APERÇU", "ÉTATS FINANCIERS"]
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
+TABS = ["APERÇU", "ÉTATS FINANCIERS"]  # clés d'état (FR)
+_TAB_LABELS = {"APERÇU": ("APERÇU", "OVERVIEW"), "ÉTATS FINANCIERS": ("ÉTATS FINANCIERS", "FINANCIALS")}
 BASE_FISCAL_YEAR = getattr(config, "BASE_FISCAL_YEAR", 2024)
 
 _EMPH = {"Marge brute", "EBITDA", "Résultat d'exploitation (EBIT)", "Résultat avant impôt",
@@ -53,9 +60,9 @@ class MATargetScene(Scene):
         self.back_btn = widgets.Button(back_rect,
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.sheet_inc_btn = widgets.Button((210, btn_y, 200, btn_h),
-                                            "→ TABLEUR (CR)", config.COL_UP)
+                                            _L("→ TABLEUR (CR)", "→ SHEET (P&L)"), config.COL_UP)
         self.sheet_bal_btn = widgets.Button((420, btn_y, 200, btn_h),
-                                            "→ TABLEUR (BILAN)", config.COL_UP)
+                                            _L("→ TABLEUR (BILAN)", "→ SHEET (BALANCE)"), config.COL_UP)
 
     def _refresh(self):
         p = self.app.gs.player
@@ -113,7 +120,7 @@ class MATargetScene(Scene):
     def _do_acquire(self):
         res = M.acquire(self.app.gs.player, self.ticker, self.debt_pct)
         if res["ok"]:
-            self._msg = f"Acquisition réussie : {self.target['name']} rejoint votre portefeuille."
+            self._msg = _L(f"Acquisition réussie : {self.target['name']} rejoint votre portefeuille.", f"Acquisition successful: {self.target['name']} joins your portfolio.")
             self._msg_col = config.COL_UP
             self._refresh()
         else:
@@ -123,7 +130,7 @@ class MATargetScene(Scene):
     def _do_action(self, action_id):
         res = M.apply_action(self.app.gs.player, self.ticker, action_id)
         if res["ok"]:
-            self._msg = "Action appliquée."
+            self._msg = _L("Action appliquée.", "Action applied.")
             self._msg_col = config.COL_UP
             self._refresh()
         else:
@@ -134,8 +141,8 @@ class MATargetScene(Scene):
         res = M.exit_company(self.app.gs.player, self.ticker)
         if res["ok"]:
             pnl = res["pnl"]
-            verb = "plus-value" if pnl >= 0 else "perte"
-            self._msg = f"Société cédée — {verb} de {abs(pnl):,.0f}.".replace(",", " ")
+            verb = _L("plus-value", "gain") if pnl >= 0 else _L("perte", "loss")
+            self._msg = _L(f"Société cédée — {verb} de {abs(pnl):,.0f}.", f"Company divested — {verb} of {abs(pnl):,.0f}.").replace(",", " ")
             self._msg_col = config.COL_UP if pnl >= 0 else config.COL_DOWN
             self._refresh()
             self.tab = "APERÇU"
@@ -150,12 +157,12 @@ class MATargetScene(Scene):
         block = M.statements_for(self.data, base_year, n_years=5)
         years = [b["year"] for b in block]
         if which == "income":
-            title = f"{self.ticker} — Compte de résultat"
+            title = _L(f"{self.ticker} — Compte de résultat", f"{self.ticker} — Income statement")
             lines = block[0]["income"]["lines"]
             rows = [(line["label"], [b["income"]["lines"][r]["value"] for b in block])
                     for r, line in enumerate(lines)]
         else:
-            title = f"{self.ticker} — Bilan"
+            title = _L(f"{self.ticker} — Bilan", f"{self.ticker} — Balance sheet")
             rows = []
             n_assets = len(block[0]["balance"]["assets_lines"])
             for r in range(n_assets):
@@ -182,13 +189,13 @@ class MATargetScene(Scene):
         p = self.app.gs.player
         cur = config.CONTINENTS.get(p.continent, {}).get("currency", "$")
         if not self.data:
-            widgets.draw_text(surf, f"Cible introuvable : {self.ticker}", (40, 40),
+            widgets.draw_text(surf, _L(f"Cible introuvable : {self.ticker}", f"Target not found: {self.ticker}"), (40, 40),
                               fonts.title(bold=True), config.COL_DOWN)
             self.back_btn.draw(surf)
             return
 
         name = self.data["name"]
-        status = "DÉTENUE" if self.owned else "CIBLE PRIVÉE"
+        status = _L("DÉTENUE", "OWNED") if self.owned else _L("CIBLE PRIVÉE", "PRIVATE TARGET")
         accent = config.COL_UP if self.owned else config.COL_AMBER
         widgets.draw_text(surf, name, (40, 22), fonts.title(bold=True), config.COL_AMBER)
         widgets.draw_text(surf, f"{self.ticker} · {self.data['sector']} · {self.data['region']} · {status}",
@@ -197,7 +204,7 @@ class MATargetScene(Scene):
         if not self._can_ma():
             p = self.app.gs.player
             g = unlocks.effective_required_grade(p, "ma")
-            widgets.draw_text(surf, f"⊘ M&A débloqué au grade {config.GRADES[g]}.",
+            widgets.draw_text(surf, _L(f"⊘ M&A débloqué au grade {config.GRADES[g]}.", f"⊘ M&A unlocked at {config.GRADES[g]} grade."),
                               (40, 104), fonts.small(), config.COL_DOWN)
             note = unlocks.track_lock_note(p, "ma")
             if note:
@@ -208,13 +215,13 @@ class MATargetScene(Scene):
         self._tab_rects = {}
         tx, ty = 40, 104
         for tname in TABS:
-            w = fonts.small(bold=True).size(tname)[0] + 28
+            w = fonts.small(bold=True).size(_L(*_TAB_LABELS[tname]))[0] + 28
             rect = pygame.Rect(tx, ty, w, 28)
             self._tab_rects[tname] = rect
             sel = (tname == self.tab)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect, border_radius=4)
             pygame.draw.rect(surf, accent if sel else config.COL_BORDER, rect, 1, border_radius=4)
-            widgets.draw_text(surf, tname, rect.center, fonts.small(bold=sel),
+            widgets.draw_text(surf, _L(*_TAB_LABELS[tname]), rect.center, fonts.small(bold=sel),
                               accent if sel else config.COL_TEXT_DIM, align="center")
             tx += w + 8
 
@@ -241,14 +248,14 @@ class MATargetScene(Scene):
 
         # ---- panneau valorisation ----
         vpanel = pygame.Rect(40, top, half, 200)
-        vinner = widgets.draw_panel(surf, vpanel, "Valorisation (comparables + DCF)", config.COL_CYAN)
+        vinner = widgets.draw_panel(surf, vpanel, _L("Valorisation (comparables + DCF)", "Valuation (comparables + DCF)"), config.COL_CYAN)
         rows = [
             ("EBITDA", widgets.format_money(val["ebitda"], cur)),
-            ("EV — comparables", widgets.format_money(val["comps_ev"], cur)),
-            ("EV — DCF", widgets.format_money(val["dcf_ev"], cur)),
-            ("EV retenue (juste valeur)", widgets.format_money(val["fair_ev"], cur)),
-            ("WACC utilisé", f"{val['wacc']*100:.1f}%"),
-            ("Valeur des fonds propres", widgets.format_money(val["equity_value"], cur)),
+            (_L("EV — comparables", "EV — comparables"), widgets.format_money(val["comps_ev"], cur)),
+            (_L("EV — DCF", "EV — DCF"), widgets.format_money(val["dcf_ev"], cur)),
+            (_L("EV retenue (juste valeur)", "EV used (fair value)"), widgets.format_money(val["fair_ev"], cur)),
+            (_L("WACC utilisé", "WACC used"), f"{val['wacc']*100:.1f}%"),
+            (_L("Valeur des fonds propres", "Equity value"), widgets.format_money(val["equity_value"], cur)),
         ]
         y = vinner.y
         for label, value in rows:
@@ -259,22 +266,22 @@ class MATargetScene(Scene):
 
         # ---- panneau profil / scores ----
         ppanel = pygame.Rect(40 + half + 20, top, half, 200)
-        pinner = widgets.draw_panel(surf, ppanel, "Profil opérationnel", config.COL_AMBER)
+        pinner = widgets.draw_panel(surf, ppanel, _L("Profil opérationnel", "Operating profile"), config.COL_AMBER)
         py = pinner.y
-        widgets.draw_text(surf, "Chiffre d'affaires", (pinner.x, py), fonts.small(), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("Chiffre d'affaires", "Revenue"), (pinner.x, py), fonts.small(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, widgets.format_money(d["revenue"], cur), (pinner.right, py),
                           fonts.small(bold=True), config.COL_WHITE, align="right")
         py += 28
-        widgets.draw_text(surf, "Marge EBITDA", (pinner.x, py), fonts.small(), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("Marge EBITDA", "EBITDA margin"), (pinner.x, py), fonts.small(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, f"{d['ebitda_margin']*100:.1f}%", (pinner.right, py),
                           fonts.small(bold=True), config.COL_WHITE, align="right")
         py += 28
-        widgets.draw_text(surf, "Effectif", (pinner.x, py), fonts.small(), config.COL_TEXT_DIM)
+        widgets.draw_text(surf, _L("Effectif", "Headcount"), (pinner.x, py), fonts.small(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, f"{d['employees']:,}".replace(",", " "), (pinner.right, py),
                           fonts.small(bold=True), config.COL_WHITE, align="right")
         py += 28
-        for label, key in (("Management", "management_score"), ("Moral des équipes", "morale"),
-                            ("Efficacité opérationnelle", "efficiency")):
+        for label, key in ((_L("Management", "Management"), "management_score"), (_L("Moral des équipes", "Team morale"), "morale"),
+                            (_L("Efficacité opérationnelle", "Operating efficiency"), "efficiency")):
             v = d[key]
             widgets.draw_text(surf, label, (pinner.x, py), fonts.small(), config.COL_TEXT_DIM)
             widgets.draw_text(surf, f"{v:.0f}/100", (pinner.right, py),
@@ -290,17 +297,19 @@ class MATargetScene(Scene):
                                                       bottom - lower_top), cur, val)
 
     def _draw_acquisition(self, surf, rect, cur, val):
-        inner = widgets.draw_panel(surf, rect, "Financement & acquisition (LBO réel : cash + dette)",
+        inner = widgets.draw_panel(surf, rect, _L("Financement & acquisition (LBO réel : cash + dette)", "Financing & acquisition (real LBO: cash + debt)"),
                                    config.COL_UP)
         price = M.ask_price(self.target)
         terms = M.financing_terms(price, self.debt_pct)
         x, y = inner.x, inner.y
-        widgets.draw_text(surf, f"Prix demandé (juste valeur + prime de contrôle {M.CONTROL_PREMIUM*100:.0f}%) : "
+        widgets.draw_text(surf, _L(f"Prix demandé (juste valeur + prime de contrôle {M.CONTROL_PREMIUM*100:.0f}%) : "
                                 f"{widgets.format_money(price, cur)}",
+                                f"Ask price (fair value + control premium {M.CONTROL_PREMIUM*100:.0f}%): "
+                                f"{widgets.format_money(price, cur)}"),
                           (x, y), fonts.small(), config.COL_TEXT)
         y += 32
 
-        widgets.draw_text(surf, "Part financée par dette", (x, y), fonts.small(), config.COL_TEXT)
+        widgets.draw_text(surf, _L("Part financée par dette", "Share financed by debt"), (x, y), fonts.small(), config.COL_TEXT)
         widgets.draw_text(surf, f"{self.debt_pct*100:.0f}%", (x + 260, y), fonts.small(bold=True), config.COL_WHITE)
         self._debt_minus_rect = pygame.Rect(x + 330, y - 2, 24, 22)
         self._debt_plus_rect = pygame.Rect(x + 358, y - 2, 24, 22)
@@ -311,9 +320,9 @@ class MATargetScene(Scene):
         y += 36
 
         rows = [
-            ("Montant emprunté (dette LBO)", widgets.format_money(terms["debt_amount"], cur)),
-            ("Apport en fonds propres (votre cash)", widgets.format_money(terms["equity_cash"], cur)),
-            ("Trésorerie disponible", widgets.format_money(self.app.gs.player.cash, cur)),
+            (_L("Montant emprunté (dette LBO)", "Amount borrowed (LBO debt)"), widgets.format_money(terms["debt_amount"], cur)),
+            (_L("Apport en fonds propres (votre cash)", "Equity contribution (your cash)"), widgets.format_money(terms["equity_cash"], cur)),
+            (_L("Trésorerie disponible", "Available cash"), widgets.format_money(self.app.gs.player.cash, cur)),
         ]
         for label, value in rows:
             widgets.draw_text(surf, label, (x, y), fonts.small(), config.COL_TEXT_DIM)
@@ -326,29 +335,32 @@ class MATargetScene(Scene):
         pygame.draw.rect(surf, config.COL_PANEL_HEAD if can_afford else config.COL_PANEL,
                          self._buy_rect, border_radius=6)
         pygame.draw.rect(surf, config.COL_UP if can_afford else config.COL_BORDER, self._buy_rect, 1, border_radius=6)
-        widgets.draw_text(surf, "ACQUÉRIR LA SOCIÉTÉ", self._buy_rect.center, fonts.body(bold=True),
+        widgets.draw_text(surf, _L("ACQUÉRIR LA SOCIÉTÉ", "ACQUIRE THE COMPANY"), self._buy_rect.center, fonts.body(bold=True),
                           config.COL_UP if can_afford else config.COL_TEXT_DIM, align="center")
         widgets.draw_text_wrapped(
-            surf, "La dette est portée par la société elle-même : intérêts et amortissement sont "
+            surf, _L("La dette est portée par la société elle-même : intérêts et amortissement sont "
             "prélevés sur son propre flux de trésorerie. En cas d'insuffisance prolongée, vous "
             "pouvez devoir éponger sur votre trésorerie personnelle, ou perdre la société (défaut).",
+            "The debt is carried by the company itself: interest and amortization are drawn "
+            "from its own cash flow. In case of prolonged shortfall, you may have to cover it "
+            "from your personal cash, or lose the company (default)."),
             (x + 280, y + 2), fonts.tiny(), config.COL_TEXT_DIM, inner.right - x - 290)
 
     def _draw_management(self, surf, rect, cur, val):
         half = (rect.w - 20) // 2
         spanel = pygame.Rect(rect.x, rect.y, half, rect.h)
-        sinner = widgets.draw_panel(surf, spanel, "Suivi LBO", config.COL_AMBER)
+        sinner = widgets.draw_panel(surf, spanel, _L("Suivi LBO", "LBO tracking"), config.COL_AMBER)
         inst = self.inst
         x, y = sinner.x, sinner.y
         rows = [
-            ("Dette restante", widgets.format_money(inst["debt_balance"], cur),
+            (_L("Dette restante", "Debt remaining"), widgets.format_money(inst["debt_balance"], cur),
              config.COL_DOWN if inst["debt_balance"] > 0 else config.COL_UP),
-            ("Coussin de trésorerie", widgets.format_money(inst["cash_buffer"], cur), config.COL_TEXT),
-            ("Dividendes cumulés perçus", widgets.format_money(inst["cum_dividends"], cur), config.COL_UP),
-            ("Fonds propres investis", widgets.format_money(inst["equity_invested"], cur), config.COL_TEXT_DIM),
-            ("Valeur actuelle des fonds propres", widgets.format_money(max(0.0, val["equity_value"]), cur),
+            (_L("Coussin de trésorerie", "Cash cushion"), widgets.format_money(inst["cash_buffer"], cur), config.COL_TEXT),
+            (_L("Dividendes cumulés perçus", "Cumulative dividends received"), widgets.format_money(inst["cum_dividends"], cur), config.COL_UP),
+            (_L("Fonds propres investis", "Equity invested"), widgets.format_money(inst["equity_invested"], cur), config.COL_TEXT_DIM),
+            (_L("Valeur actuelle des fonds propres", "Current equity value"), widgets.format_money(max(0.0, val["equity_value"]), cur),
              config.COL_WHITE),
-            ("Trimestres en détresse", f"{inst['distress_quarters']}/3",
+            (_L("Trimestres en détresse", "Distressed quarters"), f"{inst['distress_quarters']}/3",
              config.COL_DOWN if inst["distress_quarters"] > 0 else config.COL_UP),
         ]
         for label, value, col in rows:
@@ -359,19 +371,19 @@ class MATargetScene(Scene):
         y += 12
         moic = ((max(0.0, val["equity_value"]) + inst["cum_dividends"]) / inst["equity_invested"]
                 if inst["equity_invested"] else 0.0)
-        widgets.draw_text(surf, f"MOIC latent : {moic:.2f}x", (x, y), fonts.body(bold=True),
+        widgets.draw_text(surf, _L(f"MOIC latent : {moic:.2f}x", f"Unrealized MOIC: {moic:.2f}x"), (x, y), fonts.body(bold=True),
                           config.COL_UP if moic >= 1 else config.COL_DOWN)
         y += 40
         self._exit_rect = pygame.Rect(x, y, 260, 44)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._exit_rect, border_radius=6)
         pygame.draw.rect(surf, config.COL_AMBER, self._exit_rect, 1, border_radius=6)
-        widgets.draw_text(surf, "CÉDER (EXIT)", self._exit_rect.center, fonts.body(bold=True),
+        widgets.draw_text(surf, _L("CÉDER (EXIT)", "DIVEST (EXIT)"), self._exit_rect.center, fonts.body(bold=True),
                           config.COL_AMBER, align="center")
-        widgets.draw_text(surf, f"frais de cession {M.EXIT_FEE*100:.0f}%", (self._exit_rect.right + 14, y + 14),
+        widgets.draw_text(surf, _L(f"frais de cession {M.EXIT_FEE*100:.0f}%", f"exit fee {M.EXIT_FEE*100:.0f}%"), (self._exit_rect.right + 14, y + 14),
                           fonts.tiny(), config.COL_TEXT_DIM)
 
         apanel = pygame.Rect(rect.x + half + 20, rect.y, rect.w - half - 20, rect.h)
-        ainner = widgets.draw_panel(surf, apanel, "Axes d'amélioration (1 par trimestre)", config.COL_CYAN)
+        ainner = widgets.draw_panel(surf, apanel, _L("Axes d'amélioration (1 par trimestre)", "Improvement levers (1 per quarter)"), config.COL_CYAN)
         can, reason = M.can_apply_action(self.app.gs.player, self.ticker)
         ax, ay = ainner.x, ainner.y
         if not can:
@@ -403,7 +415,7 @@ class MATargetScene(Scene):
         years_elapsed = (p.day - 1) // 365
         base_year = BASE_FISCAL_YEAR + years_elapsed
         block = M.statements_for(self.data, base_year, n_years=5)
-        widgets.draw_text(surf, f"Montants en {cur} · 5 derniers exercices (N … N-4)",
+        widgets.draw_text(surf, _L(f"Montants en {cur} · 5 derniers exercices (N … N-4)", f"Amounts in {cur} · last 5 fiscal years (N … N-4)"),
                           (40, top - 4), fonts.small(), config.COL_TEXT_DIM)
         ttop = top + 20
         ph = bottom - ttop
@@ -413,7 +425,7 @@ class MATargetScene(Scene):
         for r in range(len(block[0]["income"]["lines"])):
             inc_rows.append((block[0]["income"]["lines"][r]["label"],
                              [b["income"]["lines"][r]["value"] for b in block]))
-        self._draw_table(surf, pygame.Rect(40, ttop, half, ph), "Compte de résultat",
+        self._draw_table(surf, pygame.Rect(40, ttop, half, ph), _L("Compte de résultat", "Income statement"),
                          inc_rows, block, config.COL_CYAN)
 
         bal_rows = []
@@ -423,7 +435,7 @@ class MATargetScene(Scene):
         for r in range(len(block[0]["balance"]["liab_lines"])):
             bal_rows.append((block[0]["balance"]["liab_lines"][r]["label"],
                              [b["balance"]["liab_lines"][r]["value"] for b in block]))
-        self._draw_table(surf, pygame.Rect(40 + half + 20, ttop, half, ph), "Bilan",
+        self._draw_table(surf, pygame.Rect(40 + half + 20, ttop, half, ph), _L("Bilan", "Balance sheet"),
                          bal_rows, block, config.COL_AMBER)
 
     def _draw_table(self, surf, rect, title, rows_by_year, block, accent):

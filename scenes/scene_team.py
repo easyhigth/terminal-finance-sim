@@ -105,20 +105,20 @@ class TeamScene(Scene):
         r = TEAM.hire(p, pid)
         profile = TEAM.available_profiles().get(pid, {})
         if r["ok"]:
-            self.msg = f"{profile.get('label', pid)} recruté(e)."
+            self.msg = _L(f"{profile.get('label', pid)} recruté(e).", f"{profile.get('label', pid)} hired.")
             if not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
         else:
-            reasons = {"grade": "grade insuffisant", "budget": "trésorerie insuffisante",
-                       "unknown_profile": "profil inconnu"}
-            self.msg = f"Refusé ({reasons.get(r['reason'], r['reason'])})."
+            reasons = {"grade": _L("grade insuffisant", "insufficient grade"), "budget": _L("trésorerie insuffisante", "insufficient cash"),
+                       "unknown_profile": _L("profil inconnu", "unknown profile")}
+            self.msg = _L(f"Refusé ({reasons.get(r['reason'], r['reason'])}).", f"Rejected ({reasons.get(r['reason'], r['reason'])}).")
 
     def _do_fire(self, idx):
         p = self.app.gs.player
         r = TEAM.fire(p, idx)
         if r["ok"]:
             profile = TEAM.available_profiles().get(r["removed"]["profile_id"], {})
-            self.msg = f"{profile.get('label', '?')} licencié(e)."
+            self.msg = _L(f"{profile.get('label', '?')} licencié(e).", f"{profile.get('label', '?')} fired.")
             if not p.hardcore:
                 self.app.gs.save(config.AUTOSAVE_SLOT)
 
@@ -146,11 +146,11 @@ class TeamScene(Scene):
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "ÉQUIPE — ANALYSTES JUNIORS", (40, 22),
+        widgets.draw_text(surf, _L("ÉQUIPE — ANALYSTES JUNIORS", "TEAM — JUNIOR ANALYSTS"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         if not self._can():
             g = unlocks.effective_required_grade(self.app.gs.player, "team")
-            widgets.draw_text(surf, f"⊘ Recrutement débloqué au grade {config.GRADES[g]}.",
+            widgets.draw_text(surf, _L(f"⊘ Recrutement débloqué au grade {config.GRADES[g]}.", f"⊘ Hiring unlocked at {config.GRADES[g]} grade."),
                               (42, 74), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             self.tuto_btn.draw(surf)
@@ -158,7 +158,7 @@ class TeamScene(Scene):
 
         p = self.app.gs.player
         cur = self._cur()
-        intro = "Recrutez des analystes juniors : bonus passif récurrent contre un salaire par tour. " + self.msg
+        intro = _L("Recrutez des analystes juniors : bonus passif récurrent contre un salaire par tour. ", "Hire junior analysts: recurring passive bonus in exchange for a per-turn salary. ") + self.msg
         widgets.draw_text_wrapped(surf, intro, (42, 74), fonts.small(), config.COL_TEXT_DIM,
                                   config.SCREEN_WIDTH - 84, line_gap=4)
 
@@ -193,7 +193,7 @@ class TeamScene(Scene):
 
         # ---- équipe actuelle (droite) ----
         team_rect = pygame.Rect(540, 110, config.SCREEN_WIDTH - 580, 420)
-        tinner = widgets.draw_panel(surf, team_rect, f"Équipe actuelle ({len(p.analysts)})", config.COL_PRESTIGE)
+        tinner = widgets.draw_panel(surf, team_rect, _L(f"Équipe actuelle ({len(p.analysts)})", f"Current team ({len(p.analysts)})"), config.COL_PRESTIGE)
         total_cost = TEAM.team_cost_per_step(p)
         total_rep = TEAM.team_bonus_rep_per_step(p)
         footer_h = 26
@@ -202,7 +202,7 @@ class TeamScene(Scene):
         self.fire_rects = {}
         self.assign_rects = {}
         if not p.analysts:
-            widgets.draw_text(surf, "Aucun analyste recruté. Embauchez dans le catalogue ci-contre.",
+            widgets.draw_text(surf, _L("Aucun analyste recruté. Embauchez dans le catalogue ci-contre.", "No analyst hired. Recruit from the catalog opposite."),
                               (tinner.x, tinner.y), fonts.small(), config.COL_TEXT_DIM)
             self.scroll = self._max_scroll = 0
         else:
@@ -220,12 +220,12 @@ class TeamScene(Scene):
                         keynav.draw_focus_ring(surf, row, idx == self.fire_cursor)
                     widgets.draw_text(surf, profile.get("label", a.get("profile_id", "?")),
                                       (row.x + 10, row.y + 6), fonts.small(bold=True), config.COL_TEXT)
-                    widgets.draw_text(surf, f"Coût : {widgets.format_money(profile.get('cost_per_step', 0), cur)}/tour",
+                    widgets.draw_text(surf, _L(f"Coût : {widgets.format_money(profile.get('cost_per_step', 0), cur)}/tour", f"Cost: {widgets.format_money(profile.get('cost_per_step', 0), cur)}/turn"),
                                       (row.x + 10, row.y + 26), fonts.tiny(), config.COL_TEXT_DIM)
                     fire_btn = pygame.Rect(row.right - 100, row.y + 16, 90, 30)
                     pygame.draw.rect(surf, config.COL_PANEL_HEAD, fire_btn, border_radius=4)
                     pygame.draw.rect(surf, config.COL_DOWN, fire_btn, 1, border_radius=4)
-                    widgets.draw_text(surf, "LICENCIER", fire_btn.center, fonts.tiny(bold=True),
+                    widgets.draw_text(surf, _L("LICENCIER", "FIRE"), fire_btn.center, fonts.tiny(bold=True),
                                       config.COL_DOWN, align="center")
                     self.fire_rects[idx] = fire_btn
                     # affectation (poste actif) + fatigue — cf. core/team.ASSIGNMENTS
@@ -254,7 +254,7 @@ class TeamScene(Scene):
                                config.COL_WARN if fat >= 40 else config.COL_UP)
                     if fill.w:
                         pygame.draw.rect(surf, fat_col, fill, border_radius=3)
-                    widgets.draw_text(surf, ("Fatigue" if fat else "Reposé") + (f" {fat}" if fat else ""),
+                    widgets.draw_text(surf, (_L("Fatigue", "Fatigue") if fat else _L("Reposé", "Rested")) + (f" {fat}" if fat else ""),
                                       (fat_bar.right + 8, row.y + 26), fonts.tiny(), fat_col)
                 ty += ROW_H
             surf.set_clip(prev_clip)
@@ -263,8 +263,10 @@ class TeamScene(Scene):
             self.scroll = min(self.scroll, self._max_scroll)
             self.scroll = widgets.draw_scrollbar(surf, team_rect, list_area, self.scroll, self._max_scroll, content_h)
 
-        widgets.draw_text(surf, f"Coût total récurrent : {widgets.format_money(total_cost, cur)}/tour"
+        widgets.draw_text(surf, _L(f"Coût total récurrent : {widgets.format_money(total_cost, cur)}/tour"
                           f"  ·  bonus réputation passif : +{total_rep:.2f}/tour",
+                          f"Total recurring cost: {widgets.format_money(total_cost, cur)}/turn"
+                          f"  ·  passive reputation bonus: +{total_rep:.2f}/turn"),
                           (tinner.x, list_area.bottom + 6), fonts.small(bold=True), config.COL_AMBER)
 
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14), self._focus_hints())

@@ -9,13 +9,19 @@ import pygame
 
 from core import config
 from core import review as R
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
 _CHOICES = [
-    ("accept", "Accepter le bonus standard"),
-    ("negotiate_up", "Négocier à la hausse"),
-    ("ask_fixed", "Demander une augmentation fixe"),
+    ("accept", ("Accepter le bonus standard", "Accept the standard bonus")),
+    ("negotiate_up", ("Négocier à la hausse", "Negotiate for more")),
+    ("ask_fixed", ("Demander une augmentation fixe", "Ask for a fixed raise")),
 ]
 
 
@@ -30,7 +36,7 @@ class ReviewScene(Scene):
         self.focus = 0
         self.continue_btn = widgets.Button(
             (config.SCREEN_WIDTH // 2 - 130, config.SCREEN_HEIGHT - 78, 260, 48),
-            "CONTINUER", config.COL_UP)
+            _L("CONTINUER", "CONTINUE"), config.COL_UP)
         self.back_btn = widgets.Button(config.back_button_rect(),
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
 
@@ -87,26 +93,30 @@ class ReviewScene(Scene):
     def draw(self, surf):
         surf.fill(config.COL_BG)
         if self.offer is None:
-            widgets.draw_text(surf, "Aucune revue de performance en attente.",
+            widgets.draw_text(surf, _L("Aucune revue de performance en attente.", "No pending performance review."),
                               (40, 40), fonts.head(bold=True), config.COL_TEXT_DIM)
-            widgets.draw_text(surf, "ESC pour revenir.", (40, 90), fonts.small(),
+            widgets.draw_text(surf, _L("ESC pour revenir.", "ESC to return."), (40, 90), fonts.small(),
                               config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             return
-        widgets.draw_text(surf, "REVUE DE PERFORMANCE", (40, 22),
+        widgets.draw_text(surf, _L("REVUE DE PERFORMANCE", "PERFORMANCE REVIEW"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         widgets.draw_badge(surf, "ANNUELLE", (config.SCREEN_WIDTH - 40, 30),
                            config.COL_CYAN, align="right")
 
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
         panel = pygame.Rect(120, 100, config.SCREEN_WIDTH - 240, 150)
-        inner = widgets.draw_panel(surf, panel, "Bilan annuel", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Bilan annuel", "Annual review"), config.COL_CYAN)
         o = self.offer
-        lines = (
+        lines = _L(
             f"Réputation actuelle : {o['reputation']}/100\n"
             f"Missions réalisées ce grade : {o['grade_missions']}\n"
             f"P&L réalisé récent : {widgets.format_money(o['realized_pnl'], cur)}\n"
-            f"Bonus standard proposé : {widgets.format_money(o['standard_bonus'], cur)}"
+            f"Bonus standard proposé : {widgets.format_money(o['standard_bonus'], cur)}",
+            f"Current reputation: {o['reputation']}/100\n"
+            f"Missions completed this grade: {o['grade_missions']}\n"
+            f"Recent realized P&L: {widgets.format_money(o['realized_pnl'], cur)}\n"
+            f"Standard bonus offered: {widgets.format_money(o['standard_bonus'], cur)}"
         )
         widgets.draw_text_wrapped(surf, lines, (inner.x, inner.y), fonts.body(),
                                   config.COL_TEXT, inner.w, line_gap=6)
@@ -118,11 +128,12 @@ class ReviewScene(Scene):
 
     def _draw_options(self, surf, cur):
         self.option_rects = {}
-        widgets.draw_text(surf, "Votre réponse :", (120, 270), fonts.small(bold=True),
+        widgets.draw_text(surf, _L("Votre réponse :", "Your response:"), (120, 270), fonts.small(bold=True),
                           config.COL_TEXT_DIM)
         y = 300
         mp = pygame.mouse.get_pos()
-        for i, (_, label) in enumerate(_CHOICES):
+        for i, (_, label_pair) in enumerate(_CHOICES):
+            label = _L(*label_pair)
             rect = pygame.Rect(120, y, config.SCREEN_WIDTH - 240, 60)
             self.option_rects[i] = rect
             hover = rect.collidepoint(mp)
@@ -138,16 +149,16 @@ class ReviewScene(Scene):
     def _draw_outcome(self, surf, cur):
         r = self.result
         panel = pygame.Rect(120, 280, config.SCREEN_WIDTH - 240, 200)
-        inner = widgets.draw_panel(surf, panel, "Issue de la négociation", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Issue de la négociation", "Negotiation outcome"), config.COL_CYAN)
         widgets.draw_text_wrapped(surf, r.get("message", ""), (inner.x, inner.y),
                                   fonts.body(), config.COL_TEXT, inner.w, line_gap=6)
         eff = []
         bonus_paid = r.get("bonus_paid", 0.0)
         if bonus_paid:
-            eff.append((f"bonus +{widgets.format_money(bonus_paid, cur)}", config.COL_UP))
+            eff.append((_L(f"bonus +{widgets.format_money(bonus_paid, cur)}", f"bonus +{widgets.format_money(bonus_paid, cur)}"), config.COL_UP))
         rep_delta = r.get("rep_delta", 0)
         if rep_delta:
-            eff.append((f"réputation {rep_delta:+d}",
+            eff.append((_L(f"réputation {rep_delta:+d}", f"reputation {rep_delta:+d}"),
                         config.COL_UP if rep_delta >= 0 else config.COL_DOWN))
         x = inner.x
         for text, c in eff:

@@ -10,11 +10,16 @@ import math
 
 import pygame
 
-from core import bonds, commodities, config, crypto, etfs, portfolio_views
+from core import bonds, commodities, config, crypto, etfs, i18n, portfolio_views
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
 ROW_H = 26
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
 _CLASS_LABEL = {
     "equity": "Action", "bond": "Obligation", "commodity": "Commodity",
     "crypto": "Crypto", "etf": "ETF",
@@ -192,11 +197,14 @@ class PortfolioUnifiedScene(Scene):
         if self.chart_row is not None:
             self._draw_chart_view(surf)
             return
-        widgets.draw_text(surf, "PORTEFEUILLE UNIFIÉ", (40, 22),
+        widgets.draw_text(surf, _L("PORTEFEUILLE UNIFIÉ", "UNIFIED PORTFOLIO"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Toutes vos positions (actions, obligations, commodities, "
+        widgets.draw_text(surf, _L("Toutes vos positions (actions, obligations, commodities, "
                                 "crypto, ETF) dans une table triable. Clic colonne = trier, "
                                 "clic ligne = ouvrir, clic valeur/P&L = graphe pnl(t).",
+                                "All your positions (equities, bonds, commodities, "
+                                "crypto, ETFs) in a sortable table. Click column = sort, "
+                                "click row = open, click value/P&L = pnl(t) chart."),
                           (42, 72), fonts.tiny(), config.COL_TEXT_DIM)
 
         top = config.content_top()
@@ -205,7 +213,7 @@ class PortfolioUnifiedScene(Scene):
         gap = 12
         table_w = config.SCREEN_WIDTH - 80 - heat_w - gap
         panel = pygame.Rect(40, top, table_w, total_h)
-        inner = widgets.draw_panel(surf, panel, "Positions", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Positions", "Positions"), config.COL_CYAN)
         heat_rect = pygame.Rect(40 + table_w + gap, top, heat_w, total_h)
         self._draw_heat_panel(surf, heat_rect)
 
@@ -231,7 +239,7 @@ class PortfolioUnifiedScene(Scene):
         list_top = head_y + 22
         list_area = pygame.Rect(inner.x, list_top, inner.w, inner.bottom - list_top)
         if not rows:
-            widgets.draw_text(surf, "Aucune position. Achetez des actifs depuis le marché ou la boutique.",
+            widgets.draw_text(surf, _L("Aucune position. Achetez des actifs depuis le marché ou la boutique.", "No position. Buy assets from the market or the shop."),
                               (inner.x, list_top + 6), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             return
@@ -265,7 +273,7 @@ class PortfolioUnifiedScene(Scene):
                 pcol = self._flash.tick(row["id"], live_price, config.COL_UP, config.COL_DOWN,
                                         config.COL_UP if live_pnl >= 0 else config.COL_DOWN)
                 x = inner.x
-                widgets.draw_text(surf, _CLASS_LABEL[row["cls"]], (x, y), fonts.small(), config.COL_TEXT_DIM)
+                widgets.draw_text(surf, i18n.asset_class_label(_CLASS_LABEL[row["cls"]]), (x, y), fonts.small(), config.COL_TEXT_DIM)
                 x += 110
                 widgets.draw_text(surf, widgets.fit_text(str(row["id"]), fonts.small(bold=True), 124),
                                   (x, y), fonts.small(bold=True), config.COL_AMBER)
@@ -298,7 +306,7 @@ class PortfolioUnifiedScene(Scene):
         btn_w = (rect.w - (n - 1) * gap_b) // n
         self._heat_mode_rects = {}
         x = rect.x
-        for mode, label in (("sector", "SECTEUR"), ("corr", "CORRÉL."), ("history", "ÉVOLUTION")):
+        for mode, label in (("sector", _L("SECTEUR", "SECTOR")), ("corr", _L("CORRÉL.", "CORR.")), ("history", _L("ÉVOLUTION", "HISTORY"))):
             btn = pygame.Rect(x, rect.y, btn_w, btn_h)
             active = self.heat_mode == mode
             accent = config.COL_AMBER if active else config.COL_TEXT_DIM
@@ -323,10 +331,10 @@ class PortfolioUnifiedScene(Scene):
         que `scene_analytics.py::_draw_corr` (lerp COL_PANEL -> COL_UP/DOWN),
         limitée aux N plus grosses positions pour tenir dans le panneau."""
         p = self.app.gs.player
-        inner = widgets.draw_panel(surf, rect, "Corrélation (multi-actifs)", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, rect, _L("Corrélation (multi-actifs)", "Correlation (multi-asset)"), config.COL_AMBER)
         labels, corr = portfolio_views.holdings_correlation(p, self.market)
         if len(labels) < 2:
-            widgets.draw_text(surf, "Pas assez de positions avec un historique exploitable.",
+            widgets.draw_text(surf, _L("Pas assez de positions avec un historique exploitable.", "Not enough positions with usable history."),
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
             return
         max_labels = min(len(labels), 6)
@@ -361,10 +369,10 @@ class PortfolioUnifiedScene(Scene):
         base (lerp COL_PANEL -> COL_UP/COL_DOWN, saturée à ±30%, même
         convention que `scene_analytics.py::_draw_corr`)."""
         p = self.app.gs.player
-        inner = widgets.draw_panel(surf, rect, "Heatmap sectorielle (actions)", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, rect, _L("Heatmap sectorielle (actions)", "Sector heatmap (equities)"), config.COL_AMBER)
         heat = portfolio_views.sector_heatmap(p, self.market)
         if not heat:
-            widgets.draw_text(surf, "Aucune position en actions.",
+            widgets.draw_text(surf, _L("Aucune position en actions.", "No equity position."),
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
             return
         total_abs = sum(abs(a["value"]) for a in heat) or 1.0
@@ -391,7 +399,7 @@ class PortfolioUnifiedScene(Scene):
         cur = config.CONTINENTS[p.continent]["currency"]
         series = getattr(p, "cash_history", []) or []
         if len(series) < 2:
-            widgets.draw_text(surf, "Historique insuffisant — revenez après quelques pas de marché.",
+            widgets.draw_text(surf, _L("Historique insuffisant — revenez après quelques pas de marché.", "Not enough history — come back after a few market steps."),
                               (rect.x, rect.y), fonts.small(), config.COL_TEXT_DIM)
             return
         start_val = series[0]
@@ -400,9 +408,9 @@ class PortfolioUnifiedScene(Scene):
         total_pct = ((current / start_val) - 1.0) * 100.0 if start_val else 0.0
         col = config.COL_UP if total_pnl >= 0 else config.COL_DOWN
 
-        widgets.draw_text(surf, f"Valeur nette : {widgets.format_money(current, cur)}",
+        widgets.draw_text(surf, _L(f"Valeur nette : {widgets.format_money(current, cur)}", f"Net worth: {widgets.format_money(current, cur)}"),
                           (rect.x, rect.y), fonts.small(bold=True), config.COL_WHITE)
-        widgets.draw_text(surf, f"Départ : {widgets.format_money(start_val, cur)}",
+        widgets.draw_text(surf, _L(f"Départ : {widgets.format_money(start_val, cur)}", f"Start: {widgets.format_money(start_val, cur)}"),
                           (rect.x, rect.y + 18), fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf, f"P&L total : {widgets.format_money(total_pnl, cur)} ({total_pct:+.1f}%)",
                           (rect.x, rect.y + 36), fonts.small(bold=True), col)
@@ -417,7 +425,7 @@ class PortfolioUnifiedScene(Scene):
         widgets.draw_series(surf, chart_rect, series, color=col, baseline=True,
                             mouse_pos=pygame.mouse.get_pos(), y_fmt=y_fmt,
                             show_current_line=True, line_width=2)
-        widgets.draw_chart_x_labels(surf, chart_rect, [(0.0, "début"), (1.0, "auj.")])
+        widgets.draw_chart_x_labels(surf, chart_rect, [(0.0, _L("début", "start")), (1.0, _L("auj.", "now"))])
 
     def _draw_chart_view(self, surf):
         row = self.chart_row
@@ -425,9 +433,9 @@ class PortfolioUnifiedScene(Scene):
         cur = config.CONTINENTS[p.continent]["currency"]
         is_bond = row["cls"] == "bond"
         if is_bond and self.chart_mode == "ytm":
-            title = f"Taux exigé (YTM) — {row['id']} ({_CLASS_LABEL[row['cls']]})"
+            title = _L(f"Taux exigé (YTM) — {row['id']} ({i18n.asset_class_label(_CLASS_LABEL[row['cls']])})", f"Required yield (YTM) — {row['id']} ({i18n.asset_class_label(_CLASS_LABEL[row['cls']])})")
         else:
-            title = f"P&L — {row['id']} ({_CLASS_LABEL[row['cls']]})"
+            title = f"P&L — {row['id']} ({i18n.asset_class_label(_CLASS_LABEL[row['cls']])})"
         live_price = self._live_price(row)
         live_price = live_price if live_price is not None else row["price"]
         live_pnl = row["pnl"]
@@ -456,8 +464,8 @@ class PortfolioUnifiedScene(Scene):
 
         top = config.content_top()
         panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - top)
-        panel_title = "Taux exigé (YTM) dans le temps" if (is_bond and self.chart_mode == "ytm") \
-            else "P&L latent dans le temps"
+        panel_title = _L("Taux exigé (YTM) dans le temps", "Required yield (YTM) over time") if (is_bond and self.chart_mode == "ytm") \
+            else _L("P&L latent dans le temps", "Unrealized P&L over time")
         inner = widgets.draw_panel(surf, panel, panel_title, config.COL_CYAN)
 
         if is_bond and self.chart_mode == "ytm":
@@ -465,7 +473,7 @@ class PortfolioUnifiedScene(Scene):
         else:
             series = self._pnl_series(row)
         if len(series) < 2:
-            widgets.draw_text(surf, "Historique insuffisant pour tracer ce graphe.",
+            widgets.draw_text(surf, _L("Historique insuffisant pour tracer ce graphe.", "Not enough history to draw this chart."),
                               (inner.x, inner.y), fonts.small(), config.COL_TEXT_DIM)
             self.chart_back_btn.draw(surf)
             return

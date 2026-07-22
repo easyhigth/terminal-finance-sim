@@ -208,10 +208,10 @@ def nonworld_variance_correction(w, v_nonworld0, s_cross, t_cross, beta, world_s
 # REGIME_TRANSITIONS) pour que des phases bull/bear durables émergent, lisibles
 # et exploitables par le market timing — au-delà des chocs ponctuels (Crisis).
 REGIMES = {
-    "Expansion":  {"drift": 0.0008,  "vol": 0.85, "label": "Expansion"},
-    "Calme":      {"drift": 0.0001,  "vol": 0.75, "label": "Marché calme"},
-    "Volatil":    {"drift": -0.0004, "vol": 1.70, "label": "Marché volatil"},
-    "Récession":  {"drift": -0.0016, "vol": 2.00, "label": "Récession"},
+    "Expansion":  {"drift": 0.0008,  "vol": 0.85, "label": "Expansion", "label_en": "Expansion"},
+    "Calme":      {"drift": 0.0001,  "vol": 0.75, "label": "Marché calme", "label_en": "Calm market"},
+    "Volatil":    {"drift": -0.0004, "vol": 1.70, "label": "Marché volatil", "label_en": "Volatile market"},
+    "Récession":  {"drift": -0.0016, "vol": 2.00, "label": "Récession", "label_en": "Recession"},
 }
 # Matrice de transition (par pas ≈ 1 semaine) : forte probabilité de rester dans
 # le régime courant -> durée moyenne d'un cycle de l'ordre de plusieurs trimestres

@@ -28,6 +28,14 @@ from core.market_constants import (
     _curve_slope_target,
 )
 
+# Libellés de guidance côté affichage EN (les valeurs FR de GUIDANCE_LABELS
+# restent des CLÉS de comparaison/sérialisation — cf. market.py, metrics()).
+_GUIDANCE_LABELS_EN = {
+    GUIDANCE_LABELS["up"]: "raised",
+    GUIDANCE_LABELS["flat"]: "maintained",
+    GUIDANCE_LABELS["down"]: "cut",
+}
+
 
 class MarketQueryMixin:
     def curve_point(self, years, smoothed=False):
@@ -483,13 +491,20 @@ class MarketQueryMixin:
 
     # -------------------------------------------------------------- news
     def _generate_news(self, F_world, F_sector, F_region):
-        """Génère 0..3 news selon l'ampleur des chocs du pas (pour la carte)."""
+        """Génère 0..3 news selon l'ampleur des chocs du pas (pour la carte).
+        Les gabarits de phrase sont localisés à la GÉNÉRATION (news éphémère,
+        régénérée à chaque pas) ; les noms de secteur/région restent des
+        libellés de données, affichés à l'identique dans les deux langues."""
+        from core.i18n import get_lang
+        en = get_lang() == "en"
         news = []
         # choc mondial marquant
         if abs(F_world) > VOL_WORLD * 1.6:
             kind = "good" if F_world > 0 else "bad"
-            txt = ("Vague d'optimisme sur les marchés mondiaux"
-                   if F_world > 0 else "Aversion au risque généralisée")
+            if F_world > 0:
+                txt = "Wave of optimism on global markets" if en else "Vague d'optimisme sur les marchés mondiaux"
+            else:
+                txt = "Broad risk-off sentiment" if en else "Aversion au risque généralisée"
             news.append({"region": None, "kind": kind, "text": txt})
         # secteurs marquants
         order = np.argsort(-np.abs(F_sector))
@@ -497,18 +512,26 @@ class MarketQueryMixin:
             if abs(F_sector[k]) > VOL_SECTOR * 1.7:
                 sec = self.sectors[k]
                 up = F_sector[k] > 0
-                news.append({"region": None, "kind": "good" if up else "bad",
-                             "text": f"Secteur {sec} {'en forte hausse' if up else 'sous pression'}"})
+                if en:
+                    txt = f"{sec} sector {'sharply higher' if up else 'under pressure'}"
+                else:
+                    txt = f"Secteur {sec} {'en forte hausse' if up else 'sous pression'}"
+                news.append({"region": None, "kind": "good" if up else "bad", "text": txt})
         # régions marquantes
         for ri, region in enumerate(self.regions):
             if abs(F_region[ri]) > VOL_REGION * 1.8:
                 up = F_region[ri] > 0
-                news.append({"region": region, "kind": "good" if up else "bad",
-                             "text": f"{region} : séance {'haussière' if up else 'baissière'} marquée"})
+                if en:
+                    txt = f"{region}: marked {'bullish' if up else 'bearish'} session"
+                else:
+                    txt = f"{region} : séance {'haussière' if up else 'baissière'} marquée"
+                news.append({"region": region, "kind": "good" if up else "bad", "text": txt})
         return news[:3]
 
     def _earnings_news(self):
         """News pour les surprises de résultats les plus marquantes du pas."""
+        from core.i18n import get_lang
+        en = get_lang() == "en"
         news = []
         big = sorted(self.last_earnings, key=lambda r: -abs(r["surprise"]))
         for r in big[:2]:
@@ -516,13 +539,20 @@ class MarketQueryMixin:
                 break
             region = next((c["region"] for c in self.companies
                            if c["ticker"] == r["ticker"]), None)
-            verb = "dépasse les attentes" if r["beat"] else "déçoit"
-            text = f"Résultats : {r['ticker']} {verb} ({r['surprise']*100:+.0f}%)"
+            if en:
+                verb = "beats expectations" if r["beat"] else "disappoints"
+                text = f"Earnings: {r['ticker']} {verb} ({r['surprise']*100:+.0f}%)"
+            else:
+                verb = "dépasse les attentes" if r["beat"] else "déçoit"
+                text = f"Résultats : {r['ticker']} {verb} ({r['surprise']*100:+.0f}%)"
             g_label = r.get("guidance_label")
             # guidance en désaccord avec la surprise -> info notable pour le joueur
             if g_label and ((r["beat"] and g_label == GUIDANCE_LABELS["down"])
                              or (not r["beat"] and g_label == GUIDANCE_LABELS["up"])):
-                text += f", guidance {g_label}"
+                if en:
+                    text += f", guidance {_GUIDANCE_LABELS_EN.get(g_label, g_label)}"
+                else:
+                    text += f", guidance {g_label}"
             news.append({"region": region, "kind": "good" if r["beat"] else "bad", "text": text})
         return news
 

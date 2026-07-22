@@ -492,10 +492,12 @@ class Market(MarketQueryMixin):
         self._last_news += self._earnings_news()
         self._last_news += self.company_event_news
         if self.regime_changed:
+            from core.i18n import get_lang
             good = self.regime in ("Expansion", "Calme")
+            lead = "Regime shift: " if get_lang() == "en" else "Bascule de régime : "
             self._last_news.insert(0, {
                 "region": None, "kind": "good" if good else "bad",
-                "text": f"Bascule de régime : {self.regime_label()}"})
+                "text": f"{lead}{self.regime_label()}"})
         self._last_news = self._last_news[:4]
         logger.debug(
             "market.step: step_count=%s regime=%s world=%.5f news=%d",
@@ -572,7 +574,11 @@ class Market(MarketQueryMixin):
         # reliquat de probabilité -> reste dans le régime courant
 
     def regime_label(self):
-        return REGIMES[self.regime]["label"]
+        from core.i18n import get_lang
+        r = REGIMES[self.regime]
+        if get_lang() == "en":
+            return r.get("label_en", r["label"])
+        return r["label"]
 
     def regime_age(self):
         """Nombre de pas (semaines) écoulés depuis le début du régime courant —

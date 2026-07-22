@@ -392,7 +392,7 @@ class CreditDeskApp(DesktopApp):
             mcol = config.COL_UP if h["mtm"] >= 0 else config.COL_DOWN
             widgets.draw_text(surf, f"{h['ticker']} · "
                               f"{widgets.format_money(h['notional'], cur)} · "
-                              f"payé {h['entry_spread_bps']:.0f} bp",
+                              + _L(f"payé {h['entry_spread_bps']:.0f} bp", f"paid {h['entry_spread_bps']:.0f} bp"),
                               (rinner.x, y), fonts.small(bold=True), config.COL_TEXT)
             cur_s = (f"{h['cur_spread_bps']:.0f}" if h["cur_spread_bps"]
                      else "—")

@@ -395,11 +395,13 @@ class CompanyApp(DesktopApp):
         if r:
             rcol = (config.COL_UP if r["rating"] == "ACHAT" else
                     config.COL_DOWN if r["rating"] == "VENTE" else config.COL_WARN)
-            widgets.draw_text(surf, f"RECO : {r['rating']}  ·  valeur intrinsèque "
+            widgets.draw_text(surf, _L(f"RECO : {r['rating']}  ·  valeur intrinsèque "
                                     f"{r['fair']:.2f} {cur}  ·  potentiel {r['upside']:+.0f}%",
+                                    f"RATING: {r['rating']}  ·  intrinsic value "
+                                    f"{r['fair']:.2f} {cur}  ·  upside {r['upside']:+.0f}%"),
                               (rect.x, y), fonts.small(bold=True), rcol)
         else:
-            widgets.draw_text(surf, "RESEARCH " + self.ticker + " pour une reco analyste",
+            widgets.draw_text(surf, "RESEARCH " + self.ticker + _L(" pour une reco analyste", " for an analyst rating"),
                               (rect.x, y), fonts.small(), config.COL_TEXT_DIM)
         y += 22
 
@@ -409,8 +411,10 @@ class CompanyApp(DesktopApp):
             verb = "BEAT" if le["beat"] else "MISS"
             g_label = le.get("guidance_label")
             g_txt = f"  ·  guidance {g_label}" if g_label else ""
-            widgets.draw_text(surf, f"RÉSULTATS : {verb}  surprise {le['surprise']*100:+.0f}%  "
+            widgets.draw_text(surf, _L(f"RÉSULTATS : {verb}  surprise {le['surprise']*100:+.0f}%  "
                                     f"·  croissance CA {le['growth']*100:+.1f}%{g_txt}",
+                                    f"EARNINGS: {verb}  surprise {le['surprise']*100:+.0f}%  "
+                                    f"·  revenue growth {le['growth']*100:+.1f}%{g_txt}"),
                               (rect.x, y), fonts.small(bold=True), ecol)
             y += 20
         if mt.get("earnings_anticipation"):
@@ -455,26 +459,26 @@ class CompanyApp(DesktopApp):
         inner = widgets.draw_panel(surf, panel, "Fondamentaux & valorisation", accent)
         col_valo = [
             ("Capitalisation", widgets.format_money(mt["mktcap"] * 1e6, cur), None),
-            ("Chiffre d'affaires", widgets.format_money(mt["revenue"] * 1e6, cur), None),
+            (_L("Chiffre d'affaires", "Revenue"), widgets.format_money(mt["revenue"] * 1e6, cur), None),
             ("EBITDA", widgets.format_money(mt["ebitda"] * 1e6, cur), "EBITDA"),
-            ("Résultat net", widgets.format_money(mt["net_income"] * 1e6, cur), None),
-            ("BPA (EPS)", _fmt(mt["eps"], " " + cur, 2), None),
+            (_L("Résultat net", "Net income"), widgets.format_money(mt["net_income"] * 1e6, cur), None),
+            (_L("BPA (EPS)", "EPS"), _fmt(mt["eps"], " " + cur, 2), None),
             ("P/E", _fmt(mt["pe"], "x", 1), "P/E"),
             ("EV", widgets.format_money(mt["ev"] * 1e6, cur), "EV"),
             ("EV / EBITDA", _fmt(mt["ev_ebitda"], "x", 1), "EV/EBITDA"),
             ("P / Sales", _fmt(mt["ps"], "x", 1), "P/S"),
         ]
         col_risk = [
-            ("Marge nette", _fmt(mt["net_margin"] * 100, "%", 1), None),
-            ("Marge EBITDA", _fmt(mt["ebitda_margin"] * 100, "%", 1), None),
+            (_L("Marge nette", "Net margin"), _fmt(mt["net_margin"] * 100, "%", 1), None),
+            (_L("Marge EBITDA", "EBITDA margin"), _fmt(mt["ebitda_margin"] * 100, "%", 1), None),
             ("FCF yield", _fmt(mt["fcf_yield"], "%", 1), "FCF"),
-            ("Dette nette", widgets.format_money(mt["net_debt"] * 1e6, cur), None),
-            ("Dette / EBITDA", _fmt(mt["nd_ebitda"], "x", 1), None),
-            ("Notation crédit", mt["credit_rating"], None),
-            ("Rendement div.", _fmt(mt["div_yield"] * 100, "%", 2), None),
+            (_L("Dette nette", "Net debt"), widgets.format_money(mt["net_debt"] * 1e6, cur), None),
+            (_L("Dette / EBITDA", "Debt / EBITDA"), _fmt(mt["nd_ebitda"], "x", 1), None),
+            (_L("Notation crédit", "Credit rating"), mt["credit_rating"], None),
+            (_L("Rendement div.", "Div. yield"), _fmt(mt["div_yield"] * 100, "%", 2), None),
             ("Payout", _fmt(mt["payout"], "%", 0), None),
-            ("Bêta", _fmt(mt["beta"], "", 2), "Beta"),
-            ("Actions (M)", _fmt(mt["shares"], "", 1), None),
+            (_L("Bêta", "Beta"), _fmt(mt["beta"], "", 2), "Beta"),
+            (_L("Actions (M)", "Shares (M)"), _fmt(mt["shares"], "", 1), None),
         ]
         ncols = 1 if inner.w < 320 else 2
         cw = inner.w // ncols
@@ -909,20 +913,22 @@ class CompanyApp(DesktopApp):
             y += 64
 
         if y + 20 <= inner.bottom:
-            widgets.draw_text_wrapped(surf, "La barre représente le multiple de la société ; le repère "
+            widgets.draw_text_wrapped(surf, _L("La barre représente le multiple de la société ; le repère "
                                     "vertical marque la médiane du secteur (2× = bord droit).",
+                                    "The bar shows the company multiple; the vertical marker is "
+                                    "the sector median (2× = right edge)."),
                               (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM, inner.w)
 
-        rinner = widgets.draw_panel(surf, right, "Profil rentabilité / risque", self.accent)
+        rinner = widgets.draw_panel(surf, right, _L("Profil rentabilité / risque", "Profitability / risk profile"), self.accent)
         rows = [
-            ("Marge nette", _fmt(mt["net_margin"] * 100, "%", 1), None),
-            ("Marge EBITDA", _fmt(mt["ebitda_margin"] * 100, "%", 1), None),
+            (_L("Marge nette", "Net margin"), _fmt(mt["net_margin"] * 100, "%", 1), None),
+            (_L("Marge EBITDA", "EBITDA margin"), _fmt(mt["ebitda_margin"] * 100, "%", 1), None),
             ("FCF yield", _fmt(mt["fcf_yield"], "%", 1), "FCF"),
-            ("Dette / EBITDA", _fmt(mt["nd_ebitda"], "x", 1), None),
-            ("Notation crédit", mt["credit_rating"], None),
-            ("Rendement dividende", _fmt(mt["div_yield"] * 100, "%", 2), None),
+            (_L("Dette / EBITDA", "Debt / EBITDA"), _fmt(mt["nd_ebitda"], "x", 1), None),
+            (_L("Notation crédit", "Credit rating"), mt["credit_rating"], None),
+            (_L("Rendement dividende", "Dividend yield"), _fmt(mt["div_yield"] * 100, "%", 2), None),
             ("Payout", _fmt(mt["payout"], "%", 0), None),
-            ("Bêta", _fmt(mt["beta"], "", 2), "Beta"),
+            (_L("Bêta", "Beta"), _fmt(mt["beta"], "", 2), "Beta"),
         ]
         yy = rinner.y
         for label, val, term in rows:

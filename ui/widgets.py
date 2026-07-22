@@ -72,13 +72,34 @@ def draw_text(surf, text, pos, font, color=config.COL_TEXT, align="left"):
     return rect
 
 
+# Mémo des MESURES de texte (font.size est étonnamment coûteux : 600+ appels
+# par frame sur les écrans denses — cf. scripts/profile_scenes.py). fit_text /
+# wrap_text_lines sont des fonctions PURES de (texte, police, largeur) ; les
+# polices de ui/fonts.py sont partagées et durables, donc id(font) est une clé
+# stable. Cap simple (clear en bloc) : le contenu affiché est fini, la borne
+# n'est là que pour ne pas fuir si la langue/échelle change en cours de session.
+_FIT_CACHE = {}
+_WRAP_CACHE = {}
+_MEASURE_CACHE_CAP = 6000
+
+
 def fit_text(text, font, max_width, ellipsis="…"):
     """Tronque `text` avec une ellipse pour qu'il tienne dans `max_width` pixels."""
+    key = (id(font), text, max_width, ellipsis)
+    hit = _FIT_CACHE.get(key)
+    if hit is not None:
+        return hit
     if max_width <= 0 or font.size(text)[0] <= max_width:
-        return text
-    while text and font.size(text + ellipsis)[0] > max_width:
-        text = text[:-1]
-    return (text.rstrip() + ellipsis) if text else ellipsis
+        result = text
+    else:
+        t = text
+        while t and font.size(t + ellipsis)[0] > max_width:
+            t = t[:-1]
+        result = (t.rstrip() + ellipsis) if t else ellipsis
+    if len(_FIT_CACHE) > _MEASURE_CACHE_CAP:
+        _FIT_CACHE.clear()
+    _FIT_CACHE[key] = result
+    return result
 
 
 def draw_text_fit(surf, text, pos, font, color=config.COL_TEXT, max_width=0, align="left"):
@@ -128,6 +149,10 @@ def wrap_text_lines(text, font, max_width):
     dessiner (même règle de coupe que `draw_text_wrapped`). Utile pour
     mesurer la hauteur d'un paragraphe avant de le rendre, par ex. pour
     dimensionner dynamiquement une carte selon son contenu."""
+    key = (id(font), text, max_width)
+    hit = _WRAP_CACHE.get(key)
+    if hit is not None:
+        return hit
     words = text.split(" ")
     lines = []
     line = ""
@@ -140,6 +165,9 @@ def wrap_text_lines(text, font, max_width):
             line = word
     if line:
         lines.append(line)
+    if len(_WRAP_CACHE) > _MEASURE_CACHE_CAP:
+        _WRAP_CACHE.clear()
+    _WRAP_CACHE[key] = lines
     return lines
 
 

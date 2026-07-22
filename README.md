@@ -295,6 +295,23 @@ pip install numpy scipy pytest pygame
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy pytest
 ```
 
+### Profilage du rendu
+
+Au-delà de l'overlay live `FINSIM_DEBUG=1` (FPS + décomposition de la frame,
+`ui/perf_overlay.py`), un profileur **headless** mesure le coût de rendu de
+chaque scène de façon reproductible :
+
+```bash
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python scripts/profile_scenes.py
+python scripts/profile_scenes.py --profile analytics   # cProfile d'UNE scène
+```
+
+Il classe les scènes par temps de frame et pointe la plus lourde ; `--profile
+<scène>` sort le détail fonction-par-fonction (le vrai goulot, pas la
+supposition). C'est cet outil qui a révélé que trois écrans recalculaient une
+optimisation de frontière efficiente ou des centaines de mesures de texte à
+chaque frame — désormais mis en cache (verrous dans `tests/test_perf_caches.py`).
+
 ## Installation sur Mac (PyCharm)
 
 ```bash

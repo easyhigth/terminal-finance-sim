@@ -41,6 +41,7 @@ class FrontierLabScene(Scene):
         self._reco_max_scroll = 0
         self._universe_rect = None
         self._reco_rect = None
+        self._fr_cache = None      # (clé, frontière simulée, frontière du portefeuille réel)
         self.back_btn = widgets.Button(
             config.back_button_rect(180), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.reset_btn = widgets.Button(
@@ -150,15 +151,26 @@ class FrontierLabScene(Scene):
         self._draw_frontier(surf, frontier_rect)
         self._draw_recommendations(surf, corr_rect)
 
+    def _frontier_data(self):
+        """Frontières (simulée + portefeuille réel) mises en CACHE : l'optimisation
+        SLSQP de core.finmath.efficient_frontier est lourde (~140 ms) et ne change
+        qu'avec la SÉLECTION d'actifs ou un pas de marché — la recalculer à chaque
+        draw() plombait la scène à ~7 FPS. Clé = (sélection, pas de marché)."""
+        sel = [tk for tk in self.universe if tk in self.selected]
+        key = (tuple(sel), self.market.step_count)
+        if self._fr_cache is None or self._fr_cache[0] != key:
+            fr = analytics.frontier_for_universe(self.market, sel)
+            held_fr = analytics.equity_frontier(self.app.gs.player, self.market)
+            self._fr_cache = (key, fr, held_fr)
+        return sel, self._fr_cache[1], self._fr_cache[2]
+
     def _draw_frontier(self, surf, rect):
         inner = widgets.draw_panel(surf, rect, _L("Frontière efficiente — simulation", "Efficient frontier — simulation"), config.COL_UP)
-        sel = [tk for tk in self.universe if tk in self.selected]
-        fr = analytics.frontier_for_universe(self.market, sel)
+        sel, fr, held_fr = self._frontier_data()
         if not fr:
             widgets.draw_text(surf, _L("Cochez ≥ 2 actions avec historique suffisant.", "Check ≥ 2 stocks with sufficient history."),
                               (inner.x, inner.y), fonts.tiny(), config.COL_TEXT_DIM)
             return
-        held_fr = analytics.equity_frontier(self.app.gs.player, self.market)
         vols, rets = fr["vols"], fr["rets"]
         svol, sret = fr["sim"]
         xs, ys = list(vols) + [svol], list(rets) + [sret]

@@ -209,12 +209,24 @@ def correlation(player, market):
     return charts.correlation_matrix(smap)
 
 
+_EQFR_CACHE = {}   # mémo à une entrée : {"key":…, "val":…}
+
+
 def equity_frontier(player, market, n_points=30):
     """Frontière efficiente estimée sur les actions LONGUES détenues (≥ 2).
-    Retourne {vols, rets, cur:(vol,ret), labels} (en %), ou None."""
+    Retourne {vols, rets, cur:(vol,ret), labels} (en %), ou None.
+
+    Le calcul (optimisation SLSQP de finmath.efficient_frontier) est lourd et
+    identique tant que le pas de marché ET la composition/pondération du
+    portefeuille ne changent pas : un mémo à une entrée évite de le refaire à
+    chaque draw() des écrans qui l'affichent (analytics, frontier_lab)."""
     eq = [h for h in pf.holdings(player, market) if not h["short"]]
     if len(eq) < 2:
         return None
+    key = (id(market), market.step_count, n_points,
+           tuple((h["ticker"], round(h["value"])) for h in eq))
+    if _EQFR_CACHE.get("key") == key:
+        return _EQFR_CACHE["val"]
     series = [market.history_of(h["ticker"], _HIST) for h in eq]
     rets = [charts.simple_returns(s) for s in series]
     n = min((len(r) for r in rets), default=0)
@@ -231,9 +243,11 @@ def equity_frontier(player, market, n_points=30):
     w = np.array([h["value"] / tot for h in eq])
     cur_vol = finmath.portfolio_volatility(w, cov)
     cur_ret = finmath.portfolio_return(w, mean)
-    return {"vols": np.asarray(vols) * 100, "rets": np.asarray(frets) * 100,
+    result = {"vols": np.asarray(vols) * 100, "rets": np.asarray(frets) * 100,
             "cur": (cur_vol * 100, cur_ret * 100),
             "labels": [h["ticker"] for h in eq]}
+    _EQFR_CACHE.update(key=key, val=result)
+    return result
 
 
 def frontier_for_universe(market, tickers, weights=None, n_points=30):

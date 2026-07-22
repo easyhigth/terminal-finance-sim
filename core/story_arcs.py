@@ -45,11 +45,26 @@ def _next_arc(player):
     return None
 
 
+def _localized_stage(arc, stage_idx, stage):
+    """Sujet/corps localisés du stage (EN via data.story_arcs_en, sinon FR).
+    Le contenu est figé dans la langue active au moment de la LIVRAISON
+    (message d'inbox = archive historique, comme le reste de la boîte)."""
+    from core.i18n import get_lang
+    if get_lang() != "en":
+        return stage["subject"], stage["body"]
+    from data.story_arcs_en import STAGES_EN
+    en_stages = STAGES_EN.get(arc["id"])
+    if en_stages and stage_idx < len(en_stages):
+        en = en_stages[stage_idx]
+        return en.get("subject", stage["subject"]), en.get("body", stage["body"])
+    return stage["subject"], stage["body"]
+
+
 def _deliver(player, arc, stage_idx):
     """Livre le message du stage dans l'inbox ; applique l'effet au dernier."""
     stage = arc["stages"][stage_idx]
-    inbox.push(player, stage["category"], stage["sender"],
-               stage["subject"], stage["body"])
+    subject, body = _localized_stage(arc, stage_idx, stage)
+    inbox.push(player, stage["category"], stage["sender"], subject, body)
     finale = stage_idx == len(arc["stages"]) - 1
     if finale:
         eff = arc.get("effect") or {}

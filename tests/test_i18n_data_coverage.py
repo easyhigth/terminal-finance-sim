@@ -36,11 +36,12 @@ import data.question_bank_en as qbank_en_mod
 import data.scenarios_en as scenarios_en_mod
 import data.shortcuts_data as shortcuts_mod
 import data.shortcuts_data_en as shortcuts_en_mod
+import data.story_arcs as story_arcs_mod
+import data.story_arcs_en as story_arcs_en_mod
 
-# Gaps connus et acceptés : contenu narratif profond FR-only par convention
-# (data/story_arcs.py, docstring explicite) ou pas encore traduit
+# Gaps connus et acceptés : contenu narratif profond FR-only pas encore traduit
 # (data/tutorials.py — scene_tutorials.py ignore la langue courante).
-KNOWN_FR_ONLY = {"data/story_arcs.py", "data/tutorials.py"}
+KNOWN_FR_ONLY = {"data/tutorials.py"}
 
 
 def test_glossary_en_has_exactly_the_same_terms_as_french():
@@ -101,6 +102,21 @@ def test_shortcuts_sections_match_in_count_and_shape():
             f"vs {len(en_items)} en EN")
 
 
+def test_story_arcs_en_covers_every_arc_with_matching_stage_counts():
+    """Chaque arc narratif doit avoir un pendant EN (data/story_arcs_en) avec
+    le MÊME nombre de messages, dans le même ordre — sinon un stage livré en
+    anglais retomberait en français (ou déborderait de l'index)."""
+    en = story_arcs_en_mod.STAGES_EN
+    fr_ids = {a["id"] for a in story_arcs_mod.ARCS}
+    assert fr_ids == set(en), (
+        f"IDs FR sans mirror EN : {sorted(fr_ids - set(en))} ; "
+        f"EN orphelins : {sorted(set(en) - fr_ids)}")
+    for arc in story_arcs_mod.ARCS:
+        assert len(arc["stages"]) == len(en[arc["id"]]), (
+            f"Arc {arc['id']!r} : {len(arc['stages'])} stages FR vs "
+            f"{len(en[arc['id']])} en EN")
+
+
 def test_known_fr_only_files_are_still_the_expected_set():
     """Verrou anti-oubli dans les deux sens : si un de ces fichiers gagne
     un jour une couche EN, ce test le signale (retirer l'entrée de
@@ -110,7 +126,6 @@ def test_known_fr_only_files_are_still_the_expected_set():
     for path in KNOWN_FR_ONLY:
         assert os.path.exists(path), f"{path} n'existe plus — retirer de KNOWN_FR_ONLY"
     en_pendant = {
-        "data/story_arcs.py": "data/story_arcs_en.py",
         "data/tutorials.py": "data/tutorials_en.py",
     }
     for fr_path, en_path in en_pendant.items():

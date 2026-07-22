@@ -125,7 +125,7 @@ class TutorialsScene(Scene):
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, rect)
                 pygame.draw.rect(surf, config.COL_AMBER, (linner.x - 4, y - 2, 3, 34))
             keynav.draw_focus_ring(surf, rect, i == self.cursor)
-            widgets.draw_text(surf, widgets.fit_text(t["title"], fonts.small(bold=sel), linner.w),
+            widgets.draw_text(surf, widgets.fit_text(T.localized_title(t), fonts.small(bold=sel), linner.w),
                               (linner.x + 6, y + 6), fonts.small(bold=sel),
                               config.COL_WHITE if sel else config.COL_TEXT)
             y += 38

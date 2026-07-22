@@ -1227,5 +1227,35 @@ TUTORIALS = [
 _BY_ID = {t["id"]: t for t in TUTORIALS}
 
 
+def _localized(tut):
+    """Recouvre un tutoriel FR par sa traduction EN (data.tutorials_en) quand
+    la langue active est l'anglais. `id` et `image` viennent toujours de la
+    source FR (indépendants de la langue) ; `title`/`intro`/`steps`/`concept`
+    sont remplacés. Un id absent du mirror EN retombe silencieusement sur le FR."""
+    from core.i18n import get_lang
+    if tut is None or get_lang() != "en":
+        return tut
+    from data.tutorials_en import TUTORIALS_EN
+    en = TUTORIALS_EN.get(tut["id"])
+    if not en:
+        return tut
+    merged = dict(tut)
+    for key in ("title", "intro", "steps", "concept"):
+        if key in en:
+            merged[key] = en[key]
+    return merged
+
+
+def localized_title(tut):
+    """Titre localisé d'un tutoriel (pour la liste de gauche, sans recomposer
+    tout le dict)."""
+    from core.i18n import get_lang
+    if get_lang() != "en":
+        return tut["title"]
+    from data.tutorials_en import TUTORIALS_EN
+    en = TUTORIALS_EN.get(tut["id"])
+    return en["title"] if en and "title" in en else tut["title"]
+
+
 def get(tid):
-    return _BY_ID.get(tid)
+    return _localized(_BY_ID.get(tid))

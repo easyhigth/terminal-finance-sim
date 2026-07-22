@@ -4,7 +4,7 @@ contenu (verrou de non-régression, cf. CLAUDE.md « i18n ») : le CHROME est
 bilingue FR/EN partout ; le contenu finance PROFOND reste FR par défaut,
 sauf pour les jeux de données qui affichent explicitement une couche EN
 dédiée (glossaire, leçons, banque de questions, dilemmes, scénarios,
-certifications, raccourcis). Pour CEUX-LÀ, une entrée manquante ou
+certifications, raccourcis, tutoriels). Pour CEUX-LÀ, une entrée manquante ou
 désynchronisée dans le pendant `*_en.py` ferait fuiter du texte FR (ou une
 absence de contenu) en mode anglais sans qu'aucun test ne le voie venir —
 ce fichier verrouille la PARITÉ STRUCTURELLE (mêmes identifiants des deux
@@ -14,11 +14,7 @@ Fichiers de contenu narratif profond DÉLIBÉRÉMENT FR-only (déjà documenté
 dans leur propre docstring, cf. `data/story_arcs.py`) ou purement
 structurels/référentiels (tickers, coordonnées géographiques — rien à
 traduire) : `data/companies.py`, `data/ma_targets.py`,
-`data/worldmap_geo.py`, `data/story_arcs.py`. `data/tutorials.py` est un
-gap CONNU (pas de couche EN, scenes/scene_tutorials.py ne bascule pas sur
-la langue) — répertorié explicitement ci-dessous plutôt que silencieusement
-ignoré, en attendant une traduction dédiée (hors scope de cet audit
-structurel).
+`data/worldmap_geo.py`, `data/story_arcs.py`.
 """
 import os
 
@@ -38,10 +34,12 @@ import data.shortcuts_data as shortcuts_mod
 import data.shortcuts_data_en as shortcuts_en_mod
 import data.story_arcs as story_arcs_mod
 import data.story_arcs_en as story_arcs_en_mod
+import data.tutorials as tutorials_mod
+import data.tutorials_en as tutorials_en_mod
 
-# Gaps connus et acceptés : contenu narratif profond FR-only pas encore traduit
-# (data/tutorials.py — scene_tutorials.py ignore la langue courante).
-KNOWN_FR_ONLY = {"data/tutorials.py"}
+# Gaps connus et acceptés : contenu narratif profond FR-only pas encore traduit.
+# (Plus aucun pour l'instant — tutoriels, arcs, dilemmes, etc. sont couverts.)
+KNOWN_FR_ONLY = set()
 
 
 def test_glossary_en_has_exactly_the_same_terms_as_french():
@@ -117,18 +115,28 @@ def test_story_arcs_en_covers_every_arc_with_matching_stage_counts():
             f"{len(en[arc['id']])} en EN")
 
 
+def test_tutorials_en_covers_every_tutorial_id_with_matching_step_counts():
+    """Chaque tutoriel FR doit avoir un pendant EN (data/tutorials_en) avec le
+    MÊME nombre d'étapes — sinon un tutoriel affiché en anglais retomberait sur
+    le FR (couverture partielle) ou déborderait à l'affichage des étapes."""
+    fr_ids = {t["id"] for t in tutorials_mod.TUTORIALS}
+    en_ids = set(tutorials_en_mod.TUTORIALS_EN)
+    missing = fr_ids - en_ids
+    extra = en_ids - fr_ids
+    assert not missing, f"Tutoriels FR sans traduction EN : {sorted(missing)}"
+    assert not extra, f"Tutoriels EN orphelins (plus dans la version FR) : {sorted(extra)}"
+    for t in tutorials_mod.TUTORIALS:
+        en = tutorials_en_mod.TUTORIALS_EN[t["id"]]
+        assert len(en["steps"]) == len(t["steps"]), (
+            f"Tutoriel {t['id']!r} : {len(t['steps'])} étapes FR vs "
+            f"{len(en['steps'])} en EN")
+
+
 def test_known_fr_only_files_are_still_the_expected_set():
-    """Verrou anti-oubli dans les deux sens : si un de ces fichiers gagne
-    un jour une couche EN, ce test le signale (retirer l'entrée de
-    KNOWN_FR_ONLY) plutôt que de laisser l'exception traîner sans raison ;
-    s'il en gagne un nouveau sans traduction, l'ajouter ici en connaissance
-    de cause plutôt que de le découvrir en jouant en anglais."""
+    """Verrou anti-oubli : si un fichier délibérément FR-only gagne un jour une
+    couche EN, ce test le signale (retirer l'entrée de KNOWN_FR_ONLY) plutôt que
+    de laisser l'exception traîner sans raison ; s'il en gagne un nouveau sans
+    traduction, l'ajouter ici en connaissance de cause plutôt que de le
+    découvrir en jouant en anglais."""
     for path in KNOWN_FR_ONLY:
         assert os.path.exists(path), f"{path} n'existe plus — retirer de KNOWN_FR_ONLY"
-    en_pendant = {
-        "data/tutorials.py": "data/tutorials_en.py",
-    }
-    for fr_path, en_path in en_pendant.items():
-        assert not os.path.exists(en_path), (
-            f"{en_path} existe maintenant : retirer {fr_path} de KNOWN_FR_ONLY "
-            "et ajouter un vrai test de parité pour ce fichier")

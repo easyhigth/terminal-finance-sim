@@ -26,15 +26,8 @@ from core.market_constants import (
     _curve_curvature_target,
     _curve_ns_loadings,
     _curve_slope_target,
+    guidance_label_display,
 )
-
-# Libellés de guidance côté affichage EN (les valeurs FR de GUIDANCE_LABELS
-# restent des CLÉS de comparaison/sérialisation — cf. market.py, metrics()).
-_GUIDANCE_LABELS_EN = {
-    GUIDANCE_LABELS["up"]: "raised",
-    GUIDANCE_LABELS["flat"]: "maintained",
-    GUIDANCE_LABELS["down"]: "cut",
-}
 
 
 class MarketQueryMixin:
@@ -549,10 +542,7 @@ class MarketQueryMixin:
             # guidance en désaccord avec la surprise -> info notable pour le joueur
             if g_label and ((r["beat"] and g_label == GUIDANCE_LABELS["down"])
                              or (not r["beat"] and g_label == GUIDANCE_LABELS["up"])):
-                if en:
-                    text += f", guidance {_GUIDANCE_LABELS_EN.get(g_label, g_label)}"
-                else:
-                    text += f", guidance {g_label}"
+                text += f", guidance {guidance_label_display(g_label)}"
             news.append({"region": region, "kind": "good" if r["beat"] else "bad", "text": text})
         return news
 

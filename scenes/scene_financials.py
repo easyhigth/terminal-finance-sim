@@ -10,7 +10,7 @@ sous l'angle « santé financière ». Ouvert via FA <ticker> ou « santé finan
 import pygame
 
 from core import charts as charts
-from core import config, i18n
+from core import config, i18n, market_constants
 from core import financials as F
 from core.scene_manager import Scene
 
@@ -337,9 +337,9 @@ class FinancialsScene(Scene):
                                   (inner.x, y), fonts.tiny(), config.COL_TEXT_DIM,
                                   max_width=inner.w)
             y += 15
-            g_label = le.get("guidance_label")
+            g_label = market_constants.guidance_label_display(le.get("guidance_label"))
             if g_label:
-                widgets.draw_text(surf, _L(f"Guidance {g_label}", f"Guidance {g_label}"), (inner.x, y),
+                widgets.draw_text(surf, f"Guidance {g_label}", (inner.x, y),
                                   fonts.tiny(), config.COL_TEXT_DIM)
                 y += 15
         else:

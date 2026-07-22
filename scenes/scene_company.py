@@ -10,7 +10,7 @@ Ouverte via la commande COMPANY <ticker> ou en cliquant un ticker.
 import pygame
 
 from core import charts as charts
-from core import config, i18n, intraday, liquidity
+from core import config, i18n, intraday, liquidity, market_constants
 from core import financials as F
 from core import market_hours as mh_mod
 from core import news as N
@@ -388,7 +388,7 @@ class CompanyScene(Scene):
         if le:
             ecol = config.COL_UP if le["beat"] else config.COL_DOWN
             verb = "BEAT" if le["beat"] else "MISS"
-            g_label = le.get("guidance_label")
+            g_label = market_constants.guidance_label_display(le.get("guidance_label"))
             g_txt = f"  ·  guidance {g_label}" if g_label else ""
             widgets.draw_text(surf, _L(f"RÉSULTATS : {verb}  surprise {le['surprise']*100:+.0f}%  ·  croissance CA {le['growth']*100:+.1f}%{g_txt}",
                                        f"EARNINGS: {verb}  surprise {le['surprise']*100:+.0f}%  ·  revenue growth {le['growth']*100:+.1f}%{g_txt}"),

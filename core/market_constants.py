@@ -261,6 +261,17 @@ GUIDANCE_PRICE_K = 0.35           # impact prix de la guidance (< EARN_PRICE_K d
 GUIDANCE_TO_ANTICIPATION_K = 0.6  # poids de la guidance dans le biais d'anticipation suivant
 GUIDANCE_RAISE_THRESH = 0.012     # |guidance| au-delà de laquelle on parle de relevée/abaissée
 GUIDANCE_LABELS = {"up": "relevée", "flat": "maintenue", "down": "abaissée"}
+# Les valeurs FR ci-dessus restent des CLÉS de comparaison/sérialisation
+# (metrics()['guidance_label']) ; l'EN n'existe qu'à l'AFFICHAGE.
+GUIDANCE_LABELS_EN = {"relevée": "raised", "maintenue": "maintained", "abaissée": "cut"}
+
+
+def guidance_label_display(g_label):
+    """Libellé de guidance dans la langue active (le stockage reste FR)."""
+    from core.i18n import get_lang
+    if g_label and get_lang() == "en":
+        return GUIDANCE_LABELS_EN.get(g_label, g_label)
+    return g_label
 
 # ---- révisions d'analystes entre deux publications --------------------------
 # Petits évènements de révision, déterministes (seed-derived), entre deux

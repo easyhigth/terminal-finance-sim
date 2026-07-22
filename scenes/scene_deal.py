@@ -11,8 +11,13 @@ import pygame
 
 from core import career, config, deal_game
 from core import deals as deals_mod
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 
 class DealScene(Scene):
@@ -31,7 +36,7 @@ class DealScene(Scene):
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         fy = config.SCREEN_HEIGHT - 56
         self.continue_btn = widgets.Button((config.SCREEN_WIDTH // 2 - 130, fy, 260, 44),
-                                           "CONTINUER", config.COL_UP)
+                                           _L("CONTINUER", "CONTINUE"), config.COL_UP)
 
     # ------------------------------------------------------------- events
     def handle_event(self, event):
@@ -60,19 +65,25 @@ class DealScene(Scene):
             rep = self.result["rep_delta"]
             outcome = self.result["outcome"]
             if outcome == "success":
-                self.app.notify(f"Deal conclu : {self.deal['title']} "
-                                 f"(+{cash_txt}, +{rep} rép.)", "good")
+                self.app.notify(_L(f"Deal conclu : {self.deal['title']} "
+                                 f"(+{cash_txt}, +{rep} rép.)",
+                                 f"Deal closed: {self.deal['title']} "
+                                 f"(+{cash_txt}, +{rep} rep.)"), "good")
                 career.log(p, "deal", f"Deal #{self.deal_id} conclu ({ch['text']}) : "
                                        f"+{cash_txt}, +{rep} réputation.")
             elif outcome == "partial":
-                self.app.notify(f"Succès partiel : {self.deal['title']} "
-                                 f"(+{cash_txt}, +{rep} rép.)", "warn")
+                self.app.notify(_L(f"Succès partiel : {self.deal['title']} "
+                                 f"(+{cash_txt}, +{rep} rép.)",
+                                 f"Partial success: {self.deal['title']} "
+                                 f"(+{cash_txt}, +{rep} rep.)"), "warn")
                 career.log(p, "deal", f"Deal #{self.deal_id} en demi-teinte ({ch['text']}) : "
                                        f"+{cash_txt}, +{rep} réputation (récompense réduite, "
                                        f"décision sous-optimale).")
             else:
-                self.app.notify(f"Deal échoué : {self.deal['title']} "
-                                 f"(-{cash_txt}, {rep} rép.)", "bad")
+                self.app.notify(_L(f"Deal échoué : {self.deal['title']} "
+                                 f"(-{cash_txt}, {rep} rép.)",
+                                 f"Deal failed: {self.deal['title']} "
+                                 f"(-{cash_txt}, {rep} rep.)"), "bad")
                 career.log(p, "deal", f"Deal #{self.deal_id} échoué ({ch['text']}) : "
                                        f"-{cash_txt}, {rep} réputation.")
         if not self.app.gs.player.hardcore:
@@ -92,20 +103,22 @@ class DealScene(Scene):
     # ------------------------------------------------------------- draw
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "RÉSOLUTION DE DEAL", (40, 24),
+        widgets.draw_text(surf, _L("RÉSOLUTION DE DEAL", "DEAL RESOLUTION"), (40, 24),
                           fonts.title(bold=True), config.COL_AMBER)
         if not self.challenge:
-            widgets.draw_text(surf, "Deal introuvable.", (42, 90), fonts.body(), config.COL_DOWN)
+            widgets.draw_text(surf, _L("Deal introuvable.", "Deal not found."), (42, 90), fonts.body(), config.COL_DOWN)
             self.back_btn.draw(surf)
             return
         d = self.deal
         cur = config.CONTINENTS[self.app.gs.player.continent]["currency"]
-        widgets.draw_text(surf, f"#{d['id']} {d['title']}  [{d['kind']}]  ·  "
+        widgets.draw_text(surf, _L(f"#{d['id']} {d['title']}  [{d['kind']}]  ·  "
                                 f"gain {widgets.format_money(d['reward_cash'], cur)}",
+                                f"#{d['id']} {d['title']}  [{d['kind']}]  ·  "
+                                f"reward {widgets.format_money(d['reward_cash'], cur)}"),
                           (42, 74), fonts.small(), config.COL_TEXT_DIM)
 
         panel = pygame.Rect(120, 120, config.SCREEN_WIDTH - 240, config.footer_y() - 150)
-        inner = widgets.draw_panel(surf, panel, "Décision", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L("Décision", "Decision"), config.COL_CYAN)
         widgets.draw_text_wrapped(surf, self.challenge["context"], (inner.x, inner.y),
                                   fonts.small(), config.COL_TEXT_DIM, inner.w)
         widgets.draw_text_wrapped(surf, self.challenge["prompt"], (inner.x, inner.y + 40),
@@ -131,8 +144,9 @@ class DealScene(Scene):
             # en résultat : ce que les options écartées auraient donné, pour comparer
             # avec le choix retenu plutôt que se demander "et si j'avais pris l'autre".
             if self.state == "result" and i != self.chosen:
-                qlabel = {"good": "aurait donné : succès plein", "ok": "aurait donné : succès partiel",
-                         "bad": "aurait donné : échec"}[ch["quality"]]
+                qlabel = {"good": _L("aurait donné : succès plein", "would have given: full success"),
+                          "ok": _L("aurait donné : succès partiel", "would have given: partial success"),
+                          "bad": _L("aurait donné : échec", "would have given: failure")}[ch["quality"]]
                 qcol = {"good": config.COL_UP, "ok": config.COL_WARN, "bad": config.COL_DOWN}[ch["quality"]]
                 widgets.draw_text(surf, qlabel, (rect.right - 12, rect.y + 13), fonts.tiny(),
                                   qcol, align="right")
@@ -142,9 +156,9 @@ class DealScene(Scene):
             oc = self.result["outcome"]
             ocol = (config.COL_UP if oc == "success" else
                     config.COL_WARN if oc == "partial" else config.COL_DOWN)
-            label = {"success": "DEAL CONCLU (succès plein)",
-                     "partial": "SUCCÈS PARTIEL",
-                     "fail": "DEAL ÉCHOUÉ"}[oc]
+            label = {"success": _L("DEAL CONCLU (succès plein)", "DEAL CLOSED (full success)"),
+                     "partial": _L("SUCCÈS PARTIEL", "PARTIAL SUCCESS"),
+                     "fail": _L("DEAL ÉCHOUÉ", "DEAL FAILED")}[oc]
             widgets.draw_text(surf, label, (inner.x, y + 6), fonts.head(bold=True), ocol)
             widgets.draw_text_wrapped(surf, self.challenge["expl"], (inner.x, y + 40),
                                       fonts.small(), config.COL_TEXT, inner.w)

@@ -9,16 +9,27 @@ import pygame
 
 from core import config, unlocks
 from core import macrocal as MACRO
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
 DEFAULT_STAKE = 5_000.0
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
 
 _OUTCOME_COLORS = {
     "positif": config.COL_UP,
     "neutre": config.COL_TEXT_DIM,
     "négatif": config.COL_DOWN,
 }
+# Libellés d'affichage EN des issues (les clés FR restent les clés de logique).
+_OUTCOME_EN = {"positif": "positive", "neutre": "neutral", "négatif": "negative"}
+
+
+def _outcome_label(outcome):
+    return _OUTCOME_EN.get(outcome, outcome) if get_lang() == "en" else outcome
 
 
 class CalendarScene(Scene):
@@ -41,7 +52,7 @@ class CalendarScene(Scene):
                                        f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.tuto_btn = widgets.Button((config.back_button_rect(160)[0] + 170,
                                         config.back_button_rect(160)[1], 150, 42),
-                                       "TUTO", config.COL_CYAN)
+                                       _L("TUTO", "GUIDE"), config.COL_CYAN)
 
     def _can(self):
         return unlocks.unlocked(self.app.gs.player, "calendar")
@@ -104,26 +115,30 @@ class CalendarScene(Scene):
                     return
             if self._bet_rect and self._bet_rect.collidepoint(event.pos):
                 if self.selected_event is None:
-                    self.msg = "Sélectionnez un évènement."
+                    self.msg = _L("Sélectionnez un évènement.", "Select an event.")
                     return
                 if self.selected_outcome is None:
-                    self.msg = "Sélectionnez une issue (positif/neutre/négatif)."
+                    self.msg = _L("Sélectionnez une issue (positif/neutre/négatif).", "Select an outcome (positive/neutral/negative).")
                     return
                 stake = self._stake()
                 if stake <= 0:
-                    self.msg = "Mise invalide."
+                    self.msg = _L("Mise invalide.", "Invalid stake.")
                     return
                 res = MACRO.place_bet(p, self.selected_event, self.selected_outcome, stake)
                 if res["ok"]:
                     cur = self._cur()
-                    self.msg = (f"Pari placé : {widgets.format_money(stake, cur)} sur "
-                                f"« {res['bet']['outcome']} » (x{res['bet']['multiplier']:.2f}).")
+                    self.msg = _L(f"Pari placé : {widgets.format_money(stake, cur)} sur "
+                                f"« {_outcome_label(res['bet']['outcome'])} » (x{res['bet']['multiplier']:.2f}).",
+                                f"Bet placed: {widgets.format_money(stake, cur)} on "
+                                f"\"{_outcome_label(res['bet']['outcome'])}\" (x{res['bet']['multiplier']:.2f}).")
                     if not p.hardcore:
                         self.app.gs.save(config.AUTOSAVE_SLOT)
                 else:
-                    reasons = {"cash": "trésorerie insuffisante.", "event": "évènement introuvable.",
-                               "stake": "mise invalide.", "outcome": "issue invalide."}
-                    self.msg = f"Refusé ({reasons.get(res['reason'], res['reason'])})."
+                    reasons = {"cash": _L("trésorerie insuffisante.", "insufficient cash."),
+                               "event": _L("évènement introuvable.", "event not found."),
+                               "stake": _L("mise invalide.", "invalid stake."),
+                               "outcome": _L("issue invalide.", "invalid outcome.")}
+                    self.msg = _L(f"Refusé ({reasons.get(res['reason'], res['reason'])}).", f"Rejected ({reasons.get(res['reason'], res['reason'])}).")
                 return
 
     def update(self, dt):
@@ -135,18 +150,20 @@ class CalendarScene(Scene):
     # ------------------------------------------------------------- draw
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "CALENDRIER MACRO — ÉVÈNEMENTS ÉCONOMIQUES", (40, 22),
+        widgets.draw_text(surf, _L("CALENDRIER MACRO — ÉVÈNEMENTS ÉCONOMIQUES", "MACRO CALENDAR — ECONOMIC EVENTS"), (40, 22),
                           fonts.title(bold=True), config.COL_AMBER)
         p = self.app.gs.player
         if not self._can():
             g = unlocks.effective_required_grade(self.app.gs.player, "calendar")
-            widgets.draw_text(surf, f"⊘ Calendrier macro débloqué au grade {config.GRADES[g]}.",
+            widgets.draw_text(surf, _L(f"⊘ Calendrier macro débloqué au grade {config.GRADES[g]}.", f"⊘ Macro calendar unlocked at {config.GRADES[g]} grade."),
                               (42, 74), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             self.tuto_btn.draw(surf)
             return
-        widgets.draw_text(surf, "Pariez sur l'issue (perçue par le marché) d'un évènement programmé : "
-                                "le multiplicateur dépend de la probabilité a priori. " + self.msg,
+        widgets.draw_text(surf, _L("Pariez sur l'issue (perçue par le marché) d'un évènement programmé : "
+                                "le multiplicateur dépend de la probabilité a priori. ",
+                                "Bet on the (market-perceived) outcome of a scheduled event: "
+                                "the multiplier depends on the prior probability. ") + self.msg,
                           (42, 74), fonts.small(), config.COL_TEXT_DIM)
 
         market = self.app.ensure_market()
@@ -156,7 +173,7 @@ class CalendarScene(Scene):
 
         # ---- mise + sélection d'issue ----
         ctrl_y = 104
-        widgets.draw_text(surf, "Mise :", (40, ctrl_y + 6), fonts.small(), config.COL_TEXT)
+        widgets.draw_text(surf, _L("Mise :", "Stake:"), (40, ctrl_y + 6), fonts.small(), config.COL_TEXT)
         self._stake_rect = pygame.Rect(95, ctrl_y, 140, 28)
         pygame.draw.rect(surf, config.COL_PANEL, self._stake_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN if self.stake_focus else config.COL_BORDER,
@@ -173,14 +190,14 @@ class CalendarScene(Scene):
             col = _OUTCOME_COLORS.get(outcome, config.COL_TEXT_DIM)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if selected else config.COL_PANEL, rect, border_radius=4)
             pygame.draw.rect(surf, col, rect, 2 if selected else 1, border_radius=4)
-            widgets.draw_text(surf, outcome.upper(), rect.center, fonts.tiny(bold=True), col, align="center")
+            widgets.draw_text(surf, _outcome_label(outcome).upper(), rect.center, fonts.tiny(bold=True), col, align="center")
             self._outcome_rects[outcome] = rect
             ox += 110
 
         self._bet_rect = pygame.Rect(ox + 20, ctrl_y, 120, 28)
         pygame.draw.rect(surf, config.COL_PANEL_HEAD, self._bet_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_AMBER, self._bet_rect, 1, border_radius=4)
-        widgets.draw_text(surf, "PARIER", self._bet_rect.center, fonts.small(bold=True), config.COL_AMBER, align="center")
+        widgets.draw_text(surf, _L("PARIER", "BET"), self._bet_rect.center, fonts.small(bold=True), config.COL_AMBER, align="center")
         # les DEUX issues chiffrées AVANT de parier : gain si l'issue choisie
         # sort (mise × multiplicateur - mise), perte sinon (la mise entière)
         if self.selected_event is not None and self.selected_outcome:
@@ -189,8 +206,10 @@ class CalendarScene(Scene):
             if mult and stake > 0:
                 win = stake * mult - stake
                 widgets.draw_text(surf, widgets.fit_text(
-                    f"Si « {self.selected_outcome} » sort : +{win:,.0f} · sinon : "
-                    f"-{stake:,.0f} (x{mult:.2f})", fonts.tiny(),
+                    _L(f"Si « {_outcome_label(self.selected_outcome)} » sort : +{win:,.0f} · sinon : "
+                    f"-{stake:,.0f} (x{mult:.2f})",
+                    f"If \"{_outcome_label(self.selected_outcome)}\" occurs: +{win:,.0f} · else: "
+                    f"-{stake:,.0f} (x{mult:.2f})"), fonts.tiny(),
                     config.SCREEN_WIDTH - self._bet_rect.right - 40),
                     (self._bet_rect.right + 12, ctrl_y + 8), fonts.tiny(),
                     config.COL_WARN)
@@ -201,9 +220,9 @@ class CalendarScene(Scene):
         ev_h = 50 + len(events) * 70 if events else 50
         ev_h = min(ev_h, 260)
         ev_panel = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, ev_h)
-        inner = widgets.draw_panel(surf, ev_panel, f"Évènements programmés ({len(events)})", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, ev_panel, _L(f"Évènements programmés ({len(events)})", f"Scheduled events ({len(events)})"), config.COL_CYAN)
         if not events:
-            widgets.draw_text(surf, "Aucun évènement programmé. Patientez, le temps avance en direct.",
+            widgets.draw_text(surf, _L("Aucun évènement programmé. Patientez, le temps avance en direct.", "No scheduled event. Wait, time advances live."),
                               (inner.x, inner.y + 4), fonts.small(), config.COL_TEXT_DIM)
         else:
             y = inner.y
@@ -216,42 +235,49 @@ class CalendarScene(Scene):
                                   (row.x + 12, row.y + 6), fonts.small(bold=True), config.COL_AMBER)
                 probs = e["probabilities"]
                 prob_str = "  ".join(f"{o}: {probs[o]*100:.0f}%" for o in MACRO.OUTCOMES)
-                widgets.draw_text(surf, f"Consensus : {e['consensus']}  ·  {prob_str}  ·  "
+                widgets.draw_text(surf, _L(f"Consensus : {e['consensus']}  ·  {prob_str}  ·  "
                                         f"Résolution dans {max(0, e['resolve_step'] - market.step_count)} pas",
+                                        f"Consensus: {e['consensus']}  ·  {prob_str}  ·  "
+                                        f"Resolves in {max(0, e['resolve_step'] - market.step_count)} steps"),
                                   (row.x + 12, row.y + 26), fonts.tiny(), config.COL_TEXT)
                 n_bets = len(MACRO.pending_bets_for(p, e["id"]))
-                widgets.draw_text(surf, f"Paris en cours sur cet évènement : {n_bets}",
+                widgets.draw_text(surf, _L(f"Paris en cours sur cet évènement : {n_bets}", f"Pending bets on this event: {n_bets}"),
                                   (row.x + 12, row.y + 44), fonts.tiny(), config.COL_TEXT_DIM)
                 sel = pygame.Rect(row.right - 130, row.y + 16, 110, 30)
                 pygame.draw.rect(surf, config.COL_PANEL_HEAD, sel, border_radius=4)
                 pygame.draw.rect(surf, config.COL_CYAN, sel, 1, border_radius=4)
-                widgets.draw_text(surf, "SÉLECTIONNER", sel.center, fonts.tiny(bold=True), config.COL_CYAN, align="center")
+                widgets.draw_text(surf, _L("SÉLECTIONNER", "SELECT"), sel.center, fonts.tiny(bold=True), config.COL_CYAN, align="center")
                 self._select_rects[e["id"]] = sel
                 y += 70
 
         # ---- paris en cours + historique résolu ----
         pos_top = ev_panel.bottom + 10
         pos_panel = pygame.Rect(40, pos_top, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - pos_top)
-        pinner = widgets.draw_panel(surf, pos_panel, "Paris en cours & historique", config.COL_PRESTIGE)
+        pinner = widgets.draw_panel(surf, pos_panel, _L("Paris en cours & historique", "Pending bets & history"), config.COL_PRESTIGE)
         list_area = pygame.Rect(pinner.x - 6, pinner.y, pinner.w + 12, pinner.bottom - pinner.y - 4)
         self._list_rect = list_area
 
         rows = []
         for b in p.macro_bets:
             ev = MACRO.find_event(p, b["event_id"])
-            label = ev["event_type"] if ev else f"Évènement #{b['event_id']}"
-            rows.append(("pending", f"{label} — pari « {b['outcome']} » : "
-                                     f"{widgets.format_money(b['stake'], cur)} (x{b['multiplier']:.2f})"))
+            label = ev["event_type"] if ev else _L(f"Évènement #{b['event_id']}", f"Event #{b['event_id']}")
+            rows.append(("pending", _L(f"{label} — pari « {_outcome_label(b['outcome'])} » : "
+                                     f"{widgets.format_money(b['stake'], cur)} (x{b['multiplier']:.2f})",
+                                     f"{label} — bet \"{_outcome_label(b['outcome'])}\": "
+                                     f"{widgets.format_money(b['stake'], cur)} (x{b['multiplier']:.2f})")))
         for h in reversed(p.macro_bet_history):
             for br in h["bets_resolved"]:
-                status = "GAGNÉ" if br["won"] else "PERDU"
+                status = _L("GAGNÉ", "WON") if br["won"] else _L("PERDU", "LOST")
                 rows.append(("won" if br["won"] else "lost",
-                             f"{h['event']['event_type']} — issue réelle « {h['actual_outcome']} » · "
-                             f"pari « {br['outcome']} » : {status} "
-                             f"({widgets.format_money(br['payout'], cur)})"))
+                             _L(f"{h['event']['event_type']} — issue réelle « {_outcome_label(h['actual_outcome'])} » · "
+                             f"pari « {_outcome_label(br['outcome'])} » : {status} "
+                             f"({widgets.format_money(br['payout'], cur)})",
+                             f"{h['event']['event_type']} — actual outcome \"{_outcome_label(h['actual_outcome'])}\" · "
+                             f"bet \"{_outcome_label(br['outcome'])}\": {status} "
+                             f"({widgets.format_money(br['payout'], cur)})")))
 
         if not rows:
-            widgets.draw_text(surf, "Aucun pari en cours ni résolu.",
+            widgets.draw_text(surf, _L("Aucun pari en cours ni résolu.", "No pending or resolved bet."),
                               (pinner.x, pinner.y + 4), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             self.tuto_btn.draw(surf)

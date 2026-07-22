@@ -1,0 +1,454 @@
+{
+ "apps/app_analytics.py": [
+  "Crédit",
+  "Matières",
+  "Structurés"
+ ],
+ "apps/app_book.py": [
+  "Crédit",
+  "Matières",
+  "Structuré",
+  "Structurés"
+ ],
+ "apps/app_company.py": [
+  "ACTUALITÉS",
+  "BÊTA",
+  "Fiche société",
+  "GRAPHIQUE AVANCÉ",
+  "Résultat avant impôt",
+  "Résultat d'exploitation (EBIT)",
+  "Résultat net",
+  "VOLATILITÉ",
+  "ÉTATS FINANCIERS"
+ ],
+ "apps/app_creditdesk.py": [
+  "Desk Crédit"
+ ],
+ "apps/app_dilemma.py": [
+  "DÉCISION",
+  "DÉCISION SIGNATURE",
+  "Décision",
+  "RÉGLEMENTAIRE",
+  "STRATÉGIE",
+  "ÉTHIQUE"
+ ],
+ "apps/app_evaluation.py": [
+  " /.-'éèàçâêôûïü",
+  "Évaluation"
+ ],
+ "apps/app_explorer.py": [
+  "Explorateur de marché",
+  "RÉGION"
+ ],
+ "apps/app_frontier.py": [
+  "Frontière efficiente"
+ ],
+ "apps/app_funding.py": [
+  "PRÊT-TITRES",
+  "REPO (pension livrée)",
+  "TRÉSORERIE"
+ ],
+ "apps/app_greeks.py": [
+  "MODÈLES",
+  "P&L par JOUR qui passe (le coût du temps)",
+  "P&L pour +1 point de volatilité",
+  "STRATÉGIE",
+  "exposition directionnelle (équivalent actions)"
+ ],
+ "apps/app_markethub.py": [
+  "Marché",
+  "PIB ; ↑ soutient les bénéfices",
+  "coût d'emprunt des émetteurs High Yield ; ↑ = stress marqué",
+  "coût d'emprunt des émetteurs Investment Grade ; ↑ = stress",
+  "coût de l'argent ; ↑ pèse sur actions/immo",
+  "facilité d'exécution du marché ; ↓ = conditions tendues",
+  "moral des marchés"
+ ],
+ "apps/app_research.py": [
+  "Recherche — Marchés"
+ ],
+ "apps/app_review.py": [
+  "Négocier à la hausse"
+ ],
+ "apps/app_sheet.py": [
+  "Actions détenues d'un titre",
+  "Corrélation (X;Y)",
+  "Log népérien",
+  "Marché (en direct)",
+  "Mensualité d'emprunt",
+  "Médiane",
+  "Probabilité de défaut de Merton (\"MVC\"; [années=3])",
+  "Racine carrée",
+  "Rendement à échéance d'une obligation (\"id\" — cf. Desk Taux)",
+  "Spread CDS théorique en bps (\"MVC\"; années)",
+  "Trésorerie (sans arg)",
+  "Vol implicite (\"MVC\"; strike en % du spot; années; prime; [\"call\"|\"put",
+  "Écart-type"
+ ],
+ "apps/app_shop.py": [
+  "CRÉDIT",
+  "Crédit",
+  "POSSÉDÉ",
+  "STRUCTURÉS",
+  "Structuré",
+  "◆ STRUCTURÉS",
+  "● CRÉDIT"
+ ],
+ "apps/app_strategicalloc.py": [
+  "Allocation stratégique"
+ ],
+ "apps/app_themes.py": [
+  "Thématiques"
+ ],
+ "apps/app_valuation.py": [
+  "Durée (années)",
+  "Multiple d'entrée"
+ ],
+ "apps/app_vollab.py": [
+  "GARCH (prévision de vol)",
+  "RÉGIMES (inférence)"
+ ],
+ "apps/app_zscore.py": [
+  "CORRÉLATION",
+  "VOLATILITÉ"
+ ],
+ "apps/base.py": [
+  "Allocation stratégique",
+  "Desk Crédit",
+  "Décision",
+  "Explorateur de marché",
+  "Fiche société",
+  "Frontière efficiente",
+  "Marché",
+  "Recherche — Marchés",
+  "Thématiques",
+  "Évaluation"
+ ],
+ "scenes/scene_academy.py": [
+  "Crédit",
+  "Dérivés",
+  "Leçon apprise (Académie)",
+  "Marché"
+ ],
+ "scenes/scene_analytics.py": [
+  "Crédit",
+  "Matières",
+  "Structurés"
+ ],
+ "scenes/scene_book.py": [
+  "Crédit",
+  "Matières",
+  "Structuré",
+  "Structurés"
+ ],
+ "scenes/scene_calendar.py": [
+  "négatif"
+ ],
+ "scenes/scene_career.py": [
+  "Ancienneté",
+  "Modéré",
+  "Risque élevé"
+ ],
+ "scenes/scene_commands.py": [
+  "Académie : leçons (DCF, Sharpe, VaR, options…)",
+  "Actualités du continent",
+  "Ajuster une position à pct% de la valeur nette",
+  "Analyse détaillée : poids, risque, corrél., frontière",
+  "Annoter une entrée du journal de trading",
+  "Arc de tension du marché : phase, niveau, crises actives",
+  "Attribution de performance : secteur, région, style, sélection, timing",
+  "BUY / LONG <tk> <qté>",
+  "BUYBOND / SELLBOND <id> <qté>",
+  "BUYCMDTY / SELLCMDTY <id> <qté>",
+  "BUYCRYPTO / SELLCRYPTO <id> <qté>",
+  "Bilan du journal : P&L réalisé par régime/raison",
+  "Boutique unifiée : acheter actions, ETF, obligations, commodities, cry",
+  "COVER <tk> <qté|ALL>",
+  "CRITERIA ADD <stock|etf> [clé=valeur...]",
+  "Cadre réglementaire de la région",
+  "Carrière & progression",
+  "Certifications CFA / FRM / CQF (boost de carrière)",
+  "Chandeliers japonais (OHLC agrégé)",
+  "Changer de voie après le choix initial (coût cash + rodage)",
+  "Choisir / voir sa voie de spécialisation",
+  "Comparer jusqu'à 4 sociétés OU ETF (multiples)",
+  "Contre-offre sur une cible M&A raflée par un rival",
+  "Courbe des taux (maturité × rendement)",
+  "Desk crédit : tranches de titrisation & waterfall",
+  "Desk d'IPO : souscrire à une introduction en bourse",
+  "Définition rapide. Ex : DEFINE WACC",
+  "Démarcher un client pour un mandat",
+  "Examen de promotion (critères combinés requis)",
+  "Fiche société type Bloomberg. Ex : DES MVC",
+  "Frontière efficiente, optimisation Sharpe",
+  "Graphes analytiques (5 ans d'historique dès le jour 1)",
+  "Indicateurs : taux, inflation, croissance, chômage",
+  "Indicateurs macro superposés (taux, inflation, PIB…)",
+  "Jouer la mission du grade (réputation + honoraire)",
+  "Journal de carrière",
+  "Lister / supprimer vos critères sauvegardés",
+  "Lister les deals / opportunités en cours",
+  "Marché & sociétés",
+  "Matières premières : futures, contango/backwardation",
+  "Matrice de corrélation (défaut : vos positions)",
+  "Meilleures sociétés (USA / Europe / Asia…)",
+  "Messagerie (manager, clients, conformité, desk)",
+  "Mur de trading plein écran : mosaïque d'indices + positions ouvertes e",
+  "Navigation & système",
+  "Nuage de points + régression vs indice régional",
+  "Objectifs de légende : ambitions de carrière long terme",
+  "Pays : note souveraine, dette, stabilité, histoire, bonds",
+  "Performances comparées (base 0 %)",
+  "Philosophie de run choisie au départ : avantages et coûts",
+  "Produits structurés (capital garanti, autocallable…)",
+  "Raccourcis vers l'écran carrière",
+  "Ramener les positions à poids égaux",
+  "Rechercher une société par nom ou ticker",
+  "Remonte les actifs correspondant à vos critères sauvegardés",
+  "Rivaux : classement, némésis, dernières actions",
+  "Réduire l'exposition (bêta) du portefeuille",
+  "Réglages : affichage (plein écran), son, langue, vitesse",
+  "SCREEN ETF [clé=valeur...]",
+  "SCREEN [clé=valeur...]",
+  "SELL <tk> <qté|ALL>",
+  "SHORT <tk> <qté>",
+  "Sauvegarde manuelle (désactivée en hardcore)",
+  "Sauvegarder un critère de recherche (idées)",
+  "Statut des sessions de cotation Asie/Europe/Amériques (ouvert/fermé, h",
+  "Tableur intégré (formules)",
+  "Traiter un deal avant son échéance",
+  "Trancher un dilemme en attente (éthique/régl.)",
+  "Tutoriels illustrés : acheter/vendre, bonds, futures…",
+  "Valeur intrinsèque + reco analyste",
+  "Variation % depuis une référence",
+  "Vente à découvert (parier à la baisse)",
+  "Volatilité historique annualisée glissante",
+  "Votre performance vs indice régional",
+  "Votre situation : grade, cash, réputation, temps",
+  "Vue par région",
+  "Échéances : trimestre et deals",
+  "État de marge : equity, levier, pouvoir d'achat",
+  "États financiers : résultat + bilan (N/N-1/N-2)"
+ ],
+ "scenes/scene_commodities.py": [
+  "Bétail & laitier",
+  "Céréales & oléagineux",
+  "Matériaux & construction",
+  "Minéraux stratégiques",
+  "Métaux industriels",
+  "Métaux précieux",
+  "Énergie"
+ ],
+ "scenes/scene_company.py": [
+  "ACTUALITÉS",
+  "BÊTA",
+  "GRAPHIQUE AVANCÉ",
+  "Résultat avant impôt",
+  "Résultat d'exploitation (EBIT)",
+  "Résultat net",
+  "VOLATILITÉ",
+  "ÉTATS FINANCIERS"
+ ],
+ "scenes/scene_deal.py": [
+  " réputation (récompense réduite, décision sous-optimale).",
+  " réputation.",
+  " échoué ("
+ ],
+ "scenes/scene_desktop_common.py": [
+  "Allocation stratégique",
+  "Carrière",
+  "Crédit & Financement",
+  "Desk Crédit",
+  "Décide",
+  "Décision",
+  "Fiche société",
+  "Frontière efficiente",
+  "Marché",
+  "Marché & Analyse",
+  "Succès",
+  "Thématiques",
+  "Évaluation"
+ ],
+ "scenes/scene_dilemma.py": [
+  "DÉCISION",
+  "DÉCISION SIGNATURE",
+  "RÉGLEMENTAIRE",
+  "STRATÉGIE",
+  "ÉTHIQUE"
+ ],
+ "scenes/scene_evaluation.py": [
+  " /.-'éèàçâêôûïü"
+ ],
+ "scenes/scene_examcert.py": [
+  "Ancienneté (trimestres)",
+  "Augmentez votre réputation via les missions, les deals et les certific",
+  "Concluez des deals via DEALS pour valider ce critère.",
+  "Patientez : ce critère se remplit automatiquement avec le temps passé ",
+  "Réputation",
+  "Terminez des missions (MISSIONS) — chaque mission complétée à ce grade"
+ ],
+ "scenes/scene_explorer.py": [
+  "RÉGION"
+ ],
+ "scenes/scene_financials.py": [
+  "Résultat avant impôt",
+  "Résultat d'exploitation (EBIT)",
+  "Résultat net"
+ ],
+ "scenes/scene_gameover.py": [
+  "Conformité",
+  "Exécution",
+  "Réputation"
+ ],
+ "scenes/scene_governments.py": [
+  "Océanie"
+ ],
+ "scenes/scene_graph_common.py": [
+  "Bêta",
+  "Corrél.",
+  "Volatilité"
+ ],
+ "scenes/scene_history.py": [
+  "Marchés",
+  "Événements"
+ ],
+ "scenes/scene_inbox.py": [
+  "CONFORMITÉ"
+ ],
+ "scenes/scene_intro.py": [
+  "Accomplis le travail de ton grade (analyse, décisions...) pour gagner ",
+  "De stagiaire à Partner : gravissez 12 grades en bâtissant votre réputa",
+  "Des dilemmes éthiques/réglementaires : couper les coins paie… mais fai",
+  "DÉCISIONS",
+  "Investis dans de vraies sociétés du roster : ta VALEUR NETTE monte et ",
+  "Le temps avance en direct, à la vitesse choisie. Le marché (320 sociét",
+  "Quand réputation + critères (missions, deals, ancienneté) sont réunis,",
+  "Traite des opportunités à délai et gère des mandats clients (objectif "
+ ],
+ "scenes/scene_ma_target.py": [
+  "APERÇU",
+  "Résultat avant impôt",
+  "Résultat d'exploitation (EBIT)",
+  "Résultat net",
+  "ÉTATS FINANCIERS"
+ ],
+ "scenes/scene_mandates.py": [
+  "Bêta : sensibilité du portefeuille aux mouvements du marché. β=1 suit ",
+  "Drawdown : perte maximale subie depuis un sommet de valeur liquidative",
+  "Duration : sensibilité du portefeuille obligataire aux taux d'intérêt ",
+  "Liquidité : part du portefeuille immédiatement cessible (cash + actifs",
+  "Tracking error : écart de performance entre votre portefeuille et l'in",
+  "bêta",
+  "liquidité"
+ ],
+ "scenes/scene_markethub.py": [
+  "PIB ; ↑ soutient les bénéfices",
+  "coût d'emprunt des émetteurs High Yield ; ↑ = stress marqué",
+  "coût d'emprunt des émetteurs Investment Grade ; ↑ = stress",
+  "coût de l'argent ; ↑ pèse sur actions/immo",
+  "facilité d'exécution du marché ; ↓ = conditions tendues",
+  "moral des marchés"
+ ],
+ "scenes/scene_notifications.py": [
+  "ACTUALITÉS",
+  "CONFORMITÉ"
+ ],
+ "scenes/scene_review.py": [
+  "Négocier à la hausse"
+ ],
+ "scenes/scene_risk.py": [
+  "Choc de volatilité",
+  "Choc énergie",
+  "Crise de crédit",
+  "Crise de liquidité",
+  "Récession"
+ ],
+ "scenes/scene_runsetup.py": [
+  " ajouté au classement du défi.",
+  "Ce code a déjà été importé.",
+  "Code invalide — vérifiez le copier-coller.",
+  "DIFFICULTÉ",
+  "DÉFI DU JOUR — ",
+  "Défi du jour : marché partagé",
+  "Défi historique : ",
+  "Défi historique : aucun (cliquer)",
+  "Personne n'a encore relevé le défi d'aujourd'hui. Soyez le premier — o",
+  "réputation"
+ ],
+ "scenes/scene_sandbox.py": [
+  "Aléatoire",
+  "Récession"
+ ],
+ "scenes/scene_shop.py": [
+  "CRÉDIT",
+  "Crédit",
+  "POSSÉDÉ",
+  "STRUCTURÉS",
+  "Structuré",
+  "◆ STRUCTURÉS",
+  "● CRÉDIT"
+ ],
+ "scenes/scene_stresstest.py": [
+  "Prendre acte (aucun coût)",
+  "Renforcer la couverture immédiatement"
+ ],
+ "scenes/scene_structured.py": [
+  "VOLATILITÉ",
+  "Volatilité"
+ ],
+ "scenes/scene_terminal.py": [
+  "BCE : statu quo, marché partagé sur le calendrier des baisses.",
+  "Fed : ton jugé prudent par les analystes.",
+  "Flux transfrontaliers sous contrôle renforcé.",
+  "HKMA défend le peg du HKD.",
+  "MiFID II : reporting renforcé pour les buy-side.",
+  "Saison des résultats : la tech surprend à la hausse.",
+  "Spread OAT-Bund stable après adjudication."
+ ],
+ "scenes/scene_terminal_career.py": [
+  "Préparation"
+ ],
+ "scenes/scene_terminal_commands.py": [
+  "  COMMANDS catalogue complet · le temps avance en direct (||/▶/▶▶/▶▶▶ ",
+  "  DECIDE décisions · CAREER carrière",
+  "  EVAL promotion · TRACK voie · REVIEW manager · STRESS régulateur",
+  "  LEARN académie · CERT certifications · ECO macro",
+  "  LEARN académie · GLOSSARY · DEFINE <terme>",
+  "  MISSION travailler · CAREER carrière · EVAL promotion",
+  "  PORTFOLIO·MA·RISK·QUANT·SHEET·GLOSSARY · TEAM analystes · TIMELINE c",
+  "  Réputation : ",
+  "  Trésorerie : ",
+  "  → d'autres commandes (trading, dérivés, M&A...) se débloquent en pro",
+  "  ✶ ASTUCE : Ctrl+K ouvre n'importe où une recherche rapide (page, act",
+  "RÉGLAGES"
+ ],
+ "scenes/scene_terminal_render.py": [
+  "Récession"
+ ],
+ "scenes/scene_track.py": [
+  "Black-Scholes, Greeks, vol implicite, backtest, séries temporelles.",
+  "Conseil : structuration de financements, relations clients, négociatio",
+  "Gestion de portefeuille : allocation d'actifs, frontière efficiente, o",
+  "Gestion des risques : mesure et limitation de l'exposition, VaR/CVaR, ",
+  "Quantitatif : pricing de dérivés, Greeks, modèles stochastiques, backt",
+  "Structuration, pitch, négociation, financement, conformité.",
+  "VaR, CVaR, stress testing, Bâle III, hedging, scénarios."
+ ],
+ "ui/globe.py": [
+  "Océanie"
+ ],
+ "ui/popups.py": [
+  "Crédit",
+  "Modéré",
+  "Structuré",
+  "Très faible",
+  "Très élevé",
+  "Élevé"
+ ],
+ "ui/window_manager.py": [
+  "PREMIÈRE OUVERTURE — "
+ ],
+ "ui/worldmap.py": [
+  "Océanie"
+ ]
+}

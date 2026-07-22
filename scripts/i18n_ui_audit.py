@@ -75,19 +75,35 @@ def scan(path):
     return hits
 
 
-total = 0
-for root in ROOTS:
-    for dirpath, _dirs, files in os.walk(root):
-        if "__pycache__" in dirpath:
-            continue
-        for fn in sorted(files):
-            if not fn.endswith(".py"):
+def audit(roots=ROOTS, base_dir="."):
+    """Scanne les racines et retourne {chemin_relatif: [(lineno, extrait), ...]}.
+    Réutilisé par le test anti-régression tests/test_i18n_ui_guard.py."""
+    result = {}
+    for root in roots:
+        root_path = os.path.join(base_dir, root)
+        for dirpath, _dirs, files in os.walk(root_path):
+            if "__pycache__" in dirpath:
                 continue
-            p = os.path.join(dirpath, fn)
-            hits = scan(p)
-            if hits:
-                print(f"\n### {p}  ({len(hits)})")
-                for ln, s in hits:
-                    print(f"  {ln}: {s}")
-                total += len(hits)
-print(f"\n=== TOTAL littéraux FR non localisés : {total} ===", file=sys.stderr)
+            for fn in sorted(files):
+                if not fn.endswith(".py"):
+                    continue
+                p = os.path.join(dirpath, fn)
+                hits = scan(p)
+                if hits:
+                    rel = os.path.relpath(p, base_dir)
+                    result[rel] = hits
+    return result
+
+
+def main():
+    total = 0
+    for p, hits in audit().items():
+        print(f"\n### {p}  ({len(hits)})")
+        for ln, s in hits:
+            print(f"  {ln}: {s}")
+        total += len(hits)
+    print(f"\n=== TOTAL littéraux FR non localisés : {total} ===", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()

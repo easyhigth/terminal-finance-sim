@@ -579,7 +579,7 @@ class MarketExplorerScene(Scene, PopupMixin):
         cols = [("NOM", 0), ("TYPE", 270), ("SECTEUR / CAT.", 350), ("RÉGION", 540),
                 ("COURS", 650), ("VALEUR", 750), ("RENDEMENT", 870), ("VAR %", 990)]
         for label, dx in cols:
-            widgets.draw_text(surf, label, (inner.x + dx, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
+            widgets.draw_text(surf, _tr(label), (inner.x + dx, inner.y), fonts.tiny(bold=True), config.COL_TEXT_DIM)
 
         list_top = inner.y + 22
         list_area = pygame.Rect(inner.x - 6, list_top, inner.w + 12, inner.bottom - list_top - 20)
@@ -616,7 +616,7 @@ class MarketExplorerScene(Scene, PopupMixin):
         widgets.draw_text(surf, sel_txt, (inner.x, inner.bottom - 6), fonts.tiny(), config.COL_TEXT_DIM)
 
         widgets.draw_hint_bar(surf, (config.SCREEN_WIDTH - 40, config.footer_y() + 14),
-                              [("↑↓", "naviguer"), ("ENTRÉE", "détail")])
+                              [("↑↓", _L("naviguer", "navigate")), (_L("ENTRÉE", "ENTER"), _L("détail", "detail"))])
         self.back_btn.draw(surf)
         self.add_btn.draw(surf)
         self.shop_btn.draw(surf)

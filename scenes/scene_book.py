@@ -442,7 +442,7 @@ class BookScene(Scene, PopupMixin):
         table_top = bar_y + 48
         ph = config.footer_y() - 8 - table_top
         table = pygame.Rect(40, table_top, 900, ph)
-        inner = widgets.draw_panel(surf, table, "Positions (toutes classes)", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, table, _L("Positions (toutes classes)", "Positions (all classes)"), config.COL_CYAN)
         rows = analytics.holdings_table(p, m)
         if not rows:
             widgets.draw_text_wrapped(
@@ -513,7 +513,7 @@ class BookScene(Scene, PopupMixin):
                         + (" (S)" if r["short"] else "")
                     name_col = config.COL_DOWN if r["short"] else kcol
                     widgets.draw_text(surf, name_label, (cols[0][1], y), fonts.small(bold=True), name_col)
-                    widgets.draw_text(surf, kind, (cols[1][1], y), fonts.tiny(bold=True), kcol)
+                    widgets.draw_text(surf, i18n.asset_class_label(kind), (cols[1][1], y), fonts.tiny(bold=True), kcol)
                     widgets.draw_text(surf, f"{r['qty']:.0f}", (cols[2][1], y), fonts.small(), config.COL_TEXT)
                     widgets.draw_text(surf, f"{r['avg']:.2f}", (cols[3][1], y), fonts.small(), config.COL_TEXT_DIM)
                     widgets.draw_text(surf, f"{live_price:.2f}", (cols[4][1], y), fonts.small(), pcol)
@@ -528,7 +528,7 @@ class BookScene(Scene, PopupMixin):
             self.scroll_positions = max(0, min(self._positions_max_scroll, self.scroll_positions))
             self.scroll_positions = widgets.draw_scrollbar(surf, table, list_area, self.scroll_positions,
                                    self._positions_max_scroll, content_h)
-            widgets.draw_text(surf, "clic/clic droit nom → fiche d'analyse · clic valeur/P&L (actions) → graphe",
+            widgets.draw_text(surf, _L("clic/clic droit nom → fiche d'analyse · clic valeur/P&L (actions) → graphe", "click/right-click name → analysis sheet · click value/P&L (equities) → chart"),
                               (inner.x, inner.bottom - 14), fonts.tiny(), config.COL_TEXT_DIM)
 
         # ---- panneau latéral : secteur / évolution ----
@@ -546,7 +546,7 @@ class BookScene(Scene, PopupMixin):
     def _draw_side_panel(self, surf, rect):
         """Panneau latéral à onglets : répartition sectorielle OU évolution de la
         valeur nette au fil du temps (`cash_history`)."""
-        inner = widgets.draw_panel(surf, rect, "Analyse globale", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, rect, _L("Analyse globale", "Global analysis"), config.COL_AMBER)
         sub_rect = self._draw_side_tabs(surf, inner)
         if self.side_mode == "sector":
             self._draw_sector_panel(surf, sub_rect)
@@ -628,13 +628,13 @@ class BookScene(Scene, PopupMixin):
 
         # métriques en haut du panneau
         widgets.draw_text(surf,
-                          f"Actuel : {widgets.format_money(current, cur)}",
+                          _L(f"Actuel : {widgets.format_money(current, cur)}", f"Current: {widgets.format_money(current, cur)}"),
                           (rect.x, rect.y), fonts.small(bold=True), config.COL_WHITE)
         widgets.draw_text(surf,
                           _L(f"Départ : {widgets.format_money(start_val, cur)}", f"Start: {widgets.format_money(start_val, cur)}"),
                           (rect.x, rect.y + 18), fonts.tiny(), config.COL_TEXT_DIM)
         widgets.draw_text(surf,
-                          f"P&L total : {widgets.format_money(total_pnl, cur)} ({total_pct:+.1f}%)",
+                          _L(f"P&L total : {widgets.format_money(total_pnl, cur)} ({total_pct:+.1f}%)", f"Total P&L: {widgets.format_money(total_pnl, cur)} ({total_pct:+.1f}%)"),
                           (rect.x, rect.y + 36), fonts.small(bold=True), col)
 
         chart_top = rect.y + 66

@@ -6,19 +6,32 @@ Cliquer un message le marque comme lu. Ouvert via INBOX / MAIL.
 import pygame
 
 from core import config
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, keynav, widgets
 
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
 _KIND = {
-    "manager": ("MANAGER", config.COL_AMBER),
-    "client": ("CLIENT", config.COL_CYAN),
-    "compliance": ("CONFORMITÉ", config.COL_DOWN),
-    "desk": ("DESK", config.COL_TEXT),
-    "hr": ("RH", config.COL_UP),
-    "country": ("PAYS", config.COL_PRESTIGE),
-    "research": ("VEILLE", config.COL_CYAN),
+    "manager": (("MANAGER", "MANAGER"), config.COL_AMBER),
+    "client": (("CLIENT", "CLIENT"), config.COL_CYAN),
+    "compliance": (("CONFORMITÉ", "COMPLIANCE"), config.COL_DOWN),
+    "desk": (("DESK", "DESK"), config.COL_TEXT),
+    "hr": (("RH", "HR"), config.COL_UP),
+    "country": (("PAYS", "COUNTRY"), config.COL_PRESTIGE),
+    "research": (("VEILLE", "RESEARCH"), config.COL_CYAN),
 }
-FILTER_CHIPS = [(None, "TOUS")] + [(k, v[0]) for k, v in _KIND.items()]
+
+
+def _kind_label(kind):
+    pair = _KIND.get(kind)
+    return _L(*pair[0]) if pair else kind
+
+
+FILTER_CHIPS = [(None, ("TOUS", "ALL"))] + [(k, v[0]) for k, v in _KIND.items()]
 ROW_H = 46
 
 
@@ -59,7 +72,7 @@ class InboxScene(Scene):
             order = [idx for idx in order if msgs[idx]["kind"] == self.kind_filter]
         if q:
             order = [idx for idx in order
-                     if q in f"{_KIND.get(msgs[idx]['kind'], ('', None))[0]} {msgs[idx].get('sender', '')} "
+                     if q in f"{_kind_label(msgs[idx]['kind'])} {msgs[idx].get('sender', '')} "
                               f"{msgs[idx].get('subject', '')} {msgs[idx].get('body', '')}".lower()]
         return order
 
@@ -133,8 +146,8 @@ class InboxScene(Scene):
         surf.fill(config.COL_BG)
         msgs = self.app.gs.player.inbox
         unread = sum(1 for m in msgs if not m.get("read"))
-        widgets.draw_text(surf, "MESSAGERIE", (40, 22), fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, f"{len(msgs)} messages · {unread} non lus",
+        widgets.draw_text(surf, _L("MESSAGERIE", "MAILBOX"), (40, 22), fonts.title(bold=True), config.COL_AMBER)
+        widgets.draw_text(surf, _L(f"{len(msgs)} messages · {unread} non lus", f"{len(msgs)} messages · {unread} unread"),
                           (42, 72), fonts.small(), config.COL_TEXT_DIM)
 
         # ---- recherche ----
@@ -142,7 +155,7 @@ class InboxScene(Scene):
         pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, search_rect, 1, border_radius=4)
         cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        label = (self.search + cursor) if self.search else (cursor + "Tapez pour rechercher…")
+        label = (self.search + cursor) if self.search else (cursor + _L("Tapez pour rechercher…", "Type to search…"))
         col = config.COL_TEXT if self.search else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
                           (search_rect.x + 8, search_rect.y + 4), fonts.small(), col)
@@ -156,12 +169,13 @@ class InboxScene(Scene):
         chip_y = search_rect.bottom + 8
         self._kind_rects = {}
         cx = 40
-        for kind, label in FILTER_CHIPS:
+        for kind, label_pair in FILTER_CHIPS:
+            label = _L(*label_pair)
             w = fonts.tiny(bold=True).size(label)[0] + 14
             rect = pygame.Rect(cx, chip_y, w, 20)
             self._kind_rects[kind] = rect
             sel = (kind == self.kind_filter)
-            _, kcol = _KIND.get(kind, ("", config.COL_AMBER)) if kind else ("", config.COL_AMBER)
+            _, kcol = _KIND.get(kind, (("", ""), config.COL_AMBER)) if kind else (("", ""), config.COL_AMBER)
             pygame.draw.rect(surf, config.COL_PANEL_HEAD if sel else config.COL_PANEL, rect, border_radius=3)
             pygame.draw.rect(surf, kcol if sel else config.COL_BORDER, rect, 1, border_radius=3)
             widgets.draw_text(surf, label, rect.center, fonts.tiny(bold=sel),
@@ -169,8 +183,8 @@ class InboxScene(Scene):
             cx += w + 6
 
         if self.kind_filter:
-            klabel = _KIND.get(self.kind_filter, (self.kind_filter, config.COL_AMBER))[0]
-            widgets.draw_text(surf, f"Filtre actif : {klabel} — cliquez TOUS pour réinitialiser.",
+            klabel = _kind_label(self.kind_filter)
+            widgets.draw_text(surf, _L(f"Filtre actif : {klabel} — cliquez TOUS pour réinitialiser.", f"Active filter: {klabel} — click ALL to reset."),
                               (cx + 14, chip_y + 2), fonts.tiny(), config.COL_AMBER)
 
         # liste à gauche
@@ -179,7 +193,7 @@ class InboxScene(Scene):
         listp = pygame.Rect(40, list_top, 480, ph)
         order = self._visible_order()
         self.cursor = min(self.cursor, len(order) - 1) if order else 0
-        linner = widgets.draw_panel(surf, listp, f"Reçus ({len(order)})", config.COL_CYAN)
+        linner = widgets.draw_panel(surf, listp, _L(f"Reçus ({len(order)})", f"Inbox ({len(order)})"), config.COL_CYAN)
         list_area = pygame.Rect(linner.x - 4, linner.y, linner.w + 8, linner.h)
         self._list_rect = list_area
         if self._pending_scroll:
@@ -208,7 +222,8 @@ class InboxScene(Scene):
                     if sel:
                         pygame.draw.rect(surf, config.COL_PANEL_HEAD, row)
                     keynav.draw_focus_ring(surf, row, pos == self.cursor)
-                    tag, tcol = _KIND.get(m["kind"], ("•", config.COL_TEXT))
+                    _kp, tcol = _KIND.get(m["kind"], (("•", "•"), config.COL_TEXT))
+                    tag = _L(*_kp)
                     bold = not m.get("read")
                     widgets.draw_text(surf, tag, (linner.x, y), fonts.tiny(bold=True), tcol)
                     widgets.draw_text(surf, f"J{m['day']}", (linner.right - 40, y),
@@ -229,9 +244,10 @@ class InboxScene(Scene):
         rinner = widgets.draw_panel(surf, readp, "Lecture", config.COL_AMBER)
         if self.sel is not None and 0 <= self.sel < len(msgs):
             m = msgs[self.sel]
-            tag, tcol = _KIND.get(m["kind"], ("•", config.COL_TEXT))
+            _kp, tcol = _KIND.get(m["kind"], (("•", "•"), config.COL_TEXT))
+            tag = _L(*_kp)
             widgets.draw_badge(surf, tag, (rinner.x, rinner.y), tcol)
-            widgets.draw_text(surf, f"Jour {m['day']}", (rinner.right, rinner.y),
+            widgets.draw_text(surf, _L(f"Jour {m['day']}", f"Day {m['day']}"), (rinner.right, rinner.y),
                               fonts.small(), config.COL_TEXT_DIM, align="right")
             widgets.draw_text(surf, m["subject"], (rinner.x, rinner.y + 30),
                               fonts.head(bold=True), config.COL_WHITE)
@@ -242,7 +258,7 @@ class InboxScene(Scene):
             widgets.draw_text_wrapped(surf, m["body"], (rinner.x, rinner.y + 100),
                                       fonts.body(), config.COL_TEXT, rinner.w, line_gap=6)
         else:
-            widgets.draw_text(surf, "Sélectionnez un message.", (rinner.x, rinner.y),
+            widgets.draw_text(surf, _L("Sélectionnez un message.", "Select a message."), (rinner.x, rinner.y),
                               fonts.body(), config.COL_TEXT_DIM)
 
         self.back_btn.draw(surf)

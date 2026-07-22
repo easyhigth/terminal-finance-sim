@@ -46,6 +46,15 @@ def risk_profile(player):
     return "Prudent"
 
 
+_RISK_PROFILE_EN = {"Risque élevé": "High risk", "Modéré": "Moderate", "Prudent": "Conservative"}
+
+
+def risk_profile_label(profile):
+    """Libellé localisé du profil de risque (la clé FR reste la valeur de logique)."""
+    from core.i18n import get_lang
+    return _RISK_PROFILE_EN.get(profile, profile) if get_lang() == "en" else profile
+
+
 # ---------------------------------------------------------------------------
 # Conditions de promotion (combinées)
 # ---------------------------------------------------------------------------

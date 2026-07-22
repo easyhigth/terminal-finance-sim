@@ -9,10 +9,15 @@ WALL depuis le terminal.
 import pygame
 
 from core import config
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
 from ui.datawindow import DataWindow
 from ui.popups import PopupMixin
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 _COLS = 4
 _TILE_GAP = 10
@@ -72,9 +77,9 @@ class TradingWallScene(Scene, PopupMixin):
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "MUR DE TRADING — vue mosaïque en direct", (40, 18),
+        widgets.draw_text(surf, _L("MUR DE TRADING — vue mosaïque en direct", "TRADING WALL — live mosaic view"), (40, 18),
                           fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Indices mondiaux + positions ouvertes — clic = détail",
+        widgets.draw_text(surf, _L("Indices mondiaux + positions ouvertes — clic = détail", "Global indices + open positions — click = detail"),
                           (42, 62), fonts.small(), config.COL_TEXT_DIM)
 
         tiles = self._tiles()
@@ -83,7 +88,7 @@ class TradingWallScene(Scene, PopupMixin):
         bottom = config.footer_y() - 10
         area = pygame.Rect(40, top, config.SCREEN_WIDTH - 80, bottom - top)
         if not tiles:
-            widgets.draw_text(surf, "Aucune position ouverte — les indices mondiaux s'affichent dès que le marché est chargé.",
+            widgets.draw_text(surf, _L("Aucune position ouverte — les indices mondiaux s'affichent dès que le marché est chargé.", "No open position — global indices appear as soon as the market is loaded."),
                               (area.x, area.y), fonts.small(), config.COL_TEXT_DIM)
             self.back_btn.draw(surf)
             return

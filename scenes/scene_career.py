@@ -310,7 +310,7 @@ class CareerScene(Scene):
             (_L("Trésorerie", "Cash"), widgets.format_money(p.cash, cur), config.COL_WHITE),
             (_L("Record trésorerie", "Peak cash"), widgets.format_money(max(p.best_cash, p.cash), cur), config.COL_WHITE),
             (_L("Réputation", "Reputation"), f"{p.reputation}/100", config.COL_WHITE),
-            (_L("Profil de risque", "Risk profile"), profile, profile_col),
+            (_L("Profil de risque", "Risk profile"), career.risk_profile_label(profile), profile_col),
             (_L("Deals conclus", "Deals won"), str(p.deals_won), config.COL_WHITE),
             (_L("Missions réalisées", "Missions done"), str(p.missions_done), config.COL_WHITE),
             (_L("Scrutin réglementaire", "Regulatory scrutiny"), f"{p.heat}/100", config.COL_WHITE),

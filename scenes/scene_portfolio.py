@@ -11,6 +11,7 @@ import pygame
 
 from core import config
 from core import finmath as fm
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
 
@@ -27,6 +28,10 @@ COV = np.array([
 RF = 0.02
 
 
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
+
+
 class PortfolioScene(Scene):
     def on_enter(self, **kwargs):
         self.return_to = kwargs.get("return_to", "terminal")
@@ -35,11 +40,11 @@ class PortfolioScene(Scene):
         self.back_btn = widgets.Button(
             (40, config.SCREEN_HEIGHT-66, 160, 44), f"← {self.return_to.upper()}", config.COL_TEXT_DIM)
         self.optim_sharpe_btn = widgets.Button(
-            (760, 150, 220, 40), "OPTIMISER (SHARPE)", config.COL_UP)
+            (760, 150, 220, 40), _L("OPTIMISER (SHARPE)", "OPTIMIZE (SHARPE)"), config.COL_UP)
         self.optim_minvar_btn = widgets.Button(
-            (760, 198, 220, 40), "MIN-VARIANCE", config.COL_CYAN)
+            (760, 198, 220, 40), _L("MIN-VARIANCE", "MIN-VARIANCE"), config.COL_CYAN)
         self.reset_btn = widgets.Button(
-            (760, 246, 220, 40), "RÉINITIALISER", config.COL_TEXT_DIM)
+            (760, 246, 220, 40), _L("RÉINITIALISER", "RESET"), config.COL_TEXT_DIM)
 
     def _recompute_frontier(self):
         self.fvols, self.frets, _ = fm.efficient_frontier(MEAN_RETURNS, COV, 40)
@@ -89,10 +94,12 @@ class PortfolioScene(Scene):
 
     def draw(self, surf):
         surf.fill(config.COL_BG)
-        widgets.draw_text(surf, "MODULE PORTFOLIO — FRONTIÈRE EFFICIENTE",
+        widgets.draw_text(surf, _L("MODULE PORTFOLIO — FRONTIÈRE EFFICIENTE", "PORTFOLIO MODULE — EFFICIENT FRONTIER"),
                           (40, 24), fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Optimisation moyenne-variance (Markowitz). Taux sans risque : "
+        widgets.draw_text(surf, _L("Optimisation moyenne-variance (Markowitz). Taux sans risque : "
                                 f"{RF*100:.1f}%.",
+                                "Mean-variance optimization (Markowitz). Risk-free rate: "
+                                f"{RF*100:.1f}%."),
                           (42, 76), fonts.small(), config.COL_TEXT_DIM)
 
         self._draw_chart(surf)
@@ -106,7 +113,7 @@ class PortfolioScene(Scene):
     # --- graphique frontière efficiente ----------------------------------
     def _draw_chart(self, surf):
         panel = pygame.Rect(40, 110, 700, 560)
-        inner = widgets.draw_panel(surf, panel, "Risque / Rendement", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, panel, _L("Risque / Rendement", "Risk / Return"), config.COL_AMBER)
         x0, y0 = inner.x+40, inner.bottom-30
         w, h = inner.w-60, inner.h-50
 
@@ -121,9 +128,9 @@ class PortfolioScene(Scene):
         # axes
         pygame.draw.line(surf, config.COL_BORDER, (x0, y0), (x0+w, y0), 1)
         pygame.draw.line(surf, config.COL_BORDER, (x0, y0), (x0, y0-h), 1)
-        widgets.draw_text(surf, "Volatilité →", (x0+w-90, y0+8),
+        widgets.draw_text(surf, _L("Volatilité →", "Volatility →"), (x0+w-90, y0+8),
                           fonts.tiny(), config.COL_TEXT_DIM)
-        widgets.draw_text(surf, "Rendement ↑", (x0-30, y0-h-4),
+        widgets.draw_text(surf, _L("Rendement ↑", "Return ↑"), (x0-30, y0-h-4),
                           fonts.tiny(), config.COL_TEXT_DIM)
         # graduations
         for k in range(1, 6):
@@ -164,7 +171,7 @@ class PortfolioScene(Scene):
         px, py = to_px(v, r)
         pygame.draw.circle(surf, config.COL_AMBER, (px, py), 7)
         pygame.draw.circle(surf, config.COL_WHITE, (px, py), 7, 1)
-        widgets.draw_text(surf, "VOUS", (px+10, py-6),
+        widgets.draw_text(surf, _L("VOUS", "YOU"), (px+10, py-6),
                           fonts.small(bold=True), config.COL_AMBER)
 
         # Capital Market Line (depuis rf au portefeuille tangent)
@@ -175,7 +182,7 @@ class PortfolioScene(Scene):
 
     def _draw_weights(self, surf):
         panel = pygame.Rect(760, 300, config.SCREEN_WIDTH-800, 250)
-        inner = widgets.draw_panel(surf, panel, "Allocation (poids)", config.COL_AMBER)
+        inner = widgets.draw_panel(surf, panel, _L("Allocation (poids)", "Allocation (weights)"), config.COL_AMBER)
         self._weight_btns = {}
         y = inner.y
         for i, name in enumerate(ASSETS):
@@ -203,12 +210,12 @@ class PortfolioScene(Scene):
 
     def _draw_metrics(self, surf):
         panel = pygame.Rect(760, 564, config.SCREEN_WIDTH-800, 106)
-        inner = widgets.draw_panel(surf, panel, "Métriques du portefeuille", config.COL_UP)
+        inner = widgets.draw_panel(surf, panel, _L("Métriques du portefeuille", "Portfolio metrics"), config.COL_UP)
         r, v, sh = self._metrics(self.weights)
-        widgets.draw_text(surf, f"Rendement attendu : {r*100:.2f}%",
+        widgets.draw_text(surf, _L(f"Rendement attendu : {r*100:.2f}%", f"Expected return: {r*100:.2f}%"),
                           (inner.x, inner.y), fonts.body(), config.COL_WHITE)
-        widgets.draw_text(surf, f"Volatilité        : {v*100:.2f}%",
+        widgets.draw_text(surf, _L(f"Volatilité        : {v*100:.2f}%", f"Volatility       : {v*100:.2f}%"),
                           (inner.x, inner.y+26), fonts.body(), config.COL_WHITE)
         sh_col = config.COL_UP if sh > 1 else (config.COL_WARN if sh > 0.5 else config.COL_DOWN)
-        widgets.draw_text(surf, f"Ratio de Sharpe   : {sh:.3f}",
+        widgets.draw_text(surf, _L(f"Ratio de Sharpe   : {sh:.3f}", f"Sharpe ratio      : {sh:.3f}"),
                           (inner.x, inner.y+52), fonts.body(bold=True), sh_col)

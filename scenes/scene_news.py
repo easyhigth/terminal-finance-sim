@@ -12,8 +12,13 @@ import pygame
 
 from core import config
 from core import news as N
+from core.i18n import get_lang
 from core.scene_manager import Scene
 from ui import fonts, widgets
+
+
+def _L(fr, en):
+    return en if get_lang() == "en" else fr
 
 ROW_H = 22
 _KIND_COL = {"good": config.COL_UP, "bad": config.COL_DOWN, "info": config.COL_CYAN}
@@ -94,8 +99,10 @@ class NewsScene(Scene):
         if q:
             items = [e for e in items if q in f"{e['text']} {e['region'] or ''}".lower()]
         widgets.draw_text(surf, "NEWS", (40, 22), fonts.title(bold=True), config.COL_AMBER)
-        widgets.draw_text(surf, "Tout ce qui agite la partie — filtrez par type ou région. "
+        widgets.draw_text(surf, _L("Tout ce qui agite la partie — filtrez par type ou région. "
                                 "Historique conservé jusqu'à 3 ans.",
+                                "Everything happening in the game — filter by type or region. "
+                                "History kept up to 3 years."),
                           (42, 72), fonts.small(), config.COL_TEXT_DIM)
 
         x0 = 40
@@ -106,7 +113,7 @@ class NewsScene(Scene):
         pygame.draw.rect(surf, config.COL_PANEL, search_rect, border_radius=4)
         pygame.draw.rect(surf, config.COL_CYAN, search_rect, 1, border_radius=4)
         cursor = "_" if int(self._t * 2) % 2 == 0 else " "
-        label = (self.search + cursor) if self.search else (cursor + "Tapez pour rechercher dans le texte…")
+        label = (self.search + cursor) if self.search else (cursor + _L("Tapez pour rechercher dans le texte…", "Type to search the text…"))
         col = config.COL_TEXT if self.search else config.COL_TEXT_DIM
         widgets.draw_text(surf, widgets.fit_text(label, fonts.small(), search_rect.w - 30),
                           (search_rect.x + 8, search_rect.y + 4), fonts.small(), col)
@@ -117,18 +124,18 @@ class NewsScene(Scene):
                               config.COL_TEXT_DIM, align="center")
 
         counts = N.counts_by_category(p)
-        cat_chips = [(None, f"TOUTES ({len(getattr(p, 'news_history', []) or [])})")]
+        cat_chips = [(None, _L(f"TOUTES ({len(getattr(p, 'news_history', []) or [])})", f"ALL ({len(getattr(p, 'news_history', []) or [])})"))]
         cat_chips += [(k, f"{lbl} ({counts.get(k, 0)})") for k, lbl in N.categories()]
         self._cat_rects, ybot = self._chip_row(surf, x0, top + 30, config.SCREEN_WIDTH - 40,
                                                cat_chips, self.cat_filter, config.COL_AMBER)
         regions = sorted({e["region"] for e in (getattr(p, "news_history", []) or []) if e["region"]})
-        region_chips = [(None, "TOUTES RÉGIONS")] + [(r, r) for r in regions]
+        region_chips = [(None, _L("TOUTES RÉGIONS", "ALL REGIONS"))] + [(r, r) for r in regions]
         self._region_rects, ybot = self._chip_row(surf, x0, ybot + 2, config.SCREEN_WIDTH - 40,
                                                   region_chips, self.region_filter, config.COL_CYAN)
         y = ybot + 6
 
         panel = pygame.Rect(x0, y, config.SCREEN_WIDTH - 80, config.footer_y() - 8 - y)
-        inner = widgets.draw_panel(surf, panel, f"Fil d'actualités ({len(items)})", config.COL_CYAN)
+        inner = widgets.draw_panel(surf, panel, _L(f"Fil d'actualités ({len(items)})", f"News feed ({len(items)})"), config.COL_CYAN)
         list_top = inner.y + 4
         list_area = pygame.Rect(inner.x - 6, list_top, inner.w + 12, inner.bottom - list_top - 6)
         self._list_rect = list_area
@@ -137,7 +144,7 @@ class NewsScene(Scene):
         ry = list_top - self.scroll
         last_day = None
         if not items:
-            widgets.draw_text(surf, "Aucune actualité pour ce filtre (patientez, le temps avance en direct).",
+            widgets.draw_text(surf, _L("Aucune actualité pour ce filtre (patientez, le temps avance en direct).", "No news for this filter (wait, time advances live)."),
                               (inner.x, list_top + 4), fonts.body(), config.COL_TEXT_DIM)
         for e in items:
             if e["day"] != last_day:

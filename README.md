@@ -312,6 +312,25 @@ supposition). C'est cet outil qui a révélé que trois écrans recalculaient un
 optimisation de frontière efficiente ou des centaines de mesures de texte à
 chaque frame — désormais mis en cache (verrous dans `tests/test_perf_caches.py`).
 
+### Télémétrie d'équilibrage
+
+Pour régler la difficulté sans deviner, un harnais joue N carrières complètes
+selon les **vraies règles de progression** (promotion, économie, game-over) à
+différents niveaux de compétence, et agrège le temps de jeu pour atteindre
+chaque grade :
+
+```bash
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python scripts/balance_sim.py \
+    --skills 0.6,0.75,0.9 --runs 30
+```
+
+La sortie est un tableau grade × compétence (années de jeu médianes, taux
+d'atteinte, % de game-over) : un palier jamais franchi ou un saut brusque
+signale un mur de progression. Le bot ne simule pas les mini-jeux ; il
+paramètre les décisions du joueur (assiduité, réussite aux missions, cadence de
+deals) et laisse le jeu appliquer ses propres gates. Invariants verrouillés
+dans `tests/test_balance_sim.py`.
+
 ## Installation sur Mac (PyCharm)
 
 ```bash
